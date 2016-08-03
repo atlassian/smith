@@ -1,0 +1,14 @@
+---
+apiVersion: smith.ash2k.com/v1
+kind: ResourceTemplate
+description: "Sample resource template"
+metadata:
+  name: template1
+spec:
+  resources:
+  - kind: PostgresqlResource
+    apiVersion: smith-sql.ash2k.com/v1
+    metadata:
+      name: template1
+    spec:
+      disk: 100GiB

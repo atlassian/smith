@@ -1,0 +1,18 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: smith
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: smith
+        l1: l3
+    spec:
+      containers:
+      - name: smith
+        image: ash2k/smith:75d5bb5
+        imagePullPolicy: Always
+      terminationGracePeriodSeconds: 120

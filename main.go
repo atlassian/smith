@@ -12,7 +12,11 @@ import (
 
 const (
 	ResourceName                 = "resource.smith.ash2k.com"
+	ResourceVersion = "v1"
+	ResourceGroupVersion = ResourceName+"/"+ResourceVersion
 	ThirdPartyResourceAPIVersion = "extensions/v1beta1"
+	// TODO make it work with all namespaces
+	Namespace = "default"
 )
 
 func main() {
@@ -34,6 +38,8 @@ func realMain(ctx context.Context) error {
 		return err
 	}
 
+	c.List(ctx, ResourceGroupVersion, Namespace, )
+
 	<-ctx.Done()
 	return ctx.Err()
 }
@@ -51,7 +57,7 @@ func ensureResourceExists(ctx context.Context, c *ResourceClient) error {
 		},
 		Description: "Smith resource manager",
 		Versions: []APIVersion{
-			{Name: "v1"},
+			{Name: ResourceVersion},
 		},
 	}, res)
 	if err != nil {

@@ -55,30 +55,30 @@ func (se *StatusError) Status() Status {
 	return se.status
 }
 
-func (c *ResourceClient) List(ctx context.Context, groupVersion, namespace, resource, name string, args url.Values, request interface{}, into interface{}) error {
-	return c.Do(ctx, "GET", groupVersion, namespace, resource, name, args, http.StatusOK, request, into)
+func (c *ResourceClient) List(ctx context.Context, groupVersion, namespace, resource string, args url.Values, request interface{}, into interface{}) error {
+	return c.Do(ctx, "GET", groupVersion, namespace, resource, "", args, http.StatusOK, request, into)
 }
 
 func (c *ResourceClient) Create(ctx context.Context, groupVersion, namespace, resource string, request interface{}, response interface{}) error {
 	return c.Do(ctx, "POST", groupVersion, namespace, resource, "", nil, http.StatusCreated, request, response)
 }
 
-func (c *ResourceClient) Update(ctx context.Context, groupVersion, namespace, resource, name string, request interface{}, response interface{}) error {
-	return c.Do(ctx, "PUT", groupVersion, namespace, resource, name, nil, http.StatusOK, request, response)
+func (c *ResourceClient) Update(ctx context.Context, groupVersion, namespace, resource string, request interface{}, response interface{}) error {
+	return c.Do(ctx, "PUT", groupVersion, namespace, resource, "", nil, http.StatusOK, request, response)
 }
 
 func (c *ResourceClient) Delete(ctx context.Context, groupVersion, namespace, resource, name string, request interface{}, response interface{}) error {
 	return c.Do(ctx, "DELETE", groupVersion, namespace, resource, name, nil, http.StatusOK, request, response)
 }
 
-func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, resource, name string, rf ResultFactory, wf WatchFactory) <-chan interface{} {
+func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, resource string, rf ResultFactory, wf WatchFactory) <-chan interface{} {
 	results := make(chan interface{})
 	go func() {
 		defer close(results)
 		for {
 			request, args := wf()
 			args.Set("watch", "true")
-			err := c.DoCheckResponse(ctx, "GET", groupVersion, namespace, resource, name, args, http.StatusOK, request, func(r io.ReadCloser) error {
+			err := c.DoCheckResponse(ctx, "GET", groupVersion, namespace, resource, "", args, http.StatusOK, request, func(r io.ReadCloser) error {
 				decoder := json.NewDecoder(r)
 				for {
 					r := rf()

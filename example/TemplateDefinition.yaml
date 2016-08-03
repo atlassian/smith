@@ -1,0 +1,16 @@
+---
+apiVersion: extensions/v1beta1
+kind: ThirdPartyResource
+description: "Resource template definition"
+metadata:
+  name: resource-template.smith.ash2k.com
+versions:
+  - name: v1
+---
+apiVersion: extensions/v1beta1
+kind: ThirdPartyResource
+description: "Postgresql resource definition"
+metadata:
+  name: postgresql-resource.smith-sql.ash2k.com # must use another group due to https://github.com/kubernetes/kubernetes/issues/23831
+versions:
+  - name: v1
