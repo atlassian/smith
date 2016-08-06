@@ -77,8 +77,7 @@ func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, res
 		defer close(results)
 		for {
 			request, args := wf()
-			args.Set("watch", "true")
-			err := c.DoCheckResponse(ctx, "GET", groupVersion, namespace, resource, "", args, http.StatusOK, request, func(r io.ReadCloser) error {
+			err := c.DoCheckResponse(ctx, "GET", groupVersion, "watch", namespace, resource, "", args, http.StatusOK, request, func(r io.ReadCloser) error {
 				decoder := json.NewDecoder(r)
 				for {
 					r := rf()
@@ -111,7 +110,7 @@ func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, res
 }
 
 func (c *ResourceClient) Do(ctx context.Context, verb, groupVersion, namespace, resource, name string, args url.Values, expectedStatus int, request interface{}, response interface{}) error {
-	return c.DoCheckResponse(ctx, verb, groupVersion, namespace, resource, name, args, expectedStatus, request, func(r io.ReadCloser) error {
+	return c.DoCheckResponse(ctx, verb, groupVersion, "", namespace, resource, name, args, expectedStatus, request, func(r io.ReadCloser) error {
 		// Consume body even if "response" is nil to enable connection reuse
 		b, err := ioutil.ReadAll(io.LimitReader(r, maxResponseSize))
 		if err != nil {
@@ -125,8 +124,8 @@ func (c *ResourceClient) Do(ctx context.Context, verb, groupVersion, namespace, 
 	})
 }
 
-func (c *ResourceClient) DoCheckResponse(ctx context.Context, verb, groupVersion, namespace, resource, name string, args url.Values, expectedStatus int, request interface{}, f StreamHandler) error {
-	return c.DoRequest(ctx, verb, groupVersion, namespace, resource, name, args, request, func(resp *http.Response) error {
+func (c *ResourceClient) DoCheckResponse(ctx context.Context, verb, prefix, groupVersion, namespace, resource, name string, args url.Values, expectedStatus int, request interface{}, f StreamHandler) error {
+	return c.DoRequest(ctx, verb, prefix, groupVersion, namespace, resource, name, args, request, func(resp *http.Response) error {
 		if resp.StatusCode != expectedStatus {
 			return func() error {
 				msg := fmt.Sprintf("received bad status code %d", resp.StatusCode)
@@ -148,12 +147,12 @@ func (c *ResourceClient) DoCheckResponse(ctx context.Context, verb, groupVersion
 	})
 }
 
-func (c *ResourceClient) DoRequest(ctx context.Context, verb, groupVersion, namespace, resource, name string, args url.Values, request interface{}, f ResponseHandler) error {
+func (c *ResourceClient) DoRequest(ctx context.Context, verb, prefix, groupVersion, namespace, resource, name string, args url.Values, request interface{}, f ResponseHandler) error {
 	body, err := json.Marshal(request)
 	if err != nil {
 		return err
 	}
-	p := []string{DefaultAPIPath, groupVersion}
+	p := []string{DefaultAPIPath, groupVersion, prefix}
 	if namespace != "" {
 		p = append(p, "namespaces", namespace)
 	}

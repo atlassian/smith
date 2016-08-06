@@ -8,6 +8,16 @@ const (
 	READY       ResourceState = "Ready"
 )
 
+type TemplateList struct {
+	TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ListMeta `json:"metadata,omitempty"`
+
+	// Items is a list of templates.
+	Items []Template `json:"items"`
+}
+
 // Template describes a resources template.
 // Specification and status are separate entities as per
 // https://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#spec-and-status
