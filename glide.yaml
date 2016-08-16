@@ -1,6 +1,5 @@
 package: github.com/ash2k/smith
 import:
-- package: golang.org/x/net
 - package: github.com/stretchr/testify
   subpackages:
   - assert

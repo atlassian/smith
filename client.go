@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -16,8 +17,6 @@ import (
 	"os"
 	"path"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 const (
@@ -127,21 +126,19 @@ func (c *ResourceClient) Do(ctx context.Context, verb, groupVersion, namespace, 
 func (c *ResourceClient) DoCheckResponse(ctx context.Context, verb, prefix, groupVersion, namespace, resource, name string, args url.Values, expectedStatus int, request interface{}, f StreamHandler) error {
 	return c.DoRequest(ctx, verb, prefix, groupVersion, namespace, resource, name, args, request, func(resp *http.Response) error {
 		if resp.StatusCode != expectedStatus {
-			return func() error {
-				msg := fmt.Sprintf("received bad status code %d", resp.StatusCode)
-				b, err := ioutil.ReadAll(io.LimitReader(resp.Body, maxStatusResponseSize))
-				if err != nil {
-					return errors.New(msg)
-				}
-				se := StatusError{
-					msg: msg,
-				}
-				log.Printf("Unexpected server response: %d\n%s", resp.StatusCode, b)
-				if json.Unmarshal(b, &se.status) != nil {
-					return errors.New(msg)
-				}
-				return &se
-			}()
+			msg := fmt.Sprintf("received bad status code %d", resp.StatusCode)
+			b, err := ioutil.ReadAll(io.LimitReader(resp.Body, maxStatusResponseSize))
+			if err != nil {
+				return errors.New(msg)
+			}
+			se := StatusError{
+				msg: msg,
+			}
+			log.Printf("Unexpected server response: %d\n%s", resp.StatusCode, b)
+			if json.Unmarshal(b, &se.status) != nil {
+				return errors.New(msg)
+			}
+			return &se
 		}
 		return f(resp.Body)
 	})
@@ -157,30 +154,29 @@ func (c *ResourceClient) DoRequest(ctx context.Context, verb, prefix, groupVersi
 		p = append(p, "namespaces", namespace)
 	}
 	p = append(p, resource, name)
-	url := url.URL{
+	reqUrl := url.URL{
 		Scheme:   c.Scheme,
 		Host:     c.HostPort,
 		Path:     path.Join(p...),
 		RawQuery: args.Encode(),
 	}
-	req, err := http.NewRequest(verb, url.String(), bytes.NewReader(body))
+	req, err := http.NewRequest(verb, reqUrl.String(), bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("unable to create http.Request: %v", err)
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "smith/"+Version+"/"+GitCommit)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.BearerToken))
-	// TODO replace this with request built-in context when Go 1.7 arrives
-	ctxReq, cancelFunc := context.WithCancel(ctx) // Separate context to release goroutine when function returns
-	defer cancelFunc()
-	go func() {
-		<-ctxReq.Done()
-		close(req.Cancel)
-	}()
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return fmt.Errorf("request failed: %v", err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			return fmt.Errorf("request failed: %v", err)
+		}
 	}
 	defer resp.Body.Close()
 	return f(resp)

@@ -9,7 +9,7 @@ GOBUILD_VERSION_ARGS := -ldflags "-s -X $(VERSION_VAR)=$(REPO_VERSION) -X $(GIT_
 BINARY_NAME := smith
 IMAGE_NAME := ash2k/smith
 ARCH ?= darwin
-GOVERSION := 1.6.3
+GOVERSION := 1.7.0
 GP := /gopath
 
 setup-ci:

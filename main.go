@@ -1,19 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"golang.org/x/net/context"
 )
 
 const (
 	ResourceName                 = "resource.smith.ash2k.com"
-	ResourceVersion = "v1"
-	ResourceGroupVersion = ResourceName+"/"+ResourceVersion
+	ResourceVersion              = "v1"
+	ResourceGroupVersion         = ResourceName + "/" + ResourceVersion
 	ThirdPartyResourceAPIVersion = "extensions/v1beta1"
 	// TODO make it work with all namespaces
 	Namespace = "default"
