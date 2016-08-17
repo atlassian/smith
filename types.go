@@ -1,4 +1,4 @@
-package main
+package smith
 
 type ResourceState string
 

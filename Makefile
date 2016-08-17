@@ -11,16 +11,17 @@ IMAGE_NAME := ash2k/smith
 ARCH ?= darwin
 GOVERSION := 1.7.0
 GP := /gopath
+MAIN_PKG := github.com/ash2k/smith/cmd/smith
 
 setup-ci:
 	go get -v -u github.com/Masterminds/glide
 	glide install
 
 build: *.go fmt
-	go build -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) github.com/ash2k/smith
+	go build -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
 build-race: *.go fmt
-	go build -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) github.com/ash2k/smith
+	go build -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
 build-all:
 	go build $$(glide nv)
@@ -44,7 +45,7 @@ docker:
 		-e GOPATH="$(GP)" \
 		-e CGO_ENABLED=0 \
 		golang:$(GOVERSION) \
-		go build -o build/bin/linux/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) -a -installsuffix cgo github.com/ash2k/smith
+		go build -o build/bin/linux/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) -a -installsuffix cgo $(MAIN_PKG)
 	docker build --pull -t $(IMAGE_NAME):$(GIT_HASH) build
 
 # Compile a binary with -race. Needs to be run on a glibc-based system.
@@ -55,7 +56,7 @@ docker-race:
 		-w "$(GP)/src/github.com/ash2k/smith" \
 		-e GOPATH="$(GP)" \
 		golang:$(GOVERSION) \
-		go build -race -o build/bin/linux/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) -a -installsuffix cgo github.com/ash2k/smith
+		go build -race -o build/bin/linux/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) -a -installsuffix cgo $(MAIN_PKG)
 	docker build --pull -t $(IMAGE_NAME):$(GIT_HASH)-race -f build/Dockerfile-glibc build
 
 release-hash: docker

@@ -7,6 +7,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/ash2k/smith"
+	"github.com/ash2k/smith/pkg/client"
 )
 
 const (
@@ -29,39 +32,40 @@ func main() {
 }
 
 func realMain(ctx context.Context) error {
-	c, err := NewInCluster()
+	c, err := client.NewInCluster()
 	if err != nil {
 		return err
 	}
+	c.Agent = "smith/" + Version + "/" + GitCommit
 	if err = ensureResourceExists(ctx, c); err != nil {
 		return err
 	}
 
-	c.List(ctx, ResourceGroupVersion, Namespace, )
+	//c.List(ctx, ResourceGroupVersion, Namespace, )
 
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func ensureResourceExists(ctx context.Context, c *ResourceClient) error {
+func ensureResourceExists(ctx context.Context, c *client.ResourceClient) error {
 	log.Printf("Creating ThirdPartyResource %s", ResourceName)
-	res := &ThirdPartyResource{}
-	err := c.Create(ctx, ThirdPartyResourceAPIVersion, "", "thirdpartyresources", &ThirdPartyResource{
-		TypeMeta: TypeMeta{
+	res := &smith.ThirdPartyResource{}
+	err := c.Create(ctx, ThirdPartyResourceAPIVersion, "", "thirdpartyresources", &smith.ThirdPartyResource{
+		TypeMeta: smith.TypeMeta{
 			Kind:       "ThirdPartyResource",
 			APIVersion: ThirdPartyResourceAPIVersion,
 		},
-		ObjectMeta: ObjectMeta{
+		ObjectMeta: smith.ObjectMeta{
 			Name: ResourceName,
 		},
 		Description: "Smith resource manager",
-		Versions: []APIVersion{
+		Versions: []smith.APIVersion{
 			{Name: ResourceVersion},
 		},
 	}, res)
 	if err != nil {
 		log.Printf("%#v", err)
-		if !IsConflict(err) {
+		if !client.IsConflict(err) {
 			return fmt.Errorf("failed to create ThirdPartyResource: %v", err)
 		}
 		log.Printf("ThirdPartyResource %s already exists", ResourceName)

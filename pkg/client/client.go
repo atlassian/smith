@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"bytes"
@@ -17,6 +17,8 @@ import (
 	"os"
 	"path"
 	"time"
+
+	"github.com/ash2k/smith"
 )
 
 const (
@@ -38,19 +40,20 @@ type ResourceClient struct {
 	Scheme      string
 	HostPort    string
 	BearerToken string
+	Agent       string
 	Client      http.Client
 }
 
 type StatusError struct {
 	msg    string
-	status Status
+	status smith.Status
 }
 
 func (se *StatusError) Error() string {
 	return se.msg
 }
 
-func (se *StatusError) Status() Status {
+func (se *StatusError) Status() smith.Status {
 	return se.status
 }
 
@@ -149,7 +152,7 @@ func (c *ResourceClient) DoRequest(ctx context.Context, verb, prefix, groupVersi
 	if err != nil {
 		return err
 	}
-	p := []string{DefaultAPIPath, groupVersion, prefix}
+	p := []string{smith.DefaultAPIPath, groupVersion, prefix}
 	if namespace != "" {
 		p = append(p, "namespaces", namespace)
 	}
@@ -167,7 +170,7 @@ func (c *ResourceClient) DoRequest(ctx context.Context, verb, prefix, groupVersi
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "smith/"+Version+"/"+GitCommit)
+	req.Header.Set("User-Agent", c.Agent)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.BearerToken))
 	resp, err := c.Client.Do(req)
 	if err != nil {
@@ -187,11 +190,11 @@ func NewInCluster() (*ResourceClient, error) {
 	if len(host) == 0 || len(port) == 0 {
 		return nil, errors.New("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
 	}
-	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + ServiceAccountTokenKey)
+	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + smith.ServiceAccountTokenKey)
 	if err != nil {
 		return nil, err
 	}
-	rootCA := "/var/run/secrets/kubernetes.io/serviceaccount/" + ServiceAccountRootCAKey
+	rootCA := "/var/run/secrets/kubernetes.io/serviceaccount/" + smith.ServiceAccountRootCAKey
 	CAData, err := ioutil.ReadFile(rootCA)
 	if err != nil {
 		return nil, err
