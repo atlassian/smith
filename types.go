@@ -8,6 +8,16 @@ const (
 	READY       ResourceState = "Ready"
 )
 
+const (
+	SmithDomain                  = "smith.ash2k.com"
+	TemplateResourceName         = "template." + SmithDomain
+	TemplateResourceVersion      = "v1"
+	TemplateResourceGroupVersion = TemplateResourceName + "/" + TemplateResourceVersion
+	ThirdPartyResourceAPIVersion = "extensions/v1beta1"
+	// TODO make it work with all namespaces
+	Namespace = "default"
+)
+
 type TemplateList struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
