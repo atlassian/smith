@@ -15,7 +15,10 @@ func main() {
 	defer cancelFunc()
 	cancelOnInterrupt(ctx, cancelFunc)
 
-	a := app.App{}
+	a := app.App{
+		Version: Version,
+		GitCommit: GitCommit,
+	}
 
 	if err := a.Run(ctx); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 		log.Fatalln(err)
