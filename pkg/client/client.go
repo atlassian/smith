@@ -28,7 +28,7 @@ const (
 	maxStatusResponseSize = 10 * 1024
 )
 
-type StreamHandler func(io.ReadCloser) error
+type StreamHandler func(io.Reader) error
 
 type ResponseHandler func(*http.Response) error
 
@@ -79,7 +79,7 @@ func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, res
 		defer close(results)
 		for {
 			request, args := wf()
-			err := c.DoCheckResponse(ctx, "GET", groupVersion, "watch", namespace, resource, "", args, http.StatusOK, request, func(r io.ReadCloser) error {
+			err := c.DoCheckResponse(ctx, "GET", groupVersion, "watch", namespace, resource, "", args, http.StatusOK, request, func(r io.Reader) error {
 				decoder := json.NewDecoder(r)
 				for {
 					res := rf()
@@ -112,7 +112,7 @@ func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, res
 }
 
 func (c *ResourceClient) Do(ctx context.Context, verb, groupVersion, namespace, resource, name string, args url.Values, expectedStatus int, request interface{}, response interface{}) error {
-	return c.DoCheckResponse(ctx, verb, groupVersion, "", namespace, resource, name, args, expectedStatus, request, func(r io.ReadCloser) error {
+	return c.DoCheckResponse(ctx, verb, groupVersion, "", namespace, resource, name, args, expectedStatus, request, func(r io.Reader) error {
 		// Consume body even if "response" is nil to enable connection reuse
 		b, err := ioutil.ReadAll(io.LimitReader(r, maxResponseSize))
 		if err != nil {
@@ -177,7 +177,7 @@ func (c *ResourceClient) DoRequest(ctx context.Context, verb, prefix, groupVersi
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.Agent)
-	req.Header.Set("Authorization", "Bearer " + c.BearerToken)
+	req.Header.Set("Authorization", "Bearer "+c.BearerToken)
 	resp, err := c.Client.Do(req)
 	if err != nil {
 		select {
