@@ -1,6 +1,8 @@
-hash: 567ca8eb2f503ac2ff717ce040767d9fb2a83b765822f265b850e8f5f3b4b0d7
-updated: 2016-08-16T23:11:22.026937377+01:00
+hash: 1386a21beb53081ef119cfa021e4a648ec5e153a09073160b417b7ef0937a2c4
+updated: 2016-08-23T23:23:28.515146037+05:00
 imports:
+- name: github.com/cenk/backoff
+  version: cdf48bbc1eb78d1349cbda326a4a037f7ba565c6
 - name: github.com/stretchr/testify
   version: d77da356e56a7428ad25149ca77381849a6a5232
   subpackages:

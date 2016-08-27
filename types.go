@@ -1,5 +1,10 @@
 package smith
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 type ResourceState string
 
 const (
@@ -14,8 +19,8 @@ const (
 	TemplateResourceVersion      = "v1"
 	TemplateResourceGroupVersion = TemplateResourceName + "/" + TemplateResourceVersion
 	ThirdPartyResourceAPIVersion = "extensions/v1beta1"
-	// TODO make it work with all namespaces
-	Namespace = "default"
+	AllNamespaces                = ""
+	AllResources                 = ""
 )
 
 type TemplateList struct {
@@ -79,8 +84,8 @@ type ResourceOutput struct {
 
 type ResourceSpec map[string]interface{}
 
-// GenericEvent represents a single event to a watched resource.
-type GenericEvent struct {
+// WatchEvent represents a single event to a watched resource.
+type WatchEvent struct {
 	Type EventType `json:"type"`
 
 	// Object is:
@@ -88,5 +93,42 @@ type GenericEvent struct {
 	//  * If Type is Deleted: the state of the object immediately before deletion.
 	//  * If Type is Error: *api.Status is recommended; other types may make sense
 	//    depending on context.
-	//Object Object
+	Object interface{} `json:"object"`
+}
+
+// WatchEventHeader objects are streamed from the api server in response to a watch request.
+type WatchEventHeader struct {
+	// The type of the watch event; added, modified, deleted, or error.
+	Type EventType `json:"type,omitempty" description:"the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"`
+}
+
+type TemplateWatchEvent WatchEvent
+
+func (twe *TemplateWatchEvent) UnmarshalJSON(data []byte) error {
+	var weh WatchEventHeader
+	if err := json.Unmarshal(data, &weh); err != nil {
+		return err
+	}
+	twe.Type = weh.Type
+	switch weh.Type {
+	case Added, Modified, Deleted:
+		var holder struct {
+			Object Template `json:"object"`
+		}
+		if err := json.Unmarshal(data, &holder); err != nil {
+			return err
+		}
+		twe.Object = &holder.Object
+	case Error:
+		var holder struct {
+			Object Status `json:"object"`
+		}
+		if err := json.Unmarshal(data, &holder); err != nil {
+			return err
+		}
+		twe.Object = &holder.Object
+	default:
+		return fmt.Errorf("unexpected event type: %s", weh.Type)
+	}
+	return nil
 }

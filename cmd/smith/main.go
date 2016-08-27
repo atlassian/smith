@@ -16,7 +16,7 @@ func main() {
 	cancelOnInterrupt(ctx, cancelFunc)
 
 	a := app.App{
-		Version: Version,
+		Version:   Version,
 		GitCommit: GitCommit,
 	}
 

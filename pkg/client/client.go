@@ -32,8 +32,12 @@ type StreamHandler func(io.Reader) error
 
 type ResponseHandler func(*http.Response) error
 
+// ResultFactory creates new instances of an object, that is used as JSON deserialization target.
+// Must be safe for concurrent use.
 type ResultFactory func() interface{}
 
+// WatchFactory creates new instances of HTTP request payload and HTTP URL params.
+// Must be safe for concurrent use.
 type WatchFactory func() (request interface{}, args url.Values)
 
 type ResourceClient struct {
