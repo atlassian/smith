@@ -148,9 +148,13 @@ func (c *ResourceClient) DoCheckResponse(ctx context.Context, verb, prefix, grou
 }
 
 func (c *ResourceClient) DoRequest(ctx context.Context, verb, prefix, groupVersion, namespace, resource, name string, args url.Values, request interface{}, f ResponseHandler) error {
-	body, err := json.Marshal(request)
-	if err != nil {
-		return err
+	var body []byte
+	if request != nil {
+		var err error
+		body, err = json.Marshal(request)
+		if err != nil {
+			return err
+		}
 	}
 	p := []string{smith.DefaultAPIPath, groupVersion, prefix}
 	if namespace != "" {
@@ -168,10 +172,12 @@ func (c *ResourceClient) DoRequest(ctx context.Context, verb, prefix, groupVersi
 		return fmt.Errorf("unable to create http.Request: %v", err)
 	}
 	req = req.WithContext(ctx)
-	req.Header.Set("Content-Type", "application/json")
+	if request != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.Agent)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.BearerToken))
+	req.Header.Set("Authorization", "Bearer " + c.BearerToken)
 	resp, err := c.Client.Do(req)
 	if err != nil {
 		select {
