@@ -82,14 +82,14 @@ func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, res
 			err := c.DoCheckResponse(ctx, "GET", groupVersion, "watch", namespace, resource, "", args, http.StatusOK, request, func(r io.ReadCloser) error {
 				decoder := json.NewDecoder(r)
 				for {
-					r := rf()
-					if err := decoder.Decode(r); err != nil {
+					res := rf()
+					if err := decoder.Decode(res); err != nil {
 						return err
 					}
 					select {
 					case <-ctx.Done():
 						return ctx.Err()
-					case results <- r:
+					case results <- res:
 					}
 				}
 			})
