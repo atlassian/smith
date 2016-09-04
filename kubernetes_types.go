@@ -435,6 +435,17 @@ type ThirdPartyResource struct {
 	Versions []APIVersion `json:"versions,omitempty"`
 }
 
+// ThirdPartyResourceList is a list of ThirdPartyResources.
+type ThirdPartyResourceList struct {
+	TypeMeta `json:",inline"`
+
+	// Standard list metadata.
+	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of ThirdPartyResources.
+	Items []ThirdPartyResource `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
 // EventType defines the possible types of events.
 type EventType string
 

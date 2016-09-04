@@ -8,15 +8,20 @@ import (
 )
 
 type templateState struct {
-	template     smith.Template
+	template     *smith.Template
 	needsRebuild bool
+}
+
+type templateRef struct {
+	namespace string
+	name      string
 }
 
 type templateProcessor struct {
 	client *client.ResourceClient
 	// protects fields below
 	lock      sync.Mutex
-	templates map[string]*templateState
+	templates map[templateRef]*templateState
 }
 
 // New creates a new template processor.
@@ -24,56 +29,73 @@ type templateProcessor struct {
 func New(client *client.ResourceClient) *templateProcessor {
 	return &templateProcessor{
 		client:    client,
-		templates: make(map[string]*templateState),
+		templates: make(map[templateRef]*templateState),
 	}
 }
 
-func (tp *templateProcessor) Rebuild(tpl *smith.Template) {
+func (tp *templateProcessor) Rebuild(tpl smith.Template) { // make a copy
+	tp.rebuildInternal(tpl.Namespace, tpl.Name, &tpl)
+}
+
+func (tp *templateProcessor) RebuildByName(namespace, name string) {
+	tp.rebuildInternal(namespace, name, nil)
+}
+
+func (tp *templateProcessor) rebuildInternal(namespace, name string, tpl *smith.Template) {
+	ref := templateRef{namespace: namespace, name: name}
 	tp.lock.Lock()
 	defer tp.lock.Unlock()
-	state := tp.templates[tpl.Name]
+	state := tp.templates[ref]
 	if state == nil {
 		state = &templateState{
-			template:     *tpl,
+			template:     tpl,
 			needsRebuild: true,
 		}
-		tp.templates[tpl.Name] = state
-		go tp.rebuild(tpl.Name)
+		tp.templates[ref] = state
+		go tp.rebuild(namespace, name)
 	} else {
-		state.template = *tpl
+		state.template = tpl
 		state.needsRebuild = true
 	}
 }
 
-func (tp *templateProcessor) rebuild(name string) {
+func (tp *templateProcessor) rebuild(namespace, name string) {
+	ref := templateRef{namespace: namespace, name: name}
 	for {
-		var tpl smith.Template
+		var tpl *smith.Template
 		needsRebuild := func() bool {
 			tp.lock.Lock()
 			defer tp.lock.Unlock()
-			state := tp.templates[name]
+			state := tp.templates[ref]
 			if state.needsRebuild {
 				tpl = state.template
 				state.needsRebuild = false
 				return true
 			}
-			delete(tp.templates, name)
+			delete(tp.templates, ref)
 			return false
 		}()
 		if !needsRebuild {
 			break
 		}
+		if tpl == nil {
+			// TODO fetch template
+		}
 		// TODO parse template, build resource graph, traverse graph, assert each resource exists.
-		// For each resource await its dependencies to reach READY state before creating it.
+		// For each resource ensure its dependencies (if any) are it READY state before creating it.
+		// If at least one dependency is not READY, exit loop. Rebuild will/should be called once the dependency
+		// updates it's state (noticed via watching).
 
 		// ....
 
-		// Make sure resource does not need to be rebuilt before exiting goroutine by doing one more loop
+		// Make sure template does not need to be rebuilt before exiting goroutine by doing one more loop
 	}
 }
 
-func (tp *templateProcessor) needsRebuild(name string) bool {
+// needsRebuild can be called inside of the rebuild loop to check if the template needs to be rebuilt from the start.
+func (tp *templateProcessor) needsRebuild(namespace, name string) bool {
+	ref := templateRef{namespace: namespace, name: name}
 	tp.lock.Lock()
 	defer tp.lock.Unlock()
-	return tp.templates[name].needsRebuild
+	return tp.templates[ref].needsRebuild
 }

@@ -23,7 +23,7 @@ import (
 
 const (
 	// maxResponseSize is the maximum response size we are willing to read.
-	maxResponseSize = 10 * 1024 * 1024
+	maxResponseSize = 1 * 1024 * 1024
 	// maxStatusResponseSize is the maximum status response size we are willing to read.
 	maxStatusResponseSize = 10 * 1024
 )
@@ -35,10 +35,6 @@ type ResponseHandler func(*http.Response) error
 // ResultFactory creates new instances of an object, that is used as JSON deserialization target.
 // Must be safe for concurrent use.
 type ResultFactory func() interface{}
-
-// WatchFactory creates new instances of HTTP request payload and HTTP URL params.
-// Must be safe for concurrent use.
-type WatchFactory func() (request interface{}, args url.Values)
 
 type ResourceClient struct {
 	Scheme      string
@@ -77,12 +73,21 @@ func (c *ResourceClient) Delete(ctx context.Context, groupVersion, namespace, re
 	return c.Do(ctx, "DELETE", groupVersion, namespace, resource, name, nil, http.StatusOK, request, response)
 }
 
-func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, resource string, rf ResultFactory, wf WatchFactory) <-chan interface{} {
+func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, resource string, request interface{}, args url.Values, rf ResultFactory) <-chan interface{} {
+	type hasResourceVersion interface {
+		ResourceVersion() string
+	}
+
 	results := make(chan interface{})
+	if args == nil {
+		args = url.Values{}
+	} else {
+		// TODO clone args
+	}
 	go func() {
 		defer close(results)
 		for {
-			request, args := wf()
+			var rv string
 			err := c.DoCheckResponse(ctx, "GET", groupVersion, "watch", namespace, resource, "", args, http.StatusOK, request, func(r io.Reader) error {
 				decoder := json.NewDecoder(r)
 				for {
@@ -95,10 +100,13 @@ func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, res
 						return ctx.Err()
 					case results <- res:
 					}
+					if rvResource, ok := res.(hasResourceVersion); ok {
+						rv = rvResource.ResourceVersion()
+					}
 				}
 			})
 			if err != nil {
-				results <- err
+				//results <- err
 				if err == context.Canceled || err == context.DeadlineExceeded {
 					return
 				}
@@ -106,9 +114,17 @@ func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, res
 			// Delay after failed/closed connection
 			select {
 			case <-ctx.Done():
-				results <- ctx.Err()
+				//results <- ctx.Err()
 				return
 			case <-time.After(1 * time.Second):
+			}
+			if rv == "" {
+				// It should never happen but just in case - the watch will restart from the
+				// current "event horison" rather than from the original resource version which may no
+				// longer be available.
+				args.Del("resourceVersion")
+			} else {
+				args.Set("resourceVersion", rv)
 			}
 		}
 	}()
