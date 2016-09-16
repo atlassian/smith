@@ -213,6 +213,8 @@ func splitTprName(name string) (string, string) {
 		resourcePath += "es"
 	case "y":
 		resourcePath = resourcePath[:len(resourcePath)-1] + "ies"
+	default:
+		resourcePath += "s"
 	}
 	return resourcePath, name[pos+1:]
 }
