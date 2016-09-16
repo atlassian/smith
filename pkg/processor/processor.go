@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"context"
 	"sync"
 
 	"github.com/ash2k/smith"
@@ -18,7 +19,9 @@ type templateRef struct {
 }
 
 type templateProcessor struct {
+	ctx    context.Context
 	client *client.ResourceClient
+	wg     sync.WaitGroup // tracks number of running rebuild Goroutines
 	// protects fields below
 	lock      sync.RWMutex
 	templates map[templateRef]*templateState
@@ -26,11 +29,16 @@ type templateProcessor struct {
 
 // New creates a new template processor.
 // Instances are safe for concurrent use.
-func New(client *client.ResourceClient) *templateProcessor {
+func New(ctx context.Context, client *client.ResourceClient) *templateProcessor {
 	return &templateProcessor{
+		ctx:       ctx,
 		client:    client,
 		templates: make(map[templateRef]*templateState),
 	}
+}
+
+func (tp *templateProcessor) Join() {
+	tp.wg.Wait()
 }
 
 func (tp *templateProcessor) Rebuild(tpl smith.Template) { // make a copy
@@ -52,6 +60,7 @@ func (tp *templateProcessor) rebuildInternal(namespace, name string, tpl *smith.
 			needsRebuild: true,
 		}
 		tp.templates[ref] = state
+		tp.wg.Add(1)
 		go tp.rebuild(namespace, name)
 	} else {
 		state.template = tpl
@@ -60,6 +69,7 @@ func (tp *templateProcessor) rebuildInternal(namespace, name string, tpl *smith.
 }
 
 func (tp *templateProcessor) rebuild(namespace, name string) {
+	defer tp.wg.Done()
 	ref := templateRef{namespace: namespace, name: name}
 	for {
 		var tpl *smith.Template

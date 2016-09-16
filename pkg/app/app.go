@@ -17,11 +17,24 @@ type App struct {
 }
 
 func (a *App) Run(ctx context.Context) error {
+	// 0. Create auxiliary objects
 	c, err := client.NewInCluster()
 	if err != nil {
 		return err
 	}
 	c.Agent = "smith/" + a.Version + "/" + a.GitCommit
+
+	allEvents := make(chan interface{})
+	subCtx, subCancel := context.WithCancel(ctx)
+	defer subCancel()
+
+	watcher := NewWatcher(subCtx, c, allEvents)
+	defer watcher.Join() // await termination
+	defer subCancel()    // cancel ctx to signal done to watcher. If anything blow panics, this will be called
+
+	tp := processor.New(subCtx, c)
+	defer tp.Join()   // await termination
+	defer subCancel() // cancel ctx to signal done to processor (and everything else)
 
 	// 1. Ensure ThirdPartyResource TEMPLATE exists
 	err = retryUntilSuccessOrDone(ctx, func() error {
@@ -50,13 +63,6 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	allEvents := make(chan interface{})
-	watcherCtx, watcherCancel := context.WithCancel(ctx)
-	defer watcherCancel() // if NewWatcher panics, we still want to release context
-	watcher := NewWatcher(watcherCtx, c, allEvents)
-	defer watcher.Join()  // await termination
-	defer watcherCancel() // cancel ctx to signal done to watcher
-
 	for _, tpr := range tprList.Items {
 		watchTpr(watcher, &tpr)
 	}
@@ -79,7 +85,6 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 6. Start rebuilds for existing templates to re-assert their state
-	tp := processor.New(c)
 	for _, template := range templateList.Items {
 		tp.Rebuild(template)
 	}
