@@ -20,7 +20,7 @@ type templateRef struct {
 type templateProcessor struct {
 	client *client.ResourceClient
 	// protects fields below
-	lock      sync.Mutex
+	lock      sync.RWMutex
 	templates map[templateRef]*templateState
 }
 
@@ -101,7 +101,7 @@ func (tp *templateProcessor) rebuild(namespace, name string) {
 // needsRebuild can be called inside of the rebuild loop to check if the template needs to be rebuilt from the start.
 func (tp *templateProcessor) needsRebuild(namespace, name string) bool {
 	ref := templateRef{namespace: namespace, name: name}
-	tp.lock.Lock()
-	defer tp.lock.Unlock()
+	tp.lock.RLock()
+	defer tp.lock.RUnlock()
 	return tp.templates[ref].needsRebuild
 }
