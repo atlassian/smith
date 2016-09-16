@@ -80,6 +80,12 @@ func (tp *templateProcessor) rebuild(namespace, name string) {
 		}
 		if tpl == nil {
 			// TODO fetch template
+			func() {
+				// Store fetched template for future reference
+				tp.lock.Lock()
+				defer tp.lock.Unlock()
+				tp.templates[ref].template = tpl
+			}()
 		}
 		// TODO parse template, build resource graph, traverse graph, assert each resource exists.
 		// For each resource ensure its dependencies (if any) are it READY state before creating it.
