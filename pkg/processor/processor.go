@@ -98,9 +98,13 @@ func (tp *templateProcessor) rebuild(namespace, name string) {
 			}()
 		}
 		// TODO parse template, build resource graph, traverse graph, assert each resource exists.
-		// For each resource ensure its dependencies (if any) are it READY state before creating it.
+		// For each resource ensure its dependencies (if any) are in READY state before creating it.
 		// If at least one dependency is not READY, exit loop. Rebuild will/should be called once the dependency
 		// updates it's state (noticed via watching).
+
+		// READY state might mean something different for each resource type. For ThirdPartyResources it may mean
+		// that a field "State" in the Status of the resource is set to "Ready". It may be customizable via
+		// annotations with some defaults.
 
 		// ....
 
