@@ -19,7 +19,8 @@ Template itself is defined as a Kubernetes TPR.
 Smith watches for new instances of Template (and events to existing ones), picks them up and processes them.
 
 Processing is parsing the template, building a dependency graph implicitly defined in the template
-and walking the graph, creating/updating necessary resources.
+and walking the graph, creating/updating necessary resources. Each created/referenced resource gets
+an annotation/label pointing at the Template.
 
 ### Outputs
 Some resource types can have Outputs - some values that are produced by creation of the resource in/by a
@@ -33,14 +34,14 @@ via references to other resources' outputs. Resources should be created in the r
 
 ### States
 READY is a state of a Resource indicating that the resource can be considered created. E.g. if it is
-a DB that it mean it was provisioned and set up as requested. State is part of
+a DB then it means it was provisioned and set up as requested. State is part of
 [Status](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/api-conventions.md#spec-and-status).
 
 ### Event-driven and stateless
 Smith does not block, waiting for a resource to reach the READY state. Instead, when walking the dependency
 graph, when a resource is created/updated (if not in the READY state already) it stops processing the
 template. Full template re-processing is triggered by events about the watched resources. Smith is
-watching all supported resource types and inspects annotations on events to find out which
+watching all supported resource types and inspects annotations/labels on events to find out which
 template should be re-processed because of this event. This should scale better than watching
 individual resources and much better than polling individual resources.
 
