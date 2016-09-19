@@ -12,33 +12,16 @@ import (
 )
 
 type App struct {
-	Version   string
-	GitCommit string
+	Watcher   *Watcher
+	Client    *client.ResourceClient
+	Processor *processor.TemplateProcessor
+	Events    <-chan interface{}
 }
 
 func (a *App) Run(ctx context.Context) error {
-	// 0. Create auxiliary objects
-	c, err := client.NewInCluster()
-	if err != nil {
-		return err
-	}
-	c.Agent = "smith/" + a.Version + "/" + a.GitCommit
-
-	allEvents := make(chan interface{})
-	subCtx, subCancel := context.WithCancel(ctx)
-	defer subCancel()
-
-	watcher := NewWatcher(subCtx, c, allEvents)
-	defer watcher.Join() // await termination
-	defer subCancel()    // cancel ctx to signal done to watcher. If anything blow panics, this will be called
-
-	tp := processor.New(subCtx, c)
-	defer tp.Join()   // await termination
-	defer subCancel() // cancel ctx to signal done to processor (and everything else)
-
 	// 1. Ensure ThirdPartyResource TEMPLATE exists
-	err = retryUntilSuccessOrDone(ctx, func() error {
-		return ensureResourceExists(ctx, c)
+	err := retryUntilSuccessOrDone(ctx, func() error {
+		return ensureResourceExists(ctx, a.Client)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to create resource %s: %v", smith.TemplateResourceName, e)
@@ -54,7 +37,7 @@ func (a *App) Run(ctx context.Context) error {
 	var tprList smith.ThirdPartyResourceList
 	err = retryUntilSuccessOrDone(ctx, func() error {
 		tprList = smith.ThirdPartyResourceList{}
-		return c.List(ctx, smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.AllResources, nil, nil, &tprList)
+		return a.Client.List(ctx, smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.AllResources, nil, nil, &tprList)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to list Third Party Resources %s: %v", smith.TemplateResourceName, e)
@@ -64,17 +47,17 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 	for _, tpr := range tprList.Items {
-		watchTpr(watcher, &tpr)
+		a.watchTpr(&tpr)
 	}
 
 	// 4. Watch for addition/removal of TPRs to start/stop watches
-	watcher.Watch(smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.AllResources, tprList.ResourceVersion, newTprEvent)
+	a.Watcher.Watch(smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.AllResources, tprList.ResourceVersion, newTprEvent)
 
 	// 5. List existing templates
 	var templateList smith.TemplateList
 	err = retryUntilSuccessOrDone(ctx, func() error {
 		templateList = smith.TemplateList{}
-		return c.List(ctx, smith.TemplateResourceGroupVersion, smith.AllNamespaces, smith.TemplateResourcePath, nil, nil, &templateList)
+		return a.Client.List(ctx, smith.TemplateResourceGroupVersion, smith.AllNamespaces, smith.TemplateResourcePath, nil, nil, &templateList)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to list resources %s: %v", smith.TemplateResourceName, e)
@@ -86,25 +69,25 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 6. Start rebuilds for existing templates to re-assert their state
 	for _, template := range templateList.Items {
-		tp.Rebuild(template)
+		a.Processor.Rebuild(template)
 	}
 
 	// 7. Watch for template-related events
-	watcher.Watch(smith.TemplateResourceGroupVersion, smith.AllNamespaces, smith.TemplateResourcePath, templateList.ResourceVersion, newTemplateEvent)
+	a.Watcher.Watch(smith.TemplateResourceGroupVersion, smith.AllNamespaces, smith.TemplateResourcePath, templateList.ResourceVersion, newTemplateEvent)
 
 	// 8. Process events and trigger rebuilds as necessary
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case event := <-allEvents:
+		case event := <-a.Events:
 			switch ev := event.(type) {
 			case error:
 				log.Printf("Something went wrong with watch: %v", ev)
 			case *smith.TemplateWatchEvent:
 				switch ev.Type {
 				case smith.Added, smith.Modified:
-					tp.Rebuild(*ev.Object)
+					a.Processor.Rebuild(*ev.Object)
 				case smith.Deleted:
 				// TODO Somehow use finalizers to prevent direct deletion?
 				// "No direct deletion" convention? Use ObjectMeta.DeletionTimestamp like Namespace does?
@@ -119,7 +102,7 @@ func (a *App) Run(ctx context.Context) error {
 				case smith.Added, smith.Modified, smith.Deleted:
 					templateName := ev.Object.Labels[smith.TemplateNameLabel]
 					if templateName != "" {
-						tp.RebuildByName(ev.Object.Namespace, templateName)
+						a.Processor.RebuildByName(ev.Object.Namespace, templateName)
 					}
 				case smith.Error:
 					// TODO what to do with it?
@@ -128,14 +111,14 @@ func (a *App) Run(ctx context.Context) error {
 			case *smith.TprWatchEvent:
 				switch ev.Type {
 				case smith.Added:
-					watchTpr(watcher, ev.Object)
+					a.watchTpr(ev.Object)
 				// TODO rebuild all templates containing resources of this type
 				case smith.Modified:
-					forgetTpr(watcher, ev.Object)
-					watchTpr(watcher, ev.Object)
+					a.forgetTpr(ev.Object)
+					a.watchTpr(ev.Object)
 				// TODO rebuild all templates containing resources of this type
 				case smith.Deleted:
-					forgetTpr(watcher, ev.Object)
+					a.forgetTpr(ev.Object)
 					// TODO rebuild all templates containing resources of this type
 				case smith.Error:
 					// TODO what to do with it?
@@ -188,18 +171,18 @@ func ensureResourceExists(ctx context.Context, c *client.ResourceClient) error {
 	return nil
 }
 
-func watchTpr(watcher *Watcher, tpr *smith.ThirdPartyResource) {
+func (a *App) watchTpr(tpr *smith.ThirdPartyResource) {
 	// TODO only watch supported TPRs (inspect annotations?)
 	path, group := splitTprName(tpr.Name)
 	for _, version := range tpr.Versions {
-		watcher.Watch(group+"/"+version.Name, smith.AllNamespaces, path, "", newTprInstanceEvent)
+		a.Watcher.Watch(group+"/"+version.Name, smith.AllNamespaces, path, "", newTprInstanceEvent)
 	}
 }
 
-func forgetTpr(watcher *Watcher, tpr *smith.ThirdPartyResource) {
+func (a *App) forgetTpr(tpr *smith.ThirdPartyResource) {
 	path, group := splitTprName(tpr.Name)
 	for _, version := range tpr.Versions {
-		watcher.Forget(group+"/"+version.Name, smith.AllNamespaces, path)
+		a.Watcher.Forget(group+"/"+version.Name, smith.AllNamespaces, path)
 	}
 }
 

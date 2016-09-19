@@ -18,7 +18,7 @@ type templateRef struct {
 	name      string
 }
 
-type templateProcessor struct {
+type TemplateProcessor struct {
 	ctx    context.Context
 	client *client.ResourceClient
 	wg     sync.WaitGroup // tracks number of running rebuild Goroutines
@@ -29,27 +29,27 @@ type templateProcessor struct {
 
 // New creates a new template processor.
 // Instances are safe for concurrent use.
-func New(ctx context.Context, client *client.ResourceClient) *templateProcessor {
-	return &templateProcessor{
+func New(ctx context.Context, client *client.ResourceClient) *TemplateProcessor {
+	return &TemplateProcessor{
 		ctx:       ctx,
 		client:    client,
 		templates: make(map[templateRef]*templateState),
 	}
 }
 
-func (tp *templateProcessor) Join() {
+func (tp *TemplateProcessor) Join() {
 	tp.wg.Wait()
 }
 
-func (tp *templateProcessor) Rebuild(tpl smith.Template) { // make a copy
+func (tp *TemplateProcessor) Rebuild(tpl smith.Template) { // make a copy
 	tp.rebuildInternal(tpl.Namespace, tpl.Name, &tpl)
 }
 
-func (tp *templateProcessor) RebuildByName(namespace, name string) {
+func (tp *TemplateProcessor) RebuildByName(namespace, name string) {
 	tp.rebuildInternal(namespace, name, nil)
 }
 
-func (tp *templateProcessor) rebuildInternal(namespace, name string, tpl *smith.Template) {
+func (tp *TemplateProcessor) rebuildInternal(namespace, name string, tpl *smith.Template) {
 	ref := templateRef{namespace: namespace, name: name}
 	tp.lock.Lock()
 	defer tp.lock.Unlock()
@@ -68,7 +68,7 @@ func (tp *templateProcessor) rebuildInternal(namespace, name string, tpl *smith.
 	}
 }
 
-func (tp *templateProcessor) rebuild(namespace, name string) {
+func (tp *TemplateProcessor) rebuild(namespace, name string) {
 	defer tp.wg.Done()
 	ref := templateRef{namespace: namespace, name: name}
 	for {
@@ -113,7 +113,7 @@ func (tp *templateProcessor) rebuild(namespace, name string) {
 }
 
 // needsRebuild can be called inside of the rebuild loop to check if the template needs to be rebuilt from the start.
-func (tp *templateProcessor) needsRebuild(namespace, name string) bool {
+func (tp *TemplateProcessor) needsRebuild(namespace, name string) bool {
 	ref := templateRef{namespace: namespace, name: name}
 	tp.lock.RLock()
 	defer tp.lock.RUnlock()
