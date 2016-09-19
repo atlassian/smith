@@ -1,6 +1,7 @@
 # What it is
 
 **Smith** is a Kubernetes workflow engine / resource manager **prototype**. It's not complete yet, under development.
+It may or may not fulfil https://github.com/kubernetes/kubernetes/issues/1704.
 
 ## The idea
 
@@ -42,3 +43,15 @@ template. Full template re-processing is triggered by events about the watched r
 watching all supported resource types and inspects annotations on events to find out which
 template should be re-processed because of this event. This should scale better than watching
 individual resources and much better than polling individual resources.
+
+## Notes
+
+### On [App Controller](https://github.com/Mirantis/k8s-AppController)
+Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes/issues/29453) is a very similar thing with a few differences.
+
+1. Presumably it works :)
+2. Graph of dependencies is defined explicitly. IMHO this is not the best user experience.
+3. It uses polling and blocks while waiting for the resource to become READY.
+4. The goal of Smith is to manage instances of TPRs. App Controller cannot manage them yet.
+
+It is not better or worse, just different set of design choices.
