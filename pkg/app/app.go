@@ -81,53 +81,57 @@ func (a *App) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case event := <-a.Events:
-			switch ev := event.(type) {
-			case error:
-				log.Printf("Something went wrong with watch: %v", ev)
-			case *smith.TemplateWatchEvent:
-				switch ev.Type {
-				case smith.Added, smith.Modified:
-					a.Processor.Rebuild(*ev.Object)
-				case smith.Deleted:
-				// TODO Somehow use finalizers to prevent direct deletion?
-				// "No direct deletion" convention? Use ObjectMeta.DeletionTimestamp like Namespace does?
-				// Somehow implement GC to do cleanup after template is deleted?
-				// Maybe store template in annotation on each resource to help reconstruct the dependency graph for GC?
-				case smith.Error:
-					// TODO what to do with it?
-					log.Printf("Watch returned an Error event: %#v", ev)
-				}
-			case *smith.TprInstanceWatchEvent:
-				switch ev.Type {
-				case smith.Added, smith.Modified, smith.Deleted:
-					templateName := ev.Object.Labels[smith.TemplateNameLabel]
-					if templateName != "" {
-						a.Processor.RebuildByName(ev.Object.Namespace, templateName)
-					}
-				case smith.Error:
-					// TODO what to do with it?
-					log.Printf("Watch returned an Error event: %#v", ev)
-				}
-			case *smith.TprWatchEvent:
-				switch ev.Type {
-				case smith.Added:
-					a.watchTpr(ev.Object)
-				// TODO rebuild all templates containing resources of this type
-				case smith.Modified:
-					a.forgetTpr(ev.Object)
-					a.watchTpr(ev.Object)
-				// TODO rebuild all templates containing resources of this type
-				case smith.Deleted:
-					a.forgetTpr(ev.Object)
-					// TODO rebuild all templates containing resources of this type
-				case smith.Error:
-					// TODO what to do with it?
-					log.Printf("Watch returned an Error event: %#v", ev)
-				}
-			default:
-				log.Printf("Unexpected event type: %T", event)
-			}
+			a.handleEvent(event)
 		}
+	}
+}
+
+func (a *App) handleEvent(event interface{}) {
+	switch ev := event.(type) {
+	case error:
+		log.Printf("Something went wrong with watch: %v", ev)
+	case *smith.TemplateWatchEvent:
+		switch ev.Type {
+		case smith.Added, smith.Modified:
+			a.Processor.Rebuild(*ev.Object)
+		case smith.Deleted:
+		// TODO Somehow use finalizers to prevent direct deletion?
+		// "No direct deletion" convention? Use ObjectMeta.DeletionTimestamp like Namespace does?
+		// Somehow implement GC to do cleanup after template is deleted?
+		// Maybe store template in annotation on each resource to help reconstruct the dependency graph for GC?
+		case smith.Error:
+			// TODO what to do with it?
+			log.Printf("Watch returned an Error event: %#v", ev)
+		}
+	case *smith.TprInstanceWatchEvent:
+		switch ev.Type {
+		case smith.Added, smith.Modified, smith.Deleted:
+			templateName := ev.Object.Labels[smith.TemplateNameLabel]
+			if templateName != "" {
+				a.Processor.RebuildByName(ev.Object.Namespace, templateName)
+			}
+		case smith.Error:
+			// TODO what to do with it?
+			log.Printf("Watch returned an Error event: %#v", ev)
+		}
+	case *smith.TprWatchEvent:
+		switch ev.Type {
+		case smith.Added:
+			a.watchTpr(ev.Object)
+		// TODO rebuild all templates containing resources of this type
+		case smith.Modified:
+			a.forgetTpr(ev.Object)
+			a.watchTpr(ev.Object)
+		// TODO rebuild all templates containing resources of this type
+		case smith.Deleted:
+			a.forgetTpr(ev.Object)
+		// TODO rebuild all templates containing resources of this type
+		case smith.Error:
+			// TODO what to do with it?
+			log.Printf("Watch returned an Error event: %#v", ev)
+		}
+	default:
+		log.Printf("Unexpected event type: %T", event)
 	}
 }
 
