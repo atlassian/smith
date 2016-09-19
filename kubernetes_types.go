@@ -284,18 +284,18 @@ type Time struct {
 // is no namespace field.
 type OwnerReference struct {
 	// API version of the referent.
-	APIVersion string `json:"apiVersion"`
+	APIVersion string `json:"apiVersion" protobuf:"bytes,5,opt,name=apiVersion"`
 	// Kind of the referent.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	Kind string `json:"kind"`
+	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// Name of the referent.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
-	Name string `json:"name"`
+	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// UID of the referent.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
-	UID UID `json:"uid"`
+	UID UID `json:"uid" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/kubernetes/pkg/types.UID"`
 	// If true, this reference points to the managing controller.
-	Controller *bool `json:"controller,omitempty"`
+	Controller *bool `json:"controller,omitempty" protobuf:"varint,6,opt,name=controller"`
 }
 
 // TypeMeta describes an individual object in an API response or request

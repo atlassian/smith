@@ -23,11 +23,83 @@ Processing involves parsing the template, building a dependency graph (which is 
 walking the graph, and creating/updating necessary resources. Each created/referenced resource gets
 an annotation/label pointing at the Template.
 
+### Example template
+TPR definitions:
+```yaml
+apiVersion: extensions/v1beta1
+kind: ThirdPartyResource
+description: "Resource template definition"
+metadata:
+  name: template.smith.ash2k.com
+  annotations:
+    smith.ash2k.com/resourceHasStatus: "true"
+versions:
+  - name: v1
+```
+```yaml
+apiVersion: extensions/v1beta1
+kind: ThirdPartyResource
+description: "Postgresql resource definition"
+metadata:
+  name: postgresql-resource.smith-sql.ash2k.com # must use another group due to https://github.com/kubernetes/kubernetes/issues/23831
+  annotations:
+    smith.ash2k.com/resourceHasStatus: "true"
+versions:
+  - name: v1
+```
+Template:
+```yaml
+apiVersion: smith.ash2k.com/v1
+kind: Template
+description: "Sample resource template"
+metadata:
+  name: template1
+spec:
+  resources:
+  - metadata:
+      name: db1
+    spec:
+      apiVersion: smith-sql.ash2k.com/v1
+      kind: PostgresqlResource
+      metadata:
+        name: db1
+      spec:
+        disk: 100GiB
+  - metadata:
+      name: app1
+    dependsOn:
+    - db1
+    spec:
+      apiVersion: extensions/v1beta1
+      kind: Deployment
+      metadata:
+        name: app1
+      spec:
+        replicas: 1
+        template:
+          metadata:
+            labels:
+              app: app1
+              l1: l3
+          spec:
+            containers:
+            - name: smith
+              image: ubuntu
+              imagePullPolicy: Always
+              env:
+              - name: PG_DB_NAME
+                valueFrom:
+                - resource: db1
+                  output: db-name
+            terminationGracePeriodSeconds: 120
+```
+
 ### Outputs
 Some resource types can have Outputs - values that are returned by a TPR upon creation.
 For example a TPR may define a DB to be created. The Outputs will be a Secret
 that contains the DB password, a plain string with a username, the DB URL and so on.
-A resource may consume another resources Output by referencing it in its template.
+A resource may consume another resources Output by referencing it in its template. Outputs field is part of
+[Status](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/api-conventions.md#spec-and-status).
 
 ### Dependencies
 Resources may depend on each other explicitly via DependsOn object references or implicitly
@@ -35,8 +107,7 @@ via references to other resources' outputs. Resources should be created in the r
 
 ### States
 READY is the state of a Resource when it can be considered created. E.g. if it is
-a DB then it means it was provisioned and set up as requested. State is part of
-[Status](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/api-conventions.md#spec-and-status).
+a DB then it means it was provisioned and set up as requested. State is part of Status.
 
 ### Event-driven and stateless
 Smith does not block while waiting for a resource to reach the READY state. Instead, when walking the dependency
@@ -57,3 +128,7 @@ Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes
 4. The goal of Smith is to manage instances of TPRs. App Controller cannot manage them yet.
 
 It is not better or worse, just different set of design choices.
+
+### On Kubernetes client
+https://github.com/kubernetes/client-go should be used eventually instead
+of the bespoke client.

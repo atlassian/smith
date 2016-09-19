@@ -35,7 +35,7 @@ func runApp(ctx context.Context) error {
 
 	watcher := app.NewWatcher(subCtx, c, allEvents)
 	defer watcher.Join() // await termination
-	defer subCancel()    // cancel ctx to signal done to watcher. If anything blow panics, this will be called
+	defer subCancel()    // cancel ctx to signal done to watcher. If anything below panics, this will be called
 
 	tp := processor.New(subCtx, c)
 	defer tp.Join()   // await termination

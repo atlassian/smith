@@ -64,11 +64,15 @@ type TemplateStatus struct {
 	ResourceStatus `json:",inline"`
 }
 
-type Resource struct {
-	TypeMeta `json:",inline"`
+// DependencyRef is a reference to another Resource in the same template.
+type DependencyRef string
 
+type Resource struct {
 	// Standard object metadata
 	ObjectMeta `json:"metadata,omitempty"`
+
+	// Explicit dependencies
+	DependsOn []DependencyRef `json:"dependsOn,omitempty"`
 
 	Spec ResourceSpec `json:"spec"`
 
