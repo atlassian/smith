@@ -122,10 +122,9 @@ individual resources and much better than polling individual resources.
 ### On [App Controller](https://github.com/Mirantis/k8s-AppController)
 Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes/issues/29453) is a very similar workflow engine with a few differences.
 
-1. Presumably it works :)
-2. Graph of dependencies is defined explicitly. IMHO this is not the best user experience.
-3. It uses polling and blocks while waiting for the resource to become READY.
-4. The goal of Smith is to manage instances of TPRs. App Controller cannot manage them yet.
+1. Graph of dependencies is defined explicitly.
+2. It uses polling and blocks while waiting for the resource to become READY.
+3. The goal of Smith is to manage instances of TPRs. App Controller cannot manage them yet.
 
 It is not better or worse, just different set of design choices.
 
