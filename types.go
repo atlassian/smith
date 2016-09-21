@@ -1,5 +1,7 @@
 package smith
 
+import "encoding/json"
+
 type ResourceState string
 
 const (
@@ -88,4 +90,25 @@ type ResourceOutput struct {
 	IntValue    int64  `json:"intValue,omitempty"`
 }
 
-type ResourceSpec map[string]interface{}
+// ResourceSpec holds a resource specification in a raw form plus decoded metadata.
+type ResourceSpec struct {
+	TypeMeta
+
+	// Standard object metadata
+	ObjectMeta
+
+	RawResource json.RawMessage
+}
+
+func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
+	var meta struct {
+		TypeMeta   `json:",inline"`
+		ObjectMeta `json:"metadata,omitempty"`
+	}
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return err
+	}
+	rs.TypeMeta = meta.TypeMeta
+	rs.ObjectMeta = meta.ObjectMeta
+	return rs.RawResource.UnmarshalJSON(data)
+}
