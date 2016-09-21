@@ -246,10 +246,10 @@ func NewInCluster() (*ResourceClient, error) {
 					RootCAs:    certPool,
 					//InsecureSkipVerify: true,
 				},
-				Dial: (&net.Dialer{
+				DialContext: (&net.Dialer{
 					Timeout:   30 * time.Second,
 					KeepAlive: 30 * time.Second,
-				}).Dial,
+				}).DialContext,
 			},
 		},
 	}, nil
