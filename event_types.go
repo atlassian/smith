@@ -24,31 +24,13 @@ type TemplateWatchEvent struct {
 }
 
 func (twe *TemplateWatchEvent) UnmarshalJSON(data []byte) error {
-	var weh WatchEventHeader
-	if err := json.Unmarshal(data, &weh); err != nil {
+	var holder struct {
+		Object Template `json:"object"`
+	}
+	if err := unmarshalEvent(data, &holder, &twe.Type, &twe.Status); err != nil {
 		return err
 	}
-	twe.Type = weh.Type
-	switch weh.Type {
-	case Added, Modified, Deleted:
-		var holder struct {
-			Object Template `json:"object"`
-		}
-		if err := json.Unmarshal(data, &holder); err != nil {
-			return err
-		}
-		twe.Object = &holder.Object
-	case Error:
-		var holder struct {
-			Object Status `json:"object"`
-		}
-		if err := json.Unmarshal(data, &holder); err != nil {
-			return err
-		}
-		twe.Status = &holder.Object
-	default:
-		return fmt.Errorf("unexpected event type: %s", weh.Type)
-	}
+	twe.Object = &holder.Object
 	return nil
 }
 
@@ -79,31 +61,13 @@ type TprInstanceWatchEvent struct {
 }
 
 func (twe *TprInstanceWatchEvent) UnmarshalJSON(data []byte) error {
-	var weh WatchEventHeader
-	if err := json.Unmarshal(data, &weh); err != nil {
+	var holder struct {
+		Object TprInstance `json:"object"`
+	}
+	if err := unmarshalEvent(data, &holder, &twe.Type, &twe.Status); err != nil {
 		return err
 	}
-	twe.Type = weh.Type
-	switch weh.Type {
-	case Added, Modified, Deleted:
-		var holder struct {
-			Object TprInstance `json:"object"`
-		}
-		if err := json.Unmarshal(data, &holder); err != nil {
-			return err
-		}
-		twe.Object = &holder.Object
-	case Error:
-		var holder struct {
-			Object Status `json:"object"`
-		}
-		if err := json.Unmarshal(data, &holder); err != nil {
-			return err
-		}
-		twe.Status = &holder.Object
-	default:
-		return fmt.Errorf("unexpected event type: %s", weh.Type)
-	}
+	twe.Object = &holder.Object
 	return nil
 }
 
@@ -125,20 +89,29 @@ type TprWatchEvent struct {
 }
 
 func (twe *TprWatchEvent) UnmarshalJSON(data []byte) error {
+	var holder struct {
+		Object ThirdPartyResource `json:"object"`
+	}
+	if err := unmarshalEvent(data, &holder, &twe.Type, &twe.Status); err != nil {
+		return err
+	}
+	twe.Object = &holder.Object
+	return nil
+}
+
+func (twe *TprWatchEvent) ResourceVersion() string {
+	return twe.Object.ResourceVersion
+}
+
+func unmarshalEvent(data []byte, v interface{}, t *EventType, s **Status) error {
 	var weh WatchEventHeader
 	if err := json.Unmarshal(data, &weh); err != nil {
 		return err
 	}
-	twe.Type = weh.Type
+	*t = weh.Type
 	switch weh.Type {
 	case Added, Modified, Deleted:
-		var holder struct {
-			Object ThirdPartyResource `json:"object"`
-		}
-		if err := json.Unmarshal(data, &holder); err != nil {
-			return err
-		}
-		twe.Object = &holder.Object
+		return json.Unmarshal(data, v)
 	case Error:
 		var holder struct {
 			Object Status `json:"object"`
@@ -146,13 +119,9 @@ func (twe *TprWatchEvent) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(data, &holder); err != nil {
 			return err
 		}
-		twe.Status = &holder.Object
+		*s = &holder.Object
 	default:
 		return fmt.Errorf("unexpected event type: %s", weh.Type)
 	}
 	return nil
-}
-
-func (twe *TprWatchEvent) ResourceVersion() string {
-	return twe.Object.ResourceVersion
 }
