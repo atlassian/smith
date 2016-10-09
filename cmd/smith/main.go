@@ -13,22 +13,29 @@ import (
 )
 
 func main() {
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
-	cancelOnInterrupt(ctx, cancelFunc)
-
-	if err := runApp(ctx); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+	if err := run(); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 		log.Fatalln(err)
 	}
 }
 
-func runApp(ctx context.Context) error {
+func run() error {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	cancelOnInterrupt(ctx, cancelFunc)
+
+	return runWithContext(ctx)
+}
+
+func runWithContext(ctx context.Context) error {
 	c, err := client.NewInCluster()
 	if err != nil {
 		return err
 	}
 	c.Agent = "smith/" + Version + "/" + GitCommit
+	return runWithClient(ctx, c)
+}
 
+func runWithClient(ctx context.Context, c *client.ResourceClient) error {
 	allEvents := make(chan interface{})
 	subCtx, subCancel := context.WithCancel(ctx)
 	defer subCancel()
