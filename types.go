@@ -22,6 +22,7 @@ const (
 	TemplateNameLabel = TemplateResourceName + "/templateName"
 
 	ThirdPartyResourceGroupVersion = "extensions/v1beta1"
+	ThirdPartyResourcePath         = "thirdpartyresources"
 
 	AllNamespaces = ""
 	AllResources  = ""

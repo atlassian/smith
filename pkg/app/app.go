@@ -21,7 +21,7 @@ type App struct {
 func (a *App) Run(ctx context.Context) error {
 	// 1. Ensure ThirdPartyResource TEMPLATE exists
 	err := retryUntilSuccessOrDone(ctx, func() error {
-		return ensureResourceExists(ctx, a.Client)
+		return a.ensureResourceExists(ctx)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to create resource %s: %v", smith.TemplateResourceName, e)
@@ -37,7 +37,7 @@ func (a *App) Run(ctx context.Context) error {
 	var tprList smith.ThirdPartyResourceList
 	err = retryUntilSuccessOrDone(ctx, func() error {
 		tprList = smith.ThirdPartyResourceList{}
-		return a.Client.List(ctx, smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.AllResources, nil, nil, &tprList)
+		return a.Client.List(ctx, smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.ThirdPartyResourcePath, nil, &tprList)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to list Third Party Resources %s: %v", smith.TemplateResourceName, e)
@@ -51,13 +51,13 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 4. Watch for addition/removal of TPRs to start/stop watches
-	a.Watcher.Watch(smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.AllResources, tprList.ResourceVersion, newTprEvent)
+	a.Watcher.Watch(smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.ThirdPartyResourcePath, tprList.ResourceVersion, newTprEvent)
 
 	// 5. List existing templates
 	var templateList smith.TemplateList
 	err = retryUntilSuccessOrDone(ctx, func() error {
 		templateList = smith.TemplateList{}
-		return a.Client.List(ctx, smith.TemplateResourceGroupVersion, smith.AllNamespaces, smith.TemplateResourcePath, nil, nil, &templateList)
+		return a.Client.List(ctx, smith.TemplateResourceGroupVersion, smith.AllNamespaces, smith.TemplateResourcePath, nil, &templateList)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to list resources %s: %v", smith.TemplateResourceName, e)
@@ -87,6 +87,7 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func (a *App) handleEvent(event interface{}) {
+	log.Printf("Handling event: %#v", event)
 	switch ev := event.(type) {
 	case error:
 		log.Printf("Something went wrong with watch: %v", ev)
@@ -147,10 +148,10 @@ func newTprEvent() interface{} {
 	return &smith.TprWatchEvent{}
 }
 
-func ensureResourceExists(ctx context.Context, c *client.ResourceClient) error {
+func (a *App) ensureResourceExists(ctx context.Context) error {
 	log.Printf("Creating ThirdPartyResource %s", smith.TemplateResourceName)
 	res := &smith.ThirdPartyResource{}
-	err := c.Create(ctx, smith.ThirdPartyResourceGroupVersion, "", "thirdpartyresources", &smith.ThirdPartyResource{
+	err := a.Client.Create(ctx, smith.ThirdPartyResourceGroupVersion, "", "thirdpartyresources", &smith.ThirdPartyResource{
 		TypeMeta: smith.TypeMeta{
 			Kind:       "ThirdPartyResource",
 			APIVersion: smith.ThirdPartyResourceGroupVersion,
@@ -165,7 +166,7 @@ func ensureResourceExists(ctx context.Context, c *client.ResourceClient) error {
 	}, res)
 	if err != nil {
 		log.Printf("%#v", err)
-		if !client.IsConflict(err) {
+		if !client.IsAlreadyExists(err) {
 			return fmt.Errorf("failed to create ThirdPartyResource: %v", err)
 		}
 		log.Printf("ThirdPartyResource %s already exists", smith.TemplateResourceName)
@@ -176,7 +177,12 @@ func ensureResourceExists(ctx context.Context, c *client.ResourceClient) error {
 }
 
 func (a *App) watchTpr(tpr *smith.ThirdPartyResource) {
+	if tpr.Name == smith.TemplateResourceName {
+		log.Printf("Not watching known TPR %s", tpr.Name)
+		return
+	}
 	// TODO only watch supported TPRs (inspect annotations?)
+	log.Printf("TPR: %#v", tpr)
 	path, group := splitTprName(tpr.Name)
 	for _, version := range tpr.Versions {
 		a.Watcher.Watch(group+"/"+version.Name, smith.AllNamespaces, path, "", newTprInstanceEvent)
@@ -200,13 +206,5 @@ func splitTprName(name string) (string, string) {
 		panic(fmt.Errorf("invalid resource name: %q", name))
 	}
 	resourcePath := strings.Replace(name[:pos], "-", "", -1)
-	switch string(resourcePath[len(resourcePath)-1]) {
-	case "s":
-		resourcePath += "es"
-	case "y":
-		resourcePath = resourcePath[:len(resourcePath)-1] + "ies"
-	default:
-		resourcePath += "s"
-	}
-	return resourcePath, name[pos+1:]
+	return client.ResourceKindToPath(resourcePath), name[pos+1:]
 }

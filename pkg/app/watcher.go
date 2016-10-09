@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
 	"sync"
 
@@ -39,6 +40,7 @@ func (w *Watcher) Join() {
 func (w *Watcher) Watch(groupVersion, namespace, resource, resourceVersion string, rf client.ResultFactory) {
 	key := key(groupVersion, namespace, resource)
 	if _, ok := w.watchers[key]; ok {
+		log.Printf("Already watching %s", key)
 		return
 	}
 	ctx, cancel := context.WithCancel(w.ctx)
@@ -52,7 +54,7 @@ func (w *Watcher) Watch(groupVersion, namespace, resource, resourceVersion strin
 		if resourceVersion != "" {
 			args.Set("resourceVersion", resourceVersion)
 		}
-		for e := range w.client.Watch(ctx, groupVersion, namespace, resource, nil, args, rf) {
+		for e := range w.client.Watch(ctx, groupVersion, namespace, resource, args, rf) {
 			select {
 			case <-ctx.Done():
 				return

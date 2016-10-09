@@ -28,6 +28,7 @@ const (
 	// ServiceAccountTokenKey is the key of the required data for SecretTypeServiceAccountToken secrets
 	ServiceAccountTokenKey = "token"
 	DefaultAPIPath         = "/apis"
+	LegacyAPIPath          = "/api"
 )
 
 // UID is a type that holds unique ID values, including UUIDs.  Because we
