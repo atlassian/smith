@@ -1,6 +1,7 @@
 package smith
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -278,6 +279,45 @@ type Status struct {
 
 type Time struct {
 	time.Time `protobuf:"-"`
+}
+
+// IsZero returns true if the value is nil or time is zero.
+func (t *Time) IsZero() bool {
+	if t == nil {
+		return true
+	}
+	return t.Time.IsZero()
+}
+
+// UnmarshalJSON implements the json.Unmarshaller interface.
+func (t *Time) UnmarshalJSON(b []byte) error {
+	if len(b) == 4 && string(b) == "null" {
+		t.Time = time.Time{}
+		return nil
+	}
+
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return err
+	}
+
+	pt, err := time.Parse(time.RFC3339, str)
+	if err != nil {
+		return err
+	}
+
+	t.Time = pt.Local()
+	return nil
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (t Time) MarshalJSON() ([]byte, error) {
+	if t.IsZero() {
+		// Encode unset/nil objects as JSON's "null".
+		return []byte("null"), nil
+	}
+
+	return json.Marshal(t.UTC().Format(time.RFC3339))
 }
 
 // OwnerReference contains enough information to let you identify an owning
