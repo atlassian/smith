@@ -22,6 +22,14 @@ func IsConflict(err error) bool {
 	return false
 }
 
+// IsNotFound returns true if the specified error means that the resource was not found.
+func IsNotFound(err error) bool {
+	if status, ok := err.(*StatusError); ok {
+		return status.status.Reason == smith.StatusReasonNotFound
+	}
+	return false
+}
+
 func ResourceKindToPath(kind string) string {
 	kind = strings.ToLower(kind)
 	switch kind[len(kind)-1] {

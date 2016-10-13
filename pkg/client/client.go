@@ -59,23 +59,27 @@ func (se *StatusError) Status() smith.Status {
 }
 
 func (c *ResourceClient) Get(ctx context.Context, groupVersion, namespace, resource, name string, args url.Values, into interface{}) error {
-	return c.Do(ctx, "GET", groupVersion, namespace, resource, name, args, http.StatusOK, nil, into)
+	return c.Do(ctx, "GET", groupVersion, namespace, resource, name, "", args, http.StatusOK, nil, into)
 }
 
 func (c *ResourceClient) List(ctx context.Context, groupVersion, namespace, resource string, args url.Values, into interface{}) error {
-	return c.Do(ctx, "GET", groupVersion, namespace, resource, "", args, http.StatusOK, nil, into)
+	return c.Do(ctx, "GET", groupVersion, namespace, resource, "", "", args, http.StatusOK, nil, into)
 }
 
 func (c *ResourceClient) Create(ctx context.Context, groupVersion, namespace, resource string, request interface{}, response interface{}) error {
-	return c.Do(ctx, "POST", groupVersion, namespace, resource, "", nil, http.StatusCreated, request, response)
+	return c.Do(ctx, "POST", groupVersion, namespace, resource, "", "", nil, http.StatusCreated, request, response)
 }
 
 func (c *ResourceClient) Update(ctx context.Context, groupVersion, namespace, resource string, request interface{}, response interface{}) error {
-	return c.Do(ctx, "PUT", groupVersion, namespace, resource, "", nil, http.StatusOK, request, response)
+	return c.Do(ctx, "PUT", groupVersion, namespace, resource, "", "", nil, http.StatusOK, request, response)
 }
 
-func (c *ResourceClient) Delete(ctx context.Context, groupVersion, namespace, resource, name string, request interface{}, response interface{}) error {
-	return c.Do(ctx, "DELETE", groupVersion, namespace, resource, name, nil, http.StatusOK, request, response)
+func (c *ResourceClient) Delete(ctx context.Context, groupVersion, namespace, resource, name string) error {
+	return c.Do(ctx, "DELETE", groupVersion, namespace, resource, name, "", nil, http.StatusOK, nil, nil)
+}
+
+func (c *ResourceClient) UpdateStatus(ctx context.Context, groupVersion, namespace, resource, name string, request interface{}, response interface{}) error {
+	return c.Do(ctx, "PUT", groupVersion, namespace, resource, name, "status", nil, http.StatusOK, request, response)
 }
 
 func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, resource string, args url.Values, rf ResultFactory) <-chan interface{} {
@@ -97,7 +101,7 @@ func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, res
 		args.Set("watch", "true")
 		for {
 			var rv string
-			err := c.DoCheckResponse(ctx, "GET", groupVersion, namespace, resource, "", args, http.StatusOK, nil, func(r io.Reader) error {
+			err := c.DoCheckResponse(ctx, "GET", groupVersion, namespace, resource, "", "", args, http.StatusOK, nil, func(r io.Reader) error {
 				decoder := json.NewDecoder(r)
 				for {
 					res := rf()
@@ -146,14 +150,14 @@ func (c *ResourceClient) Watch(ctx context.Context, groupVersion, namespace, res
 	return results
 }
 
-func (c *ResourceClient) Do(ctx context.Context, verb, groupVersion, namespace, resource, name string, args url.Values, expectedStatus int, request interface{}, response interface{}) error {
-	return c.DoCheckResponse(ctx, verb, groupVersion, namespace, resource, name, args, expectedStatus, request, func(r io.Reader) error {
+func (c *ResourceClient) Do(ctx context.Context, verb, groupVersion, namespace, resource, name, suffix string, args url.Values, expectedStatus int, request interface{}, response interface{}) error {
+	return c.DoCheckResponse(ctx, verb, groupVersion, namespace, resource, name, suffix, args, expectedStatus, request, func(r io.Reader) error {
 		// Consume body even if "response" is nil to enable connection reuse
 		b, err := ioutil.ReadAll(io.LimitReader(r, maxResponseSize))
 		if err != nil {
 			return err
 		}
-		log.Printf("Server response for %s %s:\n%s", verb, c.formatUrl(groupVersion, namespace, resource, name, args), b)
+		log.Printf("Server response for %s %s:\n%s", verb, c.formatUrl(groupVersion, namespace, resource, name, suffix, args), b)
 		if response == nil {
 			return nil
 		}
@@ -161,8 +165,8 @@ func (c *ResourceClient) Do(ctx context.Context, verb, groupVersion, namespace, 
 	})
 }
 
-func (c *ResourceClient) DoCheckResponse(ctx context.Context, verb, groupVersion, namespace, resource, name string, args url.Values, expectedStatus int, request interface{}, f StreamHandler) error {
-	return c.DoRequest(ctx, verb, groupVersion, namespace, resource, name, args, request, func(resp *http.Response) error {
+func (c *ResourceClient) DoCheckResponse(ctx context.Context, verb, groupVersion, namespace, resource, name, suffix string, args url.Values, expectedStatus int, request interface{}, f StreamHandler) error {
+	return c.DoRequest(ctx, verb, groupVersion, namespace, resource, name, suffix, args, request, func(resp *http.Response) error {
 		if resp.StatusCode != expectedStatus {
 			msg := fmt.Sprintf("received bad status code %d", resp.StatusCode)
 			b, err := ioutil.ReadAll(io.LimitReader(resp.Body, maxStatusResponseSize))
@@ -172,7 +176,7 @@ func (c *ResourceClient) DoCheckResponse(ctx context.Context, verb, groupVersion
 			se := StatusError{
 				msg: msg,
 			}
-			log.Printf("Unexpected server response for %s %s: %d\n%s", verb, c.formatUrl(groupVersion, namespace, resource, name, args), resp.StatusCode, b)
+			log.Printf("Unexpected server response for %s %s: %d\n%s", verb, c.formatUrl(groupVersion, namespace, resource, name, suffix, args), resp.StatusCode, b)
 			if json.Unmarshal(b, &se.status) != nil {
 				return errors.New(msg)
 			}
@@ -187,7 +191,7 @@ func (c *ResourceClient) DoCheckResponse(ctx context.Context, verb, groupVersion
 	})
 }
 
-func (c *ResourceClient) DoRequest(ctx context.Context, verb, groupVersion, namespace, resource, name string, args url.Values, request interface{}, f ResponseHandler) error {
+func (c *ResourceClient) DoRequest(ctx context.Context, verb, groupVersion, namespace, resource, name, suffix string, args url.Values, request interface{}, f ResponseHandler) error {
 	var body []byte
 	if request != nil {
 		var err error
@@ -196,7 +200,7 @@ func (c *ResourceClient) DoRequest(ctx context.Context, verb, groupVersion, name
 			return err
 		}
 	}
-	reqUrl := c.formatUrl(groupVersion, namespace, resource, name, args)
+	reqUrl := c.formatUrl(groupVersion, namespace, resource, name, suffix, args)
 	req, err := http.NewRequest(verb, reqUrl, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("unable to create http.Request: %v", err)
@@ -221,7 +225,7 @@ func (c *ResourceClient) DoRequest(ctx context.Context, verb, groupVersion, name
 	return f(resp)
 }
 
-func (c *ResourceClient) formatUrl(groupVersion, namespace, resource, name string, args url.Values) string {
+func (c *ResourceClient) formatUrl(groupVersion, namespace, resource, name, suffix string, args url.Values) string {
 	var prefix string
 	if strings.ContainsRune(groupVersion, '/') {
 		prefix = smith.DefaultAPIPath
@@ -232,7 +236,7 @@ func (c *ResourceClient) formatUrl(groupVersion, namespace, resource, name strin
 	if namespace != "" {
 		p = append(p, "namespaces", namespace)
 	}
-	p = append(p, resource, name)
+	p = append(p, resource, name, suffix)
 	u := url.URL{
 		Scheme:   c.Scheme,
 		Host:     c.HostPort,

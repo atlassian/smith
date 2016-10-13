@@ -14,7 +14,8 @@ GP := /gopath
 MAIN_PKG := github.com/ash2k/smith/cmd/smith
 
 setup-ci:
-	go get -v -u github.com/Masterminds/glide
+	go get -u github.com/Masterminds/glide
+	go get -u golang.org/x/tools/cmd/goimports
 	glide install
 
 build: *.go fmt
@@ -30,8 +31,13 @@ fmt:
 	gofmt -w=true -s $$(find . -type f -name '*.go' -not -path "./vendor/*")
 	goimports -w=true -d $$(find . -type f -name '*.go' -not -path "./vendor/*")
 
-test:
-	go test $$(glide nv)
+minikube-test:
+	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
+	KUBERNETES_SERVICE_PORT=8443 \
+	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
+	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
+	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
+	go test -race -v $$(glide nv)
 
 test-race:
 	go test -race $$(glide nv)

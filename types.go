@@ -1,6 +1,8 @@
 package smith
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type ResourceState string
 
@@ -17,6 +19,7 @@ const (
 	TemplateResourcePath         = "templates"
 	TemplateResourceName         = "template." + SmithDomain
 	TemplateResourceVersion      = "v1"
+	TemplateResourceKind         = "Template"
 	TemplateResourceGroupVersion = SmithResourceGroup + "/" + TemplateResourceVersion
 
 	TemplateNameLabel = TemplateResourceName + "/templateName"
@@ -48,7 +51,7 @@ type Template struct {
 	ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the specification of the desired behavior of the Template.
-	Spec TemplateSpec `json:"spec"`
+	Spec TemplateSpec `json:"spec,omitempty"`
 
 	// Status is most recently observed status of the Template.
 	Status TemplateStatus `json:"status,omitempty"`
@@ -98,6 +101,12 @@ type ResourceSpec struct {
 	// Standard object metadata
 	ObjectMeta
 
+	// May hold resource struct for marshaling into JSON.
+	// If nil, RawResource is used.
+	Resource interface{}
+
+	// Holds raw bytes of decoded JSON.
+	// May hold raw bytes to be used for encoding into JSON (if Resource is nil).
 	RawResource json.RawMessage
 }
 
@@ -112,4 +121,11 @@ func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
 	rs.TypeMeta = meta.TypeMeta
 	rs.ObjectMeta = meta.ObjectMeta
 	return rs.RawResource.UnmarshalJSON(data)
+}
+
+func (rs *ResourceSpec) MarshalJSON() ([]byte, error) {
+	if rs.Resource == nil {
+		return rs.RawResource.MarshalJSON()
+	}
+	return json.Marshal(rs.Resource)
 }

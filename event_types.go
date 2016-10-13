@@ -11,6 +11,35 @@ type WatchEventHeader struct {
 	Type EventType `json:"type,omitempty" description:"the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"`
 }
 
+type GenericWatchObject struct {
+	TypeMeta `json:",inline"`
+
+	// Standard object metadata
+	ObjectMeta `json:"metadata,omitempty"`
+}
+
+type GenericWatchEvent struct {
+	Type EventType `json:"type"`
+
+	Object *GenericWatchObject `json:"object"`
+	Status *Status             `json:"-"`
+}
+
+func (gwe *GenericWatchEvent) UnmarshalJSON(data []byte) error {
+	var holder struct {
+		Object GenericWatchObject `json:"object"`
+	}
+	if err := unmarshalEvent(data, &holder, &gwe.Type, &gwe.Status); err != nil {
+		return err
+	}
+	gwe.Object = &holder.Object
+	return nil
+}
+
+func (gwe *GenericWatchEvent) ResourceVersion() string {
+	return gwe.Object.ResourceVersion
+}
+
 type TemplateWatchEvent struct {
 	Type EventType `json:"type"`
 

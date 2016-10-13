@@ -487,6 +487,18 @@ type ThirdPartyResourceList struct {
 	Items []ThirdPartyResource `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// ConfigMap holds configuration data for pods to consume.
+type ConfigMap struct {
+	TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Data contains the configuration data.
+	// Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
+	Data map[string]string `json:"data,omitempty" protobuf:"bytes,2,rep,name=data"`
+}
+
 // EventType defines the possible types of events.
 type EventType string
 
