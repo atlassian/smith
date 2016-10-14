@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/ash2k/smith/pkg/app"
-	"github.com/ash2k/smith/pkg/client"
-	"github.com/ash2k/smith/pkg/processor"
+	"github.com/atlassian/smith/pkg/app"
+	"github.com/atlassian/smith/pkg/client"
+	"github.com/atlassian/smith/pkg/processor"
 )
 
 func main() {

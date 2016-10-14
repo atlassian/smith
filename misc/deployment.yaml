@@ -13,6 +13,6 @@ spec:
     spec:
       containers:
       - name: smith
-        image: ash2k/smith:75d5bb5
+        image: atlassian/smith:75d5bb5
         imagePullPolicy: Always
       terminationGracePeriodSeconds: 120

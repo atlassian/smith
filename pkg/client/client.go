@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ash2k/smith"
+	"github.com/atlassian/smith"
 )
 
 const (

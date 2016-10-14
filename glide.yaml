@@ -1,4 +1,4 @@
-package: github.com/ash2k/smith
+package: github.com/atlassian/smith
 import:
 - package: github.com/stretchr/testify
   subpackages:

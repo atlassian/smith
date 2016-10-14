@@ -30,9 +30,9 @@ apiVersion: extensions/v1beta1
 kind: ThirdPartyResource
 description: "Resource template definition"
 metadata:
-  name: template.smith.ash2k.com
+  name: template.smith.atlassian.com
   annotations:
-    smith.ash2k.com/resourceHasStatus: "true"
+    smith.atlassian.com/resourceHasStatus: "true"
 versions:
   - name: v1
 ```
@@ -41,15 +41,15 @@ apiVersion: extensions/v1beta1
 kind: ThirdPartyResource
 description: "Postgresql resource definition"
 metadata:
-  name: postgresql-resource.smith-sql.ash2k.com # must use another group due to https://github.com/kubernetes/kubernetes/issues/23831
+  name: postgresql-resource.smith-sql.atlassian.com # must use another group due to https://github.com/kubernetes/kubernetes/issues/23831
   annotations:
-    smith.ash2k.com/resourceHasStatus: "true"
+    smith.atlassian.com/resourceHasStatus: "true"
 versions:
   - name: v1
 ```
 Template:
 ```yaml
-apiVersion: smith.ash2k.com/v1
+apiVersion: smith.atlassian.com/v1
 kind: Template
 description: "Sample resource template"
 metadata:
@@ -59,7 +59,7 @@ spec:
   - metadata:
       name: db1
     spec:
-      apiVersion: smith-sql.ash2k.com/v1
+      apiVersion: smith-sql.atlassian.com/v1
       kind: PostgresqlResource
       metadata:
         name: db1

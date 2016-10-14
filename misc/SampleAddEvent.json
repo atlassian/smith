@@ -1,13 +1,13 @@
 {
   "type": "ADDED",
   "object": {
-    "apiVersion": "smith.ash2k.com/v1",
+    "apiVersion": "smith.atlassian.com/v1",
     "description": "Sample resource template",
     "kind": "ResourceTemplate",
     "metadata": {
       "name": "template1",
       "namespace": "default",
-      "selfLink": "/apis/smith.ash2k.com/v1/namespaces/default/resourcetemplates/template1",
+      "selfLink": "/apis/smith.atlassian.com/v1/namespaces/default/resourcetemplates/template1",
       "uid": "6d9e8129-5970-11e6-966b-b26bcd31cc73",
       "resourceVersion": "1803",
       "creationTimestamp": "2016-08-03T11:50:09Z",
@@ -18,7 +18,7 @@
     "spec": {
       "resources": [
         {
-          "apiVersion": "smith-sql.ash2k.com/v1",
+          "apiVersion": "smith-sql.atlassian.com/v1",
           "kind": "PostgresqlResource",
           "metadata": {
             "name": "template1"

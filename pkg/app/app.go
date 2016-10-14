@@ -6,9 +6,9 @@ import (
 	"log"
 	"strings"
 
-	"github.com/ash2k/smith"
-	"github.com/ash2k/smith/pkg/client"
-	"github.com/ash2k/smith/pkg/processor"
+	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/client"
+	"github.com/atlassian/smith/pkg/processor"
 )
 
 type App struct {
@@ -197,7 +197,7 @@ func (a *App) forgetTpr(tpr *smith.ThirdPartyResource) {
 }
 
 // splitTprName splits TPR's name into resource name and group name.
-// e.g. "postgresql-resource.smith-sql.ash2k.com" is split into "postgresqlresources" and "smith-sql.ash2k.com".
+// e.g. "postgresql-resource.smith-sql.atlassian.com" is split into "postgresqlresources" and "smith-sql.atlassian.com".
 // See https://github.com/kubernetes/kubernetes/blob/master/docs/design/extending-api.md
 // See k8s.io/pkg/api/meta/restmapper.go:147 KindToResource()
 func splitTprName(name string) (string, string) {

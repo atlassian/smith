@@ -13,7 +13,7 @@ const (
 )
 
 const (
-	SmithDomain        = "smith.ash2k.com"
+	SmithDomain        = "smith.atlassian.com"
 	SmithResourceGroup = SmithDomain
 
 	TemplateResourcePath         = "templates"

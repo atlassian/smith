@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ash2k/smith"
-	"github.com/ash2k/smith/pkg/client"
+	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/client"
 
 	"github.com/stretchr/testify/require"
 )

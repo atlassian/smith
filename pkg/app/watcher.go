@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/ash2k/smith/pkg/client"
+	"github.com/atlassian/smith/pkg/client"
 )
 
 type watchState struct {

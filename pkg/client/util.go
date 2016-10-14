@@ -3,7 +3,7 @@ package client
 import (
 	"strings"
 
-	"github.com/ash2k/smith"
+	"github.com/atlassian/smith"
 )
 
 // IsAlreadyExists determines if the err is an error which indicates that a specified resource already exists.

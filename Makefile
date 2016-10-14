@@ -7,11 +7,11 @@ BUILD_DATE := $$(date +%Y-%m-%d-%H:%M)
 GIT_HASH := $$(git rev-parse --short HEAD)
 GOBUILD_VERSION_ARGS := -ldflags "-s -X $(VERSION_VAR)=$(REPO_VERSION) -X $(GIT_VAR)=$(GIT_HASH) -X $(BUILD_DATE_VAR)=$(BUILD_DATE)"
 BINARY_NAME := smith
-IMAGE_NAME := ash2k/smith
+IMAGE_NAME := atlassian/smith
 ARCH ?= darwin
 GOVERSION := 1.7
 GP := /gopath
-MAIN_PKG := github.com/ash2k/smith/cmd/smith
+MAIN_PKG := github.com/atlassian/smith/cmd/smith
 
 setup-ci:
 	go get -u github.com/Masterminds/glide
@@ -47,7 +47,7 @@ docker:
 	docker run \
 		--rm \
 		-v "$(GOPATH)":"$(GP)" \
-		-w "$(GP)/src/github.com/ash2k/smith" \
+		-w "$(GP)/src/github.com/atlassian/smith" \
 		-e GOPATH="$(GP)" \
 		-e CGO_ENABLED=0 \
 		golang:$(GOVERSION) \
@@ -59,7 +59,7 @@ docker-race:
 	docker run \
 		--rm \
 		-v "$(GOPATH)":"$(GP)" \
-		-w "$(GP)/src/github.com/ash2k/smith" \
+		-w "$(GP)/src/github.com/atlassian/smith" \
 		-e GOPATH="$(GP)" \
 		golang:$(GOVERSION) \
 		go build -race -o build/bin/linux/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) -a -installsuffix cgo $(MAIN_PKG)
