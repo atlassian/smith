@@ -16,7 +16,7 @@ MAIN_PKG := github.com/atlassian/smith/cmd/smith
 setup-ci:
 	go get -u github.com/Masterminds/glide
 	go get -u golang.org/x/tools/cmd/goimports
-	glide install
+	glide install --strip-vendor
 
 build: *.go fmt
 	go build -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
