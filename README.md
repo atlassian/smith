@@ -147,7 +147,7 @@ standard library in this version;
 ```bash
 make setup-ci
 ```
-* To run integration tests with minikube run
+* To run integration tests with [minikube](https://github.com/kubernetes/minikube) run
 ```bash
 make minikube-test
 ```
