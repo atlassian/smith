@@ -62,7 +62,7 @@ type TemplateSpec struct {
 }
 
 type TemplateStatus struct {
-	ResourceStatus `json:",inline"`
+	State ResourceState `json:"state,omitempty"`
 }
 
 // DependencyRef is a reference to another Resource in the same template.
@@ -70,44 +70,26 @@ type DependencyRef string
 
 type Resource struct {
 	// Standard object metadata
-	ObjectMeta `json:"metadata,omitempty"`
+	//ObjectMeta `json:"metadata,omitempty"`
 
-	// Explicit dependencies
+	// Name of the resource for references.
+	Name string
+
+	// Explicit dependencies.
 	DependsOn []DependencyRef `json:"dependsOn,omitempty"`
 
 	Spec ResourceSpec `json:"spec"`
-
-	// Status is most recently observed status of the Resource.
-	Status ResourceStatus `json:"status,omitempty"`
 }
 
-type ResourceStatus struct {
-	State   ResourceState    `json:"state,omitempty"`
-	Outputs []ResourceOutput `json:"outputs,omitempty"`
-}
-
-type ResourceOutput struct {
-	Name string `json:"name"`
-	Kind string `json:"kind"`
-	// TODO support object outputs e.g. secrets
-	StringValue string `json:"strValue,omitempty"`
-	IntValue    int64  `json:"intValue,omitempty"`
-}
-
-// ResourceSpec holds a resource specification in a raw form plus decoded metadata.
+// ResourceSpec holds a resource specification in a raw JSON form plus decoded metadata.
 type ResourceSpec struct {
 	TypeMeta
 
 	// Standard object metadata
 	ObjectMeta
 
-	// May hold resource struct for marshaling into JSON.
-	// If nil, RawResource is used.
-	Resource interface{}
-
-	// Holds raw bytes of decoded JSON.
-	// May hold raw bytes to be used for encoding into JSON (if Resource is nil).
-	RawResource json.RawMessage
+	// Holds map[string]interface{} for marshaling from/into JSON.
+	Resource interface{} `json:",inline"`
 }
 
 func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
@@ -120,12 +102,21 @@ func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
 	}
 	rs.TypeMeta = meta.TypeMeta
 	rs.ObjectMeta = meta.ObjectMeta
-	return rs.RawResource.UnmarshalJSON(data)
+	return json.Unmarshal(data, &rs.Resource)
 }
 
 func (rs *ResourceSpec) MarshalJSON() ([]byte, error) {
-	if rs.Resource == nil {
-		return rs.RawResource.MarshalJSON()
+	r, ok := rs.Resource.(map[string]interface{})
+	if !ok {
+		data, err := json.Marshal(rs.Resource)
+		if err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal(data, &r); err != nil {
+			return nil, err
+		}
+		rs.Resource = r
 	}
+	r["metadata"] = &rs.ObjectMeta
 	return json.Marshal(rs.Resource)
 }

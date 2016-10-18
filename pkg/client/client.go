@@ -70,8 +70,8 @@ func (c *ResourceClient) Create(ctx context.Context, groupVersion, namespace, re
 	return c.Do(ctx, "POST", groupVersion, namespace, resource, "", "", nil, http.StatusCreated, request, response)
 }
 
-func (c *ResourceClient) Update(ctx context.Context, groupVersion, namespace, resource string, request interface{}, response interface{}) error {
-	return c.Do(ctx, "PUT", groupVersion, namespace, resource, "", "", nil, http.StatusOK, request, response)
+func (c *ResourceClient) Update(ctx context.Context, groupVersion, namespace, resource, name string, request interface{}, response interface{}) error {
+	return c.Do(ctx, "PUT", groupVersion, namespace, resource, name, "", nil, http.StatusOK, request, response)
 }
 
 func (c *ResourceClient) Delete(ctx context.Context, groupVersion, namespace, resource, name string) error {
