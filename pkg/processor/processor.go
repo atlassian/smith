@@ -13,6 +13,10 @@ import (
 	"github.com/cenk/backoff"
 )
 
+type ReadyChecker interface {
+	IsReady(*smith.Resource) (bool, error)
+}
+
 type BackOffFactory func() backoff.BackOff
 
 type templateState struct {
@@ -29,6 +33,7 @@ type TemplateProcessor struct {
 	ctx     context.Context
 	backoff BackOffFactory
 	client  *client.ResourceClient
+	rc      ReadyChecker
 	wg      sync.WaitGroup // tracks number of Goroutines running rebuildLoop()
 
 	lock      sync.RWMutex // protects fields below
@@ -37,11 +42,12 @@ type TemplateProcessor struct {
 
 // New creates a new template processor.
 // Instances are safe for concurrent use.
-func New(ctx context.Context, client *client.ResourceClient) *TemplateProcessor {
+func New(ctx context.Context, client *client.ResourceClient, rc ReadyChecker) *TemplateProcessor {
 	return &TemplateProcessor{
 		ctx:       ctx,
 		backoff:   exponentialBackOff,
 		client:    client,
+		rc:        rc,
 		templates: make(map[templateRef]*templateState),
 	}
 }
@@ -139,58 +145,71 @@ func (tp *TemplateProcessor) rebuild(namespace, name string, tpl *smith.Template
 			return err
 		}
 	}
-
-	return nil
-	//tp.client.Update(tp.ctx, smith.TemplateResourceGroupVersion, namespace, smith.TemplateResourcePath, name, &smith.Template{
-	//	TypeMeta: smith.TypeMeta{
-	//		Kind:       smith.TemplateResourceKind,
-	//		APIVersion: smith.TemplateResourceGroupVersion,
-	//	},
-	//	ObjectMeta: smith.ObjectMeta{
-	//		Name: name,
-	//		ResourceVersion: tpl.ResourceVersion,
-	//	},
-	//	Status: smith.TemplateStatus{
-	//		ResourceStatus: smith.ResourceStatus{
-	//			State: smith.READY,
-	//		},
-	//	},
-	//}, nil)
+	var err error
+	if tpl.Status.State != smith.READY {
+		tpl.Status.State = smith.READY
+		err = tp.client.Update(tp.ctx, smith.TemplateResourceGroupVersion, namespace, smith.TemplateResourcePath, name, tpl, nil)
+	}
+	if err == nil {
+		log.Printf("Template %s/%s is READY", namespace, name)
+	}
+	return err
 }
 
 func (tp *TemplateProcessor) checkResource(namespace, templateName string, res *smith.Resource) (isReady bool, e error) {
+	resourcePath := client.ResourceKindToPath(res.Spec.Kind)
+	// 0. Update label to point at the parent template
+	if res.Spec.Labels == nil {
+		res.Spec.Labels = make(map[string]string)
+	}
+	res.Spec.Labels[smith.TemplateNameLabel] = templateName
 	for {
 		var response smith.ResourceSpec
-		resourcePath := client.ResourceKindToPath(res.Spec.Kind)
-		// 0. TODO Update label to point at the parent template
 
-		// 1. Try to create resource
-		err := tp.client.Create(tp.ctx, res.Spec.APIVersion, namespace, resourcePath, &res.Spec, &response)
-		if err == nil {
-			log.Printf("template %s/%s: resource %s created", namespace, templateName, res.Name)
-			return false, nil
-		}
-		if !client.IsAlreadyExists(err) {
-			// Unexpected error
-			return false, err
-		}
-		// Resource already exists
-		// 2. Get the existing resource
-		err = tp.client.Get(tp.ctx, res.Spec.APIVersion, namespace, resourcePath, res.Spec.Name, nil, &response)
+		// 1. Try to get the resource. We do read first to avoid generating unnecessary events.
+		err := tp.client.Get(tp.ctx, res.Spec.APIVersion, namespace, resourcePath, res.Spec.Name, nil, &response)
 		if err != nil {
-			if client.IsNotFound(err) {
-				log.Printf("template %s/%s: resource %s not found, restarting loop", namespace, templateName, res.Name)
+			if !client.IsNotFound(err) {
+				// Unexpected error
+				return false, err
+			}
+			log.Printf("template %s/%s: resource %s not found, creating", namespace, templateName, res.Name)
+			// 2. Create if does not exist
+			err = tp.client.Create(tp.ctx, res.Spec.APIVersion, namespace, resourcePath, &res.Spec, &response)
+			if err == nil {
+				log.Printf("template %s/%s: resource %s created", namespace, templateName, res.Name)
+				break
+			}
+			if client.IsAlreadyExists(err) {
+				log.Printf("template %s/%s: resource %s found, restarting loop", namespace, templateName, res.Name)
 				continue
 			}
 			// Unexpected error
 			return false, err
 		}
-		// 3. TODO Compare (ignore additional annotations/labels, status?)
 
-		// 4. TODO Update if different
+		// 3. Compare spec and existing resource
+		if isEqualResources(res, &response) {
+			log.Printf("template %s/%s: resource %s has correct spec", namespace, templateName, res.Name)
+			break
+		}
 
-		return true, nil
+		// 4. Update if different
+		// https://github.com/kubernetes/kubernetes/blob/master/docs/devel/api-conventions.md#concurrency-control-and-consistency
+		res.Spec.ResourceVersion = response.ResourceVersion // Do CAS
+		err = tp.client.Update(tp.ctx, res.Spec.APIVersion, namespace, resourcePath, res.Spec.Name, &res.Spec, &response)
+		if err != nil {
+			if client.IsConflict(err) {
+				log.Printf("template %s/%s: resource %s update resulted in conflict, restarting loop", namespace, templateName, res.Name)
+				continue
+			}
+			// Unexpected error
+			return false, err
+		}
+		log.Printf("template %s/%s: resource %s updated", namespace, templateName, res.Name)
+		break
 	}
+	return tp.rc.IsReady(res)
 }
 
 func (tp *TemplateProcessor) fetchTemplate(namespace, name string) (*smith.Template, error) {
@@ -235,8 +254,16 @@ func (tp *TemplateProcessor) needsRebuild(namespace, name string) bool {
 	return ts.needsRebuild
 }
 
+// isEqualResources checks that existing resource matches the desired spec.
+func isEqualResources(res *smith.Resource, spec *smith.ResourceSpec) bool {
+	// TODO implement
+	// ignore additional annotations/labels? or make the merge behaviour configurable?
+	return true
+}
+
 func exponentialBackOff() backoff.BackOff {
 	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = 2 * time.Second
 	b.MaxElapsedTime = time.Duration(math.MaxInt64)
 	return b
 }

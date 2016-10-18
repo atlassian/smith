@@ -23,18 +23,29 @@ func TestWorkflow(t *testing.T) {
 	templateNamespace := "default"
 
 	var templateCreated bool
-	var tmpl smith.Template
+	tmpl := smith.Template{
+		TypeMeta: smith.TypeMeta{
+			Kind:       smith.TemplateResourceKind,
+			APIVersion: smith.TemplateResourceGroupVersion,
+		},
+		ObjectMeta: smith.ObjectMeta{
+			Name: templateName,
+		},
+		Spec: smith.TemplateSpec{
+			Resources: resources(),
+		},
+	}
 	_ = c.Delete(context.Background(), smith.TemplateResourceGroupVersion, templateNamespace, smith.TemplateResourcePath, templateName)
 	defer func() {
 		if templateCreated {
 			// Cleanup after test and after server has stopped
 			ctxTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			log.Printf("Deleting template %s", tmpl.Name)
-			a.Nil(c.Delete(ctxTimeout, smith.TemplateResourceGroupVersion, tmpl.Namespace, smith.TemplateResourcePath, tmpl.Name))
+			log.Printf("Deleting template %s", templateName)
+			a.Nil(c.Delete(ctxTimeout, smith.TemplateResourceGroupVersion, templateNamespace, smith.TemplateResourcePath, templateName))
 			for _, resource := range tmpl.Spec.Resources {
 				log.Printf("Deleting resource %s", resource.Spec.Name)
-				a.Nil(c.Delete(ctxTimeout, resource.Spec.APIVersion, tmpl.Namespace, client.ResourceKindToPath(resource.Spec.Kind), resource.Spec.Name))
+				a.Nil(c.Delete(ctxTimeout, resource.Spec.APIVersion, templateNamespace, client.ResourceKindToPath(resource.Spec.Kind), resource.Spec.Name))
 			}
 		}
 	}()
@@ -54,25 +65,13 @@ func TestWorkflow(t *testing.T) {
 		}
 	}()
 
-	res := resources()
-
 	time.Sleep(5 * time.Second) // Wait until the app starts and creates the Template TPR
 
-	r.Nil(c.Create(ctx, smith.TemplateResourceGroupVersion, templateNamespace, smith.TemplateResourcePath, &smith.Template{
-		TypeMeta: smith.TypeMeta{
-			Kind:       smith.TemplateResourceKind,
-			APIVersion: smith.TemplateResourceGroupVersion,
-		},
-		ObjectMeta: smith.ObjectMeta{
-			Name: templateName,
-		},
-		Spec: smith.TemplateSpec{
-			Resources: res,
-		},
-	}, &tmpl))
+	var tmplRes smith.Template
+	r.Nil(c.Create(ctx, smith.TemplateResourceGroupVersion, templateNamespace, smith.TemplateResourcePath, &tmpl, &tmplRes))
 	templateCreated = true
 
-	for _, resource := range res {
+	for _, resource := range tmpl.Spec.Resources {
 		func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
@@ -95,6 +94,9 @@ func TestWorkflow(t *testing.T) {
 			t.Fatalf("expecting event for %q resource of kind %q", resource.Spec.Name, resource.Spec.Kind)
 		}()
 	}
+	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
+	r.Nil(c.Get(ctx, smith.TemplateResourceGroupVersion, templateNamespace, smith.TemplateResourcePath, templateName, nil, &tmplRes))
+	r.Equal(smith.READY, tmplRes.Status.State)
 }
 
 func resources() []smith.Resource {
@@ -107,9 +109,7 @@ func resources() []smith.Resource {
 	}
 	return []smith.Resource{
 		{
-			ObjectMeta: smith.ObjectMeta{
-				Name: "resource1",
-			},
+			Name: "resource1",
 			Spec: smith.ResourceSpec{
 				TypeMeta:   tm1,
 				ObjectMeta: om1,

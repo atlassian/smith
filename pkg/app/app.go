@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/client"
@@ -165,7 +164,6 @@ func (a *App) ensureResourceExists(ctx context.Context) error {
 		},
 	}, res)
 	if err != nil {
-		log.Printf("%#v", err)
 		if !client.IsAlreadyExists(err) {
 			return fmt.Errorf("failed to create ThirdPartyResource: %v", err)
 		}
@@ -182,7 +180,6 @@ func (a *App) watchTpr(tpr *smith.ThirdPartyResource) {
 		return
 	}
 	// TODO only watch supported TPRs (inspect annotations?)
-	log.Printf("TPR: %#v", tpr)
 	path, group := splitTprName(tpr.Name)
 	for _, version := range tpr.Versions {
 		a.Watcher.Watch(group+"/"+version.Name, smith.AllNamespaces, path, "", newTprInstanceEvent)
@@ -194,17 +191,4 @@ func (a *App) forgetTpr(tpr *smith.ThirdPartyResource) {
 	for _, version := range tpr.Versions {
 		a.Watcher.Forget(group+"/"+version.Name, smith.AllNamespaces, path)
 	}
-}
-
-// splitTprName splits TPR's name into resource name and group name.
-// e.g. "postgresql-resource.smith-sql.atlassian.com" is split into "postgresqlresources" and "smith-sql.atlassian.com".
-// See https://github.com/kubernetes/kubernetes/blob/master/docs/design/extending-api.md
-// See k8s.io/pkg/api/meta/restmapper.go:147 KindToResource()
-func splitTprName(name string) (string, string) {
-	pos := strings.IndexByte(name, '.')
-	if pos == -1 || pos == 0 {
-		panic(fmt.Errorf("invalid resource name: %q", name))
-	}
-	resourcePath := strings.Replace(name[:pos], "-", "", -1)
-	return client.ResourceKindToPath(resourcePath), name[pos+1:]
 }

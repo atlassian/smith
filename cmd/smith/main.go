@@ -44,7 +44,9 @@ func runWithClient(ctx context.Context, c *client.ResourceClient) error {
 	defer watcher.Join() // await termination
 	defer subCancel()    // cancel ctx to signal done to watcher. If anything below panics, this will be called
 
-	tp := processor.New(subCtx, c)
+	rc := app.StatusReadyChecker{}
+
+	tp := processor.New(subCtx, c, &rc)
 	defer tp.Join()   // await termination
 	defer subCancel() // cancel ctx to signal done to processor (and everything else)
 
