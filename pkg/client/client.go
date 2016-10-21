@@ -182,11 +182,6 @@ func (c *ResourceClient) DoCheckResponse(ctx context.Context, verb, groupVersion
 			}
 			return &se
 		}
-		// If this line is removed, program crashes with
-		//panic: runtime error: invalid memory address or nil pointer dereference
-		//[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x0]
-		// https://github.com/golang/go/issues/17318
-		log.Print(f)
 		return f(resp.Body)
 	})
 }
