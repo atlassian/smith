@@ -56,8 +56,11 @@ func (tp *TemplateProcessor) Join() {
 	tp.wg.Wait()
 }
 
-func (tp *TemplateProcessor) Rebuild(tpl smith.Template) { // make a copy
-	tp.rebuildInternal(tpl.Namespace, tpl.Name, &tpl)
+// Rebuild schedules a rebuild of the template.
+// Note that the template object and/or resources in the template may be mutated asynchronously so the
+// calling code should do a proper deep copy if the object is still needed.
+func (tp *TemplateProcessor) Rebuild(tpl *smith.Template) {
+	tp.rebuildInternal(tpl.Namespace, tpl.Name, tpl)
 }
 
 func (tp *TemplateProcessor) RebuildByName(namespace, name string) {

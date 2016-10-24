@@ -68,7 +68,8 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 6. Start rebuilds for existing templates to re-assert their state
 	for _, template := range templateList.Items {
-		a.Processor.Rebuild(template)
+		t := template
+		a.Processor.Rebuild(&t)
 	}
 
 	// 7. Watch for template-related events
@@ -93,7 +94,7 @@ func (a *App) handleEvent(event interface{}) {
 	case *smith.TemplateWatchEvent:
 		switch ev.Type {
 		case smith.Added, smith.Modified:
-			a.Processor.Rebuild(*ev.Object)
+			a.Processor.Rebuild(ev.Object)
 		case smith.Deleted:
 		// TODO Somehow use finalizers to prevent direct deletion?
 		// "No direct deletion" convention? Use ObjectMeta.DeletionTimestamp like Namespace does?
