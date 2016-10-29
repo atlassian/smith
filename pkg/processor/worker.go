@@ -2,6 +2,7 @@ package processor
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -34,7 +35,7 @@ func (wrk *worker) rebuildLoop() {
 		if err == nil {
 			wrk.bo.Reset() // reset the backoff on successful rebuild
 			// Make sure template does not need to be rebuilt before exiting goroutine by doing one more iteration
-		} else if !wrk.handleError(err) {
+		} else if !wrk.handleError(tpl, err) {
 			return
 		}
 	}
@@ -56,6 +57,10 @@ func (wrk *worker) rebuild(tpl *smith.Template) error {
 			return err
 		}
 	}
+	if tpl.Status.State == smith.TERMINAL_ERROR {
+		// Sad, but true.
+		return nil
+	}
 	log.Printf("Rebuilding the template %s/%s", wrk.namespace, wrk.name)
 
 	for _, res := range tpl.Spec.Resources {
@@ -63,17 +68,19 @@ func (wrk *worker) rebuild(tpl *smith.Template) error {
 			return nil
 		}
 		isReady, err := wrk.checkResource(&res)
-		if err != nil || !isReady {
+		if err != nil {
 			return err
 		}
+		if !isReady {
+			if err := wrk.setTemplateState(tpl, smith.IN_PROGRESS); err != nil {
+				log.Printf("%v", err)
+			}
+			return nil
+		}
 	}
-	var err error
-	if tpl.Status.State != smith.READY {
-		tpl.Status.State = smith.READY
-		err = wrk.tp.client.Update(wrk.tp.ctx, smith.TemplateResourceGroupVersion, wrk.namespace, smith.TemplateResourcePath, wrk.name, tpl, nil)
-	}
+	err := wrk.setTemplateState(tpl, smith.READY)
 	if err == nil {
-		log.Printf("Template %s/%s is READY", wrk.namespace, wrk.name)
+		log.Printf("Template %s/%s is %s", wrk.namespace, wrk.name, smith.READY)
 	}
 	return err
 }
@@ -136,16 +143,34 @@ func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
 
 func (wrk *worker) fetchTemplate() (*smith.Template, error) {
 	log.Printf("Fetching the template %s/%s", wrk.namespace, wrk.name)
-	var tpl smith.Template
-	if err := wrk.tp.client.Get(wrk.tp.ctx, smith.TemplateResourceGroupVersion, wrk.namespace, smith.TemplateResourcePath, wrk.name, nil, &tpl); err != nil {
+	tpl := new(smith.Template)
+	if err := wrk.tp.client.Get(wrk.tp.ctx, smith.TemplateResourceGroupVersion, wrk.namespace, smith.TemplateResourcePath, wrk.name, nil, tpl); err != nil {
 		// TODO handle 404 - template was deleted
 		return nil, err
 	}
 	// Store fetched template for future reference
 	wrk.tp.lock.Lock()
 	defer wrk.tp.lock.Unlock()
-	wrk.template = &tpl
-	return &tpl, nil
+	if wrk.template == nil {
+		wrk.template = tpl
+	} else {
+		// Do not overwrite template that came via event while we were fetching it - it may be more fresh.
+		tpl = wrk.template
+	}
+	wrk.needsRebuild = false // In any case we are using the latest template, no need for rebuilds
+	return tpl, nil
+}
+
+func (wrk *worker) setTemplateState(tpl *smith.Template, desired smith.ResourceState) error {
+	if tpl.Status.State == desired {
+		return nil
+	}
+	tpl.Status.State = desired
+	err := wrk.tp.client.Update(wrk.tp.ctx, smith.TemplateResourceGroupVersion, wrk.namespace, smith.TemplateResourcePath, wrk.name, tpl, nil)
+	if err != nil {
+		return fmt.Errorf("failed to set template %s/%s state to %s: %v", wrk.namespace, wrk.name, desired, err)
+	}
+	return nil
 }
 
 // checkRebuild gets the current "rebuild required" status and resets it.
@@ -157,6 +182,7 @@ func (wrk *worker) checkRebuild() (*smith.Template, bool) {
 		wrk.needsRebuild = false
 		return wrk.template, true
 	}
+	// delete atomically with the check to avoid race with Processor's rebuildInternal()
 	delete(wrk.tp.workers, wrk.workerRef)
 	return nil, false
 }
@@ -167,14 +193,16 @@ func (wrk *worker) cleanupState() {
 	delete(wrk.tp.workers, wrk.workerRef)
 }
 
-func (wrk *worker) handleError(err error) (shouldContinue bool) {
+func (wrk *worker) handleError(tpl *smith.Template, err error) (shouldContinue bool) {
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		return false
 	}
 	log.Printf("Failed to rebuild the template %s/%s: %v", wrk.namespace, wrk.name, err)
 	next := wrk.bo.NextBackOff()
 	if next == backoff.Stop {
-		// TODO update template state to TERMINAL_ERROR
+		if e := wrk.setTemplateState(tpl, smith.TERMINAL_ERROR); e != nil {
+			log.Printf("%v", e)
+		}
 		return false
 	}
 	func() {
@@ -182,11 +210,13 @@ func (wrk *worker) handleError(err error) (shouldContinue bool) {
 		defer wrk.tp.lock.Unlock()
 		wrk.needsRebuild = true
 	}()
-	// TODO update template state to ERROR
+	if e := wrk.setTemplateState(tpl, smith.ERROR); e != nil {
+		log.Printf("%v", e)
+	}
 	after := time.NewTimer(next)
+	defer after.Stop()
 	select {
 	case <-wrk.tp.ctx.Done():
-		after.Stop()
 		return false
 	case <-after.C:
 	}

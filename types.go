@@ -7,9 +7,11 @@ import (
 type ResourceState string
 
 const (
-	NEW         ResourceState = ""
-	IN_PROGRESS ResourceState = "InProgress"
-	READY       ResourceState = "Ready"
+	NEW            ResourceState = ""
+	IN_PROGRESS    ResourceState = "InProgress"
+	READY          ResourceState = "Ready"
+	ERROR          ResourceState = "Error"
+	TERMINAL_ERROR ResourceState = "Terminal_Error"
 )
 
 const (
