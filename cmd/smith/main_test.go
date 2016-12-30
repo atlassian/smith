@@ -12,6 +12,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/client-go/pkg/api/unversioned"
+	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/watch"
 )
 
 func TestWorkflow(t *testing.T) {
@@ -24,11 +27,11 @@ func TestWorkflow(t *testing.T) {
 
 	var templateCreated bool
 	tmpl := smith.Template{
-		TypeMeta: smith.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       smith.TemplateResourceKind,
 			APIVersion: smith.TemplateResourceGroupVersion,
 		},
-		ObjectMeta: smith.ObjectMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: templateName,
 		},
 		Spec: smith.TemplateSpec{
@@ -80,7 +83,7 @@ func TestWorkflow(t *testing.T) {
 				case error:
 					t.Logf("Something went wrong with watch: %v", ev)
 				case *smith.GenericWatchEvent:
-					if ev.Type == smith.Added &&
+					if ev.Type == watch.Added &&
 						ev.Object.TypeMeta == resource.Spec.TypeMeta &&
 						ev.Object.Name == resource.Spec.Name {
 						t.Logf("received event for resource %q of kind %q", resource.Spec.Name, resource.Spec.Kind)
@@ -100,11 +103,11 @@ func TestWorkflow(t *testing.T) {
 }
 
 func resources() []smith.Resource {
-	tm1 := smith.TypeMeta{
+	tm1 := unversioned.TypeMeta{
 		Kind:       "ConfigMap",
 		APIVersion: "v1",
 	}
-	om1 := smith.ObjectMeta{
+	om1 := api.ObjectMeta{
 		Name: "config1",
 	}
 	return []smith.Resource{
@@ -113,7 +116,7 @@ func resources() []smith.Resource {
 			Spec: smith.ResourceSpec{
 				TypeMeta:   tm1,
 				ObjectMeta: om1,
-				Resource: &smith.ConfigMap{
+				Resource: &api.ConfigMap{
 					TypeMeta:   tm1,
 					ObjectMeta: om1,
 					Data: map[string]string{

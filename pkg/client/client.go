@@ -20,6 +20,9 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+
+	"k8s.io/client-go/pkg/api/unversioned"
+	api "k8s.io/client-go/pkg/api/v1"
 )
 
 const (
@@ -47,14 +50,14 @@ type ResourceClient struct {
 
 type StatusError struct {
 	msg    string
-	status smith.Status
+	status unversioned.Status
 }
 
 func (se *StatusError) Error() string {
 	return se.msg
 }
 
-func (se *StatusError) Status() smith.Status {
+func (se *StatusError) Status() unversioned.Status {
 	return se.status
 }
 
@@ -246,11 +249,11 @@ func NewInCluster() (*ResourceClient, error) {
 	if len(host) == 0 || len(port) == 0 {
 		return nil, errors.New("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
 	}
-	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + smith.ServiceAccountTokenKey)
+	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountTokenKey)
 	if err != nil {
 		return nil, err
 	}
-	rootCA := "/var/run/secrets/kubernetes.io/serviceaccount/" + smith.ServiceAccountRootCAKey
+	rootCA := "/var/run/secrets/kubernetes.io/serviceaccount/" + api.ServiceAccountRootCAKey
 	CAData, err := ioutil.ReadFile(rootCA)
 	if err != nil {
 		return nil, err

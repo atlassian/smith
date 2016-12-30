@@ -2,6 +2,14 @@ package smith
 
 import (
 	"encoding/json"
+
+	"k8s.io/client-go/pkg/api/unversioned"
+	api "k8s.io/client-go/pkg/api/v1"
+)
+
+const (
+	DefaultAPIPath = "/apis"
+	LegacyAPIPath  = "/api"
 )
 
 type ResourceState string
@@ -34,10 +42,10 @@ const (
 )
 
 type TemplateList struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of templates.
 	Items []Template `json:"items"`
@@ -47,10 +55,10 @@ type TemplateList struct {
 // Specification and status are separate entities as per
 // https://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#spec-and-status
 type Template struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// Standard object metadata
-	ObjectMeta `json:"metadata,omitempty"`
+	api.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the specification of the desired behavior of the Template.
 	Spec TemplateSpec `json:"spec,omitempty"`
@@ -85,10 +93,10 @@ type Resource struct {
 
 // ResourceSpec holds a resource specification in a raw JSON form plus decoded metadata.
 type ResourceSpec struct {
-	TypeMeta
+	unversioned.TypeMeta
 
 	// Standard object metadata
-	ObjectMeta
+	api.ObjectMeta
 
 	// Holds map[string]interface{} for marshaling from/into JSON.
 	Resource interface{} `json:",inline"`
@@ -96,8 +104,8 @@ type ResourceSpec struct {
 
 func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
 	var meta struct {
-		TypeMeta   `json:",inline"`
-		ObjectMeta `json:"metadata,omitempty"`
+		unversioned.TypeMeta `json:",inline"`
+		api.ObjectMeta       `json:"metadata,omitempty"`
 	}
 	if err := json.Unmarshal(data, &meta); err != nil {
 		return err

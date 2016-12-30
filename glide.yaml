@@ -4,3 +4,5 @@ import:
   subpackages:
   - assert
 - package: github.com/cenk/backoff
+- package: k8s.io/client-go
+  version: ~2.0.0-alpha.1

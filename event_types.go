@@ -3,26 +3,31 @@ package smith
 import (
 	"encoding/json"
 	"fmt"
+
+	"k8s.io/client-go/pkg/api/unversioned"
+	api "k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/pkg/watch"
 )
 
 // WatchEventHeader objects are streamed from the api server in response to a watch request.
 type WatchEventHeader struct {
 	// The type of the watch event; added, modified, deleted, or error.
-	Type EventType `json:"type,omitempty" description:"the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"`
+	Type watch.EventType `json:"type,omitempty" description:"the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"`
 }
 
 type GenericWatchObject struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// Standard object metadata
-	ObjectMeta `json:"metadata,omitempty"`
+	api.ObjectMeta `json:"metadata,omitempty"`
 }
 
 type GenericWatchEvent struct {
-	Type EventType `json:"type"`
+	Type watch.EventType `json:"type"`
 
 	Object *GenericWatchObject `json:"object"`
-	Status *Status             `json:"-"`
+	Status *unversioned.Status `json:"-"`
 }
 
 func (gwe *GenericWatchEvent) UnmarshalJSON(data []byte) error {
@@ -41,15 +46,15 @@ func (gwe *GenericWatchEvent) ResourceVersion() string {
 }
 
 type TemplateWatchEvent struct {
-	Type EventType `json:"type"`
+	Type watch.EventType `json:"type"`
 
 	// Object is:
 	//  * If Type is Added or Modified: the new state of the object.
 	//  * If Type is Deleted: the state of the object immediately before deletion.
 	//  * If Type is Error: *api.Status is recommended; other types may make sense
 	//    depending on context.
-	Object *Template `json:"object"`
-	Status *Status   `json:"-"`
+	Object *Template           `json:"object"`
+	Status *unversioned.Status `json:"-"`
 }
 
 func (twe *TemplateWatchEvent) UnmarshalJSON(data []byte) error {
@@ -70,23 +75,23 @@ func (twe *TemplateWatchEvent) ResourceVersion() string {
 // TprInstance describes some Third Party Resource instance.
 // It contains only metadata about the object.
 type TprInstance struct {
-	TypeMeta `json:",inline"`
+	unversioned.TypeMeta `json:",inline"`
 
 	// Standard object metadata
-	ObjectMeta `json:"metadata,omitempty"`
+	api.ObjectMeta `json:"metadata,omitempty"`
 }
 
 // TprInstanceWatchEvent describes a watch event for some Third Party Resource instance.
 type TprInstanceWatchEvent struct {
-	Type EventType `json:"type"`
+	Type watch.EventType `json:"type"`
 
 	// Object is:
 	//  * If Type is Added or Modified: the new state of the object.
 	//  * If Type is Deleted: the state of the object immediately before deletion.
 	//  * If Type is Error: *api.Status is recommended; other types may make sense
 	//    depending on context.
-	Object *TprInstance `json:"object"`
-	Status *Status      `json:"-"`
+	Object *TprInstance        `json:"object"`
+	Status *unversioned.Status `json:"-"`
 }
 
 func (twe *TprInstanceWatchEvent) UnmarshalJSON(data []byte) error {
@@ -106,20 +111,20 @@ func (twe *TprInstanceWatchEvent) ResourceVersion() string {
 
 // TprWatchEvent describes a watch event for Third Party Resource.
 type TprWatchEvent struct {
-	Type EventType `json:"type"`
+	Type watch.EventType `json:"type"`
 
 	// Object is:
 	//  * If Type is Added or Modified: the new state of the object.
 	//  * If Type is Deleted: the state of the object immediately before deletion.
 	//  * If Type is Error: *api.Status is recommended; other types may make sense
 	//    depending on context.
-	Object *ThirdPartyResource `json:"object"`
-	Status *Status             `json:"-"`
+	Object *extensions.ThirdPartyResource `json:"object"`
+	Status *unversioned.Status            `json:"-"`
 }
 
 func (twe *TprWatchEvent) UnmarshalJSON(data []byte) error {
 	var holder struct {
-		Object ThirdPartyResource `json:"object"`
+		Object extensions.ThirdPartyResource `json:"object"`
 	}
 	if err := unmarshalEvent(data, &holder, &twe.Type, &twe.Status); err != nil {
 		return err
@@ -132,18 +137,18 @@ func (twe *TprWatchEvent) ResourceVersion() string {
 	return twe.Object.ResourceVersion
 }
 
-func unmarshalEvent(data []byte, v interface{}, t *EventType, s **Status) error {
+func unmarshalEvent(data []byte, v interface{}, t *watch.EventType, s **unversioned.Status) error {
 	var weh WatchEventHeader
 	if err := json.Unmarshal(data, &weh); err != nil {
 		return err
 	}
 	*t = weh.Type
 	switch weh.Type {
-	case Added, Modified, Deleted:
+	case watch.Added, watch.Modified, watch.Deleted:
 		return json.Unmarshal(data, v)
-	case Error:
+	case watch.Error:
 		var holder struct {
-			Object Status `json:"object"`
+			Object unversioned.Status `json:"object"`
 		}
 		if err := json.Unmarshal(data, &holder); err != nil {
 			return err

@@ -8,6 +8,12 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/processor"
+
+	"k8s.io/client-go/pkg/api/errors"
+	"k8s.io/client-go/pkg/api/unversioned"
+	api "k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/pkg/watch"
 )
 
 type App struct {
@@ -33,9 +39,9 @@ func (a *App) Run(ctx context.Context) error {
 	// 2. TODO watch supported built-in resource types for events.
 
 	// 3. List Third Party Resources to figure out list of supported ones
-	var tprList smith.ThirdPartyResourceList
+	var tprList extensions.ThirdPartyResourceList
 	err = retryUntilSuccessOrDone(ctx, func() error {
-		tprList = smith.ThirdPartyResourceList{}
+		tprList = extensions.ThirdPartyResourceList{}
 		return a.Client.List(ctx, smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.ThirdPartyResourcePath, nil, &tprList)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
@@ -93,41 +99,41 @@ func (a *App) handleEvent(event interface{}) {
 		log.Printf("Something went wrong with watch: %v", ev)
 	case *smith.TemplateWatchEvent:
 		switch ev.Type {
-		case smith.Added, smith.Modified:
+		case watch.Added, watch.Modified:
 			a.Processor.Rebuild(ev.Object)
-		case smith.Deleted:
+		case watch.Deleted:
 		// TODO Somehow use finalizers to prevent direct deletion?
 		// "No direct deletion" convention? Use ObjectMeta.DeletionTimestamp like Namespace does?
 		// Somehow implement GC to do cleanup after template is deleted?
 		// Maybe store template in annotation on each resource to help reconstruct the dependency graph for GC?
-		case smith.Error:
+		case watch.Error:
 			// TODO what to do with it?
 			log.Printf("Watch returned an Error event: %#v", ev)
 		}
 	case *smith.TprInstanceWatchEvent:
 		switch ev.Type {
-		case smith.Added, smith.Modified, smith.Deleted:
+		case watch.Added, watch.Modified, watch.Deleted:
 			templateName := ev.Object.Labels[smith.TemplateNameLabel]
 			if templateName != "" {
 				a.Processor.RebuildByName(ev.Object.Namespace, templateName)
 			}
-		case smith.Error:
+		case watch.Error:
 			// TODO what to do with it?
 			log.Printf("Watch returned an Error event: %#v", ev)
 		}
 	case *smith.TprWatchEvent:
 		switch ev.Type {
-		case smith.Added:
+		case watch.Added:
 			a.watchTpr(ev.Object)
 		// TODO rebuild all templates containing resources of this type
-		case smith.Modified:
+		case watch.Modified:
 			a.forgetTpr(ev.Object)
 			a.watchTpr(ev.Object)
 		// TODO rebuild all templates containing resources of this type
-		case smith.Deleted:
+		case watch.Deleted:
 			a.forgetTpr(ev.Object)
 		// TODO rebuild all templates containing resources of this type
-		case smith.Error:
+		case watch.Error:
 			// TODO what to do with it?
 			log.Printf("Watch returned an Error event: %#v", ev)
 		}
@@ -150,22 +156,22 @@ func newTprEvent() interface{} {
 
 func (a *App) ensureResourceExists(ctx context.Context) error {
 	log.Printf("Creating ThirdPartyResource %s", smith.TemplateResourceName)
-	res := &smith.ThirdPartyResource{}
-	err := a.Client.Create(ctx, smith.ThirdPartyResourceGroupVersion, "", "thirdpartyresources", &smith.ThirdPartyResource{
-		TypeMeta: smith.TypeMeta{
+	res := &extensions.ThirdPartyResource{}
+	err := a.Client.Create(ctx, smith.ThirdPartyResourceGroupVersion, "", "thirdpartyresources", &extensions.ThirdPartyResource{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ThirdPartyResource",
 			APIVersion: smith.ThirdPartyResourceGroupVersion,
 		},
-		ObjectMeta: smith.ObjectMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: smith.TemplateResourceName,
 		},
 		Description: "Smith resource manager",
-		Versions: []smith.APIVersion{
+		Versions: []extensions.APIVersion{
 			{Name: smith.TemplateResourceVersion},
 		},
 	}, res)
 	if err != nil {
-		if !client.IsAlreadyExists(err) {
+		if !errors.IsAlreadyExists(err) {
 			return fmt.Errorf("failed to create ThirdPartyResource: %v", err)
 		}
 		log.Printf("ThirdPartyResource %s already exists", smith.TemplateResourceName)
@@ -175,7 +181,7 @@ func (a *App) ensureResourceExists(ctx context.Context) error {
 	return nil
 }
 
-func (a *App) watchTpr(tpr *smith.ThirdPartyResource) {
+func (a *App) watchTpr(tpr *extensions.ThirdPartyResource) {
 	if tpr.Name == smith.TemplateResourceName {
 		log.Printf("Not watching known TPR %s", tpr.Name)
 		return
@@ -187,7 +193,7 @@ func (a *App) watchTpr(tpr *smith.ThirdPartyResource) {
 	}
 }
 
-func (a *App) forgetTpr(tpr *smith.ThirdPartyResource) {
+func (a *App) forgetTpr(tpr *extensions.ThirdPartyResource) {
 	path, group := splitTprName(tpr.Name)
 	for _, version := range tpr.Versions {
 		a.Watcher.Forget(group+"/"+version.Name, smith.AllNamespaces, path)
