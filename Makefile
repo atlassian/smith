@@ -18,10 +18,10 @@ setup-ci:
 	go get -u golang.org/x/tools/cmd/goimports
 	glide install --strip-vendor
 
-build: *.go fmt
+build: fmt
 	go build -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
-build-race: *.go fmt
+build-race: fmt
 	go build -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
 build-all:
@@ -44,6 +44,7 @@ test-race:
 
 # Compile a static binary. Cannot be used with -race
 docker:
+	docker pull golang:$(GOVERSION)
 	docker run \
 		--rm \
 		-v "$(GOPATH)":"$(GP)" \
@@ -56,6 +57,7 @@ docker:
 
 # Compile a binary with -race. Needs to be run on a glibc-based system.
 docker-race:
+	docker pull golang:$(GOVERSION)
 	docker run \
 		--rm \
 		-v "$(GOPATH)":"$(GP)" \
