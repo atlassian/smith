@@ -1,5 +1,5 @@
-hash: 1386a21beb53081ef119cfa021e4a648ec5e153a09073160b417b7ef0937a2c4
-updated: 2016-10-10T21:20:23.57186486+11:00
+hash: f27fb3e4730fda8ed5c42f817930c65ff9c68a226bd125cc2f66772e81ba1220
+updated: 2016-12-30T12:41:53.762835931+11:00
 imports:
 - name: github.com/cenk/backoff
   version: 8edc80b07f38c27352fb186d971c628a6c32552b
@@ -8,6 +8,8 @@ imports:
   subpackages:
   - assert
   - require
+- name: k8s.io/client-go
+  version: d81cb85237595f720d83eda492bae8f6162fc5c0
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9

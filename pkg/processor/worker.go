@@ -10,6 +10,7 @@ import (
 	"github.com/atlassian/smith/pkg/client"
 
 	"github.com/cenk/backoff"
+	"k8s.io/client-go/pkg/api/errors"
 )
 
 type worker struct {
@@ -98,7 +99,7 @@ func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
 		// 1. Try to get the resource. We do read first to avoid generating unnecessary events.
 		err := wrk.tp.client.Get(wrk.tp.ctx, res.Spec.APIVersion, wrk.namespace, resourcePath, res.Spec.Name, nil, &response)
 		if err != nil {
-			if !client.IsNotFound(err) {
+			if !errors.IsNotFound(err) {
 				// Unexpected error
 				return false, err
 			}
@@ -109,7 +110,7 @@ func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
 				log.Printf("template %s/%s: resource %s created", wrk.namespace, wrk.name, res.Name)
 				break
 			}
-			if client.IsAlreadyExists(err) {
+			if errors.IsAlreadyExists(err) {
 				log.Printf("template %s/%s: resource %s found, restarting loop", wrk.namespace, wrk.name, res.Name)
 				continue
 			}
@@ -128,7 +129,7 @@ func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
 		res.Spec.ResourceVersion = response.ResourceVersion // Do CAS
 		err = wrk.tp.client.Update(wrk.tp.ctx, res.Spec.APIVersion, wrk.namespace, resourcePath, res.Spec.Name, &res.Spec, &response)
 		if err != nil {
-			if client.IsConflict(err) {
+			if errors.IsConflict(err) {
 				log.Printf("template %s/%s: resource %s update resulted in conflict, restarting loop", wrk.namespace, wrk.name, res.Name)
 				continue
 			}
