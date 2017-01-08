@@ -12,7 +12,7 @@ type StatusReadyChecker struct {
 }
 
 func (rc *StatusReadyChecker) IsReady(res *smith.Resource) (bool, error) {
-	switch res.Spec.Kind {
+	switch res.Spec.GetKind() {
 	case "ConfigMap":
 		return true, nil
 	default:

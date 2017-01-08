@@ -2,25 +2,34 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/client"
+	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/unversioned"
-	api "k8s.io/client-go/pkg/api/v1"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/watch"
 )
 
 func TestWorkflow(t *testing.T) {
 	a := assert.New(t)
 	r := require.New(t)
-	c := newClient(t, r)
+	config := configFromEnv(t)
+
+	templateClient, err := resources.GetTemplateTprClient(config)
+	r.NoError(err)
+
+	clients := dynamic.NewClientPool(config, nil, dynamic.LegacyAPIPathResolverFunc)
 
 	templateName := "template1"
 	templateNamespace := "default"
@@ -31,24 +40,48 @@ func TestWorkflow(t *testing.T) {
 			Kind:       smith.TemplateResourceKind,
 			APIVersion: smith.TemplateResourceGroupVersion,
 		},
-		ObjectMeta: api.ObjectMeta{
+		Metadata: apiv1.ObjectMeta{
 			Name: templateName,
 		},
 		Spec: smith.TemplateSpec{
-			Resources: resources(),
+			Resources: tplResources(r),
 		},
 	}
-	_ = c.Delete(context.Background(), smith.TemplateResourceGroupVersion, templateNamespace, smith.TemplateResourcePath, templateName)
+	err = templateClient.Delete().
+		Namespace(templateNamespace).
+		Resource(smith.TemplateResourcePath).
+		Name(templateName).
+		Do().
+		Error()
+	if err == nil {
+		log.Print("Template deleted")
+	} else if !errors.IsNotFound(err) {
+		r.NoError(err)
+	}
 	defer func() {
-		if templateCreated {
-			// Cleanup after test and after server has stopped
-			ctxTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
+		if !templateCreated {
 			log.Printf("Deleting template %s", templateName)
-			a.Nil(c.Delete(ctxTimeout, smith.TemplateResourceGroupVersion, templateNamespace, smith.TemplateResourcePath, templateName))
+			a.NoError(templateClient.Delete().
+				Namespace(templateNamespace).
+				Resource(smith.TemplateResourcePath).
+				Name(templateName).
+				Do().
+				Error())
 			for _, resource := range tmpl.Spec.Resources {
-				log.Printf("Deleting resource %s", resource.Spec.Name)
-				a.Nil(c.Delete(ctxTimeout, resource.Spec.APIVersion, templateNamespace, client.ResourceKindToPath(resource.Spec.Kind), resource.Spec.Name))
+				log.Printf("Deleting resource %s", resource.Spec.GetName())
+				gv, err := unversioned.ParseGroupVersion(resource.Spec.GetAPIVersion())
+				if !a.NoError(err) {
+					continue
+				}
+				client, err := clients.ClientForGroupVersionKind(gv.WithKind(resource.Spec.GetKind()))
+				if !a.NoError(err) {
+					continue
+				}
+				a.NoError(client.Resource(&unversioned.APIResource{
+					Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
+					Namespaced: true,
+					Kind:       resource.Spec.GetKind(),
+				}, templateNamespace).Delete(resource.Spec.GetName(), &apiv1.DeleteOptions{}))
 			}
 		}
 	}()
@@ -63,67 +96,90 @@ func TestWorkflow(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		if err := runWithClient(ctx, c); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+		if err := runWithConfig(ctx, config); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 			t.Error(err)
 		}
 	}()
 
-	time.Sleep(5 * time.Second) // Wait until the app starts and creates the Template TPR
+	time.Sleep(1 * time.Second) // Wait until the app starts and creates the Template TPR
 
-	var tmplRes smith.Template
-	r.Nil(c.Create(ctx, smith.TemplateResourceGroupVersion, templateNamespace, smith.TemplateResourcePath, &tmpl, &tmplRes))
+	log.Print("Creating a new template")
+	r.NoError(templateClient.Post().
+		Namespace(templateNamespace).
+		Resource(smith.TemplateResourcePath).
+		Body(&tmpl).
+		Do().
+		Error())
+
 	templateCreated = true
 
 	for _, resource := range tmpl.Spec.Resources {
 		func() {
+			c, err := clients.ClientForGroupVersionKind(resource.Spec.GroupVersionKind())
+			r.NoError(err)
+			w, err := c.Resource(&unversioned.APIResource{
+				Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
+				Namespaced: true,
+				Kind:       resource.Spec.GetKind(),
+			}, templateNamespace).Watch(&apiv1.ListOptions{})
+			r.NoError(err)
+			defer w.Stop()
 			ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			for event := range c.Watch(ctxTimeout, resource.Spec.APIVersion, templateNamespace, client.ResourceKindToPath(resource.Spec.Kind), nil, genericEventFactory) {
-				switch ev := event.(type) {
-				case error:
-					t.Logf("Something went wrong with watch: %v", ev)
-				case *smith.GenericWatchEvent:
-					if ev.Type == watch.Added &&
-						ev.Object.TypeMeta == resource.Spec.TypeMeta &&
-						ev.Object.Name == resource.Spec.Name {
-						t.Logf("received event for resource %q of kind %q", resource.Spec.Name, resource.Spec.Kind)
+			for {
+				select {
+				case <-ctxTimeout.Done():
+					t.Fatalf("Timeout waiting for events for resource %s", resource.Name)
+				case ev := <-w.ResultChan():
+					log.Printf("event %#v", ev)
+					if ev.Type != watch.Added || ev.Object.GetObjectKind().GroupVersionKind() != resource.Spec.GetObjectKind().GroupVersionKind() {
+						continue
+					}
+					obj, ok := ev.Object.(*runtime.Unstructured)
+					r.True(ok)
+					if obj.GetName() == resource.Spec.GetName() {
+						log.Printf("received event for resource %q of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
 						return
 					}
-					t.Logf("event %#v", ev)
-				default:
-					t.Fatalf("unexpected event type: %T", event)
 				}
 			}
-			t.Fatalf("expecting event for %q resource of kind %q", resource.Spec.Name, resource.Spec.Kind)
+			t.Fatalf("expecting event for %q resource of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
 		}()
 	}
 	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
-	r.Nil(c.Get(ctx, smith.TemplateResourceGroupVersion, templateNamespace, smith.TemplateResourcePath, templateName, nil, &tmplRes))
+	var tmplRes smith.Template
+	r.NoError(templateClient.Get().
+		Namespace(templateNamespace).
+		Resource(smith.TemplateResourcePath).
+		Name(templateName).
+		Do().
+		Into(&tmplRes))
+	log.Printf("tpl = %#v", &tmplRes)
 	r.Equal(smith.READY, tmplRes.Status.State)
 }
 
-func resources() []smith.Resource {
-	tm1 := unversioned.TypeMeta{
-		Kind:       "ConfigMap",
-		APIVersion: "v1",
+func tplResources(r *require.Assertions) []smith.Resource {
+	c := apiv1.ConfigMap{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: apiv1.ObjectMeta{
+			Name: "config1",
+		},
+		Data: map[string]string{
+			"a": "b",
+		},
 	}
-	om1 := api.ObjectMeta{
-		Name: "config1",
-	}
+	data, err := json.Marshal(&c)
+	r.NoError(err)
+
+	r1 := runtime.Unstructured{}
+	r.NoError(r1.UnmarshalJSON(data))
 	return []smith.Resource{
 		{
 			Name: "resource1",
-			Spec: smith.ResourceSpec{
-				TypeMeta:   tm1,
-				ObjectMeta: om1,
-				Resource: &api.ConfigMap{
-					TypeMeta:   tm1,
-					ObjectMeta: om1,
-					Data: map[string]string{
-						"a": "b",
-					},
-				},
-			},
+			Spec: r1,
 		},
 	}
 }

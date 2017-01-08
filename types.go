@@ -2,14 +2,12 @@ package smith
 
 import (
 	"encoding/json"
+	"log"
 
+	"k8s.io/client-go/pkg/api/meta"
 	"k8s.io/client-go/pkg/api/unversioned"
-	api "k8s.io/client-go/pkg/api/v1"
-)
-
-const (
-	DefaultAPIPath = "/apis"
-	LegacyAPIPath  = "/api"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/runtime"
 )
 
 type ResourceState string
@@ -19,7 +17,7 @@ const (
 	IN_PROGRESS    ResourceState = "InProgress"
 	READY          ResourceState = "Ready"
 	ERROR          ResourceState = "Error"
-	TERMINAL_ERROR ResourceState = "Terminal_Error"
+	TERMINAL_ERROR ResourceState = "TerminalError"
 )
 
 const (
@@ -33,32 +31,36 @@ const (
 	TemplateResourceGroupVersion = SmithResourceGroup + "/" + TemplateResourceVersion
 
 	TemplateNameLabel = TemplateResourceName + "/templateName"
-
-	ThirdPartyResourceGroupVersion = "extensions/v1beta1"
-	ThirdPartyResourcePath         = "thirdpartyresources"
-
-	AllNamespaces = ""
-	AllResources  = ""
 )
 
 type TemplateList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	Metadata unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of templates.
 	Items []Template `json:"items"`
 }
 
+// GetObjectKind is required to satisfy Object interface.
+func (tl *TemplateList) GetObjectKind() unversioned.ObjectKind {
+	return &tl.TypeMeta
+}
+
+// GetListMeta is required to satisfy ListMetaAccessor interface.
+func (tl *TemplateList) GetListMeta() meta.List {
+	return &tl.Metadata
+}
+
+var _ runtime.Object = &TemplateList{}
+var _ meta.ListMetaAccessor = &TemplateList{}
+
 // Template describes a resources template.
-// Specification and status are separate entities as per
-// https://releases.k8s.io/release-1.3/docs/devel/api-conventions.md#spec-and-status
 type Template struct {
 	unversioned.TypeMeta `json:",inline"`
 
 	// Standard object metadata
-	api.ObjectMeta `json:"metadata,omitempty"`
+	Metadata apiv1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the specification of the desired behavior of the Template.
 	Spec TemplateSpec `json:"spec,omitempty"`
@@ -66,6 +68,19 @@ type Template struct {
 	// Status is most recently observed status of the Template.
 	Status TemplateStatus `json:"status,omitempty"`
 }
+
+// Required to satisfy Object interface
+func (t *Template) GetObjectKind() unversioned.ObjectKind {
+	return &t.TypeMeta
+}
+
+// Required to satisfy ObjectMetaAccessor interface
+func (t *Template) GetObjectMeta() meta.Object {
+	return &t.Metadata
+}
+
+var _ runtime.Object = &Template{}
+var _ meta.ObjectMetaAccessor = &Template{}
 
 type TemplateSpec struct {
 	Resources []Resource `json:"resources"`
@@ -79,54 +94,41 @@ type TemplateStatus struct {
 type DependencyRef string
 
 type Resource struct {
-	// Standard object metadata
-	//ObjectMeta `json:"metadata,omitempty"`
-
 	// Name of the resource for references.
 	Name string
 
 	// Explicit dependencies.
 	DependsOn []DependencyRef `json:"dependsOn,omitempty"`
 
-	Spec ResourceSpec `json:"spec"`
+	Spec runtime.Unstructured `json:"spec"`
 }
 
-// ResourceSpec holds a resource specification in a raw JSON form plus decoded metadata.
-type ResourceSpec struct {
-	unversioned.TypeMeta
+// The code below is used only to work around a known problem with third-party
+// resources and ugorji. If/when these issues are resolved, the code below
+// should no longer be required.
 
-	// Standard object metadata
-	api.ObjectMeta
+type templateListCopy TemplateList
+type templateCopy Template
 
-	// Holds map[string]interface{} for marshaling from/into JSON.
-	Resource interface{} `json:",inline"`
-}
-
-func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
-	var meta struct {
-		unversioned.TypeMeta `json:",inline"`
-		api.ObjectMeta       `json:"metadata,omitempty"`
-	}
-	if err := json.Unmarshal(data, &meta); err != nil {
+func (e *Template) UnmarshalJSON(data []byte) error {
+	tmp := templateCopy{}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
 		return err
 	}
-	rs.TypeMeta = meta.TypeMeta
-	rs.ObjectMeta = meta.ObjectMeta
-	return json.Unmarshal(data, &rs.Resource)
+	tmp2 := Template(tmp)
+	*e = tmp2
+	log.Printf("%s", data)
+	return nil
 }
 
-func (rs *ResourceSpec) MarshalJSON() ([]byte, error) {
-	r, ok := rs.Resource.(map[string]interface{})
-	if !ok {
-		data, err := json.Marshal(rs.Resource)
-		if err != nil {
-			return nil, err
-		}
-		if err = json.Unmarshal(data, &r); err != nil {
-			return nil, err
-		}
-		rs.Resource = r
+func (el *TemplateList) UnmarshalJSON(data []byte) error {
+	tmp := templateListCopy{}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
 	}
-	r["metadata"] = &rs.ObjectMeta
-	return json.Marshal(rs.Resource)
+	tmp2 := TemplateList(tmp)
+	*el = tmp2
+	return nil
 }

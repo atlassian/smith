@@ -2,14 +2,16 @@ package processor
 
 import (
 	"context"
+	"log"
 	"math"
 	"sync"
 	"time"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/client"
 
 	"github.com/cenk/backoff"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 )
 
 type ReadyChecker interface {
@@ -24,11 +26,12 @@ type workerRef struct {
 }
 
 type TemplateProcessor struct {
-	ctx     context.Context
-	backoff BackOffFactory
-	client  *client.ResourceClient
-	rc      ReadyChecker
-	wg      sync.WaitGroup // tracks number of Goroutines running rebuildLoop()
+	ctx            context.Context
+	backoff        BackOffFactory
+	templateClient *rest.RESTClient
+	clients        dynamic.ClientPool
+	rc             ReadyChecker
+	wg             sync.WaitGroup // tracks number of Goroutines running rebuildLoop()
 
 	lock    sync.RWMutex // protects fields below
 	workers map[workerRef]*worker
@@ -36,13 +39,14 @@ type TemplateProcessor struct {
 
 // New creates a new template processor.
 // Instances are safe for concurrent use.
-func New(ctx context.Context, client *client.ResourceClient, rc ReadyChecker) *TemplateProcessor {
+func New(ctx context.Context, templateClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker) *TemplateProcessor {
 	return &TemplateProcessor{
-		ctx:     ctx,
-		backoff: exponentialBackOff,
-		client:  client,
-		rc:      rc,
-		workers: make(map[workerRef]*worker),
+		ctx:            ctx,
+		backoff:        exponentialBackOff,
+		templateClient: templateClient,
+		clients:        clients,
+		rc:             rc,
+		workers:        make(map[workerRef]*worker),
 	}
 }
 
@@ -54,10 +58,12 @@ func (tp *TemplateProcessor) Join() {
 // Note that the template object and/or resources in the template may be mutated asynchronously so the
 // calling code should do a proper deep copy if the object is still needed.
 func (tp *TemplateProcessor) Rebuild(tpl *smith.Template) {
-	tp.rebuildInternal(tpl.Namespace, tpl.Name, tpl)
+	log.Printf("Rebuilding the template %#v", tpl)
+	tp.rebuildInternal(tpl.Metadata.Namespace, tpl.Metadata.Name, tpl)
 }
 
 func (tp *TemplateProcessor) RebuildByName(namespace, name string) {
+	log.Printf("Rebuilding the template %s/%s", namespace, name)
 	tp.rebuildInternal(namespace, name, nil)
 }
 
