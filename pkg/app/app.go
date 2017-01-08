@@ -2,31 +2,55 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/processor"
+	"github.com/atlassian/smith/pkg/resources"
 
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/unversioned"
-	api "k8s.io/client-go/pkg/api/v1"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/watch"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 )
 
 type App struct {
-	Watcher   *Watcher
-	Client    *client.ResourceClient
-	Processor *processor.TemplateProcessor
-	Events    <-chan interface{}
+	RestConfig *rest.Config
 }
 
 func (a *App) Run(ctx context.Context) error {
+	clientset, err := kubernetes.NewForConfig(a.RestConfig)
+	if err != nil {
+		return err
+	}
+
+	templateClient, err := resources.GetTemplateTprClient(a.RestConfig)
+	if err != nil {
+		return err
+	}
+
+	clients := dynamic.NewClientPool(a.RestConfig, nil, dynamic.LegacyAPIPathResolverFunc)
+
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
+	tp := processor.New(ctx, templateClient, clients, &StatusReadyChecker{})
+	defer tp.Join() // await termination
+	defer cancel()  // cancel ctx to signal done to processor (and everything else)
+
 	// 1. Ensure ThirdPartyResource TEMPLATE exists
-	err := retryUntilSuccessOrDone(ctx, func() error {
-		return a.ensureResourceExists(ctx)
+	err = retryUntilSuccessOrDone(ctx, func() error {
+		return a.ensureResourceExists(ctx, clientset)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to create resource %s: %v", smith.TemplateResourceName, e)
@@ -38,138 +62,31 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 2. TODO watch supported built-in resource types for events.
 
-	// 3. List Third Party Resources to figure out list of supported ones
-	var tprList extensions.ThirdPartyResourceList
-	err = retryUntilSuccessOrDone(ctx, func() error {
-		tprList = extensions.ThirdPartyResourceList{}
-		return a.Client.List(ctx, smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.ThirdPartyResourcePath, nil, &tprList)
-	}, func(e error) bool {
-		// TODO be smarter about what is retried
-		log.Printf("Failed to list Third Party Resources %s: %v", smith.TemplateResourceName, e)
-		return false
-	})
-	if err != nil {
-		return err
-	}
-	for _, tpr := range tprList.Items {
-		a.watchTpr(&tpr)
-	}
+	// 3. Watch Third Party Resources to add watches for supported ones
+	a.watchThirdPartyResources(ctx, clientset, clients, tp)
 
-	// 4. Watch for addition/removal of TPRs to start/stop watches
-	a.Watcher.Watch(smith.ThirdPartyResourceGroupVersion, smith.AllNamespaces, smith.ThirdPartyResourcePath, tprList.ResourceVersion, newTprEvent)
+	// 4. Watch Templates
+	a.watchTemplates(ctx, templateClient, tp)
 
-	// 5. List existing templates
-	var templateList smith.TemplateList
-	err = retryUntilSuccessOrDone(ctx, func() error {
-		templateList = smith.TemplateList{}
-		return a.Client.List(ctx, smith.TemplateResourceGroupVersion, smith.AllNamespaces, smith.TemplateResourcePath, nil, &templateList)
-	}, func(e error) bool {
-		// TODO be smarter about what is retried
-		log.Printf("Failed to list resources %s: %v", smith.TemplateResourceName, e)
-		return false
-	})
-	if err != nil {
-		return err
-	}
-
-	// 6. Start rebuilds for existing templates to re-assert their state
-	for _, template := range templateList.Items {
-		t := template
-		a.Processor.Rebuild(&t)
-	}
-
-	// 7. Watch for template-related events
-	a.Watcher.Watch(smith.TemplateResourceGroupVersion, smith.AllNamespaces, smith.TemplateResourcePath, templateList.ResourceVersion, newTemplateEvent)
-
-	// 8. Process events and trigger rebuilds as necessary
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case event := <-a.Events:
-			a.handleEvent(event)
-		}
-	}
+	<-ctx.Done()
+	return ctx.Err()
 }
 
-func (a *App) handleEvent(event interface{}) {
-	log.Printf("Handling event: %#v", event)
-	switch ev := event.(type) {
-	case error:
-		log.Printf("Something went wrong with watch: %v", ev)
-	case *smith.TemplateWatchEvent:
-		switch ev.Type {
-		case watch.Added, watch.Modified:
-			a.Processor.Rebuild(ev.Object)
-		case watch.Deleted:
-		// TODO Somehow use finalizers to prevent direct deletion?
-		// "No direct deletion" convention? Use ObjectMeta.DeletionTimestamp like Namespace does?
-		// Somehow implement GC to do cleanup after template is deleted?
-		// Maybe store template in annotation on each resource to help reconstruct the dependency graph for GC?
-		case watch.Error:
-			// TODO what to do with it?
-			log.Printf("Watch returned an Error event: %#v", ev)
-		}
-	case *smith.TprInstanceWatchEvent:
-		switch ev.Type {
-		case watch.Added, watch.Modified, watch.Deleted:
-			templateName := ev.Object.Labels[smith.TemplateNameLabel]
-			if templateName != "" {
-				a.Processor.RebuildByName(ev.Object.Namespace, templateName)
-			}
-		case watch.Error:
-			// TODO what to do with it?
-			log.Printf("Watch returned an Error event: %#v", ev)
-		}
-	case *smith.TprWatchEvent:
-		switch ev.Type {
-		case watch.Added:
-			a.watchTpr(ev.Object)
-		// TODO rebuild all templates containing resources of this type
-		case watch.Modified:
-			a.forgetTpr(ev.Object)
-			a.watchTpr(ev.Object)
-		// TODO rebuild all templates containing resources of this type
-		case watch.Deleted:
-			a.forgetTpr(ev.Object)
-		// TODO rebuild all templates containing resources of this type
-		case watch.Error:
-			// TODO what to do with it?
-			log.Printf("Watch returned an Error event: %#v", ev)
-		}
-	default:
-		log.Printf("Unexpected event type: %T", event)
-	}
-}
-
-func newTemplateEvent() interface{} {
-	return &smith.TemplateWatchEvent{}
-}
-
-func newTprInstanceEvent() interface{} {
-	return &smith.TprInstanceWatchEvent{}
-}
-
-func newTprEvent() interface{} {
-	return &smith.TprWatchEvent{}
-}
-
-func (a *App) ensureResourceExists(ctx context.Context) error {
+func (a *App) ensureResourceExists(ctx context.Context, clientset *kubernetes.Clientset) error {
 	log.Printf("Creating ThirdPartyResource %s", smith.TemplateResourceName)
-	res := &extensions.ThirdPartyResource{}
-	err := a.Client.Create(ctx, smith.ThirdPartyResourceGroupVersion, "", "thirdpartyresources", &extensions.ThirdPartyResource{
+	res, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(&extensions.ThirdPartyResource{
 		TypeMeta: unversioned.TypeMeta{
-			Kind:       "ThirdPartyResource",
-			APIVersion: smith.ThirdPartyResourceGroupVersion,
+			Kind: "ThirdPartyResource",
+			//APIVersion: smith.ThirdPartyResourceGroupVersion,
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name: smith.TemplateResourceName,
 		},
 		Description: "Smith resource manager",
 		Versions: []extensions.APIVersion{
 			{Name: smith.TemplateResourceVersion},
 		},
-	}, res)
+	})
 	if err != nil {
 		if !errors.IsAlreadyExists(err) {
 			return fmt.Errorf("failed to create ThirdPartyResource: %v", err)
@@ -181,21 +98,61 @@ func (a *App) ensureResourceExists(ctx context.Context) error {
 	return nil
 }
 
-func (a *App) watchTpr(tpr *extensions.ThirdPartyResource) {
-	if tpr.Name == smith.TemplateResourceName {
-		log.Printf("Not watching known TPR %s", tpr.Name)
-		return
-	}
-	// TODO only watch supported TPRs (inspect annotations?)
-	path, group := splitTprName(tpr.Name)
-	for _, version := range tpr.Versions {
-		a.Watcher.Watch(group+"/"+version.Name, smith.AllNamespaces, path, "", newTprInstanceEvent)
-	}
+func (a *App) watchThirdPartyResources(ctx context.Context, clientset *kubernetes.Clientset, clients dynamic.ClientPool, processor Processor) {
+	tprClient := clientset.ExtensionsV1beta1().ThirdPartyResources()
+	tprInf := cache.NewSharedInformer(&cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			var opts apiv1.ListOptions
+			if err := apiv1.Convert_api_ListOptions_To_v1_ListOptions(&options, &opts, nil); err != nil {
+				return nil, err
+			}
+			return tprClient.List(opts)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			var opts apiv1.ListOptions
+			if err := apiv1.Convert_api_ListOptions_To_v1_ListOptions(&options, &opts, nil); err != nil {
+				return nil, err
+			}
+			return tprClient.Watch(opts)
+		},
+	}, &extensions.ThirdPartyResource{}, 0)
+
+	tprInf.AddEventHandler(newTprEventHandler(ctx, processor, clients))
+
+	go tprInf.Run(ctx.Done())
 }
 
-func (a *App) forgetTpr(tpr *extensions.ThirdPartyResource) {
-	path, group := splitTprName(tpr.Name)
-	for _, version := range tpr.Versions {
-		a.Watcher.Forget(group+"/"+version.Name, smith.AllNamespaces, path)
-	}
+func (a *App) watchTemplates(ctx context.Context, templateClient *rest.RESTClient, processor Processor) {
+	templateInf := cache.NewSharedInformer(&cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			list := &smith.TemplateList{}
+			err := templateClient.Get().
+				Resource(smith.TemplateResourcePath).
+				//VersionedParams(&options, runtime.NewParameterCodec(api.Scheme)).
+				Do().
+				Into(list)
+			if err != nil {
+				return nil, err
+			}
+			return list, nil
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			r, err := templateClient.Get().
+				Prefix("watch").
+				Resource(smith.TemplateResourcePath).
+				//VersionedParams(&options, runtime.NewParameterCodec(api.Scheme)).
+				Stream()
+			if err != nil {
+				return nil, err
+			}
+			return watch.NewStreamWatcher(&templateDecoder{
+				decoder: json.NewDecoder(r),
+				close:   r.Close,
+			}), nil
+		},
+	}, &smith.Template{}, 0)
+
+	templateInf.AddEventHandler(newTemplateEventHandler(processor))
+
+	go templateInf.Run(ctx.Done())
 }

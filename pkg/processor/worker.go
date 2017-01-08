@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/client"
+	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/cenk/backoff"
 	"k8s.io/client-go/pkg/api/errors"
+	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/client-go/pkg/runtime"
 )
 
 type worker struct {
@@ -18,7 +20,9 @@ type worker struct {
 	bo backoff.BackOff
 	workerRef
 
-	// These fields are protected with tp.lock
+	// The fields below are protected by tp.lock
+
+	// It is ok to mutate the template itself, but pointer should only be updated while locked.
 	template     *smith.Template
 	needsRebuild bool
 }
@@ -87,17 +91,35 @@ func (wrk *worker) rebuild(tpl *smith.Template) error {
 }
 
 func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
-	resourcePath := client.ResourceKindToPath(res.Spec.Kind)
-	// 0. Update label to point at the parent template
-	if res.Spec.Labels == nil {
-		res.Spec.Labels = make(map[string]string)
+	gv, err := unversioned.ParseGroupVersion(res.Spec.GetAPIVersion())
+	if err != nil {
+		return false, err
 	}
-	res.Spec.Labels[smith.TemplateNameLabel] = wrk.name
-	for {
-		var response smith.ResourceSpec
+	kind := res.Spec.GetKind()
+	client, err := wrk.tp.clients.ClientForGroupVersionKind(gv.WithKind(kind))
+	if err != nil {
+		return false, err
+	}
 
+	resClient := client.Resource(&unversioned.APIResource{
+		Name:       resources.ResourceKindToPath(kind),
+		Namespaced: true,
+		Kind:       kind,
+	}, wrk.namespace)
+
+	// 0. Update label to point at the parent template
+	labels := res.Spec.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+		res.Spec.SetLabels(labels)
+	}
+	labels[smith.TemplateNameLabel] = wrk.name
+	name := res.Spec.GetName()
+	for {
+		var response *runtime.Unstructured
 		// 1. Try to get the resource. We do read first to avoid generating unnecessary events.
-		err := wrk.tp.client.Get(wrk.tp.ctx, res.Spec.APIVersion, wrk.namespace, resourcePath, res.Spec.Name, nil, &response)
+		//err := wrk.tp.client.Get(wrk.tp.ctx, res.Spec.APIVersion, wrk.namespace, resourcePath, res.Spec.Name, nil, &response)
+		response, err := resClient.Get(name)
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				// Unexpected error
@@ -105,7 +127,7 @@ func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
 			}
 			log.Printf("template %s/%s: resource %s not found, creating", wrk.namespace, wrk.name, res.Name)
 			// 2. Create if does not exist
-			err = wrk.tp.client.Create(wrk.tp.ctx, res.Spec.APIVersion, wrk.namespace, resourcePath, &res.Spec, &response)
+			response, err = resClient.Create(&res.Spec)
 			if err == nil {
 				log.Printf("template %s/%s: resource %s created", wrk.namespace, wrk.name, res.Name)
 				break
@@ -119,15 +141,16 @@ func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
 		}
 
 		// 3. Compare spec and existing resource
-		if isEqualResources(res, &response) {
+		if isEqualResources(res, response) {
 			log.Printf("template %s/%s: resource %s has correct spec", wrk.namespace, wrk.name, res.Name)
 			break
 		}
 
 		// 4. Update if different
-		// https://github.com/kubernetes/kubernetes/blob/master/docs/devel/api-conventions.md#concurrency-control-and-consistency
-		res.Spec.ResourceVersion = response.ResourceVersion // Do CAS
-		err = wrk.tp.client.Update(wrk.tp.ctx, res.Spec.APIVersion, wrk.namespace, resourcePath, res.Spec.Name, &res.Spec, &response)
+		// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
+		res.Spec.SetResourceVersion(response.GetResourceVersion()) // Do CAS
+
+		response, err = resClient.Update(&res.Spec)
 		if err != nil {
 			if errors.IsConflict(err) {
 				log.Printf("template %s/%s: resource %s update resulted in conflict, restarting loop", wrk.namespace, wrk.name, res.Name)
@@ -142,10 +165,17 @@ func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
 	return wrk.tp.rc.IsReady(res)
 }
 
+// TODO use cache.Store from reflector instead of this method
 func (wrk *worker) fetchTemplate() (*smith.Template, error) {
 	log.Printf("Fetching the template %s/%s", wrk.namespace, wrk.name)
 	tpl := new(smith.Template)
-	if err := wrk.tp.client.Get(wrk.tp.ctx, smith.TemplateResourceGroupVersion, wrk.namespace, smith.TemplateResourcePath, wrk.name, nil, tpl); err != nil {
+	err := wrk.tp.templateClient.Get().
+		Namespace(wrk.namespace).
+		Resource(smith.TemplateResourcePath).
+		Name(wrk.name).
+		Do().
+		Into(tpl)
+	if err != nil {
 		// TODO handle 404 - template was deleted
 		return nil, err
 	}
@@ -156,6 +186,7 @@ func (wrk *worker) fetchTemplate() (*smith.Template, error) {
 		wrk.template = tpl
 	} else {
 		// Do not overwrite template that came via event while we were fetching it - it may be more fresh.
+		// TODO figure out which one is more fresh by comparing resource versions?
 		tpl = wrk.template
 	}
 	wrk.needsRebuild = false // In any case we are using the latest template, no need for rebuilds
@@ -167,10 +198,18 @@ func (wrk *worker) setTemplateState(tpl *smith.Template, desired smith.ResourceS
 		return nil
 	}
 	tpl.Status.State = desired
-	err := wrk.tp.client.Update(wrk.tp.ctx, smith.TemplateResourceGroupVersion, wrk.namespace, smith.TemplateResourcePath, wrk.name, tpl, nil)
+	err := wrk.tp.templateClient.Put().
+		Namespace(wrk.namespace).
+		Resource(smith.TemplateResourcePath).
+		Name(wrk.name).
+		Body(tpl).
+		Do().
+		Into(tpl)
 	if err != nil {
 		return fmt.Errorf("failed to set template %s/%s state to %s: %v", wrk.namespace, wrk.name, desired, err)
 	}
+	// FIXME for some reason TypeMeta is not deserialized properly
+	log.Printf("Into = %#v", tpl)
 	return nil
 }
 
@@ -232,7 +271,7 @@ func (wrk *worker) checkNeedsRebuild() bool {
 }
 
 // isEqualResources checks that existing resource matches the desired spec.
-func isEqualResources(res *smith.Resource, spec *smith.ResourceSpec) bool {
+func isEqualResources(res *smith.Resource, spec *runtime.Unstructured) bool {
 	// TODO implement
 	// ignore additional annotations/labels? or make the merge behaviour configurable?
 	return true

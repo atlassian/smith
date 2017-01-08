@@ -8,8 +8,8 @@ import (
 	"syscall"
 
 	"github.com/atlassian/smith/pkg/app"
-	"github.com/atlassian/smith/pkg/client"
-	"github.com/atlassian/smith/pkg/processor"
+
+	"k8s.io/client-go/rest"
 )
 
 func main() {
@@ -27,34 +27,18 @@ func run() error {
 }
 
 func runWithContext(ctx context.Context) error {
-	c, err := client.NewInCluster()
+	config, err := rest.InClusterConfig()
 	if err != nil {
 		return err
 	}
-	c.Agent = "smith/" + Version + "/" + GitCommit
-	return runWithClient(ctx, c)
+	config.UserAgent = "smith/" + Version + "/" + GitCommit
+
+	return runWithConfig(ctx, config)
 }
 
-func runWithClient(ctx context.Context, c *client.ResourceClient) error {
-	allEvents := make(chan interface{})
-	subCtx, subCancel := context.WithCancel(ctx)
-	defer subCancel()
-
-	watcher := app.NewWatcher(subCtx, c, allEvents)
-	defer watcher.Join() // await termination
-	defer subCancel()    // cancel ctx to signal done to watcher. If anything below panics, this will be called
-
-	rc := app.StatusReadyChecker{}
-
-	tp := processor.New(subCtx, c, &rc)
-	defer tp.Join()   // await termination
-	defer subCancel() // cancel ctx to signal done to processor (and everything else)
-
+func runWithConfig(ctx context.Context, config *rest.Config) error {
 	a := app.App{
-		Watcher:   watcher,
-		Client:    c,
-		Processor: tp,
-		Events:    allEvents,
+		RestConfig: config,
 	}
 	return a.Run(ctx)
 }
