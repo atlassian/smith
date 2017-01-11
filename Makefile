@@ -9,14 +9,16 @@ GOBUILD_VERSION_ARGS := -ldflags "-s -X $(VERSION_VAR)=$(REPO_VERSION) -X $(GIT_
 BINARY_NAME := smith
 IMAGE_NAME := atlassian/smith
 ARCH ?= darwin
+METALINTER_CONCURRENCY ?= 4
 GOVERSION := 1.7
 GP := /gopath
 MAIN_PKG := github.com/atlassian/smith/cmd/smith
 
 setup-ci:
 	go get -u github.com/Masterminds/glide
-	go get -u golang.org/x/tools/cmd/goimports
-	glide install --strip-vendor
+	go get -u github.com/alecthomas/gometalinter
+	gometalinter --install
+	glide install
 
 build: fmt
 	go build -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
@@ -44,6 +46,21 @@ test-race:
 
 test:
 	go test $$(glide nv)
+
+check:
+	go install ./cmd/smith
+	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=600s ./... --vendor \
+		--linter='errcheck:errcheck:-ignore=net:Close' --cyclo-over=20 \
+		--disable=interfacer --disable=golint --dupl-threshold=200
+
+check-all:
+	go install ./cmd/smith
+	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=600s ./... --vendor --cyclo-over=20 \
+		--dupl-threshold=65
+
+coveralls:
+	./cover.sh
+	goveralls -coverprofile=coverage.out -service=travis-ci
 
 # Compile a static binary. Cannot be used with -race
 docker:
