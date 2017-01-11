@@ -37,10 +37,13 @@ minikube-test:
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go test -race -v $$(glide nv)
+	go test -tags=integration -race -v $$(glide nv)
 
 test-race:
 	go test -race $$(glide nv)
+
+test:
+	go test $$(glide nv)
 
 # Compile a static binary. Cannot be used with -race
 docker:
