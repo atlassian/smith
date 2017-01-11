@@ -3,7 +3,7 @@ package app
 import (
 	"github.com/atlassian/smith"
 
-	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
 )
 
 // tprInstanceEventHandler handles events for objects with various kinds, all are instance of some
@@ -45,6 +45,6 @@ func (h *tprInstanceEventHandler) handle(obj interface{}) {
 }
 
 func getTemplateNameAndNamespace(obj interface{}) (string, string) {
-	tprInst := obj.(*runtime.Unstructured)
+	tprInst := obj.(*unstructured.Unstructured)
 	return tprInst.GetLabels()[smith.TemplateNameLabel], tprInst.GetNamespace()
 }

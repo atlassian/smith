@@ -5,9 +5,10 @@ import (
 	"log"
 
 	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/runtime"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 type ResourceState string
@@ -34,27 +35,27 @@ const (
 )
 
 type TemplateList struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	Metadata unversioned.ListMeta `json:"metadata,omitempty"`
+	Metadata metav1.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of templates.
 	Items []Template `json:"items"`
 }
 
 // GetObjectKind is required to satisfy Object interface.
-func (tl *TemplateList) GetObjectKind() unversioned.ObjectKind {
+func (tl *TemplateList) GetObjectKind() schema.ObjectKind {
 	return &tl.TypeMeta
 }
 
 // GetListMeta is required to satisfy ListMetaAccessor interface.
-func (tl *TemplateList) GetListMeta() meta.List {
+func (tl *TemplateList) GetListMeta() metav1.List {
 	return &tl.Metadata
 }
 
 // Template describes a resources template.
 type Template struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 
 	// Standard object metadata
 	Metadata apiv1.ObjectMeta `json:"metadata,omitempty"`
@@ -67,7 +68,7 @@ type Template struct {
 }
 
 // Required to satisfy Object interface
-func (t *Template) GetObjectKind() unversioned.ObjectKind {
+func (t *Template) GetObjectKind() schema.ObjectKind {
 	return &t.TypeMeta
 }
 
@@ -94,7 +95,7 @@ type Resource struct {
 	// Explicit dependencies.
 	DependsOn []DependencyRef `json:"dependsOn,omitempty"`
 
-	Spec runtime.Unstructured `json:"spec"`
+	Spec unstructured.Unstructured `json:"spec"`
 }
 
 // The code below is used only to work around a known problem with third-party

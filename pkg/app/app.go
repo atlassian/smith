@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 
@@ -12,9 +11,7 @@ import (
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/pkg/runtime"
@@ -33,7 +30,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	templateClient, err := resources.GetTemplateTprClient(a.RestConfig)
+	tmplClient, tmplScheme, err := resources.GetTemplateTprClient(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -43,7 +40,7 @@ func (a *App) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	tp := processor.New(ctx, templateClient, clients, &StatusReadyChecker{})
+	tp := processor.New(ctx, tmplClient, clients, &StatusReadyChecker{})
 	defer tp.Join() // await termination
 	defer cancel()  // cancel ctx to signal done to processor (and everything else)
 
@@ -65,19 +62,15 @@ func (a *App) Run(ctx context.Context) error {
 	a.watchThirdPartyResources(ctx, clientset, clients, tp)
 
 	// 4. Watch Templates
-	a.watchTemplates(ctx, templateClient, tp)
+	a.watchTemplates(ctx, tmplClient, tmplScheme, tp)
 
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func (a *App) ensureResourceExists(ctx context.Context, clientset *kubernetes.Clientset) error {
+func (a *App) ensureResourceExists(ctx context.Context, clientset kubernetes.Interface) error {
 	log.Printf("Creating ThirdPartyResource %s", smith.TemplateResourceName)
 	res, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(&extensions.ThirdPartyResource{
-		TypeMeta: unversioned.TypeMeta{
-			Kind: "ThirdPartyResource",
-			//APIVersion: smith.ThirdPartyResourceGroupVersion,
-		},
 		ObjectMeta: apiv1.ObjectMeta{
 			Name: smith.TemplateResourceName,
 		},
@@ -97,22 +90,14 @@ func (a *App) ensureResourceExists(ctx context.Context, clientset *kubernetes.Cl
 	return nil
 }
 
-func (a *App) watchThirdPartyResources(ctx context.Context, clientset *kubernetes.Clientset, clients dynamic.ClientPool, processor Processor) {
+func (a *App) watchThirdPartyResources(ctx context.Context, clientset kubernetes.Interface, clients dynamic.ClientPool, processor Processor) {
 	tprClient := clientset.ExtensionsV1beta1().ThirdPartyResources()
 	tprInf := cache.NewSharedInformer(&cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			var opts apiv1.ListOptions
-			if err := apiv1.Convert_api_ListOptions_To_v1_ListOptions(&options, &opts, nil); err != nil {
-				return nil, err
-			}
-			return tprClient.List(opts)
+		ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+			return tprClient.List(options)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			var opts apiv1.ListOptions
-			if err := apiv1.Convert_api_ListOptions_To_v1_ListOptions(&options, &opts, nil); err != nil {
-				return nil, err
-			}
-			return tprClient.Watch(opts)
+		WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+			return tprClient.Watch(options)
 		},
 	}, &extensions.ThirdPartyResource{}, 0)
 
@@ -121,33 +106,26 @@ func (a *App) watchThirdPartyResources(ctx context.Context, clientset *kubernete
 	go tprInf.Run(ctx.Done())
 }
 
-func (a *App) watchTemplates(ctx context.Context, templateClient *rest.RESTClient, processor Processor) {
+func (a *App) watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplScheme *runtime.Scheme, processor Processor) {
+	parameterCodec := runtime.NewParameterCodec(tmplScheme)
+
+	// Cannot use cache.NewListWatchFromClient() because it uses global api.ParameterCodec which uses global
+	// api.Scheme which does not know about Smith group/version.
+	// cache.NewListWatchFromClient(templateClient, smith.TemplateResourcePath, apiv1.NamespaceAll, fields.Everything())
 	templateInf := cache.NewSharedInformer(&cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			list := &smith.TemplateList{}
-			err := templateClient.Get().
+		ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+			return tmplClient.Get().
 				Resource(smith.TemplateResourcePath).
-				//VersionedParams(&options, runtime.NewParameterCodec(api.Scheme)).
+				VersionedParams(&options, parameterCodec).
 				Do().
-				Into(list)
-			if err != nil {
-				return nil, err
-			}
-			return list, nil
+				Get()
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			r, err := templateClient.Get().
+		WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+			return tmplClient.Get().
 				Prefix("watch").
 				Resource(smith.TemplateResourcePath).
-				//VersionedParams(&options, runtime.NewParameterCodec(api.Scheme)).
-				Stream()
-			if err != nil {
-				return nil, err
-			}
-			return watch.NewStreamWatcher(&templateDecoder{
-				decoder: json.NewDecoder(r),
-				close:   r.Close,
-			}), nil
+				VersionedParams(&options, parameterCodec).
+				Watch()
 		},
 	}, &smith.Template{}, 0)
 
