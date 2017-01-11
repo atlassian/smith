@@ -52,9 +52,6 @@ func (tl *TemplateList) GetListMeta() meta.List {
 	return &tl.Metadata
 }
 
-var _ runtime.Object = &TemplateList{}
-var _ meta.ListMetaAccessor = &TemplateList{}
-
 // Template describes a resources template.
 type Template struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -78,9 +75,6 @@ func (t *Template) GetObjectKind() unversioned.ObjectKind {
 func (t *Template) GetObjectMeta() meta.Object {
 	return &t.Metadata
 }
-
-var _ runtime.Object = &Template{}
-var _ meta.ObjectMetaAccessor = &Template{}
 
 type TemplateSpec struct {
 	Resources []Resource `json:"resources"`

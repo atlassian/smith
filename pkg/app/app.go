@@ -40,8 +40,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	clients := dynamic.NewClientPool(a.RestConfig, nil, dynamic.LegacyAPIPathResolverFunc)
 
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	tp := processor.New(ctx, templateClient, clients, &StatusReadyChecker{})
