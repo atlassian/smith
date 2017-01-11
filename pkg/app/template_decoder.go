@@ -15,7 +15,7 @@ type templateDecoder struct {
 }
 
 func (d *templateDecoder) Close() {
-	d.close()
+	d.close() // #nosec
 }
 
 func (d *templateDecoder) Decode() (action watch.EventType, object runtime.Object, err error) {

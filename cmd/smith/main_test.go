@@ -145,7 +145,6 @@ func TestWorkflow(t *testing.T) {
 					}
 				}
 			}
-			t.Fatalf("expecting event for %q resource of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
 		}()
 	}
 	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
