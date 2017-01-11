@@ -1,0 +1,25 @@
+sudo: required
+
+language: go
+
+services:
+  - docker
+
+go:
+  - 1.7.4
+
+os:
+  - linux
+  - osx
+
+before_install:
+  - go get github.com/mattn/goveralls
+
+install:
+  - make setup-ci
+
+script:
+  - make build-all
+  - make test-race
+  - METALINTER_CONCURRENCY=2 make check
+  - make coveralls
