@@ -10,11 +10,12 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
@@ -73,7 +74,7 @@ func (h *tprEventHandler) onAdd(obj interface{}) {
 	log.Printf("Handling OnAdd for TPR %s", tpr.Name)
 	path, groupKind := resources.SplitTprName(tpr.Name)
 	for _, version := range tpr.Versions {
-		dc, err := h.clients.ClientForGroupVersionKind(unversioned.GroupVersionKind{
+		dc, err := h.clients.ClientForGroupVersionKind(schema.GroupVersionKind{
 			Group:   groupKind.Group,
 			Version: version.Name,
 			Kind:    groupKind.Kind,
@@ -82,18 +83,18 @@ func (h *tprEventHandler) onAdd(obj interface{}) {
 			log.Printf("Failed to instantiate client for TPR %s of version %s: %v", tpr.Name, version.Name, err)
 			continue
 		}
-		res := dc.Resource(&unversioned.APIResource{
+		res := dc.Resource(&metav1.APIResource{
 			Name: path,
 			Kind: groupKind.Kind,
 		}, apiv1.NamespaceAll)
 		tprInf := cache.NewSharedInformer(&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
 				return res.List(&options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
 				return res.Watch(&options)
 			},
-		}, &runtime.Unstructured{}, 0)
+		}, &unstructured.Unstructured{}, 0)
 
 		ctx, cancel := context.WithCancel(h.ctx)
 		h.watchers[key(tpr.Name, version.Name)] = watchState{cancel}

@@ -11,8 +11,9 @@ import (
 
 	"github.com/cenk/backoff"
 	"k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/runtime"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 type worker struct {
@@ -91,7 +92,7 @@ func (wrk *worker) rebuild(tpl *smith.Template) error {
 }
 
 func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
-	gv, err := unversioned.ParseGroupVersion(res.Spec.GetAPIVersion())
+	gv, err := schema.ParseGroupVersion(res.Spec.GetAPIVersion())
 	if err != nil {
 		return false, err
 	}
@@ -101,7 +102,7 @@ func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
 		return false, err
 	}
 
-	resClient := client.Resource(&unversioned.APIResource{
+	resClient := client.Resource(&metav1.APIResource{
 		Name:       resources.ResourceKindToPath(kind),
 		Namespaced: true,
 		Kind:       kind,
@@ -116,7 +117,7 @@ func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
 	labels[smith.TemplateNameLabel] = wrk.name
 	name := res.Spec.GetName()
 	for {
-		var response *runtime.Unstructured
+		var response *unstructured.Unstructured
 		// 1. Try to get the resource. We do read first to avoid generating unnecessary events.
 		//err := wrk.tp.client.Get(wrk.tp.ctx, res.Spec.APIVersion, wrk.namespace, resourcePath, res.Spec.Name, nil, &response)
 		response, err := resClient.Get(name)
@@ -271,7 +272,7 @@ func (wrk *worker) checkNeedsRebuild() bool {
 }
 
 // isEqualResources checks that existing resource matches the desired spec.
-func isEqualResources(res *smith.Resource, spec *runtime.Unstructured) bool {
+func isEqualResources(res *smith.Resource, spec *unstructured.Unstructured) bool {
 	// TODO implement
 	// ignore additional annotations/labels? or make the merge behaviour configurable?
 	return true

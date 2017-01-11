@@ -17,9 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/runtime"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/watch"
 )
 
@@ -28,7 +29,7 @@ func TestWorkflow(t *testing.T) {
 	r := require.New(t)
 	config := configFromEnv(t)
 
-	templateClient, err := resources.GetTemplateTprClient(config)
+	tmplClient, _, err := resources.GetTemplateTprClient(config)
 	r.NoError(err)
 
 	clients := dynamic.NewClientPool(config, nil, dynamic.LegacyAPIPathResolverFunc)
@@ -38,7 +39,7 @@ func TestWorkflow(t *testing.T) {
 
 	var templateCreated bool
 	tmpl := smith.Template{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       smith.TemplateResourceKind,
 			APIVersion: smith.TemplateResourceGroupVersion,
 		},
@@ -46,10 +47,10 @@ func TestWorkflow(t *testing.T) {
 			Name: templateName,
 		},
 		Spec: smith.TemplateSpec{
-			Resources: tplResources(r),
+			Resources: tmplResources(r),
 		},
 	}
-	err = templateClient.Delete().
+	err = tmplClient.Delete().
 		Namespace(templateNamespace).
 		Resource(smith.TemplateResourcePath).
 		Name(templateName).
@@ -63,7 +64,7 @@ func TestWorkflow(t *testing.T) {
 	defer func() {
 		if !templateCreated {
 			log.Printf("Deleting template %s", templateName)
-			a.NoError(templateClient.Delete().
+			a.NoError(tmplClient.Delete().
 				Namespace(templateNamespace).
 				Resource(smith.TemplateResourcePath).
 				Name(templateName).
@@ -71,7 +72,7 @@ func TestWorkflow(t *testing.T) {
 				Error())
 			for _, resource := range tmpl.Spec.Resources {
 				log.Printf("Deleting resource %s", resource.Spec.GetName())
-				gv, err := unversioned.ParseGroupVersion(resource.Spec.GetAPIVersion())
+				gv, err := schema.ParseGroupVersion(resource.Spec.GetAPIVersion())
 				if !a.NoError(err) {
 					continue
 				}
@@ -79,7 +80,7 @@ func TestWorkflow(t *testing.T) {
 				if !a.NoError(err) {
 					continue
 				}
-				a.NoError(client.Resource(&unversioned.APIResource{
+				a.NoError(client.Resource(&metav1.APIResource{
 					Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
 					Namespaced: true,
 					Kind:       resource.Spec.GetKind(),
@@ -106,7 +107,7 @@ func TestWorkflow(t *testing.T) {
 	time.Sleep(1 * time.Second) // Wait until the app starts and creates the Template TPR
 
 	log.Print("Creating a new template")
-	r.NoError(templateClient.Post().
+	r.NoError(tmplClient.Post().
 		Namespace(templateNamespace).
 		Resource(smith.TemplateResourcePath).
 		Body(&tmpl).
@@ -119,7 +120,7 @@ func TestWorkflow(t *testing.T) {
 		func() {
 			c, err := clients.ClientForGroupVersionKind(resource.Spec.GroupVersionKind())
 			r.NoError(err)
-			w, err := c.Resource(&unversioned.APIResource{
+			w, err := c.Resource(&metav1.APIResource{
 				Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
 				Namespaced: true,
 				Kind:       resource.Spec.GetKind(),
@@ -137,7 +138,7 @@ func TestWorkflow(t *testing.T) {
 					if ev.Type != watch.Added || ev.Object.GetObjectKind().GroupVersionKind() != resource.Spec.GetObjectKind().GroupVersionKind() {
 						continue
 					}
-					obj, ok := ev.Object.(*runtime.Unstructured)
+					obj, ok := ev.Object.(*unstructured.Unstructured)
 					r.True(ok)
 					if obj.GetName() == resource.Spec.GetName() {
 						log.Printf("received event for resource %q of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
@@ -149,7 +150,7 @@ func TestWorkflow(t *testing.T) {
 	}
 	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
 	var tmplRes smith.Template
-	r.NoError(templateClient.Get().
+	r.NoError(tmplClient.Get().
 		Namespace(templateNamespace).
 		Resource(smith.TemplateResourcePath).
 		Name(templateName).
@@ -159,9 +160,9 @@ func TestWorkflow(t *testing.T) {
 	r.Equal(smith.READY, tmplRes.Status.State)
 }
 
-func tplResources(r *require.Assertions) []smith.Resource {
+func tmplResources(r *require.Assertions) []smith.Resource {
 	c := apiv1.ConfigMap{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
@@ -175,7 +176,7 @@ func tplResources(r *require.Assertions) []smith.Resource {
 	data, err := json.Marshal(&c)
 	r.NoError(err)
 
-	r1 := runtime.Unstructured{}
+	r1 := unstructured.Unstructured{}
 	r.NoError(r1.UnmarshalJSON(data))
 	return []smith.Resource{
 		{
