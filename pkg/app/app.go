@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 
@@ -11,7 +12,7 @@ import (
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/errors"
+	kerrors "k8s.io/client-go/pkg/api/errors"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/pkg/runtime"
@@ -56,13 +57,35 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	// 2. TODO watch supported built-in resource types for events.
+	// 2. Watch Templates
+	tmplInf, err := a.watchTemplates(ctx, tmplClient, tmplScheme, tp)
+	if err != nil {
+		return err
+	}
 
-	// 3. Watch Third Party Resources to add watches for supported ones
-	a.watchThirdPartyResources(ctx, clientset, clients, tp)
+	// We must wait for tmplInf to populate its cache to avoid reading from an empty cache
+	// in case of resource-generated events.
+	if !cache.WaitForCacheSync(ctx.Done(), tmplInf.HasSynced) {
+		return errors.New("wait for Template Informer was cancelled")
+	}
 
-	// 4. Watch Templates
-	a.watchTemplates(ctx, tmplClient, tmplScheme, tp)
+	store := tmplInf.GetStore()
+	ieh := newTprInstanceEventHandler(tp, func(namespace, tmplName string) (*smith.Template, error) {
+		tmpl, exists, err := store.GetByKey(keyForTemplate(namespace, tmplName))
+		if err != nil || !exists {
+			return nil, err
+		}
+		// TODO make a deep copy to prevent mutating original object
+		return tmpl.(*smith.Template), nil
+	})
+
+	// 3. TODO watch supported built-in resource types for events.
+
+	// 4. Watch Third Party Resources to add watches for supported ones
+
+	if err := a.watchThirdPartyResources(ctx, clientset, clients, ieh); err != nil {
+		return err
+	}
 
 	<-ctx.Done()
 	return ctx.Err()
@@ -80,7 +103,7 @@ func (a *App) ensureResourceExists(ctx context.Context, clientset kubernetes.Int
 		},
 	})
 	if err != nil {
-		if !errors.IsAlreadyExists(err) {
+		if !kerrors.IsAlreadyExists(err) {
 			return fmt.Errorf("failed to create ThirdPartyResource: %v", err)
 		}
 		log.Printf("ThirdPartyResource %s already exists", smith.TemplateResourceName)
@@ -90,7 +113,7 @@ func (a *App) ensureResourceExists(ctx context.Context, clientset kubernetes.Int
 	return nil
 }
 
-func (a *App) watchThirdPartyResources(ctx context.Context, clientset kubernetes.Interface, clients dynamic.ClientPool, processor Processor) {
+func (a *App) watchThirdPartyResources(ctx context.Context, clientset kubernetes.Interface, clients dynamic.ClientPool, handler cache.ResourceEventHandler) error {
 	tprClient := clientset.ExtensionsV1beta1().ThirdPartyResources()
 	tprInf := cache.NewSharedInformer(&cache.ListWatch{
 		ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
@@ -101,18 +124,22 @@ func (a *App) watchThirdPartyResources(ctx context.Context, clientset kubernetes
 		},
 	}, &extensions.ThirdPartyResource{}, 0)
 
-	tprInf.AddEventHandler(newTprEventHandler(ctx, processor, clients))
+	if err := tprInf.AddEventHandler(newTprEventHandler(ctx, handler, clients)); err != nil {
+		return err
+	}
 
 	go tprInf.Run(ctx.Done())
+
+	return nil
 }
 
-func (a *App) watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplScheme *runtime.Scheme, processor Processor) {
+func (a *App) watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplScheme *runtime.Scheme, processor Processor) (cache.SharedInformer, error) {
 	parameterCodec := runtime.NewParameterCodec(tmplScheme)
 
 	// Cannot use cache.NewListWatchFromClient() because it uses global api.ParameterCodec which uses global
 	// api.Scheme which does not know about Smith group/version.
 	// cache.NewListWatchFromClient(templateClient, smith.TemplateResourcePath, apiv1.NamespaceAll, fields.Everything())
-	templateInf := cache.NewSharedInformer(&cache.ListWatch{
+	tmplInf := cache.NewSharedInformer(&cache.ListWatch{
 		ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
 			return tmplClient.Get().
 				Resource(smith.TemplateResourcePath).
@@ -129,7 +156,16 @@ func (a *App) watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplS
 		},
 	}, &smith.Template{}, 0)
 
-	templateInf.AddEventHandler(newTemplateEventHandler(processor))
+	if err := tmplInf.AddEventHandler(newTemplateEventHandler(processor)); err != nil {
+		return nil, err
+	}
 
-	go templateInf.Run(ctx.Done())
+	go tmplInf.Run(ctx.Done())
+
+	return tmplInf, nil
+}
+
+// keyForTemplate returns same key as client-go/tools/cache/store.MetaNamespaceKeyFunc
+func keyForTemplate(namespace, tmplName string) string {
+	return namespace + "/" + tmplName
 }

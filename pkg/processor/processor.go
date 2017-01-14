@@ -22,7 +22,7 @@ type BackOffFactory func() backoff.BackOff
 
 type workerRef struct {
 	namespace string
-	name      string
+	tmplName  string
 }
 
 type TemplateProcessor struct {
@@ -59,33 +59,22 @@ func (tp *TemplateProcessor) Join() {
 // calling code should do a proper deep copy if the object is still needed.
 func (tp *TemplateProcessor) Rebuild(tpl *smith.Template) {
 	log.Printf("Rebuilding the template %#v", tpl)
-	tp.rebuildInternal(tpl.Metadata.Namespace, tpl.Metadata.Name, tpl)
-}
-
-func (tp *TemplateProcessor) RebuildByName(namespace, name string) {
-	log.Printf("Rebuilding the template %s/%s", namespace, name)
-	tp.rebuildInternal(namespace, name, nil)
-}
-
-func (tp *TemplateProcessor) rebuildInternal(namespace, name string, tpl *smith.Template) {
-	ref := workerRef{namespace: namespace, name: name}
+	ref := workerRef{namespace: tpl.Metadata.Namespace, tmplName: tpl.Metadata.Name}
 	tp.lock.Lock()
 	defer tp.lock.Unlock()
 	wrk := tp.workers[ref]
 	if wrk == nil {
 		wrk = &worker{
-			tp:           tp,
-			template:     tpl,
-			bo:           tp.backoff(),
-			workerRef:    ref,
-			needsRebuild: true,
+			tp:        tp,
+			template:  tpl,
+			bo:        tp.backoff(),
+			workerRef: ref,
 		}
 		tp.workers[ref] = wrk
 		tp.wg.Add(1)
 		go wrk.rebuildLoop()
 	} else {
 		wrk.template = tpl
-		wrk.needsRebuild = true
 	}
 }
 
