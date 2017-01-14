@@ -34,11 +34,11 @@ type tprEventHandler struct {
 	watchers map[string]watchState
 }
 
-func newTprEventHandler(ctx context.Context, processor Processor, clients dynamic.ClientPool) *tprEventHandler {
+func newTprEventHandler(ctx context.Context, handler cache.ResourceEventHandler, clients dynamic.ClientPool) *tprEventHandler {
 	return &tprEventHandler{
 		ctx:      ctx,
 		clients:  clients,
-		handler:  newTprInstanceEventHandler(processor),
+		handler:  handler,
 		watchers: make(map[string]watchState),
 	}
 }
@@ -96,10 +96,13 @@ func (h *tprEventHandler) onAdd(obj interface{}) {
 			},
 		}, &unstructured.Unstructured{}, 0)
 
+		if err := tprInf.AddEventHandler(h.handler); err != nil {
+			log.Printf("Failed to add an event handler for TPR %s of version %s: %v", tpr.Name, version.Name, err)
+			continue
+		}
+
 		ctx, cancel := context.WithCancel(h.ctx)
 		h.watchers[key(tpr.Name, version.Name)] = watchState{cancel}
-
-		tprInf.AddEventHandler(h.handler)
 
 		go tprInf.Run(ctx.Done())
 	}
