@@ -70,7 +70,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	store := tmplInf.GetStore()
-	ieh := newTprInstanceEventHandler(tp, func(namespace, tmplName string) (*smith.Template, error) {
+	reh := newResourceEventHandler(tp, func(namespace, tmplName string) (*smith.Template, error) {
 		tmpl, exists, err := store.GetByKey(keyForTemplate(namespace, tmplName))
 		if err != nil || !exists {
 			return nil, err
@@ -83,7 +83,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 4. Watch Third Party Resources to add watches for supported ones
 
-	if err := a.watchThirdPartyResources(ctx, clientset, clients, ieh); err != nil {
+	if err := a.watchThirdPartyResources(ctx, clientset, clients, reh); err != nil {
 		return err
 	}
 

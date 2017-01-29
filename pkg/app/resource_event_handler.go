@@ -11,26 +11,25 @@ import (
 // Name2Template is a function that does a lookup of Template based on its namespace and name.
 type Name2Template func(namespace, tmplName string) (*smith.Template, error)
 
-// tprInstanceEventHandler handles events for objects with various kinds, all are instance of some
-// Third Party Resource.
-type tprInstanceEventHandler struct {
+// resourceEventHandler handles events for objects with various kinds.
+type resourceEventHandler struct {
 	processor Processor
 	name2tmpl Name2Template
 }
 
-func newTprInstanceEventHandler(processor Processor, name2tmpl Name2Template) *tprInstanceEventHandler {
-	return &tprInstanceEventHandler{
+func newResourceEventHandler(processor Processor, name2tmpl Name2Template) *resourceEventHandler {
+	return &resourceEventHandler{
 		processor: processor,
 		name2tmpl: name2tmpl,
 	}
 }
 
-func (h *tprInstanceEventHandler) OnAdd(obj interface{}) {
+func (h *resourceEventHandler) OnAdd(obj interface{}) {
 	tmplName, namespace := getTemplateNameAndNamespace(obj)
 	h.rebuildByName(namespace, tmplName)
 }
 
-func (h *tprInstanceEventHandler) OnUpdate(oldObj, newObj interface{}) {
+func (h *resourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	oldTmplName, oldNamespace := getTemplateNameAndNamespace(oldObj)
 
 	newTmplName, newNamespace := getTemplateNameAndNamespace(oldObj)
@@ -41,12 +40,12 @@ func (h *tprInstanceEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	h.rebuildByName(newNamespace, newTmplName)
 }
 
-func (h *tprInstanceEventHandler) OnDelete(obj interface{}) {
+func (h *resourceEventHandler) OnDelete(obj interface{}) {
 	tmplName, namespace := getTemplateNameAndNamespace(obj)
 	h.rebuildByName(namespace, tmplName)
 }
 
-func (h *tprInstanceEventHandler) rebuildByName(namespace, tmplName string) {
+func (h *resourceEventHandler) rebuildByName(namespace, tmplName string) {
 	if len(tmplName) == 0 {
 		return
 	}
