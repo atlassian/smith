@@ -14,6 +14,9 @@ GOVERSION := 1.7
 GP := /gopath
 MAIN_PKG := github.com/atlassian/smith/cmd/smith
 
+setup: setup-ci
+	go get -u golang.org/x/tools/cmd/goimports
+
 setup-ci:
 	go get -u github.com/Masterminds/glide
 	go get -u github.com/alecthomas/gometalinter
