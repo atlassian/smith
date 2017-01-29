@@ -136,7 +136,7 @@ of the bespoke client.
 
 * Please run on Kubernetes 1.4+ because earlier versions have some bugs that may prevent Smith from working properly;
 * Go 1.7+ is required because [context package](https://golang.org/doc/go1.7#context) is used and it was added to
-standard library in this version (use 1.7.3+ to avoid nil-pointer compiler bug);
+standard library in this version;
 * Working Docker installation - build process uses dockerized Go to isolate from the host system;
 * At the moment only in-cluster mode is supported;
 * List of project dependencies and their versions can be found in `glide.yaml` and `glide.lock` files.
