@@ -65,7 +65,7 @@ func (wrk *worker) rebuild(tmpl *smith.Template) error {
 		if wrk.checkNeedsRebuild() {
 			return nil
 		}
-		isReady, err := wrk.checkResource(&res)
+		isReady, err := wrk.checkResource(tmpl, &res)
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ func (wrk *worker) rebuild(tmpl *smith.Template) error {
 	return err
 }
 
-func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
+func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isReady bool, e error) {
 	gv, err := schema.ParseGroupVersion(res.Spec.GetAPIVersion())
 	if err != nil {
 		return false, err
@@ -101,17 +101,14 @@ func (wrk *worker) checkResource(res *smith.Resource) (isReady bool, e error) {
 	}, wrk.namespace)
 
 	// 0. Update label to point at the parent template
-	labels := res.Spec.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-		res.Spec.SetLabels(labels)
-	}
-	labels[smith.TemplateNameLabel] = wrk.tmplName
+	res.Spec.SetLabels(mergeLabels(
+		tmpl.Metadata.Labels,
+		res.Spec.GetLabels(),
+		map[string]string{smith.TemplateNameLabel: wrk.tmplName}))
 	name := res.Spec.GetName()
 	for {
 		var response *unstructured.Unstructured
 		// 1. Try to get the resource. We do read first to avoid generating unnecessary events.
-		//err := wrk.tp.client.Get(wrk.tp.ctx, res.Spec.APIVersion, wrk.namespace, resourcePath, res.Spec.Name, nil, &response)
 		response, err := resClient.Get(name)
 		if err != nil {
 			if !errors.IsNotFound(err) {
@@ -174,7 +171,7 @@ func (wrk *worker) setTemplateState(tpl *smith.Template, desired smith.ResourceS
 		return fmt.Errorf("failed to set template %s/%s state to %s: %v", wrk.namespace, wrk.tmplName, desired, err)
 	}
 	// FIXME for some reason TypeMeta is not deserialized properly
-	log.Printf("Into = %#v", tpl)
+	//log.Printf("Into = %#v", tpl)
 	return nil
 }
 
@@ -241,4 +238,14 @@ func isEqualResources(res *smith.Resource, spec *unstructured.Unstructured) bool
 	// TODO implement
 	// ignore additional annotations/labels? or make the merge behaviour configurable?
 	return true
+}
+
+func mergeLabels(labels ...map[string]string) map[string]string {
+	result := make(map[string]string)
+	for _, m := range labels {
+		for k, v := range m {
+			result[k] = v
+		}
+	}
+	return result
 }
