@@ -45,6 +45,11 @@ func TestWorkflow(t *testing.T) {
 		},
 		Metadata: apiv1.ObjectMeta{
 			Name: templateName,
+			Labels: map[string]string{
+				"templateLabel":         "templateValue",
+				"overlappingLabel":      "overlappingTemplateValue",
+				smith.TemplateNameLabel: "templateLabel123",
+			},
 		},
 		Spec: smith.TemplateSpec{
 			Resources: tmplResources(r),
@@ -62,7 +67,7 @@ func TestWorkflow(t *testing.T) {
 		r.NoError(err)
 	}
 	defer func() {
-		if !templateCreated {
+		if templateCreated {
 			log.Printf("Deleting template %s", templateName)
 			a.NoError(tmplClient.Delete().
 				Namespace(templateNamespace).
@@ -142,6 +147,12 @@ func TestWorkflow(t *testing.T) {
 					r.True(ok)
 					if obj.GetName() == resource.Spec.GetName() {
 						log.Printf("received event for resource %q of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
+						a.EqualValues(map[string]string{
+							"configLabel":           "configValue",
+							"templateLabel":         "templateValue",
+							"overlappingLabel":      "overlappingConfigValue",
+							smith.TemplateNameLabel: templateName,
+						}, obj.GetLabels())
 						return
 					}
 				}
@@ -168,6 +179,11 @@ func tmplResources(r *require.Assertions) []smith.Resource {
 		},
 		ObjectMeta: apiv1.ObjectMeta{
 			Name: "config1",
+			Labels: map[string]string{
+				"configLabel":           "configValue",
+				"overlappingLabel":      "overlappingConfigValue",
+				smith.TemplateNameLabel: "configLabel123",
+			},
 		},
 		Data: map[string]string{
 			"a": "b",
