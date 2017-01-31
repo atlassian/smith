@@ -128,10 +128,6 @@ Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes
 
 It is not better or worse, just different set of design choices.
 
-### On Kubernetes client
-https://github.com/kubernetes/client-go should be used eventually instead
-of the bespoke client.
-
 ### Requirements
 
 * Please run on Kubernetes 1.4+ because earlier versions have some bugs that may prevent Smith from working properly;
