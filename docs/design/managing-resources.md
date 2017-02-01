@@ -49,3 +49,37 @@ metadata:
     name: DbClaim1
     uid: 038b49a6-e746-11e6-baf3-ee8d75af8f6e
 ```
+
+### smith.a.c/tpr/readyWhenFieldPath=`<FieldPath>`, smith.a.c/tpr/readyWhenFieldValue=`<Value>`
+
+Applied to a TPR `T` to indicate that an instance of it `Tinst` is considered `READY` when it has a field,
+located by `<FieldPath>`, that equals `<Value>`.
+
+Example of a TPR `T`:
+
+```
+apiVersion: extensions/v1beta1
+description: Smith example AWS CloudFormation stack
+kind: ThirdPartyResource
+metadata:
+  name: cloud-formation.smith.atlassian.com
+  annotations:
+    smith.atlassian.com/tpr/readyWhenFieldPath: status.state
+    smith.atlassian.com/tpr/readyWhenFieldValue: Ready
+versions:
+- name: v1
+
+```
+
+Example of a TPR instance `Tinst`:
+
+```
+apiVersion: smith.atlassian.com/v1
+kind: CloudFormation
+metadata:
+  name: cfn-1
+spec:
+  ...
+status:
+  state: Ready
+```
