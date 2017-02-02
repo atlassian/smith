@@ -11,11 +11,12 @@ import (
 
 	"github.com/cenk/backoff"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
 )
 
 type ReadyChecker interface {
-	IsReady(*smith.Resource) (bool, error)
+	IsReady(*unstructured.Unstructured) (bool, error)
 }
 
 type BackOffFactory func() backoff.BackOff

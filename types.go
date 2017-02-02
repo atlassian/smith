@@ -32,6 +32,10 @@ const (
 	TemplateResourceGroupVersion = SmithResourceGroup + "/" + TemplateResourceVersion
 
 	TemplateNameLabel = TemplateResourceName + "/templateName"
+
+	// See docs/design/managing-resources.md
+	TprFieldPathAnnotation  = SmithDomain + "/tpr/readyWhenFieldPath"
+	TprFieldValueAnnotation = SmithDomain + "/tpr/readyWhenFieldValue"
 )
 
 type TemplateList struct {
