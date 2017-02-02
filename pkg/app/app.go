@@ -8,6 +8,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/processor"
+	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/resources"
 
 	"k8s.io/client-go/dynamic"
@@ -41,13 +42,30 @@ func (a *App) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	tp := processor.New(ctx, tmplClient, clients, &StatusReadyChecker{})
+	// 1. TPR Informer
+	tprInf := tprInformer(ctx, clientset)
+
+	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
+	// in Ready Checker.
+	if !cache.WaitForCacheSync(ctx.Done(), tprInf.HasSynced) {
+		return errors.New("wait for TPR Informer was cancelled")
+	}
+
+	// 2. Ready Checker
+
+	rc := readychecker.New(&TprStore{
+		Store: tprInf.GetStore(),
+	})
+
+	// 3. Processor
+
+	tp := processor.New(ctx, tmplClient, clients, rc)
 	defer tp.Join() // await termination
 	defer cancel()  // cancel ctx to signal done to processor (and everything else)
 
-	// 1. Ensure ThirdPartyResource TEMPLATE exists
+	// 4. Ensure ThirdPartyResource TEMPLATE exists
 	err = retryUntilSuccessOrDone(ctx, func() error {
-		return a.ensureResourceExists(ctx, clientset)
+		return ensureResourceExists(clientset)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to create resource %s: %v", smith.TemplateResourceName, e)
@@ -57,8 +75,8 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	// 2. Watch Templates
-	tmplInf, err := a.watchTemplates(ctx, tmplClient, tmplScheme, tp)
+	// 5. Watch Templates
+	tmplInf, err := watchTemplates(ctx, tmplClient, tmplScheme, tp)
 	if err != nil {
 		return err
 	}
@@ -72,11 +90,11 @@ func (a *App) Run(ctx context.Context) error {
 	sl := storeLookup{store: tmplInf.GetStore()}
 	reh := newResourceEventHandler(tp, sl.lookup)
 
-	// 3. TODO watch supported built-in resource types for events.
+	// 6. TODO watch supported built-in resource types for events.
 
-	// 4. Watch Third Party Resources to add watches for supported ones
+	// 7. Watch Third Party Resources to add watches for supported ones
 
-	if err := a.watchThirdPartyResources(ctx, clientset, clients, reh); err != nil {
+	if err := tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients)); err != nil {
 		return err
 	}
 
@@ -84,7 +102,7 @@ func (a *App) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (a *App) ensureResourceExists(ctx context.Context, clientset kubernetes.Interface) error {
+func ensureResourceExists(clientset kubernetes.Interface) error {
 	log.Printf("Creating ThirdPartyResource %s", smith.TemplateResourceName)
 	res, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(&extensions.ThirdPartyResource{
 		ObjectMeta: apiv1.ObjectMeta{
@@ -106,7 +124,7 @@ func (a *App) ensureResourceExists(ctx context.Context, clientset kubernetes.Int
 	return nil
 }
 
-func (a *App) watchThirdPartyResources(ctx context.Context, clientset kubernetes.Interface, clients dynamic.ClientPool, handler cache.ResourceEventHandler) error {
+func tprInformer(ctx context.Context, clientset kubernetes.Interface) cache.SharedInformer {
 	tprClient := clientset.ExtensionsV1beta1().ThirdPartyResources()
 	tprInf := cache.NewSharedInformer(&cache.ListWatch{
 		ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
@@ -117,16 +135,12 @@ func (a *App) watchThirdPartyResources(ctx context.Context, clientset kubernetes
 		},
 	}, &extensions.ThirdPartyResource{}, 0)
 
-	if err := tprInf.AddEventHandler(newTprEventHandler(ctx, handler, clients)); err != nil {
-		return err
-	}
-
 	go tprInf.Run(ctx.Done())
 
-	return nil
+	return tprInf
 }
 
-func (a *App) watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplScheme *runtime.Scheme, processor Processor) (cache.SharedInformer, error) {
+func watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplScheme *runtime.Scheme, processor Processor) (cache.SharedInformer, error) {
 	parameterCodec := runtime.NewParameterCodec(tmplScheme)
 
 	// Cannot use cache.NewListWatchFromClient() because it uses global api.ParameterCodec which uses global

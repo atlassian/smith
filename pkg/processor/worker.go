@@ -106,10 +106,10 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 		res.Spec.GetLabels(),
 		map[string]string{smith.TemplateNameLabel: wrk.tmplName}))
 	name := res.Spec.GetName()
+	var response *unstructured.Unstructured
 	for {
-		var response *unstructured.Unstructured
 		// 1. Try to get the resource. We do read first to avoid generating unnecessary events.
-		response, err := resClient.Get(name)
+		response, err = resClient.Get(name)
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				// Unexpected error
@@ -152,7 +152,7 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 		log.Printf("template %s/%s: resource %s updated", wrk.namespace, wrk.tmplName, res.Name)
 		break
 	}
-	return wrk.tp.rc.IsReady(res)
+	return wrk.tp.rc.IsReady(response)
 }
 
 func (wrk *worker) setTemplateState(tpl *smith.Template, desired smith.ResourceState) error {
