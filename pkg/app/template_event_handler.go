@@ -37,8 +37,9 @@ func (h *templateEventHandler) handle(obj interface{}) {
 	out := &smith.Template{}
 
 	if err := smith.DeepCopy_Template(in, out); err != nil {
-		log.Printf("Failed to do deep copy of %#v: %v", in, err)
+		log.Printf("[TEH] Failed to do deep copy of %#v: %v", in, err)
 		return
 	}
+	log.Printf("[TEH] Rebuilding %s/%s template because it was added/updated", out.Metadata.Namespace, out.Metadata.Name)
 	h.processor.Rebuild(out)
 }

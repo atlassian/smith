@@ -1,8 +1,6 @@
-package resources
+package tprattribute
 
 import (
-	"github.com/atlassian/smith"
-
 	"k8s.io/client-go/pkg/api"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/runtime"
@@ -11,17 +9,17 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func GetTemplateTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
+func GetSleeperTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
 	groupVersion := schema.GroupVersion{
-		Group:   smith.SmithResourceGroup,
-		Version: smith.TemplateResourceVersion,
+		Group:   SleeperResourceGroup,
+		Version: SleeperResourceVersion,
 	}
 
 	schemeBuilder := runtime.NewSchemeBuilder(func(scheme *runtime.Scheme) error {
 		scheme.AddKnownTypes(
 			groupVersion,
-			&smith.Template{},
-			&smith.TemplateList{},
+			&Sleeper{},
+			&SleeperList{},
 			&apiv1.ListOptions{},
 			&apiv1.DeleteOptions{},
 		)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/processor"
@@ -104,7 +105,7 @@ func (a *App) Run(ctx context.Context) error {
 
 func ensureResourceExists(clientset kubernetes.Interface) error {
 	log.Printf("Creating ThirdPartyResource %s", smith.TemplateResourceName)
-	res, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(&extensions.ThirdPartyResource{
+	tpr := &extensions.ThirdPartyResource{
 		ObjectMeta: apiv1.ObjectMeta{
 			Name: smith.TemplateResourceName,
 		},
@@ -112,14 +113,22 @@ func ensureResourceExists(clientset kubernetes.Interface) error {
 		Versions: []extensions.APIVersion{
 			{Name: smith.TemplateResourceVersion},
 		},
-	})
+	}
+	res, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
 	if err != nil {
 		if !kerrors.IsAlreadyExists(err) {
-			return fmt.Errorf("failed to create ThirdPartyResource: %v", err)
+			return fmt.Errorf("failed to create %s ThirdPartyResource: %v", smith.TemplateResourceName, err)
 		}
-		log.Printf("ThirdPartyResource %s already exists", smith.TemplateResourceName)
+		// TODO handle conflicts and update properly
+		//log.Printf("ThirdPartyResource %s already exists, updating", smith.TemplateResourceName)
+		//_, err = clientset.ExtensionsV1beta1().ThirdPartyResources().Update(tpr)
+		//if err != nil {
+		//	return fmt.Errorf("failed to update %s ThirdPartyResource: %v",  smith.TemplateResourceName, err)
+		//}
 	} else {
 		log.Printf("ThirdPartyResource %s created: %+v", smith.TemplateResourceName, res)
+		// TODO It takes a while for k8s to add a new rest endpoint. Polling?
+		time.Sleep(10 * time.Second)
 	}
 	return nil
 }
