@@ -26,7 +26,7 @@ func newResourceEventHandler(processor Processor, name2tmpl Name2Template) *reso
 
 func (h *resourceEventHandler) OnAdd(obj interface{}) {
 	tmplName, namespace := getTemplateNameAndNamespace(obj)
-	h.rebuildByName(namespace, tmplName)
+	h.rebuildByName(namespace, tmplName, obj)
 }
 
 func (h *resourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
@@ -35,26 +35,27 @@ func (h *resourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	newTmplName, newNamespace := getTemplateNameAndNamespace(oldObj)
 
 	if oldTmplName != newTmplName { // changed label on template
-		h.rebuildByName(oldNamespace, oldTmplName)
+		h.rebuildByName(oldNamespace, oldTmplName, oldObj)
 	}
-	h.rebuildByName(newNamespace, newTmplName)
+	h.rebuildByName(newNamespace, newTmplName, newObj)
 }
 
 func (h *resourceEventHandler) OnDelete(obj interface{}) {
 	tmplName, namespace := getTemplateNameAndNamespace(obj)
-	h.rebuildByName(namespace, tmplName)
+	h.rebuildByName(namespace, tmplName, obj)
 }
 
-func (h *resourceEventHandler) rebuildByName(namespace, tmplName string) {
+func (h *resourceEventHandler) rebuildByName(namespace, tmplName string, obj interface{}) {
 	if len(tmplName) == 0 {
 		return
 	}
 	tmpl, err := h.name2tmpl(namespace, tmplName)
 	if err != nil {
-		log.Printf("Failed to do template lookup for %s/%s: %v", namespace, tmplName, err)
+		log.Printf("[REH] Failed to do template lookup for %s/%s: %v", namespace, tmplName, err)
 		return
 	}
 	if tmpl != nil {
+		log.Printf("[REH] Rebuilding %s/%s template because of resource %s add/update/delete", namespace, tmplName, obj.(*unstructured.Unstructured).GetName())
 		h.processor.Rebuild(tmpl)
 	} else {
 		// TODO template not found - handle deletion?

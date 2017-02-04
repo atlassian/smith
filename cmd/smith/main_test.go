@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"sync"
 	"testing"
 	"time"
@@ -62,13 +61,13 @@ func TestWorkflow(t *testing.T) {
 		Do().
 		Error()
 	if err == nil {
-		log.Print("Template deleted")
+		t.Log("Template deleted")
 	} else if !errors.IsNotFound(err) {
 		r.NoError(err)
 	}
 	defer func() {
 		if templateCreated {
-			log.Printf("Deleting template %s", templateName)
+			t.Logf("Deleting template %s", templateName)
 			a.NoError(tmplClient.Delete().
 				Namespace(templateNamespace).
 				Resource(smith.TemplateResourcePath).
@@ -76,7 +75,7 @@ func TestWorkflow(t *testing.T) {
 				Do().
 				Error())
 			for _, resource := range tmpl.Spec.Resources {
-				log.Printf("Deleting resource %s", resource.Spec.GetName())
+				t.Logf("Deleting resource %s", resource.Spec.GetName())
 				gv, err := schema.ParseGroupVersion(resource.Spec.GetAPIVersion())
 				if !a.NoError(err) {
 					continue
@@ -104,14 +103,14 @@ func TestWorkflow(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		if err := runWithConfig(ctx, config); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-			t.Error(err)
+		if err := runWithConfig(ctx, config); err != context.Canceled && err != context.DeadlineExceeded {
+			a.NoError(err)
 		}
 	}()
 
 	time.Sleep(1 * time.Second) // Wait until the app starts and creates the Template TPR
 
-	log.Print("Creating a new template")
+	t.Log("Creating a new template")
 	r.NoError(tmplClient.Post().
 		Namespace(templateNamespace).
 		Resource(smith.TemplateResourcePath).
@@ -139,22 +138,22 @@ func TestWorkflow(t *testing.T) {
 				case <-ctxTimeout.Done():
 					t.Fatalf("Timeout waiting for events for resource %s", resource.Name)
 				case ev := <-w.ResultChan():
-					log.Printf("event %#v", ev)
-					if ev.Type != watch.Added || ev.Object.GetObjectKind().GroupVersionKind() != resource.Spec.GetObjectKind().GroupVersionKind() {
+					t.Logf("event %#v", ev)
+					if ev.Type != watch.Added || ev.Object.GetObjectKind().GroupVersionKind() != resource.Spec.GroupVersionKind() {
 						continue
 					}
-					obj, ok := ev.Object.(*unstructured.Unstructured)
-					r.True(ok)
-					if obj.GetName() == resource.Spec.GetName() {
-						log.Printf("received event for resource %q of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
-						a.EqualValues(map[string]string{
-							"configLabel":           "configValue",
-							"templateLabel":         "templateValue",
-							"overlappingLabel":      "overlappingConfigValue",
-							smith.TemplateNameLabel: templateName,
-						}, obj.GetLabels())
-						return
+					obj := ev.Object.(*unstructured.Unstructured)
+					if obj.GetName() != resource.Spec.GetName() {
+						continue
 					}
+					t.Logf("received event for resource %q of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
+					a.EqualValues(map[string]string{
+						"configLabel":           "configValue",
+						"templateLabel":         "templateValue",
+						"overlappingLabel":      "overlappingConfigValue",
+						smith.TemplateNameLabel: templateName,
+					}, obj.GetLabels())
+					return
 				}
 			}
 		}()
@@ -167,8 +166,7 @@ func TestWorkflow(t *testing.T) {
 		Name(templateName).
 		Do().
 		Into(&tmplRes))
-	log.Printf("tpl = %#v", &tmplRes)
-	r.Equal(smith.READY, tmplRes.Status.State)
+	r.Equal(smith.READY, tmplRes.Status.State, tmplRes)
 }
 
 func tmplResources(r *require.Assertions) []smith.Resource {

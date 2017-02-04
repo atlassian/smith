@@ -11,6 +11,7 @@ import (
 
 	"github.com/cenk/backoff"
 	"k8s.io/client-go/pkg/api/errors"
+	kerrors "k8s.io/client-go/pkg/api/errors"
 	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/pkg/runtime/schema"
@@ -59,7 +60,7 @@ func (wrk *worker) rebuild(tmpl *smith.Template) error {
 		// Sad, but true.
 		return nil
 	}
-	log.Printf("Rebuilding the template %s/%s", wrk.namespace, wrk.tmplName)
+	log.Printf("[WORKER] Rebuilding the template %s/%s", wrk.namespace, wrk.tmplName)
 
 	for _, res := range tmpl.Spec.Resources {
 		if wrk.checkNeedsRebuild() {
@@ -71,16 +72,12 @@ func (wrk *worker) rebuild(tmpl *smith.Template) error {
 		}
 		if !isReady {
 			if err := wrk.setTemplateState(tmpl, smith.IN_PROGRESS); err != nil {
-				log.Printf("%v", err)
+				log.Printf("[WORKER] %v", err)
 			}
 			return nil
 		}
 	}
-	err := wrk.setTemplateState(tmpl, smith.READY)
-	if err == nil {
-		log.Printf("Template %s/%s is %s", wrk.namespace, wrk.tmplName, smith.READY)
-	}
-	return err
+	return wrk.setTemplateState(tmpl, smith.READY)
 }
 
 func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isReady bool, e error) {
@@ -115,15 +112,15 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 				// Unexpected error
 				return false, err
 			}
-			log.Printf("template %s/%s: resource %s not found, creating", wrk.namespace, wrk.tmplName, res.Name)
+			log.Printf("[WORKER] template %s/%s: resource %q not found, creating", wrk.namespace, wrk.tmplName, res.Name)
 			// 2. Create if does not exist
 			response, err = resClient.Create(&res.Spec)
 			if err == nil {
-				log.Printf("template %s/%s: resource %s created", wrk.namespace, wrk.tmplName, res.Name)
+				log.Printf("[WORKER] template %s/%s: resource %q created", wrk.namespace, wrk.tmplName, res.Name)
 				break
 			}
 			if errors.IsAlreadyExists(err) {
-				log.Printf("template %s/%s: resource %s found, restarting loop", wrk.namespace, wrk.tmplName, res.Name)
+				log.Printf("[WORKER] template %s/%s: resource %q found, restarting loop", wrk.namespace, wrk.tmplName, res.Name)
 				continue
 			}
 			// Unexpected error
@@ -132,7 +129,7 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 
 		// 3. Compare spec and existing resource
 		if isEqualResources(res, response) {
-			log.Printf("template %s/%s: resource %s has correct spec", wrk.namespace, wrk.tmplName, res.Name)
+			//log.Printf("[WORKER] template %s/%s: resource %s has correct spec", wrk.namespace, wrk.tmplName, res.Name)
 			break
 		}
 
@@ -143,13 +140,13 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 		response, err = resClient.Update(&res.Spec)
 		if err != nil {
 			if errors.IsConflict(err) {
-				log.Printf("template %s/%s: resource %s update resulted in conflict, restarting loop", wrk.namespace, wrk.tmplName, res.Name)
+				log.Printf("[WORKER] template %s/%s: resource %q update resulted in conflict, restarting loop", wrk.namespace, wrk.tmplName, res.Name)
 				continue
 			}
 			// Unexpected error
 			return false, err
 		}
-		log.Printf("template %s/%s: resource %s updated", wrk.namespace, wrk.tmplName, res.Name)
+		log.Printf("[WORKER] template %s/%s: resource %q updated", wrk.namespace, wrk.tmplName, res.Name)
 		break
 	}
 	return wrk.tp.rc.IsReady(response)
@@ -159,6 +156,7 @@ func (wrk *worker) setTemplateState(tpl *smith.Template, desired smith.ResourceS
 	if tpl.Status.State == desired {
 		return nil
 	}
+	log.Printf("[WORKER] setting template %s/%s State to %q from %q", wrk.namespace, wrk.tmplName, desired, tpl.Status.State)
 	tpl.Status.State = desired
 	err := wrk.tp.templateClient.Put().
 		Namespace(wrk.namespace).
@@ -168,10 +166,19 @@ func (wrk *worker) setTemplateState(tpl *smith.Template, desired smith.ResourceS
 		Do().
 		Into(tpl)
 	if err != nil {
-		return fmt.Errorf("failed to set template %s/%s state to %s: %v", wrk.namespace, wrk.tmplName, desired, err)
+		if kerrors.IsConflict(err) {
+			// Something updated the template concurrently.
+			// It is possible that it was us in previous iteration but we haven't observed the
+			// resulting update event for the template and this iteration was triggered by something
+			// else e.g. resource update.
+			// It is safe to ignore this conflict because we will reiterate because of the update event.
+			return nil
+		}
+		return fmt.Errorf("failed to set template %s/%s state to %q: %v", wrk.namespace, wrk.tmplName, desired, err)
 	}
+	log.Printf("[WORKER] template %s/%s is %q", wrk.namespace, wrk.tmplName, desired)
 	// FIXME for some reason TypeMeta is not deserialized properly
-	//log.Printf("Into = %#v", tpl)
+	//log.Printf("[WORKER] Into = %#v", tpl)
 	return nil
 }
 
@@ -193,18 +200,21 @@ func (wrk *worker) checkRebuild() *smith.Template {
 func (wrk *worker) cleanupState() {
 	wrk.tp.lock.Lock()
 	defer wrk.tp.lock.Unlock()
-	delete(wrk.tp.workers, wrk.workerRef)
+	if wrk.tp.workers[wrk.workerRef] == wrk {
+		// Only cleanup if there is a stale reference to the current worker.
+		delete(wrk.tp.workers, wrk.workerRef)
+	}
 }
 
 func (wrk *worker) handleError(tmpl *smith.Template, err error) (shouldContinue bool) {
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		return false
 	}
-	log.Printf("Failed to rebuild the template %s/%s: %v", wrk.namespace, wrk.tmplName, err)
+	log.Printf("[WORKER] Failed to rebuild the template %s/%s: %v", wrk.namespace, wrk.tmplName, err)
 	next := wrk.bo.NextBackOff()
 	if next == backoff.Stop {
 		if e := wrk.setTemplateState(tmpl, smith.TERMINAL_ERROR); e != nil {
-			log.Printf("%v", e)
+			log.Printf("[WORKER] %v", e)
 		}
 		return false
 	}
@@ -214,7 +224,7 @@ func (wrk *worker) handleError(tmpl *smith.Template, err error) (shouldContinue 
 		wrk.template = tmpl
 	}()
 	if e := wrk.setTemplateState(tmpl, smith.ERROR); e != nil {
-		log.Printf("%v", e)
+		log.Printf("[WORKER] %v", e)
 	}
 	after := time.NewTimer(next)
 	defer after.Stop()

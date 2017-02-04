@@ -4,7 +4,7 @@ This file describes the way Smith manages instances of Third Party Resources (TP
 
 ## Defined annotations
 
-### smith.a.c/tpr/readyWhenExistsKind=`<Kind>`, smith.a.c/tpr/readyWhenExistsVersion=`<GroupVersion>`
+### smith.a.c/TprReadyWhenExistsKind=`<Kind>`, smith.a.c/TprReadyWhenExistsVersion=`<GroupVersion>`
 
 Applied to a TPR `T` to indicate that an instance of it `Tinst` is considered `READY` when a resource of
 Kind=`<Kind>` `K` exists in the same namespace and that resource has an
@@ -19,8 +19,8 @@ kind: ThirdPartyResource
 metadata:
   name: resource-claim.smith.atlassian.com
   annotations:
-    smith.atlassian.com/tpr/readyWhenExistsKind: ResourceBinding
-    smith.atlassian.com/tpr/readyWhenExistsVersion: smith.atlassian.com/v1
+    smith.atlassian.com/TprReadyWhenExistsKind: ResourceBinding
+    smith.atlassian.com/TprReadyWhenExistsVersion: smith.atlassian.com/v1
 versions:
 - name: v1
 
@@ -50,7 +50,7 @@ metadata:
     uid: 038b49a6-e746-11e6-baf3-ee8d75af8f6e
 ```
 
-### smith.a.c/tpr/readyWhenFieldPath=`<FieldPath>`, smith.a.c/tpr/readyWhenFieldValue=`<Value>`
+### smith.a.c/TprReadyWhenFieldPath=`<FieldPath>`, smith.a.c/TprReadyWhenFieldValue=`<Value>`
 
 Applied to a TPR `T` to indicate that an instance of it `Tinst` is considered `READY` when it has a field,
 located by `<FieldPath>`, that equals `<Value>`.
@@ -64,8 +64,8 @@ kind: ThirdPartyResource
 metadata:
   name: cloud-formation.smith.atlassian.com
   annotations:
-    smith.atlassian.com/tpr/readyWhenFieldPath: status.state
-    smith.atlassian.com/tpr/readyWhenFieldValue: Ready
+    smith.atlassian.com/TprReadyWhenFieldPath: status.state
+    smith.atlassian.com/TprReadyWhenFieldValue: Ready
 versions:
 - name: v1
 

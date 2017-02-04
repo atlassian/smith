@@ -2,8 +2,6 @@ package processor
 
 import (
 	"context"
-	"log"
-	"math"
 	"sync"
 	"time"
 
@@ -59,7 +57,7 @@ func (tp *TemplateProcessor) Join() {
 // Note that the template object and/or resources in the template may be mutated asynchronously so the
 // calling code should do a proper deep copy if the object is still needed.
 func (tp *TemplateProcessor) Rebuild(tpl *smith.Template) {
-	log.Printf("Rebuilding the template %#v", tpl)
+	//log.Printf("Rebuilding the template %#v", tpl)
 	ref := workerRef{namespace: tpl.Metadata.Namespace, tmplName: tpl.Metadata.Name}
 	tp.lock.Lock()
 	defer tp.lock.Unlock()
@@ -82,6 +80,7 @@ func (tp *TemplateProcessor) Rebuild(tpl *smith.Template) {
 func exponentialBackOff() backoff.BackOff {
 	b := backoff.NewExponentialBackOff()
 	b.InitialInterval = 2 * time.Second
-	b.MaxElapsedTime = time.Duration(math.MaxInt64)
+	b.MaxElapsedTime = 5 * time.Second
+	//b.MaxElapsedTime = time.Duration(math.MaxInt64)
 	return b
 }

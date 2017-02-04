@@ -2,7 +2,6 @@ package smith
 
 import (
 	"encoding/json"
-	"log"
 
 	"k8s.io/client-go/pkg/api/meta"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
@@ -31,11 +30,11 @@ const (
 	TemplateResourceKind         = "Template"
 	TemplateResourceGroupVersion = SmithResourceGroup + "/" + TemplateResourceVersion
 
-	TemplateNameLabel = TemplateResourceName + "/templateName"
+	TemplateNameLabel = TemplateResourceName + "/TemplateName"
 
 	// See docs/design/managing-resources.md
-	TprFieldPathAnnotation  = SmithDomain + "/tpr/readyWhenFieldPath"
-	TprFieldValueAnnotation = SmithDomain + "/tpr/readyWhenFieldValue"
+	TprFieldPathAnnotation  = SmithDomain + "/TprReadyWhenFieldPath"
+	TprFieldValueAnnotation = SmithDomain + "/TprReadyWhenFieldValue"
 )
 
 type TemplateList struct {
@@ -117,7 +116,6 @@ func (e *Template) UnmarshalJSON(data []byte) error {
 	}
 	tmp2 := Template(tmp)
 	*e = tmp2
-	log.Printf("%s", data)
 	return nil
 }
 

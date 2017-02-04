@@ -68,10 +68,10 @@ func (h *tprEventHandler) OnDelete(obj interface{}) {
 func (h *tprEventHandler) onAdd(obj interface{}) {
 	tpr := obj.(*extensions.ThirdPartyResource)
 	if tpr.Name == smith.TemplateResourceName {
-		log.Printf("Not watching known TPR %s", tpr.Name)
+		log.Printf("[TPREH] Not watching known TPR %s", tpr.Name)
 		return
 	}
-	log.Printf("Handling OnAdd for TPR %s", tpr.Name)
+	log.Printf("[TPREH] Handling OnAdd for TPR %s", tpr.Name)
 	path, groupKind := resources.SplitTprName(tpr.Name)
 	for _, version := range tpr.Versions {
 		dc, err := h.clients.ClientForGroupVersionKind(schema.GroupVersionKind{
@@ -80,7 +80,7 @@ func (h *tprEventHandler) onAdd(obj interface{}) {
 			Kind:    groupKind.Kind,
 		})
 		if err != nil {
-			log.Printf("Failed to instantiate client for TPR %s of version %s: %v", tpr.Name, version.Name, err)
+			log.Printf("[TPREH] Failed to instantiate client for TPR %s of version %s: %v", tpr.Name, version.Name, err)
 			continue
 		}
 		res := dc.Resource(&metav1.APIResource{
@@ -97,7 +97,7 @@ func (h *tprEventHandler) onAdd(obj interface{}) {
 		}, &unstructured.Unstructured{}, 0)
 
 		if err := tprInf.AddEventHandler(h.handler); err != nil {
-			log.Printf("Failed to add an event handler for TPR %s of version %s: %v", tpr.Name, version.Name, err)
+			log.Printf("[TPREH] Failed to add an event handler for TPR %s of version %s: %v", tpr.Name, version.Name, err)
 			continue
 		}
 
