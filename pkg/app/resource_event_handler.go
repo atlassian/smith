@@ -17,13 +17,6 @@ type resourceEventHandler struct {
 	name2tmpl Name2Template
 }
 
-func newResourceEventHandler(processor Processor, name2tmpl Name2Template) *resourceEventHandler {
-	return &resourceEventHandler{
-		processor: processor,
-		name2tmpl: name2tmpl,
-	}
-}
-
 func (h *resourceEventHandler) OnAdd(obj interface{}) {
 	tmplName, namespace := getTemplateNameAndNamespace(obj)
 	h.rebuildByName(namespace, tmplName, obj)

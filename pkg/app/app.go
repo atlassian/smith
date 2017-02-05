@@ -54,8 +54,8 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 2. Ready Checker
 
-	rc := readychecker.New(&TprStore{
-		Store: tprInf.GetStore(),
+	rc := readychecker.New(&tprStore{
+		store: tprInf.GetStore(),
 	})
 
 	// 3. Processor
@@ -88,8 +88,11 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for Template Informer was cancelled")
 	}
 
-	sl := storeLookup{store: tmplInf.GetStore()}
-	reh := newResourceEventHandler(tp, sl.lookup)
+	sl := templateStore{store: tmplInf.GetStore()}
+	reh := &resourceEventHandler{
+		processor: tp,
+		name2tmpl: sl.Get,
+	}
 
 	// 6. TODO watch supported built-in resource types for events.
 
@@ -172,34 +175,11 @@ func watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplScheme *ru
 		},
 	}, &smith.Template{}, 0)
 
-	if err := tmplInf.AddEventHandler(newTemplateEventHandler(processor)); err != nil {
+	if err := tmplInf.AddEventHandler(&templateEventHandler{processor: processor}); err != nil {
 		return nil, err
 	}
 
 	go tmplInf.Run(ctx.Done())
 
 	return tmplInf, nil
-}
-
-type storeLookup struct {
-	store cache.Store
-}
-
-func (s *storeLookup) lookup(namespace, tmplName string) (*smith.Template, error) {
-	tmpl, exists, err := s.store.GetByKey(keyForTemplate(namespace, tmplName))
-	if err != nil || !exists {
-		return nil, err
-	}
-	in := tmpl.(*smith.Template)
-	out := &smith.Template{}
-
-	if err := smith.DeepCopy_Template(in, out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// keyForTemplate returns same key as client-go/tools/cache/store.MetaNamespaceKeyFunc
-func keyForTemplate(namespace, tmplName string) string {
-	return namespace + "/" + tmplName
 }

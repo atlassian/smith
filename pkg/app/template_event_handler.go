@@ -10,13 +10,6 @@ type templateEventHandler struct {
 	processor Processor
 }
 
-// newTemplateEventHandler handles events for objects with Kind: Template.
-func newTemplateEventHandler(processor Processor) *templateEventHandler {
-	return &templateEventHandler{
-		processor: processor,
-	}
-}
-
 func (h *templateEventHandler) OnAdd(obj interface{}) {
 	h.handle(obj)
 }
