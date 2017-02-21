@@ -10,7 +10,7 @@ BINARY_NAME := smith
 IMAGE_NAME := atlassian/smith
 ARCH ?= darwin
 METALINTER_CONCURRENCY ?= 4
-GOVERSION := 1.7
+GOVERSION := 1.8
 GP := /gopath
 MAIN_PKG := github.com/atlassian/smith/cmd/smith
 
