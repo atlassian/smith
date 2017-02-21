@@ -13,8 +13,8 @@ import (
 )
 
 var alwaysReady = map[schema.GroupKind]struct{}{
-	schema.GroupKind{Group: "", Kind: "ConfigMap"}: {},
-	schema.GroupKind{Group: "", Kind: "Secret"}:    {},
+	{Group: "", Kind: "ConfigMap"}: {},
+	{Group: "", Kind: "Secret"}:    {},
 }
 
 // TprStore gets a TPR definition for a Group and Kind of the resource (TPR instance).
