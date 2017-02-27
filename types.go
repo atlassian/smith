@@ -114,8 +114,7 @@ func (e *Template) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	tmp2 := Template(tmp)
-	*e = tmp2
+	*e = Template(tmp)
 	return nil
 }
 
@@ -125,7 +124,6 @@ func (el *TemplateList) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	tmp2 := TemplateList(tmp)
-	*el = tmp2
+	*el = TemplateList(tmp)
 	return nil
 }

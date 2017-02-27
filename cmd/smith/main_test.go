@@ -111,12 +111,13 @@ func TestWorkflow(t *testing.T) {
 	time.Sleep(1 * time.Second) // Wait until the app starts and creates the Template TPR
 
 	t.Log("Creating a new template")
+	var tmplRes smith.Template
 	r.NoError(tmplClient.Post().
 		Namespace(templateNamespace).
 		Resource(smith.TemplateResourcePath).
 		Body(&tmpl).
 		Do().
-		Error())
+		Into(&tmplRes))
 
 	templateCreated = true
 
@@ -147,26 +148,33 @@ func TestWorkflow(t *testing.T) {
 						continue
 					}
 					t.Logf("received event for resource %q of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
-					a.EqualValues(map[string]string{
+					a.Equal(map[string]string{
 						"configLabel":           "configValue",
 						"templateLabel":         "templateValue",
 						"overlappingLabel":      "overlappingConfigValue",
 						smith.TemplateNameLabel: templateName,
 					}, obj.GetLabels())
+					a.Equal([]metav1.OwnerReference{
+						{
+							APIVersion: smith.TemplateResourceVersion,
+							Kind:       smith.TemplateResourceKind,
+							Name:       templateName,
+							UID:        tmplRes.Metadata.UID,
+						},
+					}, obj.GetOwnerReferences())
 					return
 				}
 			}
 		}()
 	}
 	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
-	var tmplRes smith.Template
 	r.NoError(tmplClient.Get().
 		Namespace(templateNamespace).
 		Resource(smith.TemplateResourcePath).
 		Name(templateName).
 		Do().
 		Into(&tmplRes))
-	r.Equal(smith.READY, tmplRes.Status.State, tmplRes)
+	r.Equal(smith.READY, tmplRes.Status.State, "%#v", tmplRes)
 }
 
 func tmplResources(r *require.Assertions) []smith.Resource {

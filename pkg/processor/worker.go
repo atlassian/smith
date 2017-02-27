@@ -102,10 +102,20 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 		tmpl.Metadata.Labels,
 		res.Spec.GetLabels(),
 		map[string]string{smith.TemplateNameLabel: wrk.tmplName}))
+
+	// 1. Update OwnerReferences
+	// Hardcode APIVersion/Kind because of https://github.com/kubernetes/client-go/issues/60
+	res.Spec.SetOwnerReferences(append(res.Spec.GetOwnerReferences(), metav1.OwnerReference{
+		APIVersion: smith.TemplateResourceVersion,
+		Kind:       smith.TemplateResourceKind,
+		Name:       tmpl.Metadata.Name,
+		UID:        tmpl.Metadata.UID,
+	}))
+
 	name := res.Spec.GetName()
 	var response *unstructured.Unstructured
 	for {
-		// 1. Try to get the resource. We do read first to avoid generating unnecessary events.
+		// 2. Try to get the resource. We do read first to avoid generating unnecessary events.
 		response, err = resClient.Get(name)
 		if err != nil {
 			if !errors.IsNotFound(err) {
@@ -113,7 +123,7 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 				return false, err
 			}
 			log.Printf("[WORKER] template %s/%s: resource %q not found, creating", wrk.namespace, wrk.tmplName, res.Name)
-			// 2. Create if does not exist
+			// 3. Create if does not exist
 			response, err = resClient.Create(&res.Spec)
 			if err == nil {
 				log.Printf("[WORKER] template %s/%s: resource %q created", wrk.namespace, wrk.tmplName, res.Name)
@@ -127,13 +137,13 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 			return false, err
 		}
 
-		// 3. Compare spec and existing resource
+		// 4. Compare spec and existing resource
 		if isEqualResources(res, response) {
 			//log.Printf("[WORKER] template %s/%s: resource %s has correct spec", wrk.namespace, wrk.tmplName, res.Name)
 			break
 		}
 
-		// 4. Update if different
+		// 5. Update if different
 		// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
 		res.Spec.SetResourceVersion(response.GetResourceVersion()) // Do CAS
 
