@@ -8,8 +8,8 @@ import (
 	"github.com/atlassian/smith"
 
 	"github.com/cenk/backoff"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
 )
 

@@ -10,11 +10,11 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/cenk/backoff"
-	"k8s.io/client-go/pkg/api/errors"
-	kerrors "k8s.io/client-go/pkg/api/errors"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type worker struct {

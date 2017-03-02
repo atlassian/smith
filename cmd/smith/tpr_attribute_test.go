@@ -15,10 +15,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/client-go/pkg/api/errors"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestTprAttribute(t *testing.T) {
@@ -42,7 +41,7 @@ func TestTprAttribute(t *testing.T) {
 			Kind:       smith.TemplateResourceKind,
 			APIVersion: smith.TemplateResourceGroupVersion,
 		},
-		Metadata: apiv1.ObjectMeta{
+		Metadata: metav1.ObjectMeta{
 			Name: templateName,
 		},
 		Spec: smith.TemplateSpec{
@@ -168,7 +167,7 @@ func tmplAttrResources(r *require.Assertions) (*tprattribute.Sleeper, *unstructu
 			Kind:       tprattribute.SleeperResourceKind,
 			APIVersion: tprattribute.SleeperResourceGroupVersion,
 		},
-		Metadata: apiv1.ObjectMeta{
+		Metadata: metav1.ObjectMeta{
 			Name: "sleeper1",
 		},
 		Spec: tprattribute.SleeperSpec{

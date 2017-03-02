@@ -3,11 +3,9 @@ package smith
 import (
 	"encoding/json"
 
-	"k8s.io/client-go/pkg/api/meta"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/pkg/runtime/schema"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type ResourceState string
@@ -61,7 +59,7 @@ type Template struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Standard object metadata
-	Metadata apiv1.ObjectMeta `json:"metadata,omitempty"`
+	Metadata metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the specification of the desired behavior of the Template.
 	Spec TemplateSpec `json:"spec,omitempty"`
@@ -76,7 +74,7 @@ func (t *Template) GetObjectKind() schema.ObjectKind {
 }
 
 // Required to satisfy ObjectMetaAccessor interface
-func (t *Template) GetObjectMeta() meta.Object {
+func (t *Template) GetObjectMeta() metav1.Object {
 	return &t.Metadata
 }
 

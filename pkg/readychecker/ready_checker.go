@@ -7,9 +7,9 @@ import (
 
 	"github.com/atlassian/smith"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 var alwaysReady = map[schema.GroupKind]struct{}{
