@@ -14,13 +14,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/pkg/api/errors"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/watch"
 )
 
 func TestWorkflow(t *testing.T) {
@@ -42,7 +42,7 @@ func TestWorkflow(t *testing.T) {
 			Kind:       smith.TemplateResourceKind,
 			APIVersion: smith.TemplateResourceGroupVersion,
 		},
-		Metadata: apiv1.ObjectMeta{
+		Metadata: metav1.ObjectMeta{
 			Name: templateName,
 			Labels: map[string]string{
 				"templateLabel":         "templateValue",
@@ -88,7 +88,7 @@ func TestWorkflow(t *testing.T) {
 					Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
 					Namespaced: true,
 					Kind:       resource.Spec.GetKind(),
-				}, templateNamespace).Delete(resource.Spec.GetName(), &apiv1.DeleteOptions{}))
+				}, templateNamespace).Delete(resource.Spec.GetName(), &metav1.DeleteOptions{}))
 			}
 		}
 	}()
@@ -129,7 +129,7 @@ func TestWorkflow(t *testing.T) {
 				Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
 				Namespaced: true,
 				Kind:       resource.Spec.GetKind(),
-			}, templateNamespace).Watch(&apiv1.ListOptions{})
+			}, templateNamespace).Watch(metav1.ListOptions{})
 			r.NoError(err)
 			defer w.Stop()
 			ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -183,7 +183,7 @@ func tmplResources(r *require.Assertions) []smith.Resource {
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "config1",
 			Labels: map[string]string{
 				"configLabel":           "configValue",

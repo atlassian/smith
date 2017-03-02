@@ -3,10 +3,8 @@ package tprattribute
 import (
 	"encoding/json"
 
-	"k8s.io/client-go/pkg/api/meta"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/runtime/schema"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -53,7 +51,7 @@ type Sleeper struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Standard object metadata
-	Metadata apiv1.ObjectMeta `json:"metadata,omitempty"`
+	Metadata metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the specification of the desired behavior of the Sleeper.
 	Spec SleeperSpec `json:"spec,omitempty"`
@@ -68,7 +66,7 @@ func (t *Sleeper) GetObjectKind() schema.ObjectKind {
 }
 
 // Required to satisfy ObjectMetaAccessor interface
-func (t *Sleeper) GetObjectMeta() meta.Object {
+func (t *Sleeper) GetObjectMeta() metav1.Object {
 	return &t.Metadata
 }
 
@@ -95,8 +93,7 @@ func (s *Sleeper) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	tmp2 := Sleeper(tmp)
-	*s = tmp2
+	*s = Sleeper(tmp)
 	return nil
 }
 
@@ -106,7 +103,6 @@ func (sl *SleeperList) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	tmp2 := SleeperList(tmp)
-	*sl = tmp2
+	*sl = SleeperList(tmp)
 	return nil
 }

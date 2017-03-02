@@ -12,13 +12,13 @@ import (
 	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/resources"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	kerrors "k8s.io/client-go/pkg/api/errors"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -98,9 +98,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 7. Watch Third Party Resources to add watches for supported ones
 
-	if err := tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients)); err != nil {
-		return err
-	}
+	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients))
 
 	<-ctx.Done()
 	return ctx.Err()
@@ -109,7 +107,7 @@ func (a *App) Run(ctx context.Context) error {
 func ensureResourceExists(clientset kubernetes.Interface) error {
 	log.Printf("Creating ThirdPartyResource %s", smith.TemplateResourceName)
 	tpr := &extensions.ThirdPartyResource{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: smith.TemplateResourceName,
 		},
 		Description: "Smith resource manager",
@@ -139,10 +137,10 @@ func ensureResourceExists(clientset kubernetes.Interface) error {
 func tprInformer(ctx context.Context, clientset kubernetes.Interface) cache.SharedInformer {
 	tprClient := clientset.ExtensionsV1beta1().ThirdPartyResources()
 	tprInf := cache.NewSharedInformer(&cache.ListWatch{
-		ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return tprClient.List(options)
 		},
-		WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			return tprClient.Watch(options)
 		},
 	}, &extensions.ThirdPartyResource{}, 0)
@@ -159,14 +157,14 @@ func watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplScheme *ru
 	// api.Scheme which does not know about Smith group/version.
 	// cache.NewListWatchFromClient(templateClient, smith.TemplateResourcePath, apiv1.NamespaceAll, fields.Everything())
 	tmplInf := cache.NewSharedInformer(&cache.ListWatch{
-		ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return tmplClient.Get().
 				Resource(smith.TemplateResourcePath).
 				VersionedParams(&options, parameterCodec).
 				Do().
 				Get()
 		},
-		WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			return tmplClient.Get().
 				Prefix("watch").
 				Resource(smith.TemplateResourcePath).
@@ -175,9 +173,7 @@ func watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplScheme *ru
 		},
 	}, &smith.Template{}, 0)
 
-	if err := tmplInf.AddEventHandler(&templateEventHandler{processor: processor}); err != nil {
-		return nil, err
-	}
+	tmplInf.AddEventHandler(&templateEventHandler{processor: processor})
 
 	go tmplInf.Run(ctx.Done())
 

@@ -1,16 +1,15 @@
 package smith
 
 import (
-	apiv1 "k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func DeepCopy_Template(in *Template, out *Template) error {
 	if err := metav1.DeepCopy_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, nil); err != nil {
 		return err
 	}
-	if err := apiv1.DeepCopy_v1_ObjectMeta(&in.Metadata, &out.Metadata, nil); err != nil {
+	if err := metav1.DeepCopy_v1_ObjectMeta(&in.Metadata, &out.Metadata, nil); err != nil {
 		return err
 	}
 	if err := DeepCopy_TemplateSpec(&in.Spec, &out.Spec); err != nil {

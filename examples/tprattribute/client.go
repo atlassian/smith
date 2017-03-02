@@ -1,11 +1,11 @@
 package tprattribute
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/pkg/api"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
 )
 
@@ -20,8 +20,8 @@ func GetSleeperTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, e
 			groupVersion,
 			&Sleeper{},
 			&SleeperList{},
-			&apiv1.ListOptions{},
-			&apiv1.DeleteOptions{},
+			&metav1.ListOptions{},
+			&metav1.DeleteOptions{},
 		)
 		return scheme.AddConversionFuncs(
 			api.Convert_v1_TypeMeta_To_v1_TypeMeta,

@@ -5,7 +5,7 @@ import (
 
 	"github.com/atlassian/smith"
 
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // Name2Template is a function that does a lookup of Template based on its namespace and name.

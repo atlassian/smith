@@ -8,12 +8,12 @@ import (
 
 	"github.com/atlassian/smith"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	kerrors "k8s.io/client-go/pkg/api/errors"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -56,7 +56,7 @@ func (a *App) Run(ctx context.Context) error {
 func ensureResourceExists(clientset kubernetes.Interface) error {
 	log.Printf("Creating ThirdPartyResource %s", SleeperResourceName)
 	tpr := &extensions.ThirdPartyResource{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: SleeperResourceName,
 			Annotations: map[string]string{
 				smith.TprFieldPathAnnotation:  "status.state",
@@ -91,14 +91,14 @@ func sleeperInformer(ctx context.Context, sClient *rest.RESTClient, sScheme *run
 	parameterCodec := runtime.NewParameterCodec(sScheme)
 
 	tmplInf := cache.NewSharedInformer(&cache.ListWatch{
-		ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return sClient.Get().
 				Resource(SleeperResourcePath).
 				VersionedParams(&options, parameterCodec).
 				Do().
 				Get()
 		},
-		WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			return sClient.Get().
 				Prefix("watch").
 				Resource(SleeperResourcePath).
@@ -112,9 +112,7 @@ func sleeperInformer(ctx context.Context, sClient *rest.RESTClient, sScheme *run
 		client: sClient,
 	}
 
-	if err := tmplInf.AddEventHandler(seh); err != nil {
-		return err
-	}
+	tmplInf.AddEventHandler(seh)
 
 	// Run the Informer concurrently
 	go tmplInf.Run(ctx.Done())

@@ -9,14 +9,14 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -88,18 +88,15 @@ func (h *tprEventHandler) onAdd(obj interface{}) {
 			Kind: groupKind.Kind,
 		}, apiv1.NamespaceAll)
 		tprInf := cache.NewSharedInformer(&cache.ListWatch{
-			ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
-				return res.List(&options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return res.List(options)
 			},
-			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-				return res.Watch(&options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return res.Watch(options)
 			},
 		}, &unstructured.Unstructured{}, 0)
 
-		if err := tprInf.AddEventHandler(h.handler); err != nil {
-			log.Printf("[TPREH] Failed to add an event handler for TPR %s of version %s: %v", tpr.Name, version.Name, err)
-			continue
-		}
+		tprInf.AddEventHandler(h.handler)
 
 		ctx, cancel := context.WithCancel(h.ctx)
 		h.watchers[key(tpr.Name, version.Name)] = watchState{cancel}
