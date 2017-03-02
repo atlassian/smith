@@ -1,6 +1,6 @@
 package readychecker
 
-// The rest of this file was copied from k8s.io/client-go/pkg/apis/meta/v1/unstructured/unstructured.go
+// The rest of this file was copied from k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructured.go
 // Remove once https://github.com/kubernetes/kubernetes/issues/40790 is fixed and available for use.
 
 /*
