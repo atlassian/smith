@@ -105,12 +105,13 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 
 	// 1. Update OwnerReferences
 	// Hardcode APIVersion/Kind because of https://github.com/kubernetes/client-go/issues/60
-	res.Spec.SetOwnerReferences(append(res.Spec.GetOwnerReferences(), metav1.OwnerReference{
-		APIVersion: smith.TemplateResourceVersion,
-		Kind:       smith.TemplateResourceKind,
-		Name:       tmpl.Metadata.Name,
-		UID:        tmpl.Metadata.UID,
-	}))
+	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/39816 is fixed
+	//res.Spec.SetOwnerReferences(append(res.Spec.GetOwnerReferences(), metav1.OwnerReference{
+	//	APIVersion: smith.TemplateResourceVersion,
+	//	Kind:       smith.TemplateResourceKind,
+	//	Name:       tmpl.Metadata.Name,
+	//	UID:        tmpl.Metadata.UID,
+	//}))
 
 	name := res.Spec.GetName()
 	var response *unstructured.Unstructured
