@@ -1,6 +1,6 @@
 // +build integration
 
-package main
+package integration_tests
 
 import (
 	"net"

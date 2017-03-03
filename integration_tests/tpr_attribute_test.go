@@ -1,6 +1,6 @@
 // +build integration
 
-package main
+package integration_tests
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/tprattribute"
+	"github.com/atlassian/smith/pkg/app"
 	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/stretchr/testify/assert"
@@ -21,21 +22,19 @@ import (
 )
 
 func TestTprAttribute(t *testing.T) {
-	a := assert.New(t)
-	r := require.New(t)
 	config := configFromEnv(t)
 
 	tmplClient, _, err := resources.GetTemplateTprClient(config)
-	r.NoError(err)
+	require.NoError(t, err)
 
 	sClient, _, err := tprattribute.GetSleeperTprClient(config)
-	r.NoError(err)
+	require.NoError(t, err)
 
 	templateName := "template-attribute"
 	templateNamespace := "default"
 
 	var templateCreated bool
-	sleeper, sleeperU := tmplAttrResources(r)
+	sleeper, sleeperU := tmplAttrResources(t)
 	tmpl := smith.Template{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       smith.TemplateResourceKind,
@@ -62,19 +61,19 @@ func TestTprAttribute(t *testing.T) {
 	if err == nil {
 		t.Log("Template deleted")
 	} else if !errors.IsNotFound(err) {
-		r.NoError(err)
+		require.NoError(t, err)
 	}
 	defer func() {
 		if templateCreated {
 			t.Logf("Deleting template %s", templateName)
-			a.NoError(tmplClient.Delete().
+			assert.NoError(t, tmplClient.Delete().
 				Namespace(templateNamespace).
 				Resource(smith.TemplateResourcePath).
 				Name(templateName).
 				Do().
 				Error())
 			t.Logf("Deleting resource %s", sleeper.Metadata.Name)
-			a.NoError(sClient.Delete().
+			assert.NoError(t, sClient.Delete().
 				Namespace(templateNamespace).
 				Resource(tprattribute.SleeperResourcePath).
 				Name(sleeper.Metadata.Name).
@@ -93,25 +92,28 @@ func TestTprAttribute(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		if err := runWithConfig(ctx, config); err != context.Canceled && err != context.DeadlineExceeded {
-			a.NoError(err)
+		apl := app.App{
+			RestConfig: config,
+		}
+		if err := apl.Run(ctx); err != context.Canceled && err != context.DeadlineExceeded {
+			assert.NoError(t, err)
 		}
 	}()
 	go func() {
 		defer wg.Done()
 
-		app := tprattribute.App{
+		apl := tprattribute.App{
 			RestConfig: config,
 		}
-		if err := app.Run(ctx); err != context.Canceled && err != context.DeadlineExceeded {
-			a.NoError(err)
+		if err := apl.Run(ctx); err != context.Canceled && err != context.DeadlineExceeded {
+			assert.NoError(t, err)
 		}
 	}()
 
 	time.Sleep(5 * time.Second) // Wait until apps start and creates the Template TPR and Sleeper TPR
 
 	t.Log("Creating a new template")
-	r.NoError(tmplClient.Post().
+	require.NoError(t, tmplClient.Post().
 		Namespace(templateNamespace).
 		Resource(smith.TemplateResourcePath).
 		Body(&tmpl).
@@ -126,7 +128,7 @@ func TestTprAttribute(t *testing.T) {
 			Prefix("watch").
 			Resource(tprattribute.SleeperResourcePath).
 			Watch()
-		r.NoError(err)
+		require.NoError(t, err)
 		defer w.Stop()
 		ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+1)*time.Second)
 		defer cancel()
@@ -141,7 +143,7 @@ func TestTprAttribute(t *testing.T) {
 					continue
 				}
 				t.Logf("received event with status.state == %q for resource %q of kind %q", obj.Status.State, sleeper.Metadata.Name, sleeper.Kind)
-				a.EqualValues(map[string]string{
+				assert.EqualValues(t, map[string]string{
 					smith.TemplateNameLabel: templateName,
 				}, obj.Metadata.Labels)
 				if obj.Status.State == tprattribute.AWAKE {
@@ -152,16 +154,16 @@ func TestTprAttribute(t *testing.T) {
 	}()
 	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
 	var tmplRes smith.Template
-	r.NoError(tmplClient.Get().
+	require.NoError(t, tmplClient.Get().
 		Namespace(templateNamespace).
 		Resource(smith.TemplateResourcePath).
 		Name(templateName).
 		Do().
 		Into(&tmplRes))
-	r.Equal(smith.READY, tmplRes.Status.State)
+	require.Equal(t, smith.READY, tmplRes.Status.State)
 }
 
-func tmplAttrResources(r *require.Assertions) (*tprattribute.Sleeper, *unstructured.Unstructured) {
+func tmplAttrResources(t *testing.T) (*tprattribute.Sleeper, *unstructured.Unstructured) {
 	c := &tprattribute.Sleeper{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       tprattribute.SleeperResourceKind,
@@ -176,9 +178,9 @@ func tmplAttrResources(r *require.Assertions) (*tprattribute.Sleeper, *unstructu
 		},
 	}
 	data, err := json.Marshal(c)
-	r.NoError(err)
+	require.NoError(t, err)
 
 	u := &unstructured.Unstructured{}
-	r.NoError(u.UnmarshalJSON(data))
+	require.NoError(t, u.UnmarshalJSON(data))
 	return c, u
 }

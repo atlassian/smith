@@ -1,6 +1,6 @@
 // +build integration
 
-package main
+package integration_tests
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/app"
 	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/stretchr/testify/assert"
@@ -24,12 +25,10 @@ import (
 )
 
 func TestWorkflow(t *testing.T) {
-	a := assert.New(t)
-	r := require.New(t)
 	config := configFromEnv(t)
 
 	tmplClient, _, err := resources.GetTemplateTprClient(config)
-	r.NoError(err)
+	require.NoError(t, err)
 
 	clients := dynamic.NewClientPool(config, nil, dynamic.LegacyAPIPathResolverFunc)
 
@@ -51,7 +50,7 @@ func TestWorkflow(t *testing.T) {
 			},
 		},
 		Spec: smith.TemplateSpec{
-			Resources: tmplResources(r),
+			Resources: tmplResources(t),
 		},
 	}
 	err = tmplClient.Delete().
@@ -63,12 +62,12 @@ func TestWorkflow(t *testing.T) {
 	if err == nil {
 		t.Log("Template deleted")
 	} else if !errors.IsNotFound(err) {
-		r.NoError(err)
+		require.NoError(t, err)
 	}
 	defer func() {
 		if templateCreated {
 			t.Logf("Deleting template %s", templateName)
-			a.NoError(tmplClient.Delete().
+			assert.NoError(t, tmplClient.Delete().
 				Namespace(templateNamespace).
 				Resource(smith.TemplateResourcePath).
 				Name(templateName).
@@ -77,14 +76,14 @@ func TestWorkflow(t *testing.T) {
 			for _, resource := range tmpl.Spec.Resources {
 				t.Logf("Deleting resource %s", resource.Spec.GetName())
 				gv, err := schema.ParseGroupVersion(resource.Spec.GetAPIVersion())
-				if !a.NoError(err) {
+				if !assert.NoError(t, err) {
 					continue
 				}
 				client, err := clients.ClientForGroupVersionKind(gv.WithKind(resource.Spec.GetKind()))
-				if !a.NoError(err) {
+				if !assert.NoError(t, err) {
 					continue
 				}
-				a.NoError(client.Resource(&metav1.APIResource{
+				assert.NoError(t, client.Resource(&metav1.APIResource{
 					Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
 					Namespaced: true,
 					Kind:       resource.Spec.GetKind(),
@@ -102,9 +101,11 @@ func TestWorkflow(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		if err := runWithConfig(ctx, config); err != context.Canceled && err != context.DeadlineExceeded {
-			a.NoError(err)
+		apl := app.App{
+			RestConfig: config,
+		}
+		if err := apl.Run(ctx); err != context.Canceled && err != context.DeadlineExceeded {
+			assert.NoError(t, err)
 		}
 	}()
 
@@ -112,7 +113,7 @@ func TestWorkflow(t *testing.T) {
 
 	t.Log("Creating a new template")
 	var tmplRes smith.Template
-	r.NoError(tmplClient.Post().
+	require.NoError(t, tmplClient.Post().
 		Namespace(templateNamespace).
 		Resource(smith.TemplateResourcePath).
 		Body(&tmpl).
@@ -124,13 +125,13 @@ func TestWorkflow(t *testing.T) {
 	for _, resource := range tmpl.Spec.Resources {
 		func() {
 			c, err := clients.ClientForGroupVersionKind(resource.Spec.GroupVersionKind())
-			r.NoError(err)
+			require.NoError(t, err)
 			w, err := c.Resource(&metav1.APIResource{
 				Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
 				Namespaced: true,
 				Kind:       resource.Spec.GetKind(),
 			}, templateNamespace).Watch(metav1.ListOptions{})
-			r.NoError(err)
+			require.NoError(t, err)
 			defer w.Stop()
 			ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
@@ -148,7 +149,7 @@ func TestWorkflow(t *testing.T) {
 						continue
 					}
 					t.Logf("received event for resource %q of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
-					a.Equal(map[string]string{
+					assert.Equal(t, map[string]string{
 						"configLabel":           "configValue",
 						"templateLabel":         "templateValue",
 						"overlappingLabel":      "overlappingConfigValue",
@@ -169,16 +170,16 @@ func TestWorkflow(t *testing.T) {
 		}()
 	}
 	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
-	r.NoError(tmplClient.Get().
+	require.NoError(t, tmplClient.Get().
 		Namespace(templateNamespace).
 		Resource(smith.TemplateResourcePath).
 		Name(templateName).
 		Do().
 		Into(&tmplRes))
-	r.Equal(smith.READY, tmplRes.Status.State, "%#v", tmplRes)
+	require.Equal(t, smith.READY, tmplRes.Status.State, "%#v", tmplRes)
 }
 
-func tmplResources(r *require.Assertions) []smith.Resource {
+func tmplResources(t *testing.T) []smith.Resource {
 	c := apiv1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ConfigMap",
@@ -197,10 +198,10 @@ func tmplResources(r *require.Assertions) []smith.Resource {
 		},
 	}
 	data, err := json.Marshal(&c)
-	r.NoError(err)
+	require.NoError(t, err)
 
 	r1 := unstructured.Unstructured{}
-	r.NoError(r1.UnmarshalJSON(data))
+	require.NoError(t, r1.UnmarshalJSON(data))
 	return []smith.Resource{
 		{
 			Name: "resource1",
