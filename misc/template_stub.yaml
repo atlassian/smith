@@ -1,0 +1,54 @@
+apiVersion: smith.atlassian.com/v1
+kind: TemplateStub
+description: "Service template stub"
+metadata:
+  name: template_stub_1
+overridable:
+  DEPLOYMENT_REPLICAS:
+    default: 2
+    schema:
+      type: integer
+      minimum: 1
+
+  DEPLOYMENT_IMAGE:
+    schema:
+      type: string
+      minLength: 1
+
+  DEPLOYMENT_POD_SPEC:
+    default:
+      containers:
+      - name: app
+        image: "$(DEPLOYMENT_IMAGE)"
+        ports:
+        - containerPort: 8080
+    schema:
+      type: object
+
+spec:
+  resources:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: config1
+    data:
+      a: b
+  - apiVersion: extensions/v1beta1
+    kind: Deployment
+    metadata:
+      name: app-deployment
+    spec:
+      replicas: "$((DEPLOYMENT_REPLICAS))"
+      template:
+        metadata:
+          labels:
+            app: app
+        spec: "$((DEPLOYMENT_POD_SPEC))"
+      strategy:
+        type: RollingUpdate
+      minReadySeconds: 0
+  - apiVersion: extensions/v1beta1
+    kind: Ingress
+    metadata:
+      name: app-ingress
+    spec:
