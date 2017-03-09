@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/atlassian/smith/pkg/app"
+	"github.com/atlassian/smith/pkg/resources"
 
 	"k8s.io/client-go/rest"
 )
@@ -27,9 +28,12 @@ func run() error {
 }
 
 func runWithContext(ctx context.Context) error {
-	config, err := rest.InClusterConfig()
+	config, err := resources.ConfigFromEnv()
 	if err != nil {
-		return err
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return err
+		}
 	}
 	config.UserAgent = "smith/" + Version + "/" + GitCommit
 
