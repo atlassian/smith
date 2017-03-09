@@ -44,6 +44,14 @@ minikube-test:
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	go test -tags=integration -race -v $$(glide nv)
 
+minikube-run:
+	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
+	KUBERNETES_SERVICE_PORT=8443 \
+	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
+	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
+	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
+	go run -race cmd/smith/*
+
 test-race:
 	go test -race $$(glide nv)
 

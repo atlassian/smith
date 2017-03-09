@@ -25,7 +25,8 @@ import (
 )
 
 func TestWorkflow(t *testing.T) {
-	config := configFromEnv(t)
+	config, err := resources.ConfigFromEnv()
+	require.NoError(t, err)
 
 	tmplClient, _, err := resources.GetTemplateTprClient(config)
 	require.NoError(t, err)
