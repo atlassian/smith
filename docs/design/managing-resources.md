@@ -4,6 +4,42 @@ This file describes the way Smith manages instances of Third Party Resources (TP
 
 ## Defined annotations
 
+### smith.a.c/TprReadyWhenFieldPath=`<FieldPath>`, smith.a.c/TprReadyWhenFieldValue=`<Value>`
+
+Applied to a TPR `T` to indicate that an instance of it `Tinst` is considered `READY` when it has a field,
+located by `<FieldPath>`, that equals `<Value>`.
+
+Example of a TPR `T`:
+
+```
+apiVersion: extensions/v1beta1
+description: Smith example AWS CloudFormation stack
+kind: ThirdPartyResource
+metadata:
+  name: cloud-formation.smith.atlassian.com
+  annotations:
+    smith.atlassian.com/TprReadyWhenFieldPath: status.state
+    smith.atlassian.com/TprReadyWhenFieldValue: Ready
+versions:
+- name: v1
+
+```
+
+Example of a TPR instance `Tinst`:
+
+```
+apiVersion: smith.atlassian.com/v1
+kind: CloudFormation
+metadata:
+  name: cfn-1
+spec:
+  ...
+status:
+  state: Ready
+```
+
+## Defined but not implemented
+
 ### smith.a.c/TprReadyWhenExistsKind=`<Kind>`, smith.a.c/TprReadyWhenExistsVersion=`<GroupVersion>`
 
 Applied to a TPR `T` to indicate that an instance of it `Tinst` is considered `READY` when a resource of
@@ -48,38 +84,4 @@ metadata:
     kind: ResourceClaim
     name: DbClaim1
     uid: 038b49a6-e746-11e6-baf3-ee8d75af8f6e
-```
-
-### smith.a.c/TprReadyWhenFieldPath=`<FieldPath>`, smith.a.c/TprReadyWhenFieldValue=`<Value>`
-
-Applied to a TPR `T` to indicate that an instance of it `Tinst` is considered `READY` when it has a field,
-located by `<FieldPath>`, that equals `<Value>`.
-
-Example of a TPR `T`:
-
-```
-apiVersion: extensions/v1beta1
-description: Smith example AWS CloudFormation stack
-kind: ThirdPartyResource
-metadata:
-  name: cloud-formation.smith.atlassian.com
-  annotations:
-    smith.atlassian.com/TprReadyWhenFieldPath: status.state
-    smith.atlassian.com/TprReadyWhenFieldValue: Ready
-versions:
-- name: v1
-
-```
-
-Example of a TPR instance `Tinst`:
-
-```
-apiVersion: smith.atlassian.com/v1
-kind: CloudFormation
-metadata:
-  name: cfn-1
-spec:
-  ...
-status:
-  state: Ready
 ```
