@@ -3,12 +3,12 @@ package app
 import (
 	"github.com/atlassian/smith"
 
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 )
 
 type bundleStore struct {
-	store cache.Store
+	store  cache.Store
 	scheme *runtime.Scheme
 }
 
