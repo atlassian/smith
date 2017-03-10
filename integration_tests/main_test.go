@@ -178,6 +178,7 @@ func TestWorkflow(t *testing.T) {
 		Do().
 		Into(&tmplRes))
 	require.Equal(t, smith.READY, tmplRes.Status.State, "%#v", tmplRes)
+	require.Equal(t, tmpl.Spec, tmplRes.Spec, "%#v", tmplRes)
 }
 
 func tmplResources(t *testing.T) []smith.Resource {
