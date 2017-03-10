@@ -88,7 +88,10 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for Template Informer was cancelled")
 	}
 
-	sl := templateStore{store: tmplInf.GetStore()}
+	sl := templateStore{
+		store:  tmplInf.GetStore(),
+		scheme: tmplScheme,
+	}
 	reh := &resourceEventHandler{
 		processor: tp,
 		name2tmpl: sl.Get,
@@ -173,7 +176,10 @@ func watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplScheme *ru
 		},
 	}, &smith.Template{}, 0)
 
-	tmplInf.AddEventHandler(&templateEventHandler{processor: processor})
+	tmplInf.AddEventHandler(&templateEventHandler{
+		processor: processor,
+		scheme:    tmplScheme,
+	})
 
 	go tmplInf.Run(ctx.Done())
 

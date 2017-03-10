@@ -4,11 +4,12 @@ import (
 	"log"
 
 	"github.com/atlassian/smith"
-	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type templateEventHandler struct {
 	processor Processor
+	scheme    *runtime.Scheme
 }
 
 func (h *templateEventHandler) OnAdd(obj interface{}) {
@@ -29,8 +30,7 @@ func (h *templateEventHandler) OnDelete(obj interface{}) {
 func (h *templateEventHandler) handle(obj interface{}) {
 	in := obj.(*smith.Template)
 
-	c := conversion.NewCloner()
-	out, err := c.DeepCopy(in)
+	out, err := h.scheme.DeepCopy(in)
 	if err != nil {
 		log.Printf("[TEH] Failed to do deep copy of %#v: %v", in, err)
 		return

@@ -3,12 +3,13 @@ package app
 import (
 	"github.com/atlassian/smith"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/apimachinery/pkg/conversion"
 )
 
 type templateStore struct {
-	store cache.Store
+	store  cache.Store
+	scheme *runtime.Scheme
 }
 
 func (s *templateStore) Get(namespace, tmplName string) (*smith.Template, error) {
@@ -18,8 +19,7 @@ func (s *templateStore) Get(namespace, tmplName string) (*smith.Template, error)
 	}
 	in := tmpl.(*smith.Template)
 
-	c := conversion.NewCloner()
-	out, err := c.DeepCopy(in)
+	out, err := s.scheme.DeepCopy(in)
 	if err != nil {
 		return nil, err
 	}
