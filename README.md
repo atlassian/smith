@@ -15,22 +15,22 @@ with Kubernetes as its core. Other microservices can create/update/watch TPRs to
 
 ## Implementation
 
-A group of resources is defined using a Template (just like a Stack for AWS CloudFormation).
-The Template itself is also a Kubernetes TPR.
-Smith watches for new instances of a Template (and events to existing ones), picks them up and processes them.
+A group of resources is defined using a Bundle (just like a Stack for AWS CloudFormation).
+The Bundle itself is also a Kubernetes TPR.
+Smith watches for new instances of a Bundle (and events to existing ones), picks them up and processes them.
 
-Processing involves parsing the template, building a dependency graph (which is implicitly defined in the template),
+Processing involves parsing the bundle, building a dependency graph (which is implicitly defined in the bundle),
 walking the graph, and creating/updating necessary resources. Each created/referenced resource gets
-an annotation/label pointing at the Template.
+an annotation/label pointing at the Bundle.
 
-### Example template
+### Example bundle
 TPR definitions:
 ```yaml
 apiVersion: extensions/v1beta1
 kind: ThirdPartyResource
-description: "Resource template definition"
+description: "Resource bundle definition"
 metadata:
-  name: template.smith.atlassian.com
+  name: bundle.smith.atlassian.com
   annotations:
     smith.atlassian.com/resourceHasStatus: "true"
 versions:
@@ -47,13 +47,13 @@ metadata:
 versions:
   - name: v1
 ```
-Template:
+Bundle:
 ```yaml
 apiVersion: smith.atlassian.com/v1
-kind: Template
-description: "Sample resource template"
+kind: Bundle
+description: "Sample resource bundle"
 metadata:
-  name: template1
+  name: bundle1
 spec:
   resources:
   - metadata:
@@ -76,7 +76,7 @@ spec:
         name: app1
       spec:
         replicas: 1
-        template:
+        bundle:
           metadata:
             labels:
               app: app1
@@ -98,7 +98,7 @@ spec:
 Some resource types can have Outputs - values that are returned by a TPR upon creation.
 For example a TPR may define a DB to be created. The Outputs will be a Secret
 that contains the DB password, a plain string with a username, the DB URL and so on.
-A resource may consume another resources Output by referencing it in its template. Outputs field is part of
+A resource may consume another resources Output by referencing it in its bundle. Outputs field is part of
 [Status](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/api-conventions.md#spec-and-status).
 
 ### Dependencies
@@ -112,9 +112,9 @@ a DB then it means it was provisioned and set up as requested. State is part of 
 ### Event-driven and stateless
 Smith does not block while waiting for a resource to reach the READY state. Instead, when walking the dependency
 graph, if a resource is not in the READY state (still being created) it stops processing the
-template. Full template re-processing is triggered by events about the watched resources. Smith is
+bundle. Full bundle re-processing is triggered by events about the watched resources. Smith is
 watching all supported resource types and inspects annotations/labels on events to find out which
-template should be re-processed because of the event. This should scale better than watching
+bundle should be re-processed because of the event. This should scale better than watching
 individual resources and much better than polling individual resources.
 
 ## Notes

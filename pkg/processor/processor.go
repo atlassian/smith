@@ -21,54 +21,54 @@ type ReadyChecker interface {
 type BackOffFactory func() backoff.BackOff
 
 type workerRef struct {
-	namespace string
-	tmplName  string
+	namespace  string
+	bundleName string
 }
 
-type TemplateProcessor struct {
-	ctx            context.Context
-	backoff        BackOffFactory
-	templateClient *rest.RESTClient
-	clients        dynamic.ClientPool
-	rc             ReadyChecker
-	scheme         *runtime.Scheme
-	wg             sync.WaitGroup // tracks number of Goroutines running rebuildLoop()
+type BundleProcessor struct {
+	ctx          context.Context
+	backoff      BackOffFactory
+	bundleClient *rest.RESTClient
+	clients      dynamic.ClientPool
+	rc           ReadyChecker
+	scheme       *runtime.Scheme
+	wg           sync.WaitGroup // tracks number of Goroutines running rebuildLoop()
 
 	lock    sync.RWMutex // protects fields below
 	workers map[workerRef]*worker
 }
 
-// New creates a new template processor.
+// New creates a new bundle processor.
 // Instances are safe for concurrent use.
-func New(ctx context.Context, templateClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker, scheme *runtime.Scheme) *TemplateProcessor {
-	return &TemplateProcessor{
-		ctx:            ctx,
-		backoff:        exponentialBackOff,
-		templateClient: templateClient,
-		clients:        clients,
-		rc:             rc,
-		scheme:         scheme,
-		workers:        make(map[workerRef]*worker),
+func New(ctx context.Context, bundleClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker, scheme *runtime.Scheme) *BundleProcessor {
+	return &BundleProcessor{
+		ctx:          ctx,
+		backoff:      exponentialBackOff,
+		bundleClient: bundleClient,
+		clients:      clients,
+		rc:           rc,
+		scheme:       scheme,
+		workers:      make(map[workerRef]*worker),
 	}
 }
 
-func (tp *TemplateProcessor) Join() {
+func (tp *BundleProcessor) Join() {
 	tp.wg.Wait()
 }
 
-// Rebuild schedules a rebuild of the template.
-// Note that the template object and/or resources in the template may be mutated asynchronously so the
+// Rebuild schedules a rebuild of the bundle.
+// Note that the bundle object and/or resources in the bundle may be mutated asynchronously so the
 // calling code should do a proper deep copy if the object is still needed.
-func (tp *TemplateProcessor) Rebuild(tpl *smith.Template) {
-	//log.Printf("Rebuilding the template %#v", tpl)
-	ref := workerRef{namespace: tpl.Metadata.Namespace, tmplName: tpl.Metadata.Name}
+func (tp *BundleProcessor) Rebuild(tpl *smith.Bundle) {
+	//log.Printf("Rebuilding the bundle %#v", tpl)
+	ref := workerRef{namespace: tpl.Metadata.Namespace, bundleName: tpl.Metadata.Name}
 	tp.lock.Lock()
 	defer tp.lock.Unlock()
 	wrk := tp.workers[ref]
 	if wrk == nil {
 		wrk = &worker{
 			tp:        tp,
-			template:  tpl,
+			bundle:    tpl,
 			bo:        tp.backoff(),
 			workerRef: ref,
 		}
@@ -76,7 +76,7 @@ func (tp *TemplateProcessor) Rebuild(tpl *smith.Template) {
 		tp.wg.Add(1)
 		go wrk.rebuildLoop()
 	} else {
-		wrk.template = tpl
+		wrk.bundle = tpl
 	}
 }
 

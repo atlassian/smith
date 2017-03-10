@@ -25,26 +25,26 @@ func TestTprAttribute(t *testing.T) {
 	config, err := resources.ConfigFromEnv()
 	require.NoError(t, err)
 
-	tmplClient, _, err := resources.GetTemplateTprClient(config)
+	bundleClient, _, err := resources.GetBundleTprClient(config)
 	require.NoError(t, err)
 
 	sClient, _, err := tprattribute.GetSleeperTprClient(config)
 	require.NoError(t, err)
 
-	templateName := "template-attribute"
-	templateNamespace := "default"
+	bundleName := "bundle-attribute"
+	bundleNamespace := "default"
 
-	var templateCreated bool
-	sleeper, sleeperU := tmplAttrResources(t)
-	tmpl := smith.Template{
+	var bundleCreated bool
+	sleeper, sleeperU := bundleAttrResources(t)
+	bundle := smith.Bundle{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       smith.TemplateResourceKind,
-			APIVersion: smith.TemplateResourceGroupVersion,
+			Kind:       smith.BundleResourceKind,
+			APIVersion: smith.BundleResourceGroupVersion,
 		},
 		Metadata: metav1.ObjectMeta{
-			Name: templateName,
+			Name: bundleName,
 		},
-		Spec: smith.TemplateSpec{
+		Spec: smith.BundleSpec{
 			Resources: []smith.Resource{
 				{
 					Name: sleeper.Metadata.Name,
@@ -53,29 +53,29 @@ func TestTprAttribute(t *testing.T) {
 			},
 		},
 	}
-	err = tmplClient.Delete().
-		Namespace(templateNamespace).
-		Resource(smith.TemplateResourcePath).
-		Name(templateName).
+	err = bundleClient.Delete().
+		Namespace(bundleNamespace).
+		Resource(smith.BundleResourcePath).
+		Name(bundleName).
 		Do().
 		Error()
 	if err == nil {
-		t.Log("Template deleted")
+		t.Log("Bundle deleted")
 	} else if !errors.IsNotFound(err) {
 		require.NoError(t, err)
 	}
 	defer func() {
-		if templateCreated {
-			t.Logf("Deleting template %s", templateName)
-			assert.NoError(t, tmplClient.Delete().
-				Namespace(templateNamespace).
-				Resource(smith.TemplateResourcePath).
-				Name(templateName).
+		if bundleCreated {
+			t.Logf("Deleting bundle %s", bundleName)
+			assert.NoError(t, bundleClient.Delete().
+				Namespace(bundleNamespace).
+				Resource(smith.BundleResourcePath).
+				Name(bundleName).
 				Do().
 				Error())
 			t.Logf("Deleting resource %s", sleeper.Metadata.Name)
 			assert.NoError(t, sClient.Delete().
-				Namespace(templateNamespace).
+				Namespace(bundleNamespace).
 				Resource(tprattribute.SleeperResourcePath).
 				Name(sleeper.Metadata.Name).
 				Do().
@@ -111,21 +111,21 @@ func TestTprAttribute(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(5 * time.Second) // Wait until apps start and creates the Template TPR and Sleeper TPR
+	time.Sleep(5 * time.Second) // Wait until apps start and creates the Bundle TPR and Sleeper TPR
 
-	t.Log("Creating a new template")
-	require.NoError(t, tmplClient.Post().
-		Namespace(templateNamespace).
-		Resource(smith.TemplateResourcePath).
-		Body(&tmpl).
+	t.Log("Creating a new bundle")
+	require.NoError(t, bundleClient.Post().
+		Namespace(bundleNamespace).
+		Resource(smith.BundleResourcePath).
+		Body(&bundle).
 		Do().
 		Error())
 
-	templateCreated = true
+	bundleCreated = true
 
 	func() {
 		w, err := sClient.Get().
-			Namespace(templateNamespace).
+			Namespace(bundleNamespace).
 			Prefix("watch").
 			Resource(tprattribute.SleeperResourcePath).
 			Watch()
@@ -145,7 +145,7 @@ func TestTprAttribute(t *testing.T) {
 				}
 				t.Logf("received event with status.state == %q for resource %q of kind %q", obj.Status.State, sleeper.Metadata.Name, sleeper.Kind)
 				assert.EqualValues(t, map[string]string{
-					smith.TemplateNameLabel: templateName,
+					smith.BundleNameLabel: bundleName,
 				}, obj.Metadata.Labels)
 				if obj.Status.State == tprattribute.AWAKE {
 					return
@@ -154,17 +154,17 @@ func TestTprAttribute(t *testing.T) {
 		}
 	}()
 	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
-	var tmplRes smith.Template
-	require.NoError(t, tmplClient.Get().
-		Namespace(templateNamespace).
-		Resource(smith.TemplateResourcePath).
-		Name(templateName).
+	var bundleRes smith.Bundle
+	require.NoError(t, bundleClient.Get().
+		Namespace(bundleNamespace).
+		Resource(smith.BundleResourcePath).
+		Name(bundleName).
 		Do().
-		Into(&tmplRes))
-	require.Equal(t, smith.READY, tmplRes.Status.State)
+		Into(&bundleRes))
+	require.Equal(t, smith.READY, bundleRes.Status.State)
 }
 
-func tmplAttrResources(t *testing.T) (*tprattribute.Sleeper, *unstructured.Unstructured) {
+func bundleAttrResources(t *testing.T) (*tprattribute.Sleeper, *unstructured.Unstructured) {
 	c := &tprattribute.Sleeper{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       tprattribute.SleeperResourceKind,

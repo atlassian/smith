@@ -47,7 +47,7 @@ func (h *tprEventHandler) OnAdd(obj interface{}) {
 	h.mx.Lock()
 	defer h.mx.Unlock()
 	h.onAdd(obj)
-	// TODO rebuild all templates containing resources of this type
+	// TODO rebuild all bundles containing resources of this type
 }
 
 func (h *tprEventHandler) OnUpdate(oldObj, newObj interface{}) {
@@ -55,19 +55,19 @@ func (h *tprEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	defer h.mx.Unlock()
 	h.onDelete(oldObj)
 	h.onAdd(newObj)
-	// TODO rebuild all templates containing resources of this type
+	// TODO rebuild all bundles containing resources of this type
 }
 
 func (h *tprEventHandler) OnDelete(obj interface{}) {
 	h.mx.Lock()
 	defer h.mx.Unlock()
 	h.onDelete(obj)
-	// TODO rebuild all templates containing resources of this type
+	// TODO rebuild all bundles containing resources of this type
 }
 
 func (h *tprEventHandler) onAdd(obj interface{}) {
 	tpr := obj.(*extensions.ThirdPartyResource)
-	if tpr.Name == smith.TemplateResourceName {
+	if tpr.Name == smith.BundleResourceName {
 		log.Printf("[TPREH] Not watching known TPR %s", tpr.Name)
 		return
 	}

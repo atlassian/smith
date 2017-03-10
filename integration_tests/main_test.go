@@ -28,53 +28,53 @@ func TestWorkflow(t *testing.T) {
 	config, err := resources.ConfigFromEnv()
 	require.NoError(t, err)
 
-	tmplClient, _, err := resources.GetTemplateTprClient(config)
+	bundleClient, _, err := resources.GetBundleTprClient(config)
 	require.NoError(t, err)
 
 	clients := dynamic.NewClientPool(config, nil, dynamic.LegacyAPIPathResolverFunc)
 
-	templateName := "template1"
-	templateNamespace := "default"
+	bundleName := "bundle1"
+	bundleNamespace := "default"
 
-	var templateCreated bool
-	tmpl := smith.Template{
+	var bundleCreated bool
+	bundle := smith.Bundle{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       smith.TemplateResourceKind,
-			APIVersion: smith.TemplateResourceGroupVersion,
+			Kind:       smith.BundleResourceKind,
+			APIVersion: smith.BundleResourceGroupVersion,
 		},
 		Metadata: metav1.ObjectMeta{
-			Name: templateName,
+			Name: bundleName,
 			Labels: map[string]string{
-				"templateLabel":         "templateValue",
-				"overlappingLabel":      "overlappingTemplateValue",
-				smith.TemplateNameLabel: "templateLabel123",
+				"bundleLabel":         "bundleValue",
+				"overlappingLabel":    "overlappingBundleValue",
+				smith.BundleNameLabel: "bundleLabel123",
 			},
 		},
-		Spec: smith.TemplateSpec{
-			Resources: tmplResources(t),
+		Spec: smith.BundleSpec{
+			Resources: bundleResources(t),
 		},
 	}
-	err = tmplClient.Delete().
-		Namespace(templateNamespace).
-		Resource(smith.TemplateResourcePath).
-		Name(templateName).
+	err = bundleClient.Delete().
+		Namespace(bundleNamespace).
+		Resource(smith.BundleResourcePath).
+		Name(bundleName).
 		Do().
 		Error()
 	if err == nil {
-		t.Log("Template deleted")
+		t.Log("Bundle deleted")
 	} else if !errors.IsNotFound(err) {
 		require.NoError(t, err)
 	}
 	defer func() {
-		if templateCreated {
-			t.Logf("Deleting template %s", templateName)
-			assert.NoError(t, tmplClient.Delete().
-				Namespace(templateNamespace).
-				Resource(smith.TemplateResourcePath).
-				Name(templateName).
+		if bundleCreated {
+			t.Logf("Deleting bundle %s", bundleName)
+			assert.NoError(t, bundleClient.Delete().
+				Namespace(bundleNamespace).
+				Resource(smith.BundleResourcePath).
+				Name(bundleName).
 				Do().
 				Error())
-			for _, resource := range tmpl.Spec.Resources {
+			for _, resource := range bundle.Spec.Resources {
 				t.Logf("Deleting resource %s", resource.Spec.GetName())
 				gv, err := schema.ParseGroupVersion(resource.Spec.GetAPIVersion())
 				if !assert.NoError(t, err) {
@@ -88,7 +88,7 @@ func TestWorkflow(t *testing.T) {
 					Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
 					Namespaced: true,
 					Kind:       resource.Spec.GetKind(),
-				}, templateNamespace).Delete(resource.Spec.GetName(), &metav1.DeleteOptions{}))
+				}, bundleNamespace).Delete(resource.Spec.GetName(), &metav1.DeleteOptions{}))
 			}
 		}
 	}()
@@ -110,20 +110,20 @@ func TestWorkflow(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(1 * time.Second) // Wait until the app starts and creates the Template TPR
+	time.Sleep(1 * time.Second) // Wait until the app starts and creates the Bundle TPR
 
-	t.Log("Creating a new template")
-	var tmplRes smith.Template
-	require.NoError(t, tmplClient.Post().
-		Namespace(templateNamespace).
-		Resource(smith.TemplateResourcePath).
-		Body(&tmpl).
+	t.Log("Creating a new bundle")
+	var bundleRes smith.Bundle
+	require.NoError(t, bundleClient.Post().
+		Namespace(bundleNamespace).
+		Resource(smith.BundleResourcePath).
+		Body(&bundle).
 		Do().
-		Into(&tmplRes))
+		Into(&bundleRes))
 
-	templateCreated = true
+	bundleCreated = true
 
-	for _, resource := range tmpl.Spec.Resources {
+	for _, resource := range bundle.Spec.Resources {
 		func() {
 			c, err := clients.ClientForGroupVersionKind(resource.Spec.GroupVersionKind())
 			require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestWorkflow(t *testing.T) {
 				Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
 				Namespaced: true,
 				Kind:       resource.Spec.GetKind(),
-			}, templateNamespace).Watch(metav1.ListOptions{})
+			}, bundleNamespace).Watch(metav1.ListOptions{})
 			require.NoError(t, err)
 			defer w.Stop()
 			ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -151,18 +151,18 @@ func TestWorkflow(t *testing.T) {
 					}
 					t.Logf("received event for resource %q of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
 					assert.Equal(t, map[string]string{
-						"configLabel":           "configValue",
-						"templateLabel":         "templateValue",
-						"overlappingLabel":      "overlappingConfigValue",
-						smith.TemplateNameLabel: templateName,
+						"configLabel":         "configValue",
+						"bundleLabel":         "bundleValue",
+						"overlappingLabel":    "overlappingConfigValue",
+						smith.BundleNameLabel: bundleName,
 					}, obj.GetLabels())
 					// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/39816 is fixed
 					//a.Equal([]metav1.OwnerReference{
 					//	{
-					//		APIVersion: smith.TemplateResourceVersion,
-					//		Kind:       smith.TemplateResourceKind,
-					//		Name:       templateName,
-					//		UID:        tmplRes.Metadata.UID,
+					//		APIVersion: smith.BundleResourceVersion,
+					//		Kind:       smith.BundleResourceKind,
+					//		Name:       bundleName,
+					//		UID:        bundleRes.Metadata.UID,
 					//	},
 					//}, obj.GetOwnerReferences())
 					return
@@ -171,17 +171,17 @@ func TestWorkflow(t *testing.T) {
 		}()
 	}
 	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
-	require.NoError(t, tmplClient.Get().
-		Namespace(templateNamespace).
-		Resource(smith.TemplateResourcePath).
-		Name(templateName).
+	require.NoError(t, bundleClient.Get().
+		Namespace(bundleNamespace).
+		Resource(smith.BundleResourcePath).
+		Name(bundleName).
 		Do().
-		Into(&tmplRes))
-	require.Equal(t, smith.READY, tmplRes.Status.State, "%#v", tmplRes)
-	require.Equal(t, tmpl.Spec, tmplRes.Spec, "%#v", tmplRes)
+		Into(&bundleRes))
+	require.Equal(t, smith.READY, bundleRes.Status.State, "%#v", bundleRes)
+	require.Equal(t, bundle.Spec, bundleRes.Spec, "%#v", bundleRes)
 }
 
-func tmplResources(t *testing.T) []smith.Resource {
+func bundleResources(t *testing.T) []smith.Resource {
 	c := apiv1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ConfigMap",
@@ -190,9 +190,9 @@ func tmplResources(t *testing.T) []smith.Resource {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "config1",
 			Labels: map[string]string{
-				"configLabel":           "configValue",
-				"overlappingLabel":      "overlappingConfigValue",
-				smith.TemplateNameLabel: "configLabel123",
+				"configLabel":         "configValue",
+				"overlappingLabel":    "overlappingConfigValue",
+				smith.BundleNameLabel: "configLabel123",
 			},
 		},
 		Data: map[string]string{

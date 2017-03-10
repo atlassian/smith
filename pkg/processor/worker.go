@@ -18,14 +18,14 @@ import (
 )
 
 type worker struct {
-	tp *TemplateProcessor
+	tp *BundleProcessor
 	bo backoff.BackOff
 	workerRef
 
 	// The fields below are protected by tp.lock
 
-	// It is ok to mutate the template itself, but pointer should only be updated while locked.
-	template *smith.Template
+	// It is ok to mutate the bundle itself, but pointer should only be updated while locked.
+	bundle *smith.Bundle
 }
 
 func (wrk *worker) rebuildLoop() {
@@ -33,21 +33,21 @@ func (wrk *worker) rebuildLoop() {
 	defer wrk.cleanupState()
 
 	for {
-		tmpl := wrk.checkRebuild()
-		if tmpl == nil {
+		bundle := wrk.checkRebuild()
+		if bundle == nil {
 			return
 		}
-		err := wrk.rebuild(tmpl)
+		err := wrk.rebuild(bundle)
 		if err == nil {
 			wrk.bo.Reset() // reset the backoff on successful rebuild
-			// Make sure template does not need to be rebuilt before exiting goroutine by doing one more iteration
-		} else if !wrk.handleError(tmpl, err) {
+			// Make sure bundle does not need to be rebuilt before exiting goroutine by doing one more iteration
+		} else if !wrk.handleError(bundle, err) {
 			return
 		}
 	}
 }
 
-// TODO parse template, build resource graph, traverse graph, assert each resource exists.
+// TODO parse bundle, build resource graph, traverse graph, assert each resource exists.
 // For each resource ensure its dependencies (if any) are in READY state before creating it.
 // If at least one dependency is not READY, exit loop. Rebuild will/should be called once the dependency
 // updates it's state (noticed via watching).
@@ -55,14 +55,14 @@ func (wrk *worker) rebuildLoop() {
 // READY state might mean something different for each resource type. For ThirdPartyResources it may mean
 // that a field "State" in the Status of the resource is set to "Ready". It may be customizable via
 // annotations with some defaults.
-func (wrk *worker) rebuild(tmpl *smith.Template) error {
-	if tmpl.Status.State == smith.TERMINAL_ERROR {
+func (wrk *worker) rebuild(bundle *smith.Bundle) error {
+	if bundle.Status.State == smith.TERMINAL_ERROR {
 		// Sad, but true.
 		return nil
 	}
-	log.Printf("[WORKER] Rebuilding the template %s/%s", wrk.namespace, wrk.tmplName)
+	log.Printf("[WORKER] Rebuilding the bundle %s/%s", wrk.namespace, wrk.bundleName)
 
-	for _, res := range tmpl.Spec.Resources {
+	for _, res := range bundle.Spec.Resources {
 		if wrk.checkNeedsRebuild() {
 			return nil
 		}
@@ -70,21 +70,21 @@ func (wrk *worker) rebuild(tmpl *smith.Template) error {
 		if err != nil {
 			return err
 		}
-		isReady, err := wrk.checkResource(tmpl, resClone.(*smith.Resource))
+		isReady, err := wrk.checkResource(bundle, resClone.(*smith.Resource))
 		if err != nil {
 			return err
 		}
 		if !isReady {
-			if err := wrk.setTemplateState(tmpl, smith.IN_PROGRESS); err != nil {
+			if err := wrk.setBundleState(bundle, smith.IN_PROGRESS); err != nil {
 				log.Printf("[WORKER] %v", err)
 			}
 			return nil
 		}
 	}
-	return wrk.setTemplateState(tmpl, smith.READY)
+	return wrk.setBundleState(bundle, smith.READY)
 }
 
-func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isReady bool, e error) {
+func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource) (isReady bool, e error) {
 	gv, err := schema.ParseGroupVersion(res.Spec.GetAPIVersion())
 	if err != nil {
 		return false, err
@@ -101,20 +101,20 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 		Kind:       kind,
 	}, wrk.namespace)
 
-	// 0. Update label to point at the parent template
+	// 0. Update label to point at the parent bundle
 	res.Spec.SetLabels(mergeLabels(
-		tmpl.Metadata.Labels,
+		bundle.Metadata.Labels,
 		res.Spec.GetLabels(),
-		map[string]string{smith.TemplateNameLabel: wrk.tmplName}))
+		map[string]string{smith.BundleNameLabel: wrk.bundleName}))
 
 	// 1. Update OwnerReferences
 	// Hardcode APIVersion/Kind because of https://github.com/kubernetes/client-go/issues/60
 	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/39816 is fixed
 	//res.Spec.SetOwnerReferences(append(res.Spec.GetOwnerReferences(), metav1.OwnerReference{
-	//	APIVersion: smith.TemplateResourceVersion,
-	//	Kind:       smith.TemplateResourceKind,
-	//	Name:       tmpl.Metadata.Name,
-	//	UID:        tmpl.Metadata.UID,
+	//	APIVersion: smith.BundleResourceVersion,
+	//	Kind:       smith.BundleResourceKind,
+	//	Name:       bundle.Metadata.Name,
+	//	UID:        bundle.Metadata.UID,
 	//}))
 
 	name := res.Spec.GetName()
@@ -127,15 +127,15 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 				// Unexpected error
 				return false, err
 			}
-			log.Printf("[WORKER] template %s/%s: resource %q not found, creating", wrk.namespace, wrk.tmplName, res.Name)
+			log.Printf("[WORKER] bundle %s/%s: resource %q not found, creating", wrk.namespace, wrk.bundleName, res.Name)
 			// 3. Create if does not exist
 			response, err = resClient.Create(&res.Spec)
 			if err == nil {
-				log.Printf("[WORKER] template %s/%s: resource %q created", wrk.namespace, wrk.tmplName, res.Name)
+				log.Printf("[WORKER] bundle %s/%s: resource %q created", wrk.namespace, wrk.bundleName, res.Name)
 				break
 			}
 			if errors.IsAlreadyExists(err) {
-				log.Printf("[WORKER] template %s/%s: resource %q found, restarting loop", wrk.namespace, wrk.tmplName, res.Name)
+				log.Printf("[WORKER] bundle %s/%s: resource %q found, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
 				continue
 			}
 			// Unexpected error
@@ -144,7 +144,7 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 
 		// 4. Compare spec and existing resource
 		if isEqualResources(res, response) {
-			//log.Printf("[WORKER] template %s/%s: resource %s has correct spec", wrk.namespace, wrk.tmplName, res.Name)
+			//log.Printf("[WORKER] bundle %s/%s: resource %s has correct spec", wrk.namespace, wrk.bundleName, res.Name)
 			break
 		}
 
@@ -155,57 +155,57 @@ func (wrk *worker) checkResource(tmpl *smith.Template, res *smith.Resource) (isR
 		response, err = resClient.Update(&res.Spec)
 		if err != nil {
 			if errors.IsConflict(err) {
-				log.Printf("[WORKER] template %s/%s: resource %q update resulted in conflict, restarting loop", wrk.namespace, wrk.tmplName, res.Name)
+				log.Printf("[WORKER] bundle %s/%s: resource %q update resulted in conflict, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
 				continue
 			}
 			// Unexpected error
 			return false, err
 		}
-		log.Printf("[WORKER] template %s/%s: resource %q updated", wrk.namespace, wrk.tmplName, res.Name)
+		log.Printf("[WORKER] bundle %s/%s: resource %q updated", wrk.namespace, wrk.bundleName, res.Name)
 		break
 	}
 	return wrk.tp.rc.IsReady(response)
 }
 
-func (wrk *worker) setTemplateState(tpl *smith.Template, desired smith.ResourceState) error {
+func (wrk *worker) setBundleState(tpl *smith.Bundle, desired smith.ResourceState) error {
 	if tpl.Status.State == desired {
 		return nil
 	}
-	log.Printf("[WORKER] setting template %s/%s State to %q from %q", wrk.namespace, wrk.tmplName, desired, tpl.Status.State)
+	log.Printf("[WORKER] setting bundle %s/%s State to %q from %q", wrk.namespace, wrk.bundleName, desired, tpl.Status.State)
 	tpl.Status.State = desired
-	err := wrk.tp.templateClient.Put().
+	err := wrk.tp.bundleClient.Put().
 		Namespace(wrk.namespace).
-		Resource(smith.TemplateResourcePath).
-		Name(wrk.tmplName).
+		Resource(smith.BundleResourcePath).
+		Name(wrk.bundleName).
 		Body(tpl).
 		Do().
 		Into(tpl)
 	if err != nil {
 		if kerrors.IsConflict(err) {
-			// Something updated the template concurrently.
+			// Something updated the bundle concurrently.
 			// It is possible that it was us in previous iteration but we haven't observed the
-			// resulting update event for the template and this iteration was triggered by something
+			// resulting update event for the bundle and this iteration was triggered by something
 			// else e.g. resource update.
 			// It is safe to ignore this conflict because we will reiterate because of the update event.
 			return nil
 		}
-		return fmt.Errorf("failed to set template %s/%s state to %q: %v", wrk.namespace, wrk.tmplName, desired, err)
+		return fmt.Errorf("failed to set bundle %s/%s state to %q: %v", wrk.namespace, wrk.bundleName, desired, err)
 	}
-	log.Printf("[WORKER] template %s/%s is %q", wrk.namespace, wrk.tmplName, desired)
+	log.Printf("[WORKER] bundle %s/%s is %q", wrk.namespace, wrk.bundleName, desired)
 	// FIXME for some reason TypeMeta is not deserialized properly
 	//log.Printf("[WORKER] Into = %#v", tpl)
 	return nil
 }
 
-// checkRebuild returns a pointer to the template if a rebuild is required.
-// It returns nil if there is no new template and rebuild is not required.
-func (wrk *worker) checkRebuild() *smith.Template {
+// checkRebuild returns a pointer to the bundle if a rebuild is required.
+// It returns nil if there is no new bundle and rebuild is not required.
+func (wrk *worker) checkRebuild() *smith.Bundle {
 	wrk.tp.lock.Lock()
 	defer wrk.tp.lock.Unlock()
-	tmpl := wrk.template
-	if tmpl != nil {
-		wrk.template = nil
-		return tmpl
+	bundle := wrk.bundle
+	if bundle != nil {
+		wrk.bundle = nil
+		return bundle
 	}
 	// delete atomically with the check to avoid race with Processor's rebuildInternal()
 	delete(wrk.tp.workers, wrk.workerRef)
@@ -221,14 +221,14 @@ func (wrk *worker) cleanupState() {
 	}
 }
 
-func (wrk *worker) handleError(tmpl *smith.Template, err error) (shouldContinue bool) {
+func (wrk *worker) handleError(bundle *smith.Bundle, err error) (shouldContinue bool) {
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		return false
 	}
-	log.Printf("[WORKER] Failed to rebuild the template %s/%s: %v", wrk.namespace, wrk.tmplName, err)
+	log.Printf("[WORKER] Failed to rebuild the bundle %s/%s: %v", wrk.namespace, wrk.bundleName, err)
 	next := wrk.bo.NextBackOff()
 	if next == backoff.Stop {
-		if e := wrk.setTemplateState(tmpl, smith.TERMINAL_ERROR); e != nil {
+		if e := wrk.setBundleState(bundle, smith.TERMINAL_ERROR); e != nil {
 			log.Printf("[WORKER] %v", e)
 		}
 		return false
@@ -236,9 +236,9 @@ func (wrk *worker) handleError(tmpl *smith.Template, err error) (shouldContinue 
 	func() {
 		wrk.tp.lock.Lock()
 		defer wrk.tp.lock.Unlock()
-		wrk.template = tmpl
+		wrk.bundle = bundle
 	}()
-	if e := wrk.setTemplateState(tmpl, smith.ERROR); e != nil {
+	if e := wrk.setBundleState(bundle, smith.ERROR); e != nil {
 		log.Printf("[WORKER] %v", e)
 	}
 	after := time.NewTimer(next)
@@ -251,11 +251,11 @@ func (wrk *worker) handleError(tmpl *smith.Template, err error) (shouldContinue 
 	return true
 }
 
-// needsRebuild can be called inside of the rebuild loop to check if the template needs to be rebuilt from the start.
+// needsRebuild can be called inside of the rebuild loop to check if the bundle needs to be rebuilt from the start.
 func (wrk *worker) checkNeedsRebuild() bool {
 	wrk.tp.lock.RLock()
 	defer wrk.tp.lock.RUnlock()
-	return wrk.template != nil
+	return wrk.bundle != nil
 }
 
 // isEqualResources checks that existing resource matches the desired spec.
