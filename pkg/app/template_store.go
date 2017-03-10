@@ -4,6 +4,7 @@ import (
 	"github.com/atlassian/smith"
 
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/conversion"
 )
 
 type templateStore struct {
@@ -16,12 +17,14 @@ func (s *templateStore) Get(namespace, tmplName string) (*smith.Template, error)
 		return nil, err
 	}
 	in := tmpl.(*smith.Template)
-	out := &smith.Template{}
 
-	if err := smith.DeepCopy_Template(in, out); err != nil {
+	c := conversion.NewCloner()
+	out, err := c.DeepCopy(in)
+	if err != nil {
 		return nil, err
 	}
-	return out, nil
+
+	return out.(*smith.Template), nil
 }
 
 // keyForTemplate returns same key as client-go/tools/cache/store.MetaNamespaceKeyFunc

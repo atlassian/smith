@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/atlassian/smith"
+	"k8s.io/apimachinery/pkg/conversion"
 )
 
 type templateEventHandler struct {
@@ -27,12 +28,14 @@ func (h *templateEventHandler) OnDelete(obj interface{}) {
 
 func (h *templateEventHandler) handle(obj interface{}) {
 	in := obj.(*smith.Template)
-	out := &smith.Template{}
 
-	if err := smith.DeepCopy_Template(in, out); err != nil {
+	c := conversion.NewCloner()
+	out, err := c.DeepCopy(in)
+	if err != nil {
 		log.Printf("[TEH] Failed to do deep copy of %#v: %v", in, err)
 		return
 	}
-	log.Printf("[TEH] Rebuilding %s/%s template because it was added/updated", out.Metadata.Namespace, out.Metadata.Name)
-	h.processor.Rebuild(out)
+
+	log.Printf("[TEH] Rebuilding %s/%s template because it was added/updated", out.(*smith.Template).Metadata.Namespace, out.(*smith.Template).Metadata.Name)
+	h.processor.Rebuild(out.(*smith.Template))
 }
