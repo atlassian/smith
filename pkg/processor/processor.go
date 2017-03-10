@@ -9,6 +9,7 @@ import (
 
 	"github.com/cenk/backoff"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -30,6 +31,7 @@ type TemplateProcessor struct {
 	templateClient *rest.RESTClient
 	clients        dynamic.ClientPool
 	rc             ReadyChecker
+	scheme         *runtime.Scheme
 	wg             sync.WaitGroup // tracks number of Goroutines running rebuildLoop()
 
 	lock    sync.RWMutex // protects fields below
@@ -38,13 +40,14 @@ type TemplateProcessor struct {
 
 // New creates a new template processor.
 // Instances are safe for concurrent use.
-func New(ctx context.Context, templateClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker) *TemplateProcessor {
+func New(ctx context.Context, templateClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker, scheme *runtime.Scheme) *TemplateProcessor {
 	return &TemplateProcessor{
 		ctx:            ctx,
 		backoff:        exponentialBackOff,
 		templateClient: templateClient,
 		clients:        clients,
 		rc:             rc,
+		scheme:         scheme,
 		workers:        make(map[workerRef]*worker),
 	}
 }
