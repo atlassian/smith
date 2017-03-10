@@ -33,7 +33,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	tmplClient, tmplScheme, err := resources.GetTemplateTprClient(a.RestConfig)
+	bundleClient, bundleScheme, err := resources.GetBundleTprClient(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 3. Processor
 
-	tp := processor.New(ctx, tmplClient, clients, rc, tmplScheme)
+	tp := processor.New(ctx, bundleClient, clients, rc, bundleScheme)
 	defer tp.Join() // await termination
 	defer cancel()  // cancel ctx to signal done to processor (and everything else)
 
@@ -69,32 +69,32 @@ func (a *App) Run(ctx context.Context) error {
 		return ensureResourceExists(clientset)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
-		log.Printf("Failed to create resource %s: %v", smith.TemplateResourceName, e)
+		log.Printf("Failed to create resource %s: %v", smith.BundleResourceName, e)
 		return false
 	})
 	if err != nil {
 		return err
 	}
 
-	// 5. Watch Templates
-	tmplInf, err := watchTemplates(ctx, tmplClient, tmplScheme, tp)
+	// 5. Watch Bundles
+	bundleInf, err := watchBundles(ctx, bundleClient, bundleScheme, tp)
 	if err != nil {
 		return err
 	}
 
-	// We must wait for tmplInf to populate its cache to avoid reading from an empty cache
+	// We must wait for bundleInf to populate its cache to avoid reading from an empty cache
 	// in case of resource-generated events.
-	if !cache.WaitForCacheSync(ctx.Done(), tmplInf.HasSynced) {
-		return errors.New("wait for Template Informer was cancelled")
+	if !cache.WaitForCacheSync(ctx.Done(), bundleInf.HasSynced) {
+		return errors.New("wait for Bundle Informer was cancelled")
 	}
 
-	sl := templateStore{
-		store:  tmplInf.GetStore(),
-		scheme: tmplScheme,
+	sl := bundleStore{store: bundleInf.GetStore(),
+		scheme: bundleScheme,
 	}
+
 	reh := &resourceEventHandler{
-		processor: tp,
-		name2tmpl: sl.Get,
+		processor:   tp,
+		name2bundle: sl.Get,
 	}
 
 	// 6. TODO watch supported built-in resource types for events.
@@ -108,29 +108,29 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func ensureResourceExists(clientset kubernetes.Interface) error {
-	log.Printf("Creating ThirdPartyResource %s", smith.TemplateResourceName)
+	log.Printf("Creating ThirdPartyResource %s", smith.BundleResourceName)
 	tpr := &extensions.ThirdPartyResource{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: smith.TemplateResourceName,
+			Name: smith.BundleResourceName,
 		},
 		Description: "Smith resource manager",
 		Versions: []extensions.APIVersion{
-			{Name: smith.TemplateResourceVersion},
+			{Name: smith.BundleResourceVersion},
 		},
 	}
 	res, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
 	if err != nil {
 		if !kerrors.IsAlreadyExists(err) {
-			return fmt.Errorf("failed to create %s ThirdPartyResource: %v", smith.TemplateResourceName, err)
+			return fmt.Errorf("failed to create %s ThirdPartyResource: %v", smith.BundleResourceName, err)
 		}
 		// TODO handle conflicts and update properly
-		//log.Printf("ThirdPartyResource %s already exists, updating", smith.TemplateResourceName)
+		//log.Printf("ThirdPartyResource %s already exists, updating", smith.BundleResourceName)
 		//_, err = clientset.ExtensionsV1beta1().ThirdPartyResources().Update(tpr)
 		//if err != nil {
-		//	return fmt.Errorf("failed to update %s ThirdPartyResource: %v",  smith.TemplateResourceName, err)
+		//	return fmt.Errorf("failed to update %s ThirdPartyResource: %v",  smith.BundleResourceName, err)
 		//}
 	} else {
-		log.Printf("ThirdPartyResource %s created: %+v", smith.TemplateResourceName, res)
+		log.Printf("ThirdPartyResource %s created: %+v", smith.BundleResourceName, res)
 		// TODO It takes a while for k8s to add a new rest endpoint. Polling?
 		time.Sleep(10 * time.Second)
 	}
@@ -153,35 +153,35 @@ func tprInformer(ctx context.Context, clientset kubernetes.Interface) cache.Shar
 	return tprInf
 }
 
-func watchTemplates(ctx context.Context, tmplClient cache.Getter, tmplScheme *runtime.Scheme, processor Processor) (cache.SharedInformer, error) {
-	parameterCodec := runtime.NewParameterCodec(tmplScheme)
+func watchBundles(ctx context.Context, bundleClient cache.Getter, bundleScheme *runtime.Scheme, processor Processor) (cache.SharedInformer, error) {
+	parameterCodec := runtime.NewParameterCodec(bundleScheme)
 
 	// Cannot use cache.NewListWatchFromClient() because it uses global api.ParameterCodec which uses global
 	// api.Scheme which does not know about Smith group/version.
-	// cache.NewListWatchFromClient(templateClient, smith.TemplateResourcePath, apiv1.NamespaceAll, fields.Everything())
-	tmplInf := cache.NewSharedInformer(&cache.ListWatch{
+	// cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, apiv1.NamespaceAll, fields.Everything())
+	bundleInf := cache.NewSharedInformer(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return tmplClient.Get().
-				Resource(smith.TemplateResourcePath).
+			return bundleClient.Get().
+				Resource(smith.BundleResourcePath).
 				VersionedParams(&options, parameterCodec).
 				Do().
 				Get()
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return tmplClient.Get().
+			return bundleClient.Get().
 				Prefix("watch").
-				Resource(smith.TemplateResourcePath).
+				Resource(smith.BundleResourcePath).
 				VersionedParams(&options, parameterCodec).
 				Watch()
 		},
-	}, &smith.Template{}, 0)
+	}, &smith.Bundle{}, 0)
 
-	tmplInf.AddEventHandler(&templateEventHandler{
+	bundleInf.AddEventHandler(&bundleEventHandler{
 		processor: processor,
-		scheme:    tmplScheme,
+		scheme:    bundleScheme,
 	})
 
-	go tmplInf.Run(ctx.Done())
+	go bundleInf.Run(ctx.Done())
 
-	return tmplInf, nil
+	return bundleInf, nil
 }

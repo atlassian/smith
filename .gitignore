@@ -1,2 +1,4 @@
 /vendor/
 /build/bin/
+/.idea/
+/.vscode/
