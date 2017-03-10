@@ -12,7 +12,7 @@ echo "mode: count" > coverage.out
 ERROR=""
 
 declare -a packages=('' \
-    'cmd/smith' \
+    'pkg/processor/graph' \
     );
 
 # Test each package and append coverage profile info to coverage.out
