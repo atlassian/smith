@@ -91,7 +91,7 @@ type DependencyRef string
 
 type Resource struct {
 	// Name of the resource for references.
-	Name string
+	Name string `json:"name"`
 
 	// Explicit dependencies.
 	DependsOn []DependencyRef `json:"dependsOn,omitempty"`

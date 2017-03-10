@@ -60,7 +60,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 3. Processor
 
-	tp := processor.New(ctx, tmplClient, clients, rc)
+	tp := processor.New(ctx, tmplClient, clients, rc, tmplScheme)
 	defer tp.Join() // await termination
 	defer cancel()  // cancel ctx to signal done to processor (and everything else)
 

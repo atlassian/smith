@@ -66,7 +66,11 @@ func (wrk *worker) rebuild(tmpl *smith.Template) error {
 		if wrk.checkNeedsRebuild() {
 			return nil
 		}
-		isReady, err := wrk.checkResource(tmpl, &res)
+		resClone, err := wrk.tp.scheme.DeepCopy(&res)
+		if err != nil {
+			return err
+		}
+		isReady, err := wrk.checkResource(tmpl, resClone.(*smith.Resource))
 		if err != nil {
 			return err
 		}
