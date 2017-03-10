@@ -5,20 +5,20 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func DeepCopy_Template(in *Template, out *Template) error {
+func DeepCopy_Bundle(in *Bundle, out *Bundle) error {
 	if err := metav1.DeepCopy_v1_TypeMeta(&in.TypeMeta, &out.TypeMeta, nil); err != nil {
 		return err
 	}
 	if err := metav1.DeepCopy_v1_ObjectMeta(&in.Metadata, &out.Metadata, nil); err != nil {
 		return err
 	}
-	if err := DeepCopy_TemplateSpec(&in.Spec, &out.Spec); err != nil {
+	if err := DeepCopy_BundleSpec(&in.Spec, &out.Spec); err != nil {
 		return err
 	}
-	return DeepCopy_TemplateStatus(&in.Status, &out.Status)
+	return DeepCopy_BundleStatus(&in.Status, &out.Status)
 }
 
-func DeepCopy_TemplateSpec(in *TemplateSpec, out *TemplateSpec) error {
+func DeepCopy_BundleSpec(in *BundleSpec, out *BundleSpec) error {
 	resources := make([]Resource, len(in.Resources))
 	for i, r := range in.Resources {
 		if err := DeepCopy_Resource(&r, &resources[i]); err != nil {
@@ -38,7 +38,7 @@ func DeepCopy_Resource(in *Resource, out *Resource) error {
 	return DeepCopy_Unstructured(&in.Spec, &out.Spec)
 }
 
-func DeepCopy_TemplateStatus(in *TemplateStatus, out *TemplateStatus) error {
+func DeepCopy_BundleStatus(in *BundleStatus, out *BundleStatus) error {
 	*out = *in
 	return nil
 }

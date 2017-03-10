@@ -14,17 +14,17 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func GetTemplateTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
+func GetBundleTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
 	groupVersion := schema.GroupVersion{
 		Group:   smith.SmithResourceGroup,
-		Version: smith.TemplateResourceVersion,
+		Version: smith.BundleResourceVersion,
 	}
 
 	schemeBuilder := runtime.NewSchemeBuilder(func(scheme *runtime.Scheme) error {
 		scheme.AddKnownTypes(
 			groupVersion,
-			&smith.Template{},
-			&smith.TemplateList{},
+			&smith.Bundle{},
+			&smith.BundleList{},
 			&metav1.ListOptions{},
 			&metav1.DeleteOptions{},
 		)

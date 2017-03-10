@@ -22,71 +22,71 @@ const (
 	SmithDomain        = "smith.atlassian.com"
 	SmithResourceGroup = SmithDomain
 
-	TemplateResourcePath         = "templates"
-	TemplateResourceName         = "template." + SmithDomain
-	TemplateResourceVersion      = "v1"
-	TemplateResourceKind         = "Template"
-	TemplateResourceGroupVersion = SmithResourceGroup + "/" + TemplateResourceVersion
+	BundleResourcePath         = "bundles"
+	BundleResourceName         = "bundle." + SmithDomain
+	BundleResourceVersion      = "v1"
+	BundleResourceKind         = "Bundle"
+	BundleResourceGroupVersion = SmithResourceGroup + "/" + BundleResourceVersion
 
-	TemplateNameLabel = TemplateResourceName + "/TemplateName"
+	BundleNameLabel = BundleResourceName + "/BundleName"
 
 	// See docs/design/managing-resources.md
 	TprFieldPathAnnotation  = SmithDomain + "/TprReadyWhenFieldPath"
 	TprFieldValueAnnotation = SmithDomain + "/TprReadyWhenFieldValue"
 )
 
-type TemplateList struct {
+type BundleList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	Metadata metav1.ListMeta `json:"metadata,omitempty"`
 
-	// Items is a list of templates.
-	Items []Template `json:"items"`
+	// Items is a list of bundles.
+	Items []Bundle `json:"items"`
 }
 
 // GetObjectKind is required to satisfy Object interface.
-func (tl *TemplateList) GetObjectKind() schema.ObjectKind {
+func (tl *BundleList) GetObjectKind() schema.ObjectKind {
 	return &tl.TypeMeta
 }
 
 // GetListMeta is required to satisfy ListMetaAccessor interface.
-func (tl *TemplateList) GetListMeta() metav1.List {
+func (tl *BundleList) GetListMeta() metav1.List {
 	return &tl.Metadata
 }
 
-// Template describes a resources template.
-type Template struct {
+// Bundle describes a resources bundle.
+type Bundle struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Standard object metadata
 	Metadata metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec is the specification of the desired behavior of the Template.
-	Spec TemplateSpec `json:"spec,omitempty"`
+	// Spec is the specification of the desired behavior of the Bundle.
+	Spec BundleSpec `json:"spec,omitempty"`
 
-	// Status is most recently observed status of the Template.
-	Status TemplateStatus `json:"status,omitempty"`
+	// Status is most recently observed status of the Bundle.
+	Status BundleStatus `json:"status,omitempty"`
 }
 
 // Required to satisfy Object interface
-func (t *Template) GetObjectKind() schema.ObjectKind {
+func (t *Bundle) GetObjectKind() schema.ObjectKind {
 	return &t.TypeMeta
 }
 
 // Required to satisfy ObjectMetaAccessor interface
-func (t *Template) GetObjectMeta() metav1.Object {
+func (t *Bundle) GetObjectMeta() metav1.Object {
 	return &t.Metadata
 }
 
-type TemplateSpec struct {
+type BundleSpec struct {
 	Resources []Resource `json:"resources"`
 }
 
-type TemplateStatus struct {
+type BundleStatus struct {
 	State ResourceState `json:"state,omitempty"`
 }
 
-// DependencyRef is a reference to another Resource in the same template.
+// DependencyRef is a reference to another Resource in the same bundle.
 type DependencyRef string
 
 type Resource struct {
@@ -103,25 +103,25 @@ type Resource struct {
 // resources and ugorji. If/when these issues are resolved, the code below
 // should no longer be required.
 
-type templateListCopy TemplateList
-type templateCopy Template
+type bundleListCopy BundleList
+type bundleCopy Bundle
 
-func (e *Template) UnmarshalJSON(data []byte) error {
-	tmp := templateCopy{}
+func (e *Bundle) UnmarshalJSON(data []byte) error {
+	tmp := bundleCopy{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
-	*e = Template(tmp)
+	*e = Bundle(tmp)
 	return nil
 }
 
-func (el *TemplateList) UnmarshalJSON(data []byte) error {
-	tmp := templateListCopy{}
+func (el *BundleList) UnmarshalJSON(data []byte) error {
+	tmp := bundleListCopy{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
-	*el = TemplateList(tmp)
+	*el = BundleList(tmp)
 	return nil
 }

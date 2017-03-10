@@ -1,8 +1,8 @@
 apiVersion: smith.atlassian.com/v1
-kind: TemplateStub
+kind: BundleTemplate
 description: "Service template stub"
 metadata:
-  name: template_stub_1
+  name: bundle_stub_1
 overridable:
   DEPLOYMENT_REPLICAS:
     default: 2
