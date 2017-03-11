@@ -161,6 +161,7 @@ func watchBundles(ctx context.Context, bundleClient cache.Getter, bundleScheme *
 			return bundleClient.Get().
 				Resource(smith.BundleResourcePath).
 				VersionedParams(&options, parameterCodec).
+				Context(ctx).
 				Do().
 				Get()
 		},
@@ -169,6 +170,7 @@ func watchBundles(ctx context.Context, bundleClient cache.Getter, bundleScheme *
 				Prefix("watch").
 				Resource(smith.BundleResourcePath).
 				VersionedParams(&options, parameterCodec).
+				Context(ctx).
 				Watch()
 		},
 	}, &smith.Bundle{}, 0)

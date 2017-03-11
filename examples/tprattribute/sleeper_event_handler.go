@@ -21,6 +21,7 @@ func (h *SleeperEventHandler) OnAdd(obj interface{}) {
 		Namespace(in.Metadata.Namespace).
 		Resource(SleeperResourcePath).
 		Name(in.Metadata.Name).
+		Context(h.ctx).
 		Body(&in).
 		Do().
 		Into(&in)
@@ -39,6 +40,7 @@ func (h *SleeperEventHandler) OnAdd(obj interface{}) {
 				Namespace(in.Metadata.Namespace).
 				Resource(SleeperResourcePath).
 				Name(in.Metadata.Name).
+				Context(h.ctx).
 				Body(&in).
 				Do().
 				Error()
