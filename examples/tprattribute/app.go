@@ -95,6 +95,7 @@ func sleeperInformer(ctx context.Context, sClient *rest.RESTClient, sScheme *run
 			return sClient.Get().
 				Resource(SleeperResourcePath).
 				VersionedParams(&options, parameterCodec).
+				Context(ctx).
 				Do().
 				Get()
 		},
@@ -103,6 +104,7 @@ func sleeperInformer(ctx context.Context, sClient *rest.RESTClient, sScheme *run
 				Prefix("watch").
 				Resource(SleeperResourcePath).
 				VersionedParams(&options, parameterCodec).
+				Context(ctx).
 				Watch()
 		},
 	}, &Sleeper{}, 0)

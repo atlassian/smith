@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/processor/graph"
 	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/cenk/backoff"
@@ -62,7 +63,27 @@ func (wrk *worker) rebuild(bundle *smith.Bundle) error {
 	}
 	log.Printf("[WORKER] Rebuilding the bundle %s/%s", wrk.namespace, wrk.bundleName)
 
+	// Build resource map by name
+	resourceMap := make(map[string]smith.Resource, len(bundle.Spec.Resources))
 	for _, res := range bundle.Spec.Resources {
+		resourceMap[res.Name] = res
+	}
+
+	// Build the graph and topologically sort it
+	graphData, sortErr := graph.TopologicalSort(bundle)
+	if sortErr != nil {
+		return sortErr
+	}
+
+	readyResources := make(map[string]struct{}, len(bundle.Spec.Resources))
+	allReady := true
+
+	// Visit vertices in sorted order
+nextVertex:
+	for _, v := range graphData.SortedVertices {
+		log.Printf("[WORKER] bundle %s/%s: checking resource %s", wrk.namespace, wrk.bundleName, v)
+		res := resourceMap[v]
+
 		if wrk.checkNeedsRebuild() {
 			return nil
 		}
@@ -70,18 +91,35 @@ func (wrk *worker) rebuild(bundle *smith.Bundle) error {
 		if err != nil {
 			return err
 		}
+		// Check if all resource dependencies are ready (so we can start processing this one)
+		for _, dependency := range graphData.Graph.Vertices[v].Edges() {
+			if _, ok := readyResources[dependency]; !ok {
+				allReady = false
+				log.Printf("[WORKER] bundle %s/%s: dependencies are not ready for resource %s", wrk.namespace, wrk.bundleName, v)
+				continue nextVertex // Move to the next resource
+			}
+		}
+		// Process the resource
 		isReady, err := wrk.checkResource(bundle, resClone.(*smith.Resource))
 		if err != nil {
 			return err
 		}
-		if !isReady {
-			if err := wrk.setBundleState(bundle, smith.IN_PROGRESS); err != nil {
-				log.Printf("[WORKER] %v", err)
-			}
-			return nil
+		log.Printf("[WORKER] bundle %s/%s: resource %s, ready: %t", wrk.namespace, wrk.bundleName, v, isReady)
+		if isReady {
+			readyResources[v] = struct{}{}
+		} else {
+			allReady = false
 		}
 	}
-	return wrk.setBundleState(bundle, smith.READY)
+
+	// Updating the bundle state
+	if allReady {
+		return wrk.setBundleState(bundle, smith.READY)
+	}
+	if err := wrk.setBundleState(bundle, smith.IN_PROGRESS); err != nil {
+		log.Printf("[WORKER] %v", err)
+	}
+	return nil
 }
 
 func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource) (isReady bool, e error) {

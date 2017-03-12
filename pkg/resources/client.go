@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 )
 
@@ -33,6 +34,9 @@ func GetBundleTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, er
 
 	scheme := runtime.NewScheme()
 	if err := schemeBuilder.AddToScheme(scheme); err != nil {
+		return nil, nil, err
+	}
+	if err := api.AddToScheme(scheme); err != nil {
 		return nil, nil, err
 	}
 
