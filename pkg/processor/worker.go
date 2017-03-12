@@ -114,7 +114,6 @@ nextVertex:
 
 	// Updating the bundle state
 	if allReady {
-		log.Printf("[WORKER] Bundle %s/%s is Ready", bundle.Metadata.Namespace, bundle.Metadata.Name)
 		return wrk.setBundleState(bundle, smith.READY)
 	}
 	if err := wrk.setBundleState(bundle, smith.IN_PROGRESS); err != nil {
