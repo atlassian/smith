@@ -88,7 +88,10 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for Bundle Informer was cancelled")
 	}
 
-	sl := bundleStore{store: bundleInf.GetStore()}
+	sl := bundleStore{
+		store:  bundleInf.GetStore(),
+		scheme: bundleScheme,
+	}
 	reh := &resourceEventHandler{
 		processor:   tp,
 		name2bundle: sl.Get,
@@ -175,7 +178,10 @@ func watchBundles(ctx context.Context, bundleClient cache.Getter, bundleScheme *
 		},
 	}, &smith.Bundle{}, 0)
 
-	bundleInf.AddEventHandler(&bundleEventHandler{processor: processor})
+	bundleInf.AddEventHandler(&bundleEventHandler{
+		processor: processor,
+		scheme:    bundleScheme,
+	})
 
 	go bundleInf.Run(ctx.Done())
 
