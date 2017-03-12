@@ -3,11 +3,13 @@ package app
 import (
 	"github.com/atlassian/smith"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
 type bundleStore struct {
-	store cache.Store
+	store  cache.Store
+	scheme *runtime.Scheme
 }
 
 func (s *bundleStore) Get(namespace, bundleName string) (*smith.Bundle, error) {
@@ -16,12 +18,13 @@ func (s *bundleStore) Get(namespace, bundleName string) (*smith.Bundle, error) {
 		return nil, err
 	}
 	in := bundle.(*smith.Bundle)
-	out := &smith.Bundle{}
 
-	if err := smith.DeepCopy_Bundle(in, out); err != nil {
+	out, err := s.scheme.DeepCopy(in)
+	if err != nil {
 		return nil, err
 	}
-	return out, nil
+
+	return out.(*smith.Bundle), nil
 }
 
 // keyForBundle returns same key as client-go/tools/cache/store.MetaNamespaceKeyFunc
