@@ -88,7 +88,8 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for Bundle Informer was cancelled")
 	}
 
-	sl := bundleStore{store: bundleInf.GetStore(),
+	sl := bundleStore{
+		store:  bundleInf.GetStore(),
 		scheme: bundleScheme,
 	}
 

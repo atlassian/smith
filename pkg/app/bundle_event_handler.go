@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/atlassian/smith"
+
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,12 +31,14 @@ func (h *bundleEventHandler) OnDelete(obj interface{}) {
 func (h *bundleEventHandler) handle(obj interface{}) {
 	in := obj.(*smith.Bundle)
 
-	out, err := h.scheme.DeepCopy(in)
+	o, err := h.scheme.DeepCopy(in)
 	if err != nil {
 		log.Printf("[TEH] Failed to do deep copy of %#v: %v", in, err)
 		return
 	}
 
-	log.Printf("[TEH] Rebuilding %s/%s template because it was added/updated", out.(*smith.Bundle).Metadata.Namespace, out.(*smith.Bundle).Metadata.Name)
-	h.processor.Rebuild(out.(*smith.Bundle))
+	out := o.(*smith.Bundle)
+
+	log.Printf("[TEH] Rebuilding %s/%s template because it was added/updated", out.Metadata.Namespace, out.Metadata.Name)
+	h.processor.Rebuild(out)
 }
