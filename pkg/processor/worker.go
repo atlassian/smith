@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/atlassian/smith"
@@ -81,7 +82,7 @@ func (wrk *worker) rebuild(bundle *smith.Bundle) error {
 	// Visit vertices in sorted order
 nextVertex:
 	for _, v := range graphData.SortedVertices {
-		log.Printf("[WORKER] bundle %s/%s: checking resource %s", wrk.namespace, wrk.bundleName, v)
+		log.Printf("[WORKER] bundle %s/%s: checking resource %q", wrk.namespace, wrk.bundleName, v)
 		res := resourceMap[v]
 
 		if wrk.checkNeedsRebuild() {
@@ -95,7 +96,7 @@ nextVertex:
 		for _, dependency := range graphData.Graph.Vertices[v].Edges() {
 			if _, ok := readyResources[dependency]; !ok {
 				allReady = false
-				log.Printf("[WORKER] bundle %s/%s: dependencies are not ready for resource %s", wrk.namespace, wrk.bundleName, v)
+				log.Printf("[WORKER] bundle %s/%s: dependencies are not ready for resource %q", wrk.namespace, wrk.bundleName, v)
 				continue nextVertex // Move to the next resource
 			}
 		}
@@ -104,7 +105,7 @@ nextVertex:
 		if err != nil {
 			return err
 		}
-		log.Printf("[WORKER] bundle %s/%s: resource %s, ready: %t", wrk.namespace, wrk.bundleName, v, isReady)
+		log.Printf("[WORKER] bundle %s/%s: resource %q, ready: %t", wrk.namespace, wrk.bundleName, v, isReady)
 		if isReady {
 			readyResources[v] = struct{}{}
 		} else {
@@ -159,6 +160,8 @@ func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource) (isR
 	var response *unstructured.Unstructured
 	for {
 		// 2. Try to get the resource. We do read first to avoid generating unnecessary events.
+		// TODO Maybe create a cache of Stores to avoid uselessly bombarding api server with requests?
+		// TODO How do we ensure we have informers for all object types so that we will get events once object is updated by its controller?
 		response, err = resClient.Get(name)
 		if err != nil {
 			if !errors.IsNotFound(err) {
@@ -181,16 +184,18 @@ func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource) (isR
 		}
 
 		// 4. Compare spec and existing resource
-		if isEqualResources(res, response) {
-			//log.Printf("[WORKER] bundle %s/%s: resource %s has correct spec", wrk.namespace, wrk.bundleName, res.Name)
+		updated, err := wrk.updateResource(res, response)
+		if err != nil {
+			// Unexpected error
+			return false, err
+		}
+		if updated == nil {
+			log.Printf("[WORKER] bundle %s/%s: resource %q has correct spec", wrk.namespace, wrk.bundleName, res.Name)
 			break
 		}
 
 		// 5. Update if different
-		// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
-		res.Spec.SetResourceVersion(response.GetResourceVersion()) // Do CAS
-
-		response, err = resClient.Update(&res.Spec)
+		response, err = resClient.Update(updated)
 		if err != nil {
 			if errors.IsConflict(err) {
 				log.Printf("[WORKER] bundle %s/%s: resource %q update resulted in conflict, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
@@ -230,8 +235,6 @@ func (wrk *worker) setBundleState(tpl *smith.Bundle, desired smith.ResourceState
 		return fmt.Errorf("failed to set bundle %s/%s state to %q: %v", wrk.namespace, wrk.bundleName, desired, err)
 	}
 	log.Printf("[WORKER] bundle %s/%s is %q", wrk.namespace, wrk.bundleName, desired)
-	// FIXME for some reason TypeMeta is not deserialized properly
-	//log.Printf("[WORKER] Into = %#v", tpl)
 	return nil
 }
 
@@ -296,11 +299,68 @@ func (wrk *worker) checkNeedsRebuild() bool {
 	return wrk.bundle != nil
 }
 
-// isEqualResources checks that existing resource matches the desired spec.
-func isEqualResources(res *smith.Resource, spec *unstructured.Unstructured) bool {
-	// TODO implement
-	// ignore additional annotations/labels? or make the merge behaviour configurable?
-	return true
+// updateResource checks if actual resource satisfies the desired spec.
+// Returns non-nil object with updates applied or nil if actual matches desired.
+func (wrk *worker) updateResource(desired *smith.Resource, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	spec := desired.Spec
+
+	// TODO Handle deleted or to be deleted object. We need to wait for the object to be gone.
+
+	upd, err := wrk.tp.scheme.Copy(actual)
+	if err != nil {
+		return nil, err
+	}
+	updated := upd.(*unstructured.Unstructured)
+
+	// Remove status to make sure ready checker will only detect readiness after resource controller has seen
+	// the object.
+	// Will be possible to implement it in a cleaner way once "status" is a separate sub-resource.
+	// See https://github.com/kubernetes/kubernetes/issues/38113
+	// Also ideally we don't want to clear the status at all but have a way to tell if controller has
+	// observed the update yet. Like Generation/ObservedGeneration for built-in controllers.
+	delete(updated.Object, "status")
+	delete(spec.Object, "status")
+
+	// empty slices/maps -> nil slices/maps so that reflect.DeepEqual() works properly
+	updated.SetLabels(normalizeMap(updated.GetLabels()))
+	updated.SetAnnotations(normalizeMap(updated.GetAnnotations()))
+	updated.SetOwnerReferences(normalizeOwnerReferences(updated.GetOwnerReferences()))
+	updated.SetFinalizers(normalizeSlice(updated.GetFinalizers()))
+
+	actualClone, err := wrk.tp.scheme.Copy(actual)
+	if err != nil {
+		return nil, err
+	}
+
+	// 1. TypeMeta
+	updated.SetKind(spec.GetKind())
+	updated.SetAPIVersion(spec.GetAPIVersion())
+
+	// 2. Some stuff from ObjectMeta
+	// TODO Ignores added annotations/labels. Should be configurable per-object and/or per-object kind?
+	updated.SetName(spec.GetName())
+	updated.SetLabels(normalizeMap(spec.GetLabels()))
+	updated.SetAnnotations(normalizeMap(spec.GetAnnotations()))
+	updated.SetOwnerReferences(normalizeOwnerReferences(spec.GetOwnerReferences())) // TODO Is this ok?
+	updated.SetFinalizers(normalizeSlice(spec.GetFinalizers()))                     // TODO Is this ok?
+
+	// 3. Everything else
+	for field, value := range spec.Object {
+		switch field {
+		case "kind", "apiVersion", "metadata":
+			continue
+		}
+		valueClone, err := wrk.tp.scheme.DeepCopy(value)
+		if err != nil {
+			return nil, err
+		}
+		updated.Object[field] = valueClone
+	}
+
+	if !reflect.DeepEqual(actualClone, actual) {
+		return updated, nil
+	}
+	return nil, nil
 }
 
 func mergeLabels(labels ...map[string]string) map[string]string {
@@ -311,4 +371,25 @@ func mergeLabels(labels ...map[string]string) map[string]string {
 		}
 	}
 	return result
+}
+
+func normalizeMap(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+	return input
+}
+
+func normalizeSlice(input []string) []string {
+	if len(input) == 0 {
+		return nil
+	}
+	return input
+}
+
+func normalizeOwnerReferences(input []metav1.OwnerReference) []metav1.OwnerReference {
+	if len(input) == 0 {
+		return nil
+	}
+	return input
 }

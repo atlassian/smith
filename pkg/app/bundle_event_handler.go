@@ -33,11 +33,11 @@ func (h *bundleEventHandler) handle(obj interface{}) {
 
 	o, err := h.scheme.DeepCopy(in)
 	if err != nil {
-		log.Printf("[TEH] Failed to do deep copy of %#v: %v", in, err)
+		log.Printf("[BEH] Failed to do deep copy of %#v: %v", in, err)
 		return
 	}
 
 	out := o.(*smith.Bundle)
-	log.Printf("[TEH] Rebuilding %s/%s template because it was added/updated", out.Metadata.Namespace, out.Metadata.Name)
+	log.Printf("[BEH] Rebuilding %s/%s bundle because it was added/updated", out.Metadata.Namespace, out.Metadata.Name)
 	h.processor.Rebuild(out)
 }

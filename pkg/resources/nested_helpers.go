@@ -1,4 +1,4 @@
-package readychecker
+package resources
 
 // The rest of this file was copied from k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructured.go
 // Remove once https://github.com/kubernetes/kubernetes/issues/40790 is fixed and available for use.
@@ -19,7 +19,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-func getNestedField(obj map[string]interface{}, fields ...string) interface{} {
+func GetNestedField(obj map[string]interface{}, fields ...string) interface{} {
 	var val interface{} = obj
 	for _, field := range fields {
 		if _, ok := val.(map[string]interface{}); !ok {
@@ -30,8 +30,8 @@ func getNestedField(obj map[string]interface{}, fields ...string) interface{} {
 	return val
 }
 
-func getNestedString(obj map[string]interface{}, fields ...string) string {
-	if str, ok := getNestedField(obj, fields...).(string); ok {
+func GetNestedString(obj map[string]interface{}, fields ...string) string {
+	if str, ok := GetNestedField(obj, fields...).(string); ok {
 		return str
 	}
 	return ""

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/resources"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -79,7 +80,7 @@ func (rc *ReadyChecker) checkPathValue(gk schema.GroupKind, obj *unstructured.Un
 	if len(path) == 0 || len(value) == 0 {
 		return false, fmt.Errorf("TPR %q is not annotated propery", tpr.Name)
 	}
-	actualValue := getNestedString(obj.Object, strings.Split(path, ".")...)
+	actualValue := resources.GetNestedString(obj.Object, strings.Split(path, ".")...)
 	if actualValue != value {
 		// TODO this is for debugging, remove later
 		log.Printf("[IsReady] %q is not equal to expected %q", actualValue, value)

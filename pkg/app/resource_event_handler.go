@@ -50,7 +50,7 @@ func (h *resourceEventHandler) rebuildByName(namespace, bundleName string, obj i
 	if bundle != nil {
 		log.Printf("[REH] Rebuilding %s/%s bundle because of resource %s add/update/delete", namespace, bundleName, obj.(*unstructured.Unstructured).GetName())
 		h.processor.Rebuild(bundle)
-	} else {
+	//} else {
 		// TODO bundle not found - handle deletion?
 		// There may be a race between TPR instance informer and bundle informer in case of
 		// connection loss. Because of that bundle informer might have stale cache without
