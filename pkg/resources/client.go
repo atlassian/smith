@@ -22,21 +22,23 @@ func GetBundleTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, er
 	}
 
 	schemeBuilder := runtime.NewSchemeBuilder(func(scheme *runtime.Scheme) error {
-		scheme.AddKnownTypes(
-			groupVersion,
+		scheme.AddKnownTypes(groupVersion,
 			&smith.Bundle{},
 			&smith.BundleList{},
-			&metav1.ListOptions{},
-			&metav1.DeleteOptions{},
 		)
+		scheme.AddUnversionedTypes(api.Unversioned,
+			&metav1.Status{},
+			&metav1.APIVersions{},
+			&metav1.APIGroupList{},
+			&metav1.APIGroup{},
+			&metav1.APIResourceList{},
+		)
+		metav1.AddToGroupVersion(scheme, groupVersion)
 		return nil
 	})
 
 	scheme := runtime.NewScheme()
 	if err := schemeBuilder.AddToScheme(scheme); err != nil {
-		return nil, nil, err
-	}
-	if err := api.AddToScheme(scheme); err != nil {
 		return nil, nil, err
 	}
 
