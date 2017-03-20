@@ -26,13 +26,7 @@ func GetBundleTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, er
 			&smith.Bundle{},
 			&smith.BundleList{},
 		)
-		scheme.AddUnversionedTypes(api.Unversioned,
-			&metav1.Status{},
-			&metav1.APIVersions{},
-			&metav1.APIGroupList{},
-			&metav1.APIGroup{},
-			&metav1.APIResourceList{},
-		)
+		scheme.AddUnversionedTypes(api.Unversioned, &metav1.Status{})
 		metav1.AddToGroupVersion(scheme, groupVersion)
 		return nil
 	})
