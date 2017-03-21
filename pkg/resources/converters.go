@@ -1,9 +1,11 @@
 package resources
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -34,4 +36,12 @@ func ResourceKindToPath(kind string) string {
 		kind += "s"
 	}
 	return kind
+}
+
+func UnstructuredToType(obj *unstructured.Unstructured, t interface{}) error {
+	data, err := obj.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, t)
 }

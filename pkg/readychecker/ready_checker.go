@@ -13,9 +13,19 @@ import (
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
-var alwaysReady = map[schema.GroupKind]struct{}{
-	{Group: "", Kind: "ConfigMap"}: {},
-	{Group: "", Kind: "Secret"}:    {},
+type IsObjectReady func(*unstructured.Unstructured) (bool, error)
+
+func alwaysReady(_ *unstructured.Unstructured) (bool, error) {
+	return true, nil
+}
+
+// each function is responsible for handling different versions of objects itself.
+var knownTypes = map[schema.GroupKind]IsObjectReady{
+	{Group: "", Kind: "ConfigMap"}:            alwaysReady,
+	{Group: "", Kind: "Secret"}:               alwaysReady,
+	{Group: "", Kind: "Service"}:              alwaysReady,
+	{Group: "extensions", Kind: "Ingress"}:    alwaysReady,
+	{Group: "extensions", Kind: "Deployment"}: isDeploymentReady,
 }
 
 // TprStore gets a TPR definition for a Group and Kind of the resource (TPR instance).
@@ -25,21 +35,15 @@ type TprStore interface {
 }
 
 type ReadyChecker struct {
-	store TprStore
-}
-
-func New(store TprStore) *ReadyChecker {
-	return &ReadyChecker{
-		store: store,
-	}
+	Store TprStore
 }
 
 func (rc *ReadyChecker) IsReady(obj *unstructured.Unstructured) (bool, error) {
 	gk := obj.GroupVersionKind().GroupKind()
 
-	// 1. Check if it is an always-ready resource
-	if _, ok := alwaysReady[gk]; ok {
-		return true, nil
+	// 1. Check if it is a known built-in resource
+	if isObjectReady, ok := knownTypes[gk]; ok {
+		return isObjectReady(obj)
 	}
 
 	// 2. Check if it is a TPR with path/value annotation
@@ -68,7 +72,7 @@ func (rc *ReadyChecker) checkForInstance(gk schema.GroupKind, obj *unstructured.
 }
 
 func (rc *ReadyChecker) checkPathValue(gk schema.GroupKind, obj *unstructured.Unstructured) (bool, error) {
-	tpr, err := rc.store.Get(gk)
+	tpr, err := rc.Store.Get(gk)
 	if err != nil {
 		return false, err
 	}

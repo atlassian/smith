@@ -14,9 +14,10 @@ import (
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
@@ -43,8 +44,15 @@ func (a *App) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// 1. TPR Informer
-	tprInf := tprInformer(ctx, clientset)
+	// 1. Informers
+
+	informerFactory := informers.NewSharedInformerFactory(clientset, 1*time.Minute)
+	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
+	deploymentInf := informerFactory.Extensions().V1beta1().Deployments().Informer()
+	ingressInf := informerFactory.Extensions().V1beta1().Ingresses().Informer()
+	serviceInf := informerFactory.Core().V1().Services().Informer()
+
+	informerFactory.Start(ctx.Done())
 
 	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
 	// in Ready Checker.
@@ -54,9 +62,11 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 2. Ready Checker
 
-	rc := readychecker.New(&tprStore{
-		store: tprInf.GetStore(),
-	})
+	rc := &readychecker.ReadyChecker{
+		Store: &tprStore{
+			store: tprInf.GetStore(),
+		},
+	}
 
 	// 3. Processor
 
@@ -103,6 +113,12 @@ func (a *App) Run(ctx context.Context) error {
 
 	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients))
 
+	// 8. Watch other kinds of resources
+
+	deploymentInf.AddEventHandler(reh)
+	ingressInf.AddEventHandler(reh)
+	serviceInf.AddEventHandler(reh)
+
 	<-ctx.Done()
 	return ctx.Err()
 }
@@ -137,46 +153,11 @@ func ensureResourceExists(clientset kubernetes.Interface) error {
 	return nil
 }
 
-func tprInformer(ctx context.Context, clientset kubernetes.Interface) cache.SharedInformer {
-	tprClient := clientset.ExtensionsV1beta1().ThirdPartyResources()
-	tprInf := cache.NewSharedInformer(&cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return tprClient.List(options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return tprClient.Watch(options)
-		},
-	}, &extensions.ThirdPartyResource{}, 0)
-
-	go tprInf.Run(ctx.Done())
-
-	return tprInf
-}
-
 func watchBundles(ctx context.Context, bundleClient cache.Getter, bundleScheme *runtime.Scheme, processor Processor) (cache.SharedInformer, error) {
-	parameterCodec := runtime.NewParameterCodec(bundleScheme)
-
-	// Cannot use cache.NewListWatchFromClient() because it uses global api.ParameterCodec which uses global
-	// api.Scheme which does not know about Smith group/version.
-	// cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, apiv1.NamespaceAll, fields.Everything())
-	bundleInf := cache.NewSharedInformer(&cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return bundleClient.Get().
-				Resource(smith.BundleResourcePath).
-				VersionedParams(&options, parameterCodec).
-				Context(ctx).
-				Do().
-				Get()
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return bundleClient.Get().
-				Prefix("watch").
-				Resource(smith.BundleResourcePath).
-				VersionedParams(&options, parameterCodec).
-				Context(ctx).
-				Watch()
-		},
-	}, &smith.Bundle{}, 0)
+	bundleInf := cache.NewSharedInformer(
+		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, metav1.NamespaceAll, fields.Everything()),
+		&smith.Bundle{},
+		1*time.Minute)
 
 	bundleInf.AddEventHandler(&bundleEventHandler{
 		processor: processor,
