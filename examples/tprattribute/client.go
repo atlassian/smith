@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func GetSleeperTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
+func GetSleeperScheme() *runtime.Scheme {
 	groupVersion := schema.GroupVersion{
 		Group:   SleeperResourceGroup,
 		Version: SleeperResourceVersion,
@@ -27,7 +27,15 @@ func GetSleeperTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, e
 
 	scheme := runtime.NewScheme()
 	if err := schemeBuilder.AddToScheme(scheme); err != nil {
-		return nil, nil, err
+		panic(err)
+	}
+	return scheme
+}
+
+func GetSleeperTprClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTClient, error) {
+	groupVersion := schema.GroupVersion{
+		Group:   SleeperResourceGroup,
+		Version: SleeperResourceVersion,
 	}
 
 	config := *cfg
@@ -39,8 +47,8 @@ func GetSleeperTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, e
 	client, err := rest.RESTClientFor(&config)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return client, scheme, nil
+	return client, nil
 }

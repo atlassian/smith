@@ -27,7 +27,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	sClient, _, err := GetSleeperTprClient(a.RestConfig)
+	sClient, err := GetSleeperTprClient(a.RestConfig, GetSleeperScheme())
 	if err != nil {
 		return err
 	}

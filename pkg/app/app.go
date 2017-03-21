@@ -33,8 +33,8 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	bundleClient, bundleScheme, err := resources.GetBundleTprClient(a.RestConfig)
+	bundleScheme := resources.GetBundleScheme()
+	bundleClient, err := resources.GetBundleTprClient(a.RestConfig, bundleScheme)
 	if err != nil {
 		return err
 	}

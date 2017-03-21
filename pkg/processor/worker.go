@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"reflect"
 	"time"
 
 	"github.com/atlassian/smith"
@@ -12,10 +11,12 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/cenk/backoff"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -184,7 +185,7 @@ func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource) (isR
 		}
 
 		// 4. Compare spec and existing resource
-		updated, err := wrk.updateResource(res, response)
+		updated, err := updateResource(wrk.tp.scheme, res, response)
 		if err != nil {
 			// Unexpected error
 			return false, err
@@ -292,7 +293,7 @@ func (wrk *worker) handleError(bundle *smith.Bundle, err error) (shouldContinue 
 	return true
 }
 
-// needsRebuild can be called inside of the rebuild loop to check if the bundle needs to be rebuilt from the start.
+// checkNeedsRebuild can be called inside of the rebuild loop to check if the bundle needs to be rebuilt from the start.
 func (wrk *worker) checkNeedsRebuild() bool {
 	wrk.tp.lock.RLock()
 	defer wrk.tp.lock.RUnlock()
@@ -301,16 +302,32 @@ func (wrk *worker) checkNeedsRebuild() bool {
 
 // updateResource checks if actual resource satisfies the desired spec.
 // Returns non-nil object with updates applied or nil if actual matches desired.
-func (wrk *worker) updateResource(desired *smith.Resource, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func updateResource(scheme *runtime.Scheme, desired *smith.Resource, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	spec := desired.Spec
 
 	// TODO Handle deleted or to be deleted object. We need to wait for the object to be gone.
 
-	upd, err := wrk.tp.scheme.Copy(actual)
+	upd, err := scheme.Copy(actual)
 	if err != nil {
 		return nil, err
 	}
 	updated := upd.(*unstructured.Unstructured)
+	delete(updated.Object, "status")
+
+	actClone, err := scheme.Copy(updated)
+	if err != nil {
+		return nil, err
+	}
+	actualClone := actClone.(*unstructured.Unstructured)
+
+	// This is to ensure those fields actually exist in underlying map whether they are nil or empty slices/map
+	actualClone.SetKind(actualClone.GetKind())
+	actualClone.SetAPIVersion(actualClone.GetAPIVersion())
+	actualClone.SetName(actualClone.GetName())
+	actualClone.SetLabels(actualClone.GetLabels())
+	actualClone.SetAnnotations(actualClone.GetAnnotations())
+	actualClone.SetOwnerReferences(actualClone.GetOwnerReferences())
+	actualClone.SetFinalizers(actualClone.GetFinalizers())
 
 	// Remove status to make sure ready checker will only detect readiness after resource controller has seen
 	// the object.
@@ -318,19 +335,7 @@ func (wrk *worker) updateResource(desired *smith.Resource, actual *unstructured.
 	// See https://github.com/kubernetes/kubernetes/issues/38113
 	// Also ideally we don't want to clear the status at all but have a way to tell if controller has
 	// observed the update yet. Like Generation/ObservedGeneration for built-in controllers.
-	delete(updated.Object, "status")
 	delete(spec.Object, "status")
-
-	// empty slices/maps -> nil slices/maps so that reflect.DeepEqual() works properly
-	updated.SetLabels(normalizeMap(updated.GetLabels()))
-	updated.SetAnnotations(normalizeMap(updated.GetAnnotations()))
-	updated.SetOwnerReferences(normalizeOwnerReferences(updated.GetOwnerReferences()))
-	updated.SetFinalizers(normalizeSlice(updated.GetFinalizers()))
-
-	actualClone, err := wrk.tp.scheme.Copy(actual)
-	if err != nil {
-		return nil, err
-	}
 
 	// 1. TypeMeta
 	updated.SetKind(spec.GetKind())
@@ -339,10 +344,10 @@ func (wrk *worker) updateResource(desired *smith.Resource, actual *unstructured.
 	// 2. Some stuff from ObjectMeta
 	// TODO Ignores added annotations/labels. Should be configurable per-object and/or per-object kind?
 	updated.SetName(spec.GetName())
-	updated.SetLabels(normalizeMap(spec.GetLabels()))
-	updated.SetAnnotations(normalizeMap(spec.GetAnnotations()))
-	updated.SetOwnerReferences(normalizeOwnerReferences(spec.GetOwnerReferences())) // TODO Is this ok?
-	updated.SetFinalizers(normalizeSlice(spec.GetFinalizers()))                     // TODO Is this ok?
+	updated.SetLabels(spec.GetLabels())
+	updated.SetAnnotations(spec.GetAnnotations())
+	updated.SetOwnerReferences(spec.GetOwnerReferences()) // TODO Is this ok?
+	updated.SetFinalizers(spec.GetFinalizers())           // TODO Is this ok?
 
 	// 3. Everything else
 	for field, value := range spec.Object {
@@ -350,14 +355,14 @@ func (wrk *worker) updateResource(desired *smith.Resource, actual *unstructured.
 		case "kind", "apiVersion", "metadata":
 			continue
 		}
-		valueClone, err := wrk.tp.scheme.DeepCopy(value)
+		valueClone, err := scheme.DeepCopy(value)
 		if err != nil {
 			return nil, err
 		}
 		updated.Object[field] = valueClone
 	}
 
-	if !reflect.DeepEqual(actualClone, actual) {
+	if !equality.Semantic.DeepEqual(updated, actualClone) {
 		return updated, nil
 	}
 	return nil, nil
@@ -371,25 +376,4 @@ func mergeLabels(labels ...map[string]string) map[string]string {
 		}
 	}
 	return result
-}
-
-func normalizeMap(input map[string]string) map[string]string {
-	if len(input) == 0 {
-		return nil
-	}
-	return input
-}
-
-func normalizeSlice(input []string) []string {
-	if len(input) == 0 {
-		return nil
-	}
-	return input
-}
-
-func normalizeOwnerReferences(input []metav1.OwnerReference) []metav1.OwnerReference {
-	if len(input) == 0 {
-		return nil
-	}
-	return input
 }
