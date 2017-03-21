@@ -1,8 +1,8 @@
 hash: 0148d6f3d9dc81617fef21b1a10c079b1b386e58d8fd66dd3feb6fa59c067aac
-updated: 2017-03-02T23:13:32.576613066+11:00
+updated: 2017-03-21T07:41:24.145290282+11:00
 imports:
 - name: github.com/cenk/backoff
-  version: b02f2bbce11d7ea6b97f282ef1771b0fe2f65ef3
+  version: 3db60c813733fce657c114634171689bbf1f8dee
 - name: github.com/davecgh/go-spew
   version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
   subpackages:
@@ -57,6 +57,7 @@ imports:
 - name: golang.org/x/net
   version: e90d6d0afc4c315a0d87a568ae68577cc15149a0
   subpackages:
+  - context
   - http2
   - http2/hpack
   - idna
@@ -79,7 +80,7 @@ imports:
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/apimachinery
-  version: d90aa2c8531f13b0ca734845934c10dcb6a56ca7
+  version: 6dcbb207c0333b9e0f98e8ba6955907421288566
   subpackages:
   - pkg/api/errors
   - pkg/api/meta
@@ -121,11 +122,12 @@ imports:
   - pkg/watch
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
-  version: 6500775c58c43486978291879ac9e1b0e9fc953f
+  version: 2cb68a18c3a2e8e60db9481b95527337ac648379
   subpackages:
   - discovery
   - dynamic
   - kubernetes
+  - kubernetes/scheme
   - kubernetes/typed/apps/v1beta1
   - kubernetes/typed/authentication/v1
   - kubernetes/typed/authentication/v1beta1
@@ -141,6 +143,8 @@ imports:
   - kubernetes/typed/policy/v1beta1
   - kubernetes/typed/rbac/v1alpha1
   - kubernetes/typed/rbac/v1beta1
+  - kubernetes/typed/settings/v1alpha1
+  - kubernetes/typed/storage/v1
   - kubernetes/typed/storage/v1beta1
   - pkg/api
   - pkg/api/install
@@ -177,11 +181,14 @@ imports:
   - pkg/apis/rbac/install
   - pkg/apis/rbac/v1alpha1
   - pkg/apis/rbac/v1beta1
+  - pkg/apis/settings
+  - pkg/apis/settings/install
+  - pkg/apis/settings/v1alpha1
   - pkg/apis/storage
   - pkg/apis/storage/install
+  - pkg/apis/storage/v1
   - pkg/apis/storage/v1beta1
   - pkg/util
-  - pkg/util/labels
   - pkg/util/parsers
   - pkg/version
   - rest
