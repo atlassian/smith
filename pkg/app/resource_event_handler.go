@@ -5,7 +5,7 @@ import (
 
 	"github.com/atlassian/smith"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Name2Bundle is a function that does a lookup of Bundle based on its namespace and name.
@@ -48,9 +48,10 @@ func (h *resourceEventHandler) rebuildByName(namespace, bundleName string, obj i
 		return
 	}
 	if bundle != nil {
-		log.Printf("[REH] Rebuilding %s/%s bundle because of resource %s add/update/delete", namespace, bundleName, obj.(*unstructured.Unstructured).GetName())
+		log.Printf("[REH] Rebuilding %s/%s bundle because of resource %s add/update/delete",
+			namespace, bundleName, obj.(metav1.Object).GetName())
 		h.processor.Rebuild(bundle)
-	//} else {
+		//} else {
 		// TODO bundle not found - handle deletion?
 		// There may be a race between TPR instance informer and bundle informer in case of
 		// connection loss. Because of that bundle informer might have stale cache without
@@ -61,6 +62,6 @@ func (h *resourceEventHandler) rebuildByName(namespace, bundleName string, obj i
 }
 
 func getBundleNameAndNamespace(obj interface{}) (string, string) {
-	tprInst := obj.(*unstructured.Unstructured)
-	return tprInst.GetLabels()[smith.BundleNameLabel], tprInst.GetNamespace()
+	meta := obj.(metav1.Object)
+	return meta.GetLabels()[smith.BundleNameLabel], meta.GetNamespace()
 }
