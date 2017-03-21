@@ -5,6 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 )
 
@@ -15,13 +16,12 @@ func GetSleeperTprClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, e
 	}
 
 	schemeBuilder := runtime.NewSchemeBuilder(func(scheme *runtime.Scheme) error {
-		scheme.AddKnownTypes(
-			groupVersion,
+		scheme.AddKnownTypes(groupVersion,
 			&Sleeper{},
 			&SleeperList{},
-			&metav1.ListOptions{},
-			&metav1.DeleteOptions{},
 		)
+		scheme.AddUnversionedTypes(api.Unversioned, &metav1.Status{})
+		metav1.AddToGroupVersion(scheme, groupVersion)
 		return nil
 	})
 

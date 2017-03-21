@@ -10,8 +10,7 @@ import (
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
@@ -28,7 +27,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	sClient, sScheme, err := GetSleeperTprClient(a.RestConfig)
+	sClient, _, err := GetSleeperTprClient(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -43,7 +42,7 @@ func (a *App) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	err = sleeperInformer(ctx, sClient, sScheme)
+	err = sleeperInformer(ctx, sClient)
 	if err != nil {
 		return err
 	}
@@ -87,27 +86,10 @@ func ensureResourceExists(clientset kubernetes.Interface) error {
 	return nil
 }
 
-func sleeperInformer(ctx context.Context, sClient *rest.RESTClient, sScheme *runtime.Scheme) error {
-	parameterCodec := runtime.NewParameterCodec(sScheme)
-
-	tmplInf := cache.NewSharedInformer(&cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return sClient.Get().
-				Resource(SleeperResourcePath).
-				VersionedParams(&options, parameterCodec).
-				Context(ctx).
-				Do().
-				Get()
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return sClient.Get().
-				Prefix("watch").
-				Resource(SleeperResourcePath).
-				VersionedParams(&options, parameterCodec).
-				Context(ctx).
-				Watch()
-		},
-	}, &Sleeper{}, 0)
+func sleeperInformer(ctx context.Context, sClient *rest.RESTClient) error {
+	tmplInf := cache.NewSharedInformer(
+		cache.NewListWatchFromClient(sClient, SleeperResourcePath, metav1.NamespaceAll, fields.Everything()),
+		&Sleeper{}, 0)
 
 	seh := &SleeperEventHandler{
 		ctx:    ctx,
