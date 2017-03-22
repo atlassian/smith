@@ -278,7 +278,9 @@ func (wrk *worker) handleError(bundle *smith.Bundle, err error) (shouldContinue 
 	func() {
 		wrk.tp.lock.Lock()
 		defer wrk.tp.lock.Unlock()
-		wrk.bundle = bundle
+		if wrk.bundle == nil { // Avoid overwriting bundle provided by external process
+			wrk.bundle = bundle // Need to re-initialize wrk.bundle so that external loop continues to run
+		}
 	}()
 	if e := wrk.setBundleState(bundle, smith.ERROR); e != nil {
 		log.Printf("[WORKER] %v", e)
