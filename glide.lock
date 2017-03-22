@@ -1,5 +1,5 @@
 hash: 0148d6f3d9dc81617fef21b1a10c079b1b386e58d8fd66dd3feb6fa59c067aac
-updated: 2017-03-21T07:41:24.145290282+11:00
+updated: 2017-03-22T22:29:18.794075668+11:00
 imports:
 - name: github.com/cenk/backoff
   version: 3db60c813733fce657c114634171689bbf1f8dee
@@ -80,8 +80,9 @@ imports:
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/apimachinery
-  version: 6dcbb207c0333b9e0f98e8ba6955907421288566
+  version: c1c4a7fe832857c75cc1d79c8e40d71d5da15fc6
   subpackages:
+  - pkg/api/equality
   - pkg/api/errors
   - pkg/api/meta
   - pkg/api/resource
@@ -92,6 +93,7 @@ imports:
   - pkg/apis/meta/v1/unstructured
   - pkg/conversion
   - pkg/conversion/queryparams
+  - pkg/conversion/unstructured
   - pkg/fields
   - pkg/labels
   - pkg/openapi
@@ -122,10 +124,36 @@ imports:
   - pkg/watch
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
-  version: 2cb68a18c3a2e8e60db9481b95527337ac648379
+  version: 76153773eaa3a268131d3d993290a194a1370585
   subpackages:
   - discovery
   - dynamic
+  - informers
+  - informers/apps
+  - informers/apps/v1beta1
+  - informers/autoscaling
+  - informers/autoscaling/v1
+  - informers/autoscaling/v2alpha1
+  - informers/batch
+  - informers/batch/v1
+  - informers/batch/v2alpha1
+  - informers/certificates
+  - informers/certificates/v1beta1
+  - informers/core
+  - informers/core/v1
+  - informers/extensions
+  - informers/extensions/v1beta1
+  - informers/internalinterfaces
+  - informers/policy
+  - informers/policy/v1beta1
+  - informers/rbac
+  - informers/rbac/v1alpha1
+  - informers/rbac/v1beta1
+  - informers/settings
+  - informers/settings/v1alpha1
+  - informers/storage
+  - informers/storage/v1
+  - informers/storage/v1beta1
   - kubernetes
   - kubernetes/scheme
   - kubernetes/typed/apps/v1beta1
@@ -146,6 +174,20 @@ imports:
   - kubernetes/typed/settings/v1alpha1
   - kubernetes/typed/storage/v1
   - kubernetes/typed/storage/v1beta1
+  - listers/apps/v1beta1
+  - listers/autoscaling/v1
+  - listers/autoscaling/v2alpha1
+  - listers/batch/v1
+  - listers/batch/v2alpha1
+  - listers/certificates/v1beta1
+  - listers/core/v1
+  - listers/extensions/v1beta1
+  - listers/policy/v1beta1
+  - listers/rbac/v1alpha1
+  - listers/rbac/v1beta1
+  - listers/settings/v1alpha1
+  - listers/storage/v1
+  - listers/storage/v1beta1
   - pkg/api
   - pkg/api/install
   - pkg/api/v1
