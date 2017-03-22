@@ -107,17 +107,15 @@ func (a *App) Run(ctx context.Context) error {
 		name2bundle: sl.Get,
 	}
 
-	// 6. TODO watch supported built-in resource types for events.
-
-	// 7. Watch Third Party Resources to add watches for supported ones
-
-	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients))
-
-	// 8. Watch other kinds of resources
+	// 6. Watch supported built-in resource types
 
 	deploymentInf.AddEventHandler(reh)
 	ingressInf.AddEventHandler(reh)
 	serviceInf.AddEventHandler(reh)
+
+	// 7. Watch Third Party Resources to add watches for supported ones
+
+	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients))
 
 	<-ctx.Done()
 	return ctx.Err()
