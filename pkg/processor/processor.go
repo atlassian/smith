@@ -52,28 +52,28 @@ func New(ctx context.Context, bundleClient *rest.RESTClient, clients dynamic.Cli
 	}
 }
 
-func (tp *BundleProcessor) Join() {
-	tp.wg.Wait()
+func (bp *BundleProcessor) Join() {
+	bp.wg.Wait()
 }
 
 // Rebuild schedules a rebuild of the bundle.
 // Note that the bundle object and/or resources in the bundle may be mutated asynchronously so the
 // calling code should do a proper deep copy if the object is still needed.
-func (tp *BundleProcessor) Rebuild(tpl *smith.Bundle) {
+func (bp *BundleProcessor) Rebuild(tpl *smith.Bundle) {
 	//log.Printf("Rebuilding the bundle %#v", tpl)
 	ref := workerRef{namespace: tpl.Metadata.Namespace, bundleName: tpl.Metadata.Name}
-	tp.lock.Lock()
-	defer tp.lock.Unlock()
-	wrk := tp.workers[ref]
+	bp.lock.Lock()
+	defer bp.lock.Unlock()
+	wrk := bp.workers[ref]
 	if wrk == nil {
 		wrk = &worker{
-			tp:        tp,
+			bp:        bp,
 			bundle:    tpl,
-			bo:        tp.backoff(),
+			bo:        bp.backoff(),
 			workerRef: ref,
 		}
-		tp.workers[ref] = wrk
-		tp.wg.Add(1)
+		bp.workers[ref] = wrk
+		bp.wg.Add(1)
 		go wrk.rebuildLoop()
 	} else {
 		wrk.bundle = tpl

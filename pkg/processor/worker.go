@@ -21,7 +21,7 @@ import (
 )
 
 type worker struct {
-	tp *BundleProcessor
+	bp *BundleProcessor
 	bo backoff.BackOff
 	workerRef
 
@@ -32,7 +32,7 @@ type worker struct {
 }
 
 func (wrk *worker) rebuildLoop() {
-	defer wrk.tp.wg.Done()
+	defer wrk.bp.wg.Done()
 	defer wrk.cleanupState()
 
 	for {
@@ -89,7 +89,7 @@ nextVertex:
 		if wrk.checkNeedsRebuild() {
 			return nil
 		}
-		resClone, err := wrk.tp.scheme.DeepCopy(&res)
+		resClone, err := wrk.bp.scheme.DeepCopy(&res)
 		if err != nil {
 			return err
 		}
@@ -130,7 +130,7 @@ func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource) (isR
 		return false, err
 	}
 	kind := res.Spec.GetKind()
-	client, err := wrk.tp.clients.ClientForGroupVersionKind(gv.WithKind(kind))
+	client, err := wrk.bp.clients.ClientForGroupVersionKind(gv.WithKind(kind))
 	if err != nil {
 		return false, err
 	}
@@ -185,7 +185,7 @@ func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource) (isR
 		}
 
 		// 4. Compare spec and existing resource
-		updated, err := updateResource(wrk.tp.scheme, res, response)
+		updated, err := updateResource(wrk.bp.scheme, res, response)
 		if err != nil {
 			// Unexpected error
 			return false, err
@@ -208,7 +208,7 @@ func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource) (isR
 		log.Printf("[WORKER] bundle %s/%s: resource %q updated", wrk.namespace, wrk.bundleName, res.Name)
 		break
 	}
-	return wrk.tp.rc.IsReady(response)
+	return wrk.bp.rc.IsReady(response)
 }
 
 func (wrk *worker) setBundleState(tpl *smith.Bundle, desired smith.ResourceState) error {
@@ -217,7 +217,7 @@ func (wrk *worker) setBundleState(tpl *smith.Bundle, desired smith.ResourceState
 	}
 	log.Printf("[WORKER] setting bundle %s/%s State to %q from %q", wrk.namespace, wrk.bundleName, desired, tpl.Status.State)
 	tpl.Status.State = desired
-	err := wrk.tp.bundleClient.Put().
+	err := wrk.bp.bundleClient.Put().
 		Namespace(wrk.namespace).
 		Resource(smith.BundleResourcePath).
 		Name(wrk.bundleName).
@@ -242,24 +242,24 @@ func (wrk *worker) setBundleState(tpl *smith.Bundle, desired smith.ResourceState
 // checkRebuild returns a pointer to the bundle if a rebuild is required.
 // It returns nil if there is no new bundle and rebuild is not required.
 func (wrk *worker) checkRebuild() *smith.Bundle {
-	wrk.tp.lock.Lock()
-	defer wrk.tp.lock.Unlock()
+	wrk.bp.lock.Lock()
+	defer wrk.bp.lock.Unlock()
 	bundle := wrk.bundle
 	if bundle != nil {
 		wrk.bundle = nil
 		return bundle
 	}
 	// delete atomically with the check to avoid race with Processor's rebuildInternal()
-	delete(wrk.tp.workers, wrk.workerRef)
+	delete(wrk.bp.workers, wrk.workerRef)
 	return nil
 }
 
 func (wrk *worker) cleanupState() {
-	wrk.tp.lock.Lock()
-	defer wrk.tp.lock.Unlock()
-	if wrk.tp.workers[wrk.workerRef] == wrk {
+	wrk.bp.lock.Lock()
+	defer wrk.bp.lock.Unlock()
+	if wrk.bp.workers[wrk.workerRef] == wrk {
 		// Only cleanup if there is a stale reference to the current worker.
-		delete(wrk.tp.workers, wrk.workerRef)
+		delete(wrk.bp.workers, wrk.workerRef)
 	}
 }
 
@@ -276,8 +276,8 @@ func (wrk *worker) handleError(bundle *smith.Bundle, err error) (shouldContinue 
 		return false
 	}
 	func() {
-		wrk.tp.lock.Lock()
-		defer wrk.tp.lock.Unlock()
+		wrk.bp.lock.Lock()
+		defer wrk.bp.lock.Unlock()
 		if wrk.bundle == nil { // Avoid overwriting bundle provided by external process
 			wrk.bundle = bundle // Need to re-initialize wrk.bundle so that external loop continues to run
 		}
@@ -288,7 +288,7 @@ func (wrk *worker) handleError(bundle *smith.Bundle, err error) (shouldContinue 
 	after := time.NewTimer(next)
 	defer after.Stop()
 	select {
-	case <-wrk.tp.ctx.Done():
+	case <-wrk.bp.ctx.Done():
 		return false
 	case <-after.C:
 	}
@@ -297,8 +297,8 @@ func (wrk *worker) handleError(bundle *smith.Bundle, err error) (shouldContinue 
 
 // checkNeedsRebuild can be called inside of the rebuild loop to check if the bundle needs to be rebuilt from the start.
 func (wrk *worker) checkNeedsRebuild() bool {
-	wrk.tp.lock.RLock()
-	defer wrk.tp.lock.RUnlock()
+	wrk.bp.lock.RLock()
+	defer wrk.bp.lock.RUnlock()
 	return wrk.bundle != nil
 }
 

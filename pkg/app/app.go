@@ -70,8 +70,8 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 3. Processor
 
-	tp := processor.New(ctx, bundleClient, clients, rc, bundleScheme)
-	defer tp.Join() // await termination
+	bp := processor.New(ctx, bundleClient, clients, rc, bundleScheme)
+	defer bp.Join() // await termination
 	defer cancel()  // cancel ctx to signal done to processor (and everything else)
 
 	// 4. Ensure ThirdPartyResource TEMPLATE exists
@@ -87,7 +87,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 5. Watch Bundles
-	bundleInf, err := watchBundles(ctx, bundleClient, bundleScheme, tp)
+	bundleInf, err := watchBundles(ctx, bundleClient, bundleScheme, bp)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (a *App) Run(ctx context.Context) error {
 		scheme: bundleScheme,
 	}
 	reh := &resourceEventHandler{
-		processor:   tp,
+		processor:   bp,
 		name2bundle: sl.Get,
 	}
 
