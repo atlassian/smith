@@ -12,6 +12,7 @@ ARCH ?= darwin
 METALINTER_CONCURRENCY ?= 4
 GOVERSION := 1.8
 GP := /gopath
+GOPATH ?= "$$HOME/go"
 MAIN_PKG := github.com/atlassian/smith/cmd/smith
 
 setup: setup-ci
