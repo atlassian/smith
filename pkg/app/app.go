@@ -15,13 +15,16 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+)
+
+const (
+	ResyncPeriod = 1 * time.Minute
 )
 
 type App struct {
@@ -46,13 +49,21 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 1. Informers
 
-	informerFactory := informers.NewSharedInformerFactory(clientset, 1*time.Minute)
+	informerFactory := informers.NewSharedInformerFactory(clientset, ResyncPeriod)
 	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
 	deploymentInf := informerFactory.Extensions().V1beta1().Deployments().Informer()
 	ingressInf := informerFactory.Extensions().V1beta1().Ingresses().Informer()
 	serviceInf := informerFactory.Core().V1().Services().Informer()
+	bundleInf := bundleInformer(bundleClient)
 
-	informerFactory.Start(ctx.Done())
+	store := NewStore()
+	store.AddInformer(tprGVK, tprInf)
+	store.AddInformer(metav1.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}, deploymentInf)
+	store.AddInformer(metav1.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}, ingressInf)
+	store.AddInformer(metav1.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}, serviceInf)
+	store.AddInformer(bundleGVK, bundleInf)
+
+	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
 
 	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
 	// in Ready Checker.
@@ -64,13 +75,13 @@ func (a *App) Run(ctx context.Context) error {
 
 	rc := &readychecker.ReadyChecker{
 		Store: &tprStore{
-			store: tprInf.GetStore(),
+			store: store,
 		},
 	}
 
 	// 3. Processor
 
-	bp := processor.New(ctx, bundleClient, clients, rc, bundleScheme)
+	bp := processor.New(ctx, bundleClient, clients, rc, bundleScheme, store)
 	defer bp.Join() // await termination
 	defer cancel()  // cancel ctx to signal done to processor (and everything else)
 
@@ -87,10 +98,13 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 5. Watch Bundles
-	bundleInf, err := watchBundles(ctx, bundleClient, bundleScheme, bp)
-	if err != nil {
-		return err
-	}
+
+	bundleInf.AddEventHandler(&bundleEventHandler{
+		processor: bp,
+		scheme:    bundleScheme,
+	})
+
+	go bundleInf.Run(ctx.Done())
 
 	// We must wait for bundleInf to populate its cache to avoid reading from an empty cache
 	// in case of resource-generated events.
@@ -99,7 +113,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	sl := bundleStore{
-		store:  bundleInf.GetStore(),
+		store:  store,
 		scheme: bundleScheme,
 	}
 	reh := &resourceEventHandler{
@@ -109,6 +123,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 6. Watch supported built-in resource types
 
+	tprInf.AddEventHandler(reh)
 	deploymentInf.AddEventHandler(reh)
 	ingressInf.AddEventHandler(reh)
 	serviceInf.AddEventHandler(reh)
@@ -151,18 +166,10 @@ func ensureResourceExists(clientset kubernetes.Interface) error {
 	return nil
 }
 
-func watchBundles(ctx context.Context, bundleClient cache.Getter, bundleScheme *runtime.Scheme, processor Processor) (cache.SharedInformer, error) {
-	bundleInf := cache.NewSharedInformer(
+func bundleInformer(bundleClient cache.Getter) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, metav1.NamespaceAll, fields.Everything()),
 		&smith.Bundle{},
-		1*time.Minute)
-
-	bundleInf.AddEventHandler(&bundleEventHandler{
-		processor: processor,
-		scheme:    bundleScheme,
-	})
-
-	go bundleInf.Run(ctx.Done())
-
-	return bundleInf, nil
+		ResyncPeriod,
+		cache.Indexers{})
 }

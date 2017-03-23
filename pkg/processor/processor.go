@@ -32,6 +32,7 @@ type BundleProcessor struct {
 	clients      dynamic.ClientPool
 	rc           ReadyChecker
 	scheme       *runtime.Scheme
+	store        smith.ByNameStore
 	wg           sync.WaitGroup // tracks number of Goroutines running rebuildLoop()
 
 	lock    sync.RWMutex // protects fields below
@@ -40,7 +41,7 @@ type BundleProcessor struct {
 
 // New creates a new bundle processor.
 // Instances are safe for concurrent use.
-func New(ctx context.Context, bundleClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker, scheme *runtime.Scheme) *BundleProcessor {
+func New(ctx context.Context, bundleClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker, scheme *runtime.Scheme, store smith.ByNameStore) *BundleProcessor {
 	return &BundleProcessor{
 		ctx:          ctx,
 		backoff:      exponentialBackOff,
@@ -48,6 +49,7 @@ func New(ctx context.Context, bundleClient *rest.RESTClient, clients dynamic.Cli
 		clients:      clients,
 		rc:           rc,
 		scheme:       scheme,
+		store:        store,
 		workers:      make(map[workerRef]*worker),
 	}
 }
