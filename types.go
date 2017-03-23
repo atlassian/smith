@@ -5,6 +5,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -34,6 +35,10 @@ const (
 	TprFieldPathAnnotation  = SmithDomain + "/TprReadyWhenFieldPath"
 	TprFieldValueAnnotation = SmithDomain + "/TprReadyWhenFieldValue"
 )
+
+type ByNameStore interface {
+	Get(gvk metav1.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error)
+}
 
 type BundleList struct {
 	metav1.TypeMeta `json:",inline"`
