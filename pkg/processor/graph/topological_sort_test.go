@@ -46,8 +46,8 @@ func TestSort1(t *testing.T) {
 	graph := initGraph()
 
 	// a -> b -> c
-	graph.addEdge("a", "b")
-	graph.addEdge("b", "c")
+	require.NoError(t, graph.addEdge("a", "b"))
+	require.NoError(t, graph.addEdge("b", "c"))
 
 	assertSortResult(t, graph, []string{"c", "b", "a", "d"})
 }
@@ -59,9 +59,9 @@ func TestSort2(t *testing.T) {
 	// a -> c
 	// a -> b
 	// b -> c
-	graph.addEdge("a", "c")
-	graph.addEdge("a", "b")
-	graph.addEdge("b", "c")
+	require.NoError(t, graph.addEdge("a", "c"))
+	require.NoError(t, graph.addEdge("a", "b"))
+	require.NoError(t, graph.addEdge("b", "c"))
 
 	assertSortResult(t, graph, []string{"c", "b", "a", "d"})
 }
@@ -74,10 +74,10 @@ func TestSort3(t *testing.T) {
 	// a -> d
 	// d -> c
 	// c -> b
-	graph.addEdge("a", "b")
-	graph.addEdge("a", "d")
-	graph.addEdge("d", "c")
-	graph.addEdge("c", "b")
+	require.NoError(t, graph.addEdge("a", "b"))
+	require.NoError(t, graph.addEdge("a", "d"))
+	require.NoError(t, graph.addEdge("d", "c"))
+	require.NoError(t, graph.addEdge("c", "b"))
 
 	assertSortResult(t, graph, []string{"b", "c", "d", "a"})
 }
@@ -88,8 +88,8 @@ func TestSortCycleError1(t *testing.T) {
 
 	// a -> b
 	// b -> a
-	graph.addEdge("a", "b")
-	graph.addEdge("b", "a")
+	require.NoError(t, graph.addEdge("a", "b"))
+	require.NoError(t, graph.addEdge("b", "a"))
 
 	assertCycleDetection(t, graph)
 }
@@ -101,9 +101,9 @@ func TestSortCycleError2(t *testing.T) {
 	// a -> b
 	// b -> c
 	// c -> a
-	graph.addEdge("a", "b")
-	graph.addEdge("b", "c")
-	graph.addEdge("c", "a")
+	require.NoError(t, graph.addEdge("a", "b"))
+	require.NoError(t, graph.addEdge("b", "c"))
+	require.NoError(t, graph.addEdge("c", "a"))
 
 	assertCycleDetection(t, graph)
 }
@@ -115,9 +115,9 @@ func TestSortCycleError3(t *testing.T) {
 	// a -> b
 	// b -> c
 	// c -> b
-	graph.addEdge("a", "b")
-	graph.addEdge("b", "c")
-	graph.addEdge("c", "b")
+	require.NoError(t, graph.addEdge("a", "b"))
+	require.NoError(t, graph.addEdge("b", "c"))
+	require.NoError(t, graph.addEdge("c", "b"))
 
 	assertCycleDetection(t, graph)
 }
