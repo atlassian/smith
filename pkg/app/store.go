@@ -15,12 +15,14 @@ const (
 )
 
 type Store struct {
+	scheme *runtime.Scheme
 	lock   sync.RWMutex
 	stores map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
-func NewStore() *Store {
+func NewStore(scheme *runtime.Scheme) *Store {
 	return &Store{
+		scheme: scheme,
 		stores: make(map[schema.GroupVersionKind]cache.SharedIndexInformer),
 	}
 }
@@ -61,6 +63,8 @@ func (s *Store) GetInformer(gvk schema.GroupVersionKind) (cache.SharedIndexInfor
 	return informer, ok
 }
 
+// Get looks up object of specified GVK in the specified namespace by name.
+// A deep copy of the object is returned so it is safe to modify it.
 func (s *Store) Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, e error) {
 	informer, ok := s.GetInformer(gvk)
 	if !ok {
@@ -74,7 +78,11 @@ func (s *Store) Get(gvk schema.GroupVersionKind, namespace, name string) (obj ru
 	case 0:
 		return nil, false, nil
 	case 1:
-		return objs[0].(runtime.Object), true, nil
+		obj, err := s.scheme.DeepCopy(objs[0])
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to do deep copy of %#v: %v", objs[0], err)
+		}
+		return obj.(runtime.Object), true, nil
 	default:
 		// Must never happen
 		panic(fmt.Errorf("multiple objects by namespace/name key for %v: %s", gvk, objs))
