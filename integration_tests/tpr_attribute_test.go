@@ -47,7 +47,7 @@ func TestTprAttribute(t *testing.T) {
 		Spec: smith.BundleSpec{
 			Resources: []smith.Resource{
 				{
-					Name: sleeper.Metadata.Name,
+					Name: smith.ResourceName(sleeper.Metadata.Name),
 					Spec: *sleeperU,
 				},
 			},

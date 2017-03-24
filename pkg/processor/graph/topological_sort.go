@@ -3,7 +3,6 @@ package graph
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/atlassian/smith"
 )
@@ -11,7 +10,7 @@ import (
 // SortedData is a container for dependency graph and topological sort result
 type SortedData struct {
 	Graph          *Graph
-	SortedVertices []string
+	SortedVertices []smith.ResourceName
 }
 
 // TopologicalSort builds resource dependency graph and topologically sorts it
@@ -24,7 +23,7 @@ func TopologicalSort(bundle *smith.Bundle) (*SortedData, error) {
 
 	for _, res := range bundle.Spec.Resources {
 		for _, d := range res.DependsOn {
-			graph.addEdge(res.Name, string(d))
+			graph.addEdge(res.Name, d)
 		}
 	}
 
@@ -43,7 +42,7 @@ func TopologicalSort(bundle *smith.Bundle) (*SortedData, error) {
 	return &graphData, nil
 }
 
-func (g *Graph) topologicalSort() ([]string, error) {
+func (g *Graph) topologicalSort() ([]smith.ResourceName, error) {
 	results := newOrderedSet()
 	for _, name := range g.orderedVertices {
 		err := g.visit(name, results, nil)
@@ -55,7 +54,7 @@ func (g *Graph) topologicalSort() ([]string, error) {
 	return results.items, nil
 }
 
-func (g *Graph) visit(name string, results *orderedset, visited *orderedset) error {
+func (g *Graph) visit(name smith.ResourceName, results *orderedset, visited *orderedset) error {
 	if visited == nil {
 		visited = newOrderedSet()
 	}
@@ -64,7 +63,7 @@ func (g *Graph) visit(name string, results *orderedset, visited *orderedset) err
 	if !added {
 		index := visited.index(name)
 		cycle := append(visited.items[index:], name)
-		return fmt.Errorf("Cycle error: %s", strings.Join(cycle, " -> "))
+		return fmt.Errorf("cycle error: %v", cycle)
 	}
 
 	n := g.Vertices[name]
@@ -80,19 +79,19 @@ func (g *Graph) visit(name string, results *orderedset, visited *orderedset) err
 }
 
 type orderedset struct {
-	indexes map[string]int
-	items   []string
+	indexes map[smith.ResourceName]int
+	items   []smith.ResourceName
 	length  int
 }
 
 func newOrderedSet() *orderedset {
 	return &orderedset{
-		indexes: make(map[string]int),
+		indexes: make(map[smith.ResourceName]int),
 		length:  0,
 	}
 }
 
-func (s *orderedset) add(item string) bool {
+func (s *orderedset) add(item smith.ResourceName) bool {
 	_, ok := s.indexes[item]
 	if !ok {
 		s.indexes[item] = s.length
@@ -110,7 +109,7 @@ func (s *orderedset) clone() *orderedset {
 	return clone
 }
 
-func (s *orderedset) index(item string) int {
+func (s *orderedset) index(item smith.ResourceName) int {
 	index, ok := s.indexes[item]
 	if ok {
 		return index

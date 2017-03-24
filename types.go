@@ -91,15 +91,15 @@ type BundleStatus struct {
 	State ResourceState `json:"state,omitempty"`
 }
 
-// DependencyRef is a reference to another Resource in the same bundle.
-type DependencyRef string
+// ResourceName is a reference to another Resource in the same bundle.
+type ResourceName string
 
 type Resource struct {
 	// Name of the resource for references.
-	Name string `json:"name"`
+	Name ResourceName `json:"name"`
 
 	// Explicit dependencies.
-	DependsOn []DependencyRef `json:"dependsOn,omitempty"`
+	DependsOn []ResourceName `json:"dependsOn,omitempty"`
 
 	Spec unstructured.Unstructured `json:"spec"`
 }

@@ -6,7 +6,7 @@ import (
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
-var converter unstructured_conversion.Converter = unstructured_conversion.NewConverter(false)
+var converter = unstructured_conversion.NewConverter(false)
 
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()

@@ -21,7 +21,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var converter unstructured_conversion.Converter = unstructured_conversion.NewConverter(false)
+var (
+	converter = unstructured_conversion.NewConverter(false)
+)
 
 type worker struct {
 	bp *BundleProcessor
@@ -69,7 +71,7 @@ func (wrk *worker) rebuild(bundle *smith.Bundle) error {
 	log.Printf("[WORKER] Rebuilding the bundle %s/%s", wrk.namespace, wrk.bundleName)
 
 	// Build resource map by name
-	resourceMap := make(map[string]smith.Resource, len(bundle.Spec.Resources))
+	resourceMap := make(map[smith.ResourceName]smith.Resource, len(bundle.Spec.Resources))
 	for _, res := range bundle.Spec.Resources {
 		resourceMap[res.Name] = res
 	}
@@ -80,22 +82,16 @@ func (wrk *worker) rebuild(bundle *smith.Bundle) error {
 		return sortErr
 	}
 
-	readyResources := make(map[string]struct{}, len(bundle.Spec.Resources))
+	readyResources := make(map[smith.ResourceName]*unstructured.Unstructured, len(bundle.Spec.Resources))
 	allReady := true
 
 	// Visit vertices in sorted order
 nextVertex:
 	for _, v := range graphData.SortedVertices {
-		log.Printf("[WORKER] bundle %s/%s: checking resource %q", wrk.namespace, wrk.bundleName, v)
-		res := resourceMap[v]
-
 		if wrk.checkNeedsRebuild() {
 			return nil
 		}
-		resClone, err := wrk.bp.scheme.DeepCopy(&res)
-		if err != nil {
-			return err
-		}
+
 		// Check if all resource dependencies are ready (so we can start processing this one)
 		for _, dependency := range graphData.Graph.Vertices[v].Edges() {
 			if _, ok := readyResources[dependency]; !ok {
@@ -105,13 +101,19 @@ nextVertex:
 			}
 		}
 		// Process the resource
-		isReady, err := wrk.checkResource(bundle, resClone.(*smith.Resource))
+		log.Printf("[WORKER] bundle %s/%s: checking resource %q", wrk.namespace, wrk.bundleName, v)
+		res := resourceMap[v]
+		resClone, err := wrk.bp.scheme.DeepCopy(&res)
 		if err != nil {
 			return err
 		}
-		log.Printf("[WORKER] bundle %s/%s: resource %q, ready: %t", wrk.namespace, wrk.bundleName, v, isReady)
-		if isReady {
-			readyResources[v] = struct{}{}
+		readyResource, err := wrk.checkResource(bundle, resClone.(*smith.Resource), readyResources)
+		if err != nil {
+			return err
+		}
+		log.Printf("[WORKER] bundle %s/%s: resource %q, ready: %t", wrk.namespace, wrk.bundleName, v, readyResource != nil)
+		if readyResource != nil {
+			readyResources[v] = readyResource
 		} else {
 			allReady = false
 		}
@@ -127,14 +129,41 @@ nextVertex:
 	return nil
 }
 
-func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource) (isReady bool, e error) {
-	// 1. Update label to point at the parent bundle
+func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) (readyResource *unstructured.Unstructured, e error) {
+	// 1. Eval spec
+	if err := wrk.evalSpec(bundle, res, readyResources); err != nil {
+		return nil, err
+	}
+
+	// 2. Create or update resource
+	resUpdated, err := wrk.createOrUpdate(res)
+	if err != nil || resUpdated == nil {
+		return nil, err
+	}
+
+	// 3. Check if resource is ready
+	ready, err := wrk.bp.rc.IsReady(resUpdated)
+	if err != nil || !ready {
+		return nil, err
+	}
+	return resUpdated, nil
+}
+
+// Mutates spec in place.
+func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) error {
+	// 1. Process references
+	sp := NewSpec(res.Name, readyResources, res.DependsOn)
+	if err := sp.ProcessObject(res.Spec.Object); err != nil {
+		return err
+	}
+
+	// 2. Update label to point at the parent bundle
 	res.Spec.SetLabels(mergeLabels(
 		bundle.Metadata.Labels,
 		res.Spec.GetLabels(),
 		map[string]string{smith.BundleNameLabel: wrk.bundleName}))
 
-	// 2. Update OwnerReferences
+	// 3. Update OwnerReferences
 	// Hardcode APIVersion/Kind because of https://github.com/kubernetes/client-go/issues/60
 	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/39816 is fixed
 	//res.Spec.SetOwnerReferences(append(res.Spec.GetOwnerReferences(), metav1.OwnerReference{
@@ -144,17 +173,11 @@ func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource) (isR
 	//	UID:        bundle.Metadata.UID,
 	//}))
 
-	// 3. Create or update resource
-	response, err := wrk.createOrUpdate(res)
-	if err != nil || response == nil {
-		return false, err
-	}
-
-	// 4. Check if resource is ready
-	return wrk.bp.rc.IsReady(response)
+	return nil
 }
 
 func (wrk *worker) createOrUpdate(res *smith.Resource) (*unstructured.Unstructured, error) {
+	// 1. Prepare client
 	gv, err := schema.ParseGroupVersion(res.Spec.GetAPIVersion())
 	if err != nil {
 		return nil, err
@@ -172,9 +195,8 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (*unstructured.Unstructur
 		Kind:       kind,
 	}, wrk.namespace)
 
-	name := res.Spec.GetName()
 	// 2. Try to get the resource. We do read first to avoid generating unnecessary events.
-	obj, exists, err := wrk.bp.store.Get(gvk, wrk.namespace, name)
+	obj, exists, err := wrk.bp.store.Get(gvk, wrk.namespace, res.Spec.GetName())
 	if err != nil {
 		// Unexpected error
 		return nil, err
