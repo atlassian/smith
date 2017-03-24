@@ -60,7 +60,7 @@ func (a *App) Run(ctx context.Context) error {
 	secretInf := informerFactory.Core().V1().Secrets().Informer()
 	bundleInf := bundleInformer(bundleClient)
 
-	store := NewStore()
+	store := NewStore(bundleScheme)
 	store.AddInformer(tprGVK, tprInf)
 	store.AddInformer(schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}, deploymentInf)
 	store.AddInformer(schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}, ingressInf)
@@ -119,8 +119,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	sl := bundleStore{
-		store:  store,
-		scheme: bundleScheme,
+		store: store,
 	}
 	reh := &resourceEventHandler{
 		processor:   bp,

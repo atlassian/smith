@@ -2,13 +2,10 @@ package app
 
 import (
 	"github.com/atlassian/smith"
-
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type bundleStore struct {
-	store  smith.ByNameStore
-	scheme *runtime.Scheme
+	store smith.ByNameStore
 }
 
 func (s *bundleStore) Get(namespace, bundleName string) (*smith.Bundle, error) {
@@ -16,10 +13,5 @@ func (s *bundleStore) Get(namespace, bundleName string) (*smith.Bundle, error) {
 	if err != nil || !exists {
 		return nil, err
 	}
-	out, err := s.scheme.DeepCopy(bundle)
-	if err != nil {
-		return nil, err
-	}
-
-	return out.(*smith.Bundle), nil
+	return bundle.(*smith.Bundle), nil
 }
