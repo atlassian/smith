@@ -15,6 +15,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -58,9 +59,9 @@ func (a *App) Run(ctx context.Context) error {
 
 	store := NewStore()
 	store.AddInformer(tprGVK, tprInf)
-	store.AddInformer(metav1.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}, deploymentInf)
-	store.AddInformer(metav1.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}, ingressInf)
-	store.AddInformer(metav1.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}, serviceInf)
+	store.AddInformer(schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}, deploymentInf)
+	store.AddInformer(schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}, ingressInf)
+	store.AddInformer(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}, serviceInf)
 	store.AddInformer(bundleGVK, bundleInf)
 
 	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
@@ -130,7 +131,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 7. Watch Third Party Resources to add watches for supported ones
 
-	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients))
+	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients, store, ResyncPeriod))
 
 	<-ctx.Done()
 	return ctx.Err()

@@ -37,7 +37,7 @@ const (
 )
 
 type ByNameStore interface {
-	Get(gvk metav1.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error)
+	Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error)
 }
 
 type BundleList struct {
