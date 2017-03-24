@@ -16,18 +16,18 @@ func TestBundleSort(t *testing.T) {
 			Resources: []smith.Resource{
 				{
 					Name:      "a",
-					DependsOn: []smith.DependencyRef{"c"},
+					DependsOn: []smith.ResourceName{"c"},
 				},
 				{
 					Name: "b",
 				},
 				{
 					Name:      "c",
-					DependsOn: []smith.DependencyRef{"b"},
+					DependsOn: []smith.ResourceName{"b"},
 				},
 				{
 					Name:      "d",
-					DependsOn: []smith.DependencyRef{"e"},
+					DependsOn: []smith.ResourceName{"e"},
 				},
 				{
 					Name: "e",
@@ -38,7 +38,7 @@ func TestBundleSort(t *testing.T) {
 	graphData, err := TopologicalSort(&bundle)
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"b", "c", "a", "e", "d"}, graphData.SortedVertices)
+	assert.Equal(t, []smith.ResourceName{"b", "c", "a", "e", "d"}, graphData.SortedVertices)
 }
 
 func TestSort1(t *testing.T) {
@@ -49,7 +49,7 @@ func TestSort1(t *testing.T) {
 	require.NoError(t, graph.addEdge("a", "b"))
 	require.NoError(t, graph.addEdge("b", "c"))
 
-	assertSortResult(t, graph, []string{"c", "b", "a", "d"})
+	assertSortResult(t, graph, []smith.ResourceName{"c", "b", "a", "d"})
 }
 
 func TestSort2(t *testing.T) {
@@ -63,7 +63,7 @@ func TestSort2(t *testing.T) {
 	require.NoError(t, graph.addEdge("a", "b"))
 	require.NoError(t, graph.addEdge("b", "c"))
 
-	assertSortResult(t, graph, []string{"c", "b", "a", "d"})
+	assertSortResult(t, graph, []smith.ResourceName{"c", "b", "a", "d"})
 }
 
 func TestSort3(t *testing.T) {
@@ -79,7 +79,7 @@ func TestSort3(t *testing.T) {
 	require.NoError(t, graph.addEdge("d", "c"))
 	require.NoError(t, graph.addEdge("c", "b"))
 
-	assertSortResult(t, graph, []string{"b", "c", "d", "a"})
+	assertSortResult(t, graph, []smith.ResourceName{"b", "c", "d", "a"})
 }
 
 func TestSortCycleError1(t *testing.T) {
@@ -131,7 +131,7 @@ func initGraph() *Graph {
 	return graph
 }
 
-func assertSortResult(t *testing.T, graph *Graph, expected []string) {
+func assertSortResult(t *testing.T, graph *Graph, expected []smith.ResourceName) {
 	result, err := graph.topologicalSort()
 	require.NoError(t, err)
 	assert.Equal(t, expected, result)
