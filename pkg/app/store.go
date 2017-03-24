@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -16,16 +16,16 @@ const (
 
 type Store struct {
 	lock   sync.RWMutex
-	stores map[metav1.GroupVersionKind]cache.SharedIndexInformer
+	stores map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
 func NewStore() *Store {
 	return &Store{
-		stores: make(map[metav1.GroupVersionKind]cache.SharedIndexInformer),
+		stores: make(map[schema.GroupVersionKind]cache.SharedIndexInformer),
 	}
 }
 
-func (s *Store) AddInformer(gvk metav1.GroupVersionKind, informer cache.SharedIndexInformer) {
+func (s *Store) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if _, ok := s.stores[gvk]; ok {
@@ -42,7 +42,7 @@ func (s *Store) AddInformer(gvk metav1.GroupVersionKind, informer cache.SharedIn
 	s.stores[gvk] = informer
 }
 
-func (s *Store) RemoveInformer(gvk metav1.GroupVersionKind) bool {
+func (s *Store) RemoveInformer(gvk schema.GroupVersionKind) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	_, ok := s.stores[gvk]
@@ -54,14 +54,14 @@ func (s *Store) RemoveInformer(gvk metav1.GroupVersionKind) bool {
 
 // GetInformer gets an informer for the specified GVK.
 // Returns false of no informer is registered.
-func (s *Store) GetInformer(gvk metav1.GroupVersionKind) (cache.SharedIndexInformer, bool) {
+func (s *Store) GetInformer(gvk schema.GroupVersionKind) (cache.SharedIndexInformer, bool) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	informer, ok := s.stores[gvk]
 	return informer, ok
 }
 
-func (s *Store) Get(gvk metav1.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, e error) {
+func (s *Store) Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, e error) {
 	informer, ok := s.GetInformer(gvk)
 	if !ok {
 		return nil, false, fmt.Errorf("no informer for %v is registered", gvk)
