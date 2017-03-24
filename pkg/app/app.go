@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -55,13 +56,17 @@ func (a *App) Run(ctx context.Context) error {
 	deploymentInf := informerFactory.Extensions().V1beta1().Deployments().Informer()
 	ingressInf := informerFactory.Extensions().V1beta1().Ingresses().Informer()
 	serviceInf := informerFactory.Core().V1().Services().Informer()
+	configMapInf := informerFactory.Core().V1().ConfigMaps().Informer()
+	secretInf := informerFactory.Core().V1().Secrets().Informer()
 	bundleInf := bundleInformer(bundleClient)
 
 	store := NewStore()
 	store.AddInformer(tprGVK, tprInf)
 	store.AddInformer(schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}, deploymentInf)
 	store.AddInformer(schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}, ingressInf)
-	store.AddInformer(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}, serviceInf)
+	store.AddInformer(api.Unversioned.WithKind("Service"), serviceInf)
+	store.AddInformer(api.Unversioned.WithKind("ConfigMap"), configMapInf)
+	store.AddInformer(api.Unversioned.WithKind("Secret"), secretInf)
 	store.AddInformer(bundleGVK, bundleInf)
 
 	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
@@ -128,6 +133,8 @@ func (a *App) Run(ctx context.Context) error {
 	deploymentInf.AddEventHandler(reh)
 	ingressInf.AddEventHandler(reh)
 	serviceInf.AddEventHandler(reh)
+	configMapInf.AddEventHandler(reh)
+	secretInf.AddEventHandler(reh)
 
 	// 7. Watch Third Party Resources to add watches for supported ones
 
