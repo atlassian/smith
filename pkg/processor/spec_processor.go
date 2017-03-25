@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -19,8 +20,9 @@ const (
 
 var (
 	// TODO a proper lexer should be use to allow escaping of $ to avoid substitution
-	reference      = regexp.MustCompile(`\$\([^()]+\)`)
-	nakedReference = regexp.MustCompile(`^\$\(\([^()]+\)\)$`)
+	reference             = regexp.MustCompile(`\$\([^()]+\)`)
+	nakedReference        = regexp.MustCompile(`^\$\(\([^()]+\)\)$`)
+	invalidNakedReference = regexp.MustCompile(`(\$\(\([^()]+\)\).|.\$\(\([^()]+\)\))`)
 )
 
 type SpecProcessor struct {
@@ -66,42 +68,48 @@ func (sp *SpecProcessor) ProcessValue(value interface{}, path ...string) (interf
 }
 
 func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{}, error) {
-	valid := true
+	var err error
 	var processed interface{}
-	if nakedReference.MatchString(value) {
-		processed, valid = sp.processMatch(value[3:len(value)-2], false)
+	if invalidNakedReference.MatchString(value) {
+		err = errors.New("naked reference in the middle of a string")
 	} else {
-		processed = reference.ReplaceAllStringFunc(value, func(match string) string {
-			processedValue, ok := sp.processMatch(match[2:len(match)-1], true)
-			valid = valid && ok
-			return fmt.Sprintf("%v", processedValue)
-		})
+		if nakedReference.MatchString(value) {
+			processed, err = sp.processMatch(value[3:len(value)-2], false)
+		} else {
+			processed = reference.ReplaceAllStringFunc(value, func(match string) string {
+				processedValue, e := sp.processMatch(match[2:len(match)-1], true)
+				if err == nil {
+					err = e
+				}
+				return fmt.Sprintf("%v", processedValue)
+			})
+		}
 	}
-	if !valid {
-		return nil, fmt.Errorf("invalid reference(s) at %s: %s", strings.Join(path, ReferenceSep), processed)
+	if err != nil {
+		return nil, fmt.Errorf("invalid reference at %q: %v", strings.Join(path, ReferenceSep), err)
 	}
 	return processed, nil
 }
 
-func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (value interface{}, ok bool) {
+func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (interface{}, error) {
 	names := strings.Split(selector, ReferenceSep)
 	if len(names) < 2 {
-		return ">>cannot include whole object: " + selector + "<<", false
+		return nil, fmt.Errorf("cannot include whole object: %s", selector)
 	}
 	objName := smith.ResourceName(names[0])
 	if objName == sp.selfName {
-		return ">>self references are not allowed: " + selector + "<<", false
+		return nil, fmt.Errorf("self references are not allowed: %s", selector)
 	}
 	res := sp.readyResources[objName]
 	if res == nil {
-		return ">>object not found: " + selector + "<<", false
+		return nil, fmt.Errorf("object not found: %s", selector)
 	}
 	if _, allowed := sp.allowedResources[objName]; !allowed {
-		return ">>references can only point at direct dependencies: " + selector + "<<", false
+		return nil, fmt.Errorf("references can only point at direct dependencies: %s", selector)
 	}
 	fieldValue := resources.GetNestedField(res.Object, names[1:]...)
 	if fieldValue == nil {
-		return ">>field not found: " + selector + "<<", false
+		return nil, fmt.Errorf("field not found: %s", selector)
 	}
 	if primitivesOnly {
 		switch fieldValue.(type) {
@@ -112,12 +120,12 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (val
 		case int8, int16, int32, int64:
 		case complex64, complex128:
 		default:
-			return fmt.Sprintf(">>cannot expand non-primitive field %s of type %T<<", selector, fieldValue), false
+			return nil, fmt.Errorf("cannot expand non-primitive field %s of type %T", selector, fieldValue)
 		}
 	} else {
 		if _, ok := fieldValue.(string); ok {
-			return ">>cannot expand field " + selector + " of type string as naked reference<<", false
+			return nil, fmt.Errorf("cannot expand field %s of type string as naked reference", selector)
 		}
 	}
-	return fieldValue, true
+	return fieldValue, nil
 }
