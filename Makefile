@@ -68,13 +68,13 @@ test:
 	go test $$(glide nv)
 
 check:
-	go install ./cmd/smith
+	go install ./cmd/smith ./examples/tprattribute/main
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=600s ./... --vendor \
 		--linter='errcheck:errcheck:-ignore=net:Close' --cyclo-over=20 \
 		--disable=interfacer --disable=golint --dupl-threshold=200
 
 check-all:
-	go install ./cmd/smith
+	go install ./cmd/smith ./examples/tprattribute/main
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=600s ./... --vendor --cyclo-over=20 \
 		--dupl-threshold=65
 
