@@ -9,10 +9,8 @@ spec:
     metadata:
       labels:
         app: smith
-        l1: l3
     spec:
       containers:
       - name: smith
-        image: atlassian/smith:75d5bb5
+        image: "atlassianlabs/smith:2104283-race"
         imagePullPolicy: Always
-      terminationGracePeriodSeconds: 120
