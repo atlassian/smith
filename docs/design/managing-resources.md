@@ -164,7 +164,7 @@ Each time `O`'s name changes a new `O` object is created, all dependent objects 
 
 Smith does not use `smith.a.c/TprOutputNameModeField` and `smith.a.c/TprOutputNameSetterField` annotations directly,
 they are defined here for completeness only. It is the job of a TPR controller to honor/support them and it is up to
-whoever constructs the Template object with that TPR to use those fields or not.
+whoever constructs the Bundle object with that TPR to use those fields or not.
 
 `smith.a.c/TprOutputNameField` is the name of a field on `K` that contains the actual name of `O` that has been created.
 
