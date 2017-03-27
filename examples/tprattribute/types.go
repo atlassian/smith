@@ -77,7 +77,7 @@ type SleeperSpec struct {
 
 type SleeperStatus struct {
 	State   SleeperState `json:"state,omitempty"`
-	Message string
+	Message string       `json:"message,omitempty"`
 }
 
 // The code below is used only to work around a known problem with third-party
