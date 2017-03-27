@@ -55,7 +55,7 @@ func (wrk *worker) rebuildLoop() {
 	}
 }
 
-// TODO parse bundle, build resource graph, traverse graph, assert each resource exists.
+// Parse bundle, build resource graph, traverse graph, assert each resource exists.
 // For each resource ensure its dependencies (if any) are in READY state before creating it.
 // If at least one dependency is not READY, exit loop. Rebuild will/should be called once the dependency
 // updates it's state (noticed via watching).
