@@ -128,7 +128,6 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 6. Watch supported built-in resource types
 
-	tprInf.AddEventHandler(reh)
 	deploymentInf.AddEventHandler(reh)
 	ingressInf.AddEventHandler(reh)
 	serviceInf.AddEventHandler(reh)

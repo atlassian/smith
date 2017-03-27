@@ -68,7 +68,9 @@ func (h *tprEventHandler) OnAdd(obj interface{}) {
 
 func (h *tprEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	newTpr := newObj.(*extensions.ThirdPartyResource)
-
+	if newTpr.Name == smith.BundleResourceName {
+		return
+	}
 	newVersions := versionsMap(newTpr)
 
 	var added []extensions.APIVersion
