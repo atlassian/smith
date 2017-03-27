@@ -7,7 +7,7 @@ BUILD_DATE := $$(date +%Y-%m-%d-%H:%M)
 GIT_HASH := $$(git rev-parse --short HEAD)
 GOBUILD_VERSION_ARGS := -ldflags "-s -X $(VERSION_VAR)=$(REPO_VERSION) -X $(GIT_VAR)=$(GIT_HASH) -X $(BUILD_DATE_VAR)=$(BUILD_DATE)"
 BINARY_NAME := smith
-IMAGE_NAME := atlassian/smith
+IMAGE_NAME := atlassianlabs/smith
 ARCH ?= darwin
 METALINTER_CONCURRENCY ?= 4
 GOVERSION := 1.8
