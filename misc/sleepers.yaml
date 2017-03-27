@@ -1,0 +1,35 @@
+apiVersion: smith.atlassian.com/v1
+kind: Bundle
+metadata:
+  name: bundlex
+spec:
+  resources:
+  - name: sleeper1
+    spec:
+      apiVersion: tpr.atlassian.com/v1
+      kind: Sleeper
+      metadata:
+        name: sleeper1
+      spec:
+        sleepFor: 3
+        wakeupMessage: Hello, Infravators!
+  - name: sleeper2
+    dependsOn:
+    - sleeper1
+    spec:
+      apiVersion: tpr.atlassian.com/v1
+      kind: Sleeper
+      metadata:
+        name: sleeper2
+      spec:
+        sleepFor: 4
+        wakeupMessage: "$(sleeper1/status/message)"
+  - name: sleeper3
+    dependsOn:
+    - sleeper2
+    spec:
+      apiVersion: tpr.atlassian.com/v1
+      kind: Sleeper
+      metadata:
+        name: sleeper3
+      spec: "$((sleeper2/spec))"
