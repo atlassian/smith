@@ -59,7 +59,7 @@ func ensureResourceExists(clientset kubernetes.Interface) error {
 			Name: SleeperResourceName,
 			Annotations: map[string]string{
 				smith.TprFieldPathAnnotation:  "status.state",
-				smith.TprFieldValueAnnotation: string(AWAKE),
+				smith.TprFieldValueAnnotation: string(Awake),
 			},
 		},
 		Description: "Sleeper TPR Informer example",

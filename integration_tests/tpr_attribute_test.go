@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 )
 
 func TestTprAttribute(t *testing.T) {
@@ -147,7 +148,7 @@ func TestTprAttribute(t *testing.T) {
 				assert.EqualValues(t, map[string]string{
 					smith.BundleNameLabel: bundleName,
 				}, obj.Metadata.Labels)
-				if obj.Status.State == tprattribute.AWAKE {
+				if obj.Status.State == tprattribute.Awake {
 					return
 				}
 			}
@@ -161,7 +162,9 @@ func TestTprAttribute(t *testing.T) {
 		Name(bundleName).
 		Do().
 		Into(&bundleRes))
-	require.Equal(t, smith.READY, bundleRes.Status.State)
+	assertCondition(t, &bundleRes, smith.BundleReady, apiv1.ConditionTrue)
+	assertCondition(t, &bundleRes, smith.BundleInProgress, apiv1.ConditionFalse)
+	assertCondition(t, &bundleRes, smith.BundleError, apiv1.ConditionFalse)
 }
 
 func bundleAttrResources(t *testing.T) (*tprattribute.Sleeper, *unstructured.Unstructured) {

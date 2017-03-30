@@ -21,10 +21,10 @@ const (
 type SleeperState string
 
 const (
-	NEW      SleeperState = ""
-	SLEEPING SleeperState = "Sleeping"
-	AWAKE    SleeperState = "Awake!"
-	ERROR    SleeperState = "Error"
+	New      SleeperState = ""
+	Sleeping SleeperState = "Sleeping"
+	Awake    SleeperState = "Awake!"
+	Error    SleeperState = "Error"
 )
 
 type SleeperList struct {
@@ -37,13 +37,13 @@ type SleeperList struct {
 }
 
 // GetObjectKind is required to satisfy Object interface.
-func (tl *SleeperList) GetObjectKind() schema.ObjectKind {
-	return &tl.TypeMeta
+func (sl *SleeperList) GetObjectKind() schema.ObjectKind {
+	return &sl.TypeMeta
 }
 
 // GetListMeta is required to satisfy ListMetaAccessor interface.
-func (tl *SleeperList) GetListMeta() metav1.List {
-	return &tl.Metadata
+func (sl *SleeperList) GetListMeta() metav1.List {
+	return &sl.Metadata
 }
 
 // Sleeper describes a sleeping resource.
@@ -61,13 +61,13 @@ type Sleeper struct {
 }
 
 // Required to satisfy Object interface
-func (t *Sleeper) GetObjectKind() schema.ObjectKind {
-	return &t.TypeMeta
+func (s *Sleeper) GetObjectKind() schema.ObjectKind {
+	return &s.TypeMeta
 }
 
 // Required to satisfy ObjectMetaAccessor interface
-func (t *Sleeper) GetObjectMeta() metav1.Object {
-	return &t.Metadata
+func (s *Sleeper) GetObjectMeta() metav1.Object {
+	return &s.Metadata
 }
 
 type SleeperSpec struct {

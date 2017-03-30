@@ -1,7 +1,6 @@
 package readychecker
 
 import (
-	"fmt"
 	"log"
 	"strings"
 
@@ -13,10 +12,10 @@ import (
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
-type IsObjectReady func(*unstructured.Unstructured) (bool, error)
+type IsObjectReady func(*unstructured.Unstructured) (isReady, retriableError bool, e error)
 
-func alwaysReady(_ *unstructured.Unstructured) (bool, error) {
-	return true, nil
+func alwaysReady(_ *unstructured.Unstructured) (isReady, retriableError bool, e error) {
+	return true, false, nil
 }
 
 // each function is responsible for handling different versions of objects itself.
@@ -38,7 +37,7 @@ type ReadyChecker struct {
 	Store TprStore
 }
 
-func (rc *ReadyChecker) IsReady(obj *unstructured.Unstructured) (bool, error) {
+func (rc *ReadyChecker) IsReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	gk := obj.GroupVersionKind().GroupKind()
 
 	// 1. Check if it is a known built-in resource
@@ -47,49 +46,39 @@ func (rc *ReadyChecker) IsReady(obj *unstructured.Unstructured) (bool, error) {
 	}
 
 	// 2. Check if it is a TPR with path/value annotation
-	ready, err := rc.checkPathValue(gk, obj)
-	if err == nil && ready {
-		return true, nil
+	ready, retriable, err := rc.checkPathValue(gk, obj)
+	if err != nil || ready {
+		return ready, retriable, err
 	}
 
 	// 3. Check if it is a TPR with Kind/GroupVersion annotation
-	ready, err2 := rc.checkForInstance(gk, obj)
-	if err2 == nil && ready {
-		return true, nil
-	}
-
-	// 4. Nothing has been found
-	if err == nil {
-		err = err2
-	}
-
-	return false, err
+	return rc.checkForInstance(gk, obj)
 }
 
-func (rc *ReadyChecker) checkForInstance(gk schema.GroupKind, obj *unstructured.Unstructured) (bool, error) {
+func (rc *ReadyChecker) checkForInstance(gk schema.GroupKind, obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	// TODO Check if it is a TPR with Kind/GroupVersion annotation
-	return false, nil
+	return false, false, nil
 }
 
-func (rc *ReadyChecker) checkPathValue(gk schema.GroupKind, obj *unstructured.Unstructured) (bool, error) {
+func (rc *ReadyChecker) checkPathValue(gk schema.GroupKind, obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	tpr, err := rc.Store.Get(gk)
 	if err != nil {
-		return false, err
+		return false, true, err
 	}
 	if tpr == nil {
-		return false, fmt.Errorf("unknown resource group %q and/or kind %q", gk.Group, gk.Kind)
+		return false, false, nil
 	}
 	path := tpr.Annotations[smith.TprFieldPathAnnotation]
 	value := tpr.Annotations[smith.TprFieldValueAnnotation]
 	if len(path) == 0 || len(value) == 0 {
-		return false, fmt.Errorf("TPR %q is not annotated propery", tpr.Name)
+		return false, false, nil
 	}
 	actualValue := resources.GetNestedString(obj.Object, strings.Split(path, ".")...)
 	if actualValue != value {
 		// TODO this is for debugging, remove later
 		log.Printf("[IsReady] %q is not equal to expected %q", actualValue, value)
-		return false, nil
+		return false, false, nil
 	}
 	log.Printf("[IsReady] %q is equal to expected %q", actualValue, value)
-	return true, nil
+	return true, false, nil
 }

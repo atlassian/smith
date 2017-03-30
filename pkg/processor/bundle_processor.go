@@ -15,7 +15,7 @@ import (
 )
 
 type ReadyChecker interface {
-	IsReady(*unstructured.Unstructured) (bool, error)
+	IsReady(*unstructured.Unstructured) (isReady, retriableError bool, e error)
 }
 
 type BackOffFactory func() backoff.BackOff
