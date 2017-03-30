@@ -21,7 +21,7 @@ Smith watches for new instances of a Bundle (and events to existing ones), picks
 
 Processing involves parsing the bundle, building a dependency graph (which is implicitly defined in the bundle),
 walking the graph, and creating/updating necessary resources. Each created/referenced resource gets
-an annotation/label pointing at the Bundle.
+an label pointing at the origin Bundle.
 
 ### Example bundle
 TPR definitions:
@@ -31,8 +31,6 @@ kind: ThirdPartyResource
 description: "Resource bundle definition"
 metadata:
   name: bundle.smith.atlassian.com
-  annotations:
-    smith.atlassian.com/resourceHasStatus: "true"
 versions:
   - name: v1
 ```
@@ -42,8 +40,6 @@ kind: ThirdPartyResource
 description: "Postgresql resource definition"
 metadata:
   name: postgresql-resource.smith-sql.atlassian.com # must use another group due to https://github.com/kubernetes/kubernetes/issues/23831
-  annotations:
-    smith.atlassian.com/resourceHasStatus: "true"
 versions:
   - name: v1
 ```
@@ -56,8 +52,7 @@ metadata:
   name: bundle1
 spec:
   resources:
-  - metadata:
-      name: db1
+  - name: db1
     spec:
       apiVersion: smith-sql.atlassian.com/v1
       kind: PostgresqlResource
@@ -65,8 +60,7 @@ spec:
         name: db1
       spec:
         disk: 100GiB
-  - metadata:
-      name: app1
+  - name: app1
     dependsOn:
     - db1
     spec:
@@ -80,41 +74,35 @@ spec:
           metadata:
             labels:
               app: app1
-              l1: l3
           spec:
             containers:
-            - name: smith
-              image: ubuntu
-              imagePullPolicy: Always
-              env:
-              - name: PG_DB_NAME
-                valueFrom:
-                - resource: db1
-                  output: db-name
-            terminationGracePeriodSeconds: 120
+            - name: app1
+              image: quay.io/some/app1
 ```
 
 ### Outputs
-Some resource types can have Outputs - values that are returned by a TPR upon creation.
-For example a TPR may define a DB to be created. The Outputs will be a Secret
-that contains the DB password, a plain string with a username, the DB URL and so on.
-A resource may consume another resources Output by referencing it in its bundle. Outputs field is part of
-[Status](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/api-conventions.md#spec-and-status).
+Some resource types can have Outputs:
+- Values placed into Status field of the object
+- New objects likes [Secrets](https://kubernetes.io/docs/user-guide/secrets/) and/or [ConfigMaps](https://kubernetes.io/docs/user-guide/configmap/)
+- [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) [objects](https://github.com/kubernetes-incubator/service-catalog/blob/master/docs/v1/api.md)
+
+Resources can reference outputs of other resources within the same bundle. [See what is supported](./docs/design/managing-resources.md). 
 
 ### Dependencies
-Resources may depend on each other explicitly via DependsOn object references or implicitly
-via references to other resources' outputs. Resources should be created in the reverse dependency order.
+Resources may depend on each other explicitly via `DependsOn` object references. Resources are created in the reverse dependency order.
 
 ### States
 READY is the state of a Resource when it can be considered created. E.g. if it is
-a DB then it means it was provisioned and set up as requested. State is part of Status.
+a DB then it means it was provisioned and set up as requested. State is often part of Status but it depends on kind of resource.
 
 ### Event-driven and stateless
 Smith does not block while waiting for a resource to reach the READY state. Instead, when walking the dependency
-graph, if a resource is not in the READY state (still being created) it stops processing the
-bundle. Full bundle re-processing is triggered by events about the watched resources. Smith is
-watching all supported resource types and inspects annotations/labels on events to find out which
-bundle should be re-processed because of the event. This should scale better than watching
+graph, if a resource is not in the READY state (still being created) it skips processing of that resource.
+Of course resources that don't have their dependencies READY are not processed either.
+Resources that can be created concurrently are created concurrently.
+Full bundle re-processing is triggered by events about the watched resources.
+Smith is watching all supported resource types and inspects labels on events to find out which
+bundle should be re-processed because of the event. This scales better than watching
 individual resources and much better than polling individual resources.
 
 ## Notes
@@ -124,7 +112,7 @@ Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes
 
 1. Graph of dependencies is defined explicitly.
 2. It uses polling and blocks while waiting for the resource to become READY.
-3. The goal of Smith is to manage instances of TPRs. App Controller cannot manage them yet.
+3. The goal of Smith is to manage instances of TPRs. App Controller cannot manage them as of this writing.
 
 It is not better or worse, just different set of design choices.
 
@@ -134,7 +122,6 @@ It is not better or worse, just different set of design choices.
 * Go 1.7+ is required because [context package](https://golang.org/doc/go1.7#context) is used and it was added to
 standard library in this version;
 * Working Docker installation - build process uses dockerized Go to isolate from the host system;
-* At the moment only in-cluster mode is supported;
 * List of project dependencies and their versions can be found in `glide.yaml` and `glide.lock` files.
 
 ### Building
@@ -146,6 +133,10 @@ make setup-ci
 * To run integration tests with [minikube](https://github.com/kubernetes/minikube) run
 ```bash
 make minikube-test
+```
+* To run against minikube run
+```bash
+make minikube-run
 ```
 * To build the docker image run
 ```bash
