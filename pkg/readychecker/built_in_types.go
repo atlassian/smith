@@ -10,10 +10,10 @@ var converter = unstructured_conversion.NewConverter(false)
 
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
-func isDeploymentReady(obj *unstructured.Unstructured) (bool, error) {
+func isDeploymentReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	var deployment extensions.Deployment
 	if err := converter.FromUnstructured(obj.Object, &deployment); err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	replicas := int32(1) // Default value if not specified
@@ -22,5 +22,5 @@ func isDeploymentReady(obj *unstructured.Unstructured) (bool, error) {
 	}
 
 	return deployment.Status.ObservedGeneration >= deployment.Generation &&
-		deployment.Status.UpdatedReplicas == replicas, nil
+		deployment.Status.UpdatedReplicas == replicas, false, nil
 }

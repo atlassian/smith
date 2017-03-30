@@ -177,7 +177,9 @@ func TestWorkflow(t *testing.T) {
 		Name(bundleName).
 		Do().
 		Into(&bundleRes))
-	require.Equal(t, smith.READY, bundleRes.Status.State, "%#v", bundleRes)
+	assertCondition(t, &bundleRes, smith.BundleReady, apiv1.ConditionTrue)
+	assertCondition(t, &bundleRes, smith.BundleInProgress, apiv1.ConditionFalse)
+	assertCondition(t, &bundleRes, smith.BundleError, apiv1.ConditionFalse)
 	require.Equal(t, bundle.Spec, bundleRes.Spec, "%#v", bundleRes)
 }
 

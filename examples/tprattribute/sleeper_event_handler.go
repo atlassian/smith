@@ -15,8 +15,8 @@ type SleeperEventHandler struct {
 
 func (h *SleeperEventHandler) OnAdd(obj interface{}) {
 	in := *obj.(*Sleeper)
-	log.Printf("[Sleeper] %s/%s was added. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Metadata.Namespace, in.Metadata.Name, SLEEPING, in.Spec.SleepFor)
-	in.Status.State = SLEEPING
+	log.Printf("[Sleeper] %s/%s was added. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Metadata.Namespace, in.Metadata.Name, Sleeping, in.Spec.SleepFor)
+	in.Status.State = Sleeping
 	err := h.client.Put().
 		Namespace(in.Metadata.Namespace).
 		Resource(SleeperResourcePath).
@@ -33,8 +33,8 @@ func (h *SleeperEventHandler) OnAdd(obj interface{}) {
 		case <-h.ctx.Done():
 			return
 		case <-time.After(time.Duration(in.Spec.SleepFor) * time.Second):
-			log.Printf("[Sleeper] %s Updating %s/%s Status to %q", in.Spec.WakeupMessage, in.Metadata.Namespace, in.Metadata.Name, AWAKE)
-			in.Status.State = AWAKE
+			log.Printf("[Sleeper] %s Updating %s/%s Status to %q", in.Spec.WakeupMessage, in.Metadata.Namespace, in.Metadata.Name, Awake)
+			in.Status.State = Awake
 			in.Status.Message = in.Spec.WakeupMessage
 			err := h.client.Put().
 				Namespace(in.Metadata.Namespace).

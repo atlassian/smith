@@ -7,16 +7,16 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 )
 
-type ResourceState string
+type BundleConditionType string
 
+// These are valid conditions of a Bundle.
 const (
-	NEW            ResourceState = ""
-	IN_PROGRESS    ResourceState = "InProgress"
-	READY          ResourceState = "Ready"
-	ERROR          ResourceState = "Error"
-	TERMINAL_ERROR ResourceState = "TerminalError"
+	BundleInProgress BundleConditionType = "InProgress"
+	BundleReady      BundleConditionType = "Ready"
+	BundleError      BundleConditionType = "Error"
 )
 
 const (
@@ -50,13 +50,13 @@ type BundleList struct {
 }
 
 // GetObjectKind is required to satisfy Object interface.
-func (tl *BundleList) GetObjectKind() schema.ObjectKind {
-	return &tl.TypeMeta
+func (bl *BundleList) GetObjectKind() schema.ObjectKind {
+	return &bl.TypeMeta
 }
 
 // GetListMeta is required to satisfy ListMetaAccessor interface.
-func (tl *BundleList) GetListMeta() metav1.List {
-	return &tl.Metadata
+func (bl *BundleList) GetListMeta() metav1.List {
+	return &bl.Metadata
 }
 
 // Bundle describes a resources bundle.
@@ -74,21 +74,81 @@ type Bundle struct {
 }
 
 // Required to satisfy Object interface
-func (t *Bundle) GetObjectKind() schema.ObjectKind {
-	return &t.TypeMeta
+func (b *Bundle) GetObjectKind() schema.ObjectKind {
+	return &b.TypeMeta
 }
 
 // Required to satisfy ObjectMetaAccessor interface
-func (t *Bundle) GetObjectMeta() metav1.Object {
-	return &t.Metadata
+func (b *Bundle) GetObjectMeta() metav1.Object {
+	return &b.Metadata
+}
+
+func (b *Bundle) GetCondition(conditionType BundleConditionType) (int, *BundleCondition) {
+	for i, condition := range b.Status.Conditions {
+		if condition.Type == conditionType {
+			return i, &condition
+		}
+	}
+	return -1, nil
+}
+
+// Updates existing Bundle condition or creates a new one. Sets LastTransitionTime to now if the
+// status has changed.
+// Returns true if Bundle condition has changed or has been added.
+func (b *Bundle) UpdateCondition(condition *BundleCondition) bool {
+	now := metav1.Now()
+	condition.LastTransitionTime = now
+	// Try to find this bundle condition.
+	conditionIndex, oldCondition := b.GetCondition(condition.Type)
+
+	if oldCondition == nil {
+		// We are adding new bundle condition.
+		b.Status.Conditions = append(b.Status.Conditions, *condition)
+		return true
+	}
+	// We are updating an existing condition, so we need to check if it has changed.
+	if condition.Status == oldCondition.Status {
+		condition.LastTransitionTime = oldCondition.LastTransitionTime
+	}
+
+	isEqual := condition.Status == oldCondition.Status &&
+		condition.Reason == oldCondition.Reason &&
+		condition.Message == oldCondition.Message &&
+		condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+
+	if !isEqual {
+		condition.LastUpdateTime = now
+	}
+
+	b.Status.Conditions[conditionIndex] = *condition
+	// Return true if one of the fields have changed.
+	return !isEqual
+
 }
 
 type BundleSpec struct {
 	Resources []Resource `json:"resources"`
 }
 
+// BundleCondition describes the state of a bundle at a certain point.
+type BundleCondition struct {
+	// Type of Bundle condition.
+	Type BundleConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status apiv1.ConditionStatus `json:"status"`
+	// The last time this condition was updated.
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message string `json:"message,omitempty"`
+}
+
 type BundleStatus struct {
-	State ResourceState `json:"state,omitempty"`
+	// Represents the latest available observations of a Bundle's current state.
+	Conditions []BundleCondition `json:"conditions,omitempty"`
 }
 
 // ResourceName is a reference to another Resource in the same bundle.
@@ -111,22 +171,22 @@ type Resource struct {
 type bundleListCopy BundleList
 type bundleCopy Bundle
 
-func (e *Bundle) UnmarshalJSON(data []byte) error {
+func (b *Bundle) UnmarshalJSON(data []byte) error {
 	tmp := bundleCopy{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
-	*e = Bundle(tmp)
+	*b = Bundle(tmp)
 	return nil
 }
 
-func (el *BundleList) UnmarshalJSON(data []byte) error {
+func (bl *BundleList) UnmarshalJSON(data []byte) error {
 	tmp := bundleListCopy{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
-	*el = BundleList(tmp)
+	*bl = BundleList(tmp)
 	return nil
 }
