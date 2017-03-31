@@ -9,6 +9,7 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,7 +62,7 @@ func (h *tprEventHandler) OnAdd(obj interface{}) {
 	log.Printf("[TPREH] Handling OnAdd for TPR %s", tpr.Name)
 	h.mx.Lock()
 	defer h.mx.Unlock()
-	h.watchVersions(tpr.Name, tpr.Versions...)
+	h.watchVersions(tpr, tpr.Versions...)
 
 	// TODO rebuild all bundles containing resources of this type
 }
@@ -98,8 +99,8 @@ func (h *tprEventHandler) OnUpdate(oldObj, newObj interface{}) {
 		}
 	}
 
-	h.unwatchVersions(newTpr.Name, removed...)
-	h.watchVersions(newTpr.Name, added...)
+	h.unwatchVersions(newTpr, removed...)
+	h.watchVersions(newTpr, added...)
 
 	// TODO rebuild all bundles containing resources of this type
 }
@@ -125,30 +126,35 @@ func (h *tprEventHandler) OnDelete(obj interface{}) {
 		versions = append(versions, state.version)
 	}
 
-	h.unwatchVersions(tpr.Name, versions...)
+	h.unwatchVersions(tpr, versions...)
 	// TODO rebuild all bundles containing resources of this type
 }
 
-func (h *tprEventHandler) watchVersions(tprName string, versions ...extensions.APIVersion) {
+func (h *tprEventHandler) watchVersions(tpr *extensions.ThirdPartyResource, versions ...extensions.APIVersion) {
 	if len(versions) == 0 {
 		return
 	}
-	tprWatch := h.watchers[tprName]
+	gk, err := resources.ExtractApiGroupAndKind(tpr)
+	if err != nil {
+		log.Printf("[TPREH] Failed parse TPR name %q: %v", tpr.Name, err)
+		return
+	}
+	tprWatch := h.watchers[tpr.Name]
 	if tprWatch == nil {
 		tprWatch = make(map[string]watchState)
-		h.watchers[tprName] = tprWatch
+		h.watchers[tpr.Name] = tprWatch
 	}
-	path, gk := resources.SplitTprName(tprName)
 	for _, version := range versions {
-		log.Printf("[TPREH] Configuring watch for TPR %s version %s", tprName, version.Name)
+		log.Printf("[TPREH] Configuring watch for TPR %s version %s", tpr.Name, version.Name)
 		gvk := gk.WithVersion(version.Name)
 		dc, err := h.clients.ClientForGroupVersionKind(gvk)
 		if err != nil {
-			log.Printf("[TPREH] Failed to instantiate client for TPR %s of version %s: %v", tprName, version.Name, err)
+			log.Printf("[TPREH] Failed to instantiate client for TPR %s of version %s: %v", tpr.Name, version.Name, err)
 			continue
 		}
+		plural, _ := meta.KindToResource(gvk)
 		res := dc.Resource(&metav1.APIResource{
-			Name: path,
+			Name: plural.Resource,
 			Kind: gk.Kind,
 		}, metav1.NamespaceAll)
 		tprInf := cache.NewSharedIndexInformer(&cache.ListWatch{
@@ -172,20 +178,20 @@ func (h *tprEventHandler) watchVersions(tprName string, versions ...extensions.A
 	}
 }
 
-func (h *tprEventHandler) unwatchVersions(tprName string, versions ...extensions.APIVersion) {
-	tprWatch := h.watchers[tprName]
+func (h *tprEventHandler) unwatchVersions(tpr *extensions.ThirdPartyResource, versions ...extensions.APIVersion) {
+	tprWatch := h.watchers[tpr.Name]
 	if tprWatch == nil {
 		// Nothing to do. This can happen if there was an error adding a watch
 		return
 	}
 	for _, version := range versions {
 		if ws, ok := tprWatch[version.Name]; ok {
-			log.Printf("[TPREH] Removing watch for TPR %s version %s", tprName, version.Name)
+			log.Printf("[TPREH] Removing watch for TPR %s version %s", tpr.Name, version.Name)
 			delete(tprWatch, version.Name)
 			ws.cancel()
 		}
 	}
 	if len(tprWatch) == 0 {
-		delete(h.watchers, tprName)
+		delete(h.watchers, tpr.Name)
 	}
 }
