@@ -1,9 +1,8 @@
 package app
 
 import (
-	"strings"
-
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/resources"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -15,9 +14,7 @@ type tprStore struct {
 }
 
 func (ts *tprStore) Get(resource schema.GroupKind) (*extensions.ThirdPartyResource, error) {
-	// TODO do it properly - handle BlockLetters in the middle (turn them into dashes)
-	name := strings.ToLower(resource.Kind) + "." + resource.Group
-	tpr, exists, err := ts.store.Get(tprGVK, metav1.NamespaceNone, name)
+	tpr, exists, err := ts.store.Get(tprGVK, metav1.NamespaceNone, resources.GroupKindToTprName(resource))
 	if err != nil || !exists {
 		return nil, err
 	}

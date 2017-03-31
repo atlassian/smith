@@ -8,12 +8,12 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/processor/graph"
-	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/cenk/backoff"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
@@ -181,8 +181,10 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 		return nil, false, err
 	}
 
+	plural, _ := meta.KindToResource(gvk)
+
 	resClient := client.Resource(&metav1.APIResource{
-		Name:       resources.ResourceKindToPath(kind),
+		Name:       plural.Resource,
 		Namespaced: true,
 		Kind:       kind,
 	}, wrk.namespace)

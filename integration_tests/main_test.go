@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -84,8 +85,9 @@ func TestWorkflow(t *testing.T) {
 				if !assert.NoError(t, err) {
 					continue
 				}
+				plural, _ := meta.KindToResource(resource.Spec.GroupVersionKind())
 				assert.NoError(t, client.Resource(&metav1.APIResource{
-					Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
+					Name:       plural.Resource,
 					Namespaced: true,
 					Kind:       resource.Spec.GetKind(),
 				}, bundleNamespace).Delete(resource.Spec.GetName(), &metav1.DeleteOptions{}))
@@ -127,8 +129,9 @@ func TestWorkflow(t *testing.T) {
 		func() {
 			c, err := clients.ClientForGroupVersionKind(resource.Spec.GroupVersionKind())
 			require.NoError(t, err)
+			plural, _ := meta.KindToResource(resource.Spec.GroupVersionKind())
 			w, err := c.Resource(&metav1.APIResource{
-				Name:       resources.ResourceKindToPath(resource.Spec.GetKind()),
+				Name:       plural.Resource,
 				Namespaced: true,
 				Kind:       resource.Spec.GetKind(),
 			}, bundleNamespace).Watch(metav1.ListOptions{})
