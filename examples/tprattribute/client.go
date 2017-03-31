@@ -5,7 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/client-go/pkg/api"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -20,7 +20,7 @@ func GetSleeperScheme() *runtime.Scheme {
 			&Sleeper{},
 			&SleeperList{},
 		)
-		scheme.AddUnversionedTypes(api.Unversioned, &metav1.Status{})
+		scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
 		metav1.AddToGroupVersion(scheme, groupVersion)
 		return nil
 	})
