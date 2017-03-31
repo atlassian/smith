@@ -15,18 +15,19 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	settings "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
 const (
-	ResyncPeriod = 1 * time.Minute
+	ResyncPeriod     = 1 * time.Minute
+	PodPresetEnabled = true
 )
 
 type App struct {
@@ -58,15 +59,22 @@ func (a *App) Run(ctx context.Context) error {
 	serviceInf := informerFactory.Core().V1().Services().Informer()
 	configMapInf := informerFactory.Core().V1().ConfigMaps().Informer()
 	secretInf := informerFactory.Core().V1().Secrets().Informer()
+	var podPresetInf cache.SharedIndexInformer
+	if PodPresetEnabled {
+		podPresetInf = informerFactory.Settings().V1alpha1().PodPresets().Informer()
+	}
 	bundleInf := bundleInformer(bundleClient)
 
 	store := NewStore(bundleScheme)
 	store.AddInformer(tprGVK, tprInf)
-	store.AddInformer(schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}, deploymentInf)
-	store.AddInformer(schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}, ingressInf)
-	store.AddInformer(api.Unversioned.WithKind("Service"), serviceInf)
-	store.AddInformer(api.Unversioned.WithKind("ConfigMap"), configMapInf)
-	store.AddInformer(api.Unversioned.WithKind("Secret"), secretInf)
+	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Deployment"), deploymentInf)
+	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Ingress"), ingressInf)
+	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("Service"), serviceInf)
+	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("ConfigMap"), configMapInf)
+	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("Secret"), secretInf)
+	if PodPresetEnabled {
+		store.AddInformer(settings.SchemeGroupVersion.WithKind("PodPreset"), podPresetInf)
+	}
 	store.AddInformer(bundleGVK, bundleInf)
 
 	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
@@ -133,6 +141,9 @@ func (a *App) Run(ctx context.Context) error {
 	serviceInf.AddEventHandler(reh)
 	configMapInf.AddEventHandler(reh)
 	secretInf.AddEventHandler(reh)
+	if PodPresetEnabled {
+		podPresetInf.AddEventHandler(reh)
+	}
 
 	// 7. Watch Third Party Resources to add watches for supported ones
 

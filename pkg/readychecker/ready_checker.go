@@ -23,6 +23,7 @@ var knownTypes = map[schema.GroupKind]IsObjectReady{
 	{Group: "", Kind: "ConfigMap"}:            alwaysReady,
 	{Group: "", Kind: "Secret"}:               alwaysReady,
 	{Group: "", Kind: "Service"}:              alwaysReady,
+	{Group: "settings", Kind: "PodPreset"}:    alwaysReady,
 	{Group: "extensions", Kind: "Ingress"}:    alwaysReady,
 	{Group: "extensions", Kind: "Deployment"}: isDeploymentReady,
 }
