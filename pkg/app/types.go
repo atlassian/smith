@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+
 	"github.com/atlassian/smith"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -16,5 +18,5 @@ var bundleGVK = schema.GroupVersionKind{
 }
 
 type Processor interface {
-	Rebuild(*smith.Bundle)
+	Rebuild(context.Context, *smith.Bundle) error
 }

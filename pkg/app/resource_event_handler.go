@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"log"
 
 	"github.com/atlassian/smith"
@@ -13,6 +14,7 @@ type Name2Bundle func(namespace, bundleName string) (*smith.Bundle, error)
 
 // resourceEventHandler handles events for objects with various kinds.
 type resourceEventHandler struct {
+	ctx         context.Context
 	processor   Processor
 	name2bundle Name2Bundle
 }
@@ -50,7 +52,9 @@ func (h *resourceEventHandler) rebuildByName(namespace, bundleName string, obj i
 	if bundle != nil {
 		log.Printf("[REH] Rebuilding %s/%s bundle because of resource %s add/update/delete",
 			namespace, bundleName, obj.(metav1.Object).GetName())
-		h.processor.Rebuild(bundle)
+		if err = h.processor.Rebuild(h.ctx, bundle); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+			log.Printf("[REH] Error rebuilding bundle %s/%s: %v", namespace, bundleName, err)
+		}
 		//} else {
 		// TODO bundle not found - handle deletion?
 		// There may be a race between TPR instance informer and bundle informer in case of
