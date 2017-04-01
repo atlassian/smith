@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/atlassian/smith"
@@ -95,9 +96,12 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 3. Processor
 
-	bp := processor.New(ctx, bundleClient, clients, rc, bundleScheme, store)
-	defer bp.Join() // await termination
-	defer cancel()  // cancel ctx to signal done to processor (and everything else)
+	bp := processor.New(bundleClient, clients, rc, bundleScheme, store)
+	var wg sync.WaitGroup
+	defer wg.Wait() // await termination
+	wg.Add(1)
+	go bp.Run(ctx, &wg)
+	defer cancel() // cancel ctx to signal done to processor (and everything else)
 
 	// 4. Ensure ThirdPartyResource TEMPLATE exists
 	err = retryUntilSuccessOrDone(ctx, func() error {
@@ -114,6 +118,7 @@ func (a *App) Run(ctx context.Context) error {
 	// 5. Watch Bundles
 
 	bundleInf.AddEventHandler(&bundleEventHandler{
+		ctx:       ctx,
 		processor: bp,
 		scheme:    bundleScheme,
 	})
@@ -130,6 +135,7 @@ func (a *App) Run(ctx context.Context) error {
 		store: store,
 	}
 	reh := &resourceEventHandler{
+		ctx:         ctx,
 		processor:   bp,
 		name2bundle: sl.Get,
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/atlassian/smith"
@@ -19,36 +21,110 @@ import (
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/rest"
 )
 
 var (
 	converter = unstructured_conversion.NewConverter(false)
 )
 
-type worker struct {
-	bp *BundleProcessor
-	bo backoff.BackOff
-	workerRef
-
-	// The fields below are protected by tp.lock
-
-	// It is ok to mutate the bundle itself, but pointer should only be updated while locked.
-	bundle *smith.Bundle
+type workerConfig struct {
+	bundleClient *rest.RESTClient
+	clients      dynamic.ClientPool
+	rc           ReadyChecker
+	scheme       *runtime.Scheme
+	store        smith.ByNameStore
 }
 
-func (wrk *worker) rebuildLoop() {
-	defer wrk.bp.wg.Done()
-	defer wrk.cleanupState()
+type worker struct {
+	bundleRef
+	workerConfig
+	bo             backoff.BackOff
+	workRequests   chan<- workRequest
+	notifyRequests chan<- notifyRequest
 
-	for {
-		bundle := wrk.checkRebuild()
-		if bundle == nil {
-			return
+	// --- Items below are only modified from main processor goroutine ---
+	pendingBundle *smith.Bundle   // next work item storage
+	notify        chan<- struct{} // channel to close to notify sleeping worker about work available
+	// ---
+
+	needsRebuild int32 // must be accessed via atomics only
+}
+
+func (wrk *worker) rebuildLoop(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+	var timer *time.Timer
+	defer func() {
+		if timer != nil {
+			timer.Stop()
 		}
-		isReady, retriable, err := wrk.rebuild(bundle)
-		if !wrk.handleRebuildResult(bundle, isReady, retriable, err) {
+	}()
+	work := make(chan *smith.Bundle)
+	workReq := workRequest{
+		bundleRef: wrk.bundleRef,
+		work:      work,
+	}
+	var notifyChan <-chan struct{}
+	var sleepChan <-chan time.Time
+	requestWork := true
+	for {
+		if requestWork {
+			select {
+			case <-ctx.Done():
+				return
+			case wrk.workRequests <- workReq:
+				// New work has been requested
+			}
+		} else {
+			requestWork = true
+		}
+		select {
+		case <-ctx.Done():
 			return
+		case <-notifyChan:
+			// Woke up because work is available
+			sleepChan = nil
+			notifyChan = nil
+			timer.Stop()
+			timer = nil
+		case <-sleepChan:
+			// Woke up after backoff sleep
+			sleepChan = nil
+			notifyChan = nil
+			timer = nil
+		case bundle, ok := <-work:
+			if !ok {
+				// No work available, exit
+				return
+			}
+			// Work available
+			isReady, retriable, err := wrk.rebuild(bundle)
+			if wrk.handleRebuildResult(bundle, isReady, retriable, err) {
+				// There was a retriable error
+				next := wrk.bo.NextBackOff()
+				if next == backoff.Stop {
+					wrk.bo.Reset() // reset the backoff to restart it
+					next = wrk.bo.NextBackOff()
+				}
+				timer = time.NewTimer(next)
+				sleepChan = timer.C
+				nc := make(chan struct{})
+				notifyChan = nc
+				nrq := notifyRequest{
+					bundleRef: wrk.bundleRef,
+					bundle:    bundle,
+					notify:    nc,
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case wrk.notifyRequests <- nrq:
+					// Asked processor to notify us if/when new work is available
+				}
+				requestWork = false
+			}
 		}
 	}
 }
@@ -116,7 +192,7 @@ nextVertex:
 
 func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) (readyResource *unstructured.Unstructured, retriableError bool, e error) {
 	// 0. Clone before mutating
-	resClone, err := wrk.bp.scheme.DeepCopy(res)
+	resClone, err := wrk.scheme.DeepCopy(res)
 	if err != nil {
 		return nil, false, err
 	}
@@ -134,7 +210,7 @@ func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource, read
 	}
 
 	// 3. Check if resource is ready
-	ready, retriable, err := wrk.bp.rc.IsReady(resUpdated)
+	ready, retriable, err := wrk.rc.IsReady(resUpdated)
 	if err != nil || !ready {
 		return nil, retriable, err
 	}
@@ -176,7 +252,7 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 	}
 	kind := res.Spec.GetKind()
 	gvk := gv.WithKind(kind)
-	client, err := wrk.bp.clients.ClientForGroupVersionKind(gvk)
+	client, err := wrk.clients.ClientForGroupVersionKind(gvk)
 	if err != nil {
 		return nil, false, err
 	}
@@ -190,7 +266,7 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 	}, wrk.namespace)
 
 	// 2. Try to get the resource. We do read first to avoid generating unnecessary events.
-	obj, exists, err := wrk.bp.store.Get(gvk, wrk.namespace, res.Spec.GetName())
+	obj, exists, err := wrk.store.Get(gvk, wrk.namespace, res.Spec.GetName())
 	if err != nil {
 		// Unexpected error
 		return nil, true, err
@@ -226,7 +302,7 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 	}
 
 	// 4. Compare spec and existing resource
-	updated, err := updateResource(wrk.bp.scheme, res, response)
+	updated, err := updateResource(wrk.scheme, res, response)
 	if err != nil {
 		// Unexpected error
 		return nil, false, err
@@ -253,7 +329,7 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 
 func (wrk *worker) setBundleStatus(bundle *smith.Bundle) error {
 	log.Printf("[WORKER] setting bundle %s/%s status to %v", wrk.namespace, wrk.bundleName, bundle.Status)
-	err := wrk.bp.bundleClient.Put().
+	err := wrk.bundleClient.Put().
 		Namespace(wrk.namespace).
 		Resource(smith.BundleResourcePath).
 		Name(wrk.bundleName).
@@ -274,31 +350,7 @@ func (wrk *worker) setBundleStatus(bundle *smith.Bundle) error {
 	return nil
 }
 
-// checkRebuild returns a pointer to the bundle if a rebuild is required.
-// It returns nil if there is no new bundle and rebuild is not required.
-func (wrk *worker) checkRebuild() *smith.Bundle {
-	wrk.bp.lock.Lock()
-	defer wrk.bp.lock.Unlock()
-	bundle := wrk.bundle
-	if bundle != nil {
-		wrk.bundle = nil
-		return bundle
-	}
-	// delete atomically with the check to avoid race with Processor's rebuildInternal()
-	delete(wrk.bp.workers, wrk.workerRef)
-	return nil
-}
-
-func (wrk *worker) cleanupState() {
-	wrk.bp.lock.Lock()
-	defer wrk.bp.lock.Unlock()
-	if wrk.bp.workers[wrk.workerRef] == wrk {
-		// Only cleanup if there is a stale reference to the current worker.
-		delete(wrk.bp.workers, wrk.workerRef)
-	}
-}
-
-func (wrk *worker) handleRebuildResult(bundle *smith.Bundle, isReady, retriableError bool, err error) (shouldContinue bool) {
+func (wrk *worker) handleRebuildResult(bundle *smith.Bundle, isReady, retriableError bool, err error) (shouldBackoff bool) {
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		return false
 	}
@@ -370,42 +422,26 @@ func (wrk *worker) handleRebuildResult(bundle *smith.Bundle, isReady, retriableE
 	}
 	if err == nil {
 		wrk.bo.Reset() // reset the backoff on successful rebuild
-		return true
+		return false
 	}
 
 	log.Printf("[WORKER] Failed to rebuild the bundle %s/%s: %v", wrk.namespace, wrk.bundleName, err)
-	if !retriableError {
-		// If error is not retriable then we just exit without re-populating wrk.bundle so that the external
-		// loop terminates naturally unless an external update has set wrk.bundle.
-		return true
-	}
-	next := wrk.bo.NextBackOff()
-	if next == backoff.Stop {
-		wrk.bo.Reset() // reset the backoff to restart it
-		next = wrk.bo.NextBackOff()
-	}
-	func() {
-		wrk.bp.lock.Lock()
-		defer wrk.bp.lock.Unlock()
-		if wrk.bundle == nil { // Avoid overwriting bundle provided by external process
-			wrk.bundle = bundle // Need to re-initialize wrk.bundle so that external loop continues to run
-		}
-	}()
-	after := time.NewTimer(next)
-	defer after.Stop()
-	select {
-	case <-wrk.bp.ctx.Done():
-		return false
-	case <-after.C:
-	}
-	return true
+	// If error is not retriable then we just tell the external loop to re-iterate without backoff
+	// and terminates naturally unless new work is available.
+	return retriableError
+}
+
+func (wrk *worker) setNeedsRebuild() {
+	atomic.StoreInt32(&wrk.needsRebuild, 1)
+}
+
+func (wrk *worker) resetNeedsRebuild() {
+	atomic.StoreInt32(&wrk.needsRebuild, 0)
 }
 
 // checkNeedsRebuild can be called inside of the rebuild loop to check if the bundle needs to be rebuilt from the start.
 func (wrk *worker) checkNeedsRebuild() bool {
-	wrk.bp.lock.RLock()
-	defer wrk.bp.lock.RUnlock()
-	return wrk.bundle != nil
+	return atomic.LoadInt32(&wrk.needsRebuild) != 0
 }
 
 // updateResource checks if actual resource satisfies the desired spec.

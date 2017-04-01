@@ -8,77 +8,104 @@ import (
 	"github.com/atlassian/smith"
 
 	"github.com/cenk/backoff"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
-type ReadyChecker interface {
-	IsReady(*unstructured.Unstructured) (isReady, retriableError bool, e error)
-}
-
-type BackOffFactory func() backoff.BackOff
-
-type workerRef struct {
-	namespace  string
-	bundleName string
-}
-
 type BundleProcessor struct {
-	ctx          context.Context
+	workerConfig
 	backoff      BackOffFactory
-	bundleClient *rest.RESTClient
-	clients      dynamic.ClientPool
-	rc           ReadyChecker
-	scheme       *runtime.Scheme
-	store        smith.ByNameStore
-	wg           sync.WaitGroup // tracks number of Goroutines running rebuildLoop()
-
-	lock    sync.RWMutex // protects fields below
-	workers map[workerRef]*worker
+	incomingWork chan *smith.Bundle
 }
 
 // New creates a new bundle processor.
 // Instances are safe for concurrent use.
-func New(ctx context.Context, bundleClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker, scheme *runtime.Scheme, store smith.ByNameStore) *BundleProcessor {
+func New(bundleClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker, scheme *runtime.Scheme, store smith.ByNameStore) *BundleProcessor {
 	return &BundleProcessor{
-		ctx:          ctx,
+		workerConfig: workerConfig{
+			bundleClient: bundleClient,
+			clients:      clients,
+			rc:           rc,
+			scheme:       scheme,
+			store:        store,
+		},
 		backoff:      exponentialBackOff,
-		bundleClient: bundleClient,
-		clients:      clients,
-		rc:           rc,
-		scheme:       scheme,
-		store:        store,
-		workers:      make(map[workerRef]*worker),
+		incomingWork: make(chan *smith.Bundle),
 	}
 }
 
-func (bp *BundleProcessor) Join() {
-	bp.wg.Wait()
+func (bp *BundleProcessor) Run(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+	workers := make(map[bundleRef]*worker)
+	workRequests := make(chan workRequest)
+	notifyRequests := make(chan notifyRequest)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case bundle := <-bp.incomingWork:
+			ref := bundleRef{namespace: bundle.Metadata.Namespace, bundleName: bundle.Metadata.Name}
+			wrk := workers[ref]
+			if wrk == nil {
+				wrk = &worker{
+					bundleRef:      ref,
+					workerConfig:   bp.workerConfig,
+					bo:             bp.backoff(),
+					workRequests:   workRequests,
+					notifyRequests: notifyRequests,
+					pendingBundle:  bundle,
+				}
+				workers[ref] = wrk
+				wg.Add(1)
+				go wrk.rebuildLoop(ctx, wg)
+			} else {
+				wrk.setNeedsRebuild()
+				wrk.pendingBundle = bundle
+				if wrk.notify != nil {
+					close(wrk.notify)
+					wrk.notify = nil
+				}
+			}
+		case req := <-workRequests:
+			wrk := workers[req.bundleRef]
+			if wrk.pendingBundle == nil {
+				// no work is scheduled for worker
+				close(req.work)
+				delete(workers, req.bundleRef)
+				break
+			}
+			wrk.resetNeedsRebuild()
+			select {
+			case <-ctx.Done():
+				return
+			case req.work <- wrk.pendingBundle:
+				wrk.pendingBundle = nil
+				wrk.notify = nil
+			}
+		case nrq := <-notifyRequests:
+			wrk := workers[nrq.bundleRef]
+			if wrk.pendingBundle == nil {
+				// No pending work, let it sleep
+				wrk.pendingBundle = nrq.bundle
+				wrk.notify = nrq.notify
+			} else {
+				// Have pending work already, notify immediately
+				close(nrq.notify)
+			}
+		}
+	}
 }
 
 // Rebuild schedules a rebuild of the bundle.
 // Note that the bundle object and/or resources in the bundle may be mutated asynchronously so the
 // calling code should do a proper deep copy if the object is still needed.
-func (bp *BundleProcessor) Rebuild(tpl *smith.Bundle) {
-	//log.Printf("Rebuilding the bundle %#v", tpl)
-	ref := workerRef{namespace: tpl.Metadata.Namespace, bundleName: tpl.Metadata.Name}
-	bp.lock.Lock()
-	defer bp.lock.Unlock()
-	wrk := bp.workers[ref]
-	if wrk == nil {
-		wrk = &worker{
-			bp:        bp,
-			bundle:    tpl,
-			bo:        bp.backoff(),
-			workerRef: ref,
-		}
-		bp.workers[ref] = wrk
-		bp.wg.Add(1)
-		go wrk.rebuildLoop()
-	} else {
-		wrk.bundle = tpl
+func (bp *BundleProcessor) Rebuild(ctx context.Context, bundle *smith.Bundle) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case bp.incomingWork <- bundle:
+		return nil
 	}
 }
 

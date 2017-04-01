@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"log"
 
 	"github.com/atlassian/smith"
@@ -9,6 +10,7 @@ import (
 )
 
 type bundleEventHandler struct {
+	ctx       context.Context
 	processor Processor
 	scheme    *runtime.Scheme
 }
@@ -39,5 +41,7 @@ func (h *bundleEventHandler) handle(obj interface{}) {
 
 	out := o.(*smith.Bundle)
 	log.Printf("[BEH] Rebuilding %s/%s bundle because it was added/updated", out.Metadata.Namespace, out.Metadata.Name)
-	h.processor.Rebuild(out)
+	if err = h.processor.Rebuild(h.ctx, out); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+		log.Printf("[BEH] Error rebuilding bundle %s/%s: %v", out.Metadata.Namespace, out.Metadata.Name, err)
+	}
 }
