@@ -19,7 +19,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
@@ -34,7 +33,7 @@ type workerConfig struct {
 	bundleClient *rest.RESTClient
 	clients      dynamic.ClientPool
 	rc           ReadyChecker
-	scheme       *runtime.Scheme
+	deepCopy     smith.DeepCopy
 	store        smith.ByNameStore
 }
 
@@ -192,7 +191,7 @@ nextVertex:
 
 func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) (readyResource *unstructured.Unstructured, retriableError bool, e error) {
 	// 0. Clone before mutating
-	resClone, err := wrk.scheme.DeepCopy(res)
+	resClone, err := wrk.deepCopy(res)
 	if err != nil {
 		return nil, false, err
 	}
@@ -302,7 +301,7 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 	}
 
 	// 4. Compare spec and existing resource
-	updated, err := updateResource(wrk.scheme, res, response)
+	updated, err := updateResource(wrk.deepCopy, res, response)
 	if err != nil {
 		// Unexpected error
 		return nil, false, err
@@ -446,19 +445,19 @@ func (wrk *worker) checkNeedsRebuild() bool {
 
 // updateResource checks if actual resource satisfies the desired spec.
 // Returns non-nil object with updates applied or nil if actual matches desired.
-func updateResource(scheme *runtime.Scheme, desired *smith.Resource, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func updateResource(deepCopy smith.DeepCopy, desired *smith.Resource, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	spec := desired.Spec
 
 	// TODO Handle deleted or to be deleted object. We need to wait for the object to be gone.
 
-	upd, err := scheme.Copy(actual)
+	upd, err := deepCopy(actual)
 	if err != nil {
 		return nil, err
 	}
 	updated := upd.(*unstructured.Unstructured)
 	delete(updated.Object, "status")
 
-	actClone, err := scheme.Copy(updated)
+	actClone, err := deepCopy(updated)
 	if err != nil {
 		return nil, err
 	}
@@ -499,7 +498,7 @@ func updateResource(scheme *runtime.Scheme, desired *smith.Resource, actual *uns
 		case "kind", "apiVersion", "metadata":
 			continue
 		}
-		valueClone, err := scheme.DeepCopy(value)
+		valueClone, err := deepCopy(value)
 		if err != nil {
 			return nil, err
 		}

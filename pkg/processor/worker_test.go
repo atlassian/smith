@@ -27,7 +27,7 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 			desired := input2()
 			t.Run(fmt.Sprintf("%s actual, %s desired", kind1, kind2), func(t *testing.T) {
 				t.Parallel()
-				updated, err := updateResource(resources.GetBundleScheme(), &smith.Resource{Spec: desired}, &actual)
+				updated, err := updateResource(resources.GetBundleScheme().DeepCopy, &smith.Resource{Spec: desired}, &actual)
 				require.NoError(t, err)
 				assert.Nil(t, updated)
 			})

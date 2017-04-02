@@ -5,14 +5,12 @@ import (
 	"log"
 
 	"github.com/atlassian/smith"
-
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type bundleEventHandler struct {
 	ctx       context.Context
 	processor Processor
-	scheme    *runtime.Scheme
+	deepCopy  smith.DeepCopy
 }
 
 func (h *bundleEventHandler) OnAdd(obj interface{}) {
@@ -31,11 +29,9 @@ func (h *bundleEventHandler) OnDelete(obj interface{}) {
 }
 
 func (h *bundleEventHandler) handle(obj interface{}) {
-	in := obj.(*smith.Bundle)
-
-	o, err := h.scheme.DeepCopy(in)
+	o, err := h.deepCopy(obj)
 	if err != nil {
-		log.Printf("[BEH] Failed to do deep copy of %#v: %v", in, err)
+		log.Printf("[BEH] Failed to do deep copy of %#v: %v", obj, err)
 		return
 	}
 

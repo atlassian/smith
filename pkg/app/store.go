@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/atlassian/smith"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -15,15 +17,15 @@ const (
 )
 
 type Store struct {
-	scheme *runtime.Scheme
-	lock   sync.RWMutex
-	stores map[schema.GroupVersionKind]cache.SharedIndexInformer
+	deepCopy smith.DeepCopy
+	lock     sync.RWMutex
+	stores   map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
-func NewStore(scheme *runtime.Scheme) *Store {
+func NewStore(deepCopy smith.DeepCopy) *Store {
 	return &Store{
-		scheme: scheme,
-		stores: make(map[schema.GroupVersionKind]cache.SharedIndexInformer),
+		deepCopy: deepCopy,
+		stores:   make(map[schema.GroupVersionKind]cache.SharedIndexInformer),
 	}
 }
 
@@ -78,7 +80,7 @@ func (s *Store) Get(gvk schema.GroupVersionKind, namespace, name string) (obj ru
 	case 0:
 		return nil, false, nil
 	case 1:
-		obj, err := s.scheme.DeepCopy(objs[0])
+		obj, err := s.deepCopy(objs[0])
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to do deep copy of %#v: %v", objs[0], err)
 		}
