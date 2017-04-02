@@ -36,6 +36,8 @@ const (
 	TprFieldValueAnnotation = SmithDomain + "/TprReadyWhenFieldValue"
 )
 
+type DeepCopy func(src interface{}) (interface{}, error)
+
 type ByNameStore interface {
 	Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error)
 }

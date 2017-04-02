@@ -66,7 +66,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	bundleInf := bundleInformer(bundleClient)
 
-	store := NewStore(bundleScheme)
+	store := NewStore(bundleScheme.DeepCopy)
 	store.AddInformer(tprGVK, tprInf)
 	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Deployment"), deploymentInf)
 	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Ingress"), ingressInf)
@@ -96,7 +96,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 3. Processor
 
-	bp := processor.New(bundleClient, clients, rc, bundleScheme, store)
+	bp := processor.New(bundleClient, clients, rc, bundleScheme.DeepCopy, store)
 	var wg sync.WaitGroup
 	defer wg.Wait() // await termination
 	wg.Add(1)
@@ -120,7 +120,7 @@ func (a *App) Run(ctx context.Context) error {
 	bundleInf.AddEventHandler(&bundleEventHandler{
 		ctx:       ctx,
 		processor: bp,
-		scheme:    bundleScheme,
+		deepCopy:  bundleScheme.DeepCopy,
 	})
 
 	go bundleInf.Run(ctx.Done())

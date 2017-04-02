@@ -8,7 +8,6 @@ import (
 	"github.com/atlassian/smith"
 
 	"github.com/cenk/backoff"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -21,13 +20,13 @@ type BundleProcessor struct {
 
 // New creates a new bundle processor.
 // Instances are safe for concurrent use.
-func New(bundleClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker, scheme *runtime.Scheme, store smith.ByNameStore) *BundleProcessor {
+func New(bundleClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChecker, deepCopy smith.DeepCopy, store smith.ByNameStore) *BundleProcessor {
 	return &BundleProcessor{
 		workerConfig: workerConfig{
 			bundleClient: bundleClient,
 			clients:      clients,
 			rc:           rc,
-			scheme:       scheme,
+			deepCopy:     deepCopy,
 			store:        store,
 		},
 		backoff:      exponentialBackOff,
