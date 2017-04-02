@@ -31,6 +31,30 @@ func TestSpecProcessor(t *testing.T) {
 			"bool":    "$((res1/a/bool))",
 			"float64": "$((res1/a/float64))",
 			"object":  "$((res1/a/object))",
+
+			"slice1": []string{
+				"$((res1/a/int))",
+				"23",
+				"$((res1/a/object))",
+			},
+			"slice2": []interface{}{
+				map[string]interface{}{
+					"x": "$((res1/a/int))",
+				},
+				"$((res1/a/int))",
+				23,
+				"$((res1/a/object))",
+			},
+			"slice3": [][]interface{}{
+				{"$((res1/a/int))"},
+				{23},
+				{"$((res1/a/object))"},
+			},
+			"slice4": []interface{}{
+				[]interface{}{"$((res1/a/int))"},
+				[]interface{}{23},
+				[]interface{}{"$((res1/a/object))"},
+			},
 		},
 	}
 	expected := map[string]interface{}{
@@ -46,6 +70,42 @@ func TestSpecProcessor(t *testing.T) {
 			"object": map[string]interface{}{
 				"a": 1,
 				"b": "str",
+			},
+
+			"slice1": []interface{}{
+				42,
+				"23",
+				map[string]interface{}{
+					"a": 1,
+					"b": "str",
+				},
+			},
+			"slice2": []interface{}{
+				map[string]interface{}{
+					"x": 42,
+				},
+				42,
+				23,
+				map[string]interface{}{
+					"a": 1,
+					"b": "str",
+				},
+			},
+			"slice3": []interface{}{
+				[]interface{}{42},
+				[]interface{}{23},
+				[]interface{}{map[string]interface{}{
+					"a": 1,
+					"b": "str",
+				}},
+			},
+			"slice4": []interface{}{
+				[]interface{}{42},
+				[]interface{}{23},
+				[]interface{}{map[string]interface{}{
+					"a": 1,
+					"b": "str",
+				}},
 			},
 		},
 	}
@@ -125,6 +185,12 @@ func TestSpecProcessorErrors(t *testing.T) {
 				"invalid": "a$(resX/a/string)b",
 			},
 			err: `invalid reference at "invalid": references can only point at direct dependencies: resX/a/string`,
+		},
+		{
+			obj: map[string]interface{}{
+				"invalid": []interface{}{"a$(resX/a/string)b"},
+			},
+			err: `invalid reference at "invalid/[0]": references can only point at direct dependencies: resX/a/string`,
 		},
 	}
 	for i, input := range inputs {

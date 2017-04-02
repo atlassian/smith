@@ -3,6 +3,7 @@ package processor
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -62,7 +63,25 @@ func (sp *SpecProcessor) ProcessValue(value interface{}, path ...string) (interf
 		if err := sp.ProcessObject(v, path...); err != nil {
 			return nil, err
 		}
-		//TODO handle slices and slices of slices and ... inception. err, reflection
+	default:
+		// handle slices and slices of slices and ... inception. err, reflection
+		rv := reflect.ValueOf(value)
+		if rv.Kind() != reflect.Slice {
+			break
+		}
+		length := rv.Len()
+		// this may change underlying slice type and this is on purpose. E.g. it may be a slice of string
+		// references, some elements of which need to be turned into structs. That means resulting
+		// slice may have mixed types.
+		result := make([]interface{}, length)
+		for i := 0; i < length; i++ {
+			res, err := sp.ProcessValue(rv.Index(i).Interface(), append(path, fmt.Sprintf("[%d]", i))...)
+			if err != nil {
+				return nil, err
+			}
+			result[i] = res
+		}
+		value = result
 	}
 	return value, nil
 }
