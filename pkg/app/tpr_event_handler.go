@@ -184,10 +184,16 @@ func (h *tprEventHandler) unwatchVersions(tprName string, versions ...extensions
 		// Nothing to do. This can happen if there was an error adding a watch
 		return
 	}
+	gk, err := resources.ExtractApiGroupAndKind(tprName)
+	if err != nil {
+		log.Printf("[TPREH] Failed parse TPR name %q: %v", tprName, err)
+		return
+	}
 	for _, version := range versions {
 		if ws, ok := tprWatch[version.Name]; ok {
 			log.Printf("[TPREH] Removing watch for TPR %s version %s", tprName, version.Name)
 			delete(tprWatch, version.Name)
+			h.store.RemoveInformer(gk.WithVersion(version.Name))
 			ws.cancel()
 		}
 	}
