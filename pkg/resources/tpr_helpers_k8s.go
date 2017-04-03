@@ -27,7 +27,6 @@ import (
 	"unicode"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 func convertToCamelCase(input string) string {
@@ -46,10 +45,13 @@ func convertToCamelCase(input string) string {
 	return buf.String()
 }
 
-func ExtractApiGroupAndKind(tpr *extensions.ThirdPartyResource) (schema.GroupKind, error) {
-	parts := strings.SplitN(tpr.Name, ".", 3)
+func ExtractApiGroupAndKind(tprName string) (schema.GroupKind, error) {
+	parts := strings.SplitN(tprName, ".", 3)
 	if len(parts) < 3 {
-		return schema.GroupKind{}, fmt.Errorf("unexpectedly short resource name: %s, expected at least <kind>.<domain>.<tld>", tpr.Name)
+		return schema.GroupKind{}, fmt.Errorf("unexpectedly short resource name: %s, expected at least <kind>.<domain>.<tld>", tprName)
 	}
-	return schema.GroupKind{Kind: convertToCamelCase(parts[0]), Group: strings.Join(parts[1:], ".")}, nil
+	return schema.GroupKind{
+		Kind:  convertToCamelCase(parts[0]),
+		Group: strings.Join(parts[1:], "."),
+	}, nil
 }
