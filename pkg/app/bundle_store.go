@@ -9,7 +9,7 @@ type bundleStore struct {
 }
 
 func (s *bundleStore) Get(namespace, bundleName string) (*smith.Bundle, error) {
-	bundle, exists, err := s.store.Get(bundleGVK, namespace, bundleName)
+	bundle, exists, err := s.store.Get(smith.BundleGVK, namespace, bundleName)
 	if err != nil || !exists {
 		return nil, err
 	}

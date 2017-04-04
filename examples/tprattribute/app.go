@@ -2,19 +2,22 @@ package tprattribute
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"time"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/resources"
 
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+)
+
+const (
+	ResyncPeriod = 1 * time.Minute
 )
 
 type App struct {
@@ -27,33 +30,21 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	sClient, err := GetSleeperTprClient(a.RestConfig, GetSleeperScheme())
+	scheme := GetSleeperScheme()
+	sClient, err := GetSleeperTprClient(a.RestConfig, scheme)
 	if err != nil {
 		return err
 	}
-
-	// 1. Ensure ThirdPartyResource Sleeper exists
-	err = ensureResourceExists(clientset)
-	if err != nil {
-		return err
-	}
-
-	// 2. Create an Informer for Sleeper objects
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	err = sleeperInformer(ctx, sClient)
-	if err != nil {
-		return err
-	}
+	informerFactory := informers.NewSharedInformerFactory(clientset, ResyncPeriod)
+	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
+	store := resources.NewStore(scheme.DeepCopy)
+	store.AddInformer(smith.TprGVK, tprInf)
+	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
 
-	// 3. Wait for a signal to stop
-	<-ctx.Done()
-	return ctx.Err()
-}
-
-func ensureResourceExists(clientset kubernetes.Interface) error {
-	log.Printf("Creating ThirdPartyResource %s", SleeperResourceName)
+	// 1. Ensure ThirdPartyResource Sleeper exists
 	tpr := &extensions.ThirdPartyResource{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: SleeperResourceName,
@@ -67,23 +58,20 @@ func ensureResourceExists(clientset kubernetes.Interface) error {
 			{Name: SleeperResourceVersion},
 		},
 	}
-	res, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
+	err = resources.EnsureTprExists(ctx, clientset, store, tpr)
 	if err != nil {
-		if !kerrors.IsAlreadyExists(err) {
-			return fmt.Errorf("failed to create %s ThirdPartyResource: %v", SleeperResourceName, err)
-		}
-		// TODO handle conflicts and update properly
-		//log.Printf("ThirdPartyResource %s already exists, updating", SleeperResourceName)
-		//_, err = clientset.ExtensionsV1beta1().ThirdPartyResources().Update(tpr)
-		//if err != nil {
-		//	return fmt.Errorf("failed to update %s ThirdPartyResource: %v", SleeperResourceName, err)
-		//}
-	} else {
-		log.Printf("ThirdPartyResource %s created: %+v", SleeperResourceName, res)
-		// TODO It takes a while for k8s to add a new rest endpoint. Polling?
-		time.Sleep(10 * time.Second)
+		return err
 	}
-	return nil
+
+	// 2. Create an Informer for Sleeper objects
+	err = sleeperInformer(ctx, sClient)
+	if err != nil {
+		return err
+	}
+
+	// 3. Wait for a signal to stop
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 func sleeperInformer(ctx context.Context, sClient *rest.RESTClient) error {
