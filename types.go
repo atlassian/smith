@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 type BundleConditionType string
@@ -35,6 +36,14 @@ const (
 	TprFieldPathAnnotation  = SmithDomain + "/TprReadyWhenFieldPath"
 	TprFieldValueAnnotation = SmithDomain + "/TprReadyWhenFieldValue"
 )
+
+var TprGVK = extensions.SchemeGroupVersion.WithKind("ThirdPartyResource")
+
+var BundleGVK = schema.GroupVersionKind{
+	Group:   SmithResourceGroup,
+	Version: BundleResourceVersion,
+	Kind:    BundleResourceKind,
+}
 
 type DeepCopy func(src interface{}) (interface{}, error)
 

@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/resources"
 
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/dynamic"
@@ -66,8 +64,8 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	bundleInf := bundleInformer(bundleClient)
 
-	store := NewStore(bundleScheme.DeepCopy)
-	store.AddInformer(tprGVK, tprInf)
+	store := resources.NewStore(bundleScheme.DeepCopy)
+	store.AddInformer(smith.TprGVK, tprInf)
 	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Deployment"), deploymentInf)
 	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Ingress"), ingressInf)
 	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("Service"), serviceInf)
@@ -76,7 +74,7 @@ func (a *App) Run(ctx context.Context) error {
 	if PodPresetEnabled {
 		store.AddInformer(settings.SchemeGroupVersion.WithKind("PodPreset"), podPresetInf)
 	}
-	store.AddInformer(bundleGVK, bundleInf)
+	store.AddInformer(smith.BundleGVK, bundleInf)
 
 	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
 
@@ -104,8 +102,17 @@ func (a *App) Run(ctx context.Context) error {
 	defer cancel() // cancel ctx to signal done to processor (and everything else)
 
 	// 4. Ensure ThirdPartyResource TEMPLATE exists
+	bundleTpr := &extensions.ThirdPartyResource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: smith.BundleResourceName,
+		},
+		Description: "Smith resource manager",
+		Versions: []extensions.APIVersion{
+			{Name: smith.BundleResourceVersion},
+		},
+	}
 	err = retryUntilSuccessOrDone(ctx, func() error {
-		return ensureResourceExists(clientset)
+		return resources.EnsureTprExists(ctx, clientset, store, bundleTpr)
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to create resource %s: %v", smith.BundleResourceName, e)
@@ -157,36 +164,6 @@ func (a *App) Run(ctx context.Context) error {
 
 	<-ctx.Done()
 	return ctx.Err()
-}
-
-func ensureResourceExists(clientset kubernetes.Interface) error {
-	log.Printf("Creating ThirdPartyResource %s", smith.BundleResourceName)
-	tpr := &extensions.ThirdPartyResource{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: smith.BundleResourceName,
-		},
-		Description: "Smith resource manager",
-		Versions: []extensions.APIVersion{
-			{Name: smith.BundleResourceVersion},
-		},
-	}
-	res, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
-	if err != nil {
-		if !kerrors.IsAlreadyExists(err) {
-			return fmt.Errorf("failed to create %s ThirdPartyResource: %v", smith.BundleResourceName, err)
-		}
-		// TODO handle conflicts and update properly
-		//log.Printf("ThirdPartyResource %s already exists, updating", smith.BundleResourceName)
-		//_, err = clientset.ExtensionsV1beta1().ThirdPartyResources().Update(tpr)
-		//if err != nil {
-		//	return fmt.Errorf("failed to update %s ThirdPartyResource: %v",  smith.BundleResourceName, err)
-		//}
-	} else {
-		log.Printf("ThirdPartyResource %s created: %+v", smith.BundleResourceName, res)
-		// TODO It takes a while for k8s to add a new rest endpoint. Polling?
-		time.Sleep(10 * time.Second)
-	}
-	return nil
 }
 
 func bundleInformer(bundleClient cache.Getter) cache.SharedIndexInformer {
