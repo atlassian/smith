@@ -2,6 +2,7 @@ package tprattribute
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/atlassian/smith"
@@ -35,12 +36,22 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	store := resources.NewStore(scheme.DeepCopy)
+
+	var wgStore sync.WaitGroup
+	defer wgStore.Wait() // await store termination
+
+	ctxStore, cancelStore := context.WithCancel(context.Background())
+	defer cancelStore() // signal store to stop
+	wgStore.Add(1)
+	go store.Run(ctxStore, &wgStore)
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	informerFactory := informers.NewSharedInformerFactory(clientset, ResyncPeriod)
 	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
-	store := resources.NewStore(scheme.DeepCopy)
 	store.AddInformer(smith.TprGVK, tprInf)
 	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
 
