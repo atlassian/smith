@@ -43,7 +43,7 @@ minikube-test:
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go test -tags=integration -race -v $$(glide nv)
+	go test -tags=integration -race -v ./integration_tests
 
 minikube-run:
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
