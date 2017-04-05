@@ -64,7 +64,17 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	bundleInf := bundleInformer(bundleClient)
 
+	// 1.5 Store
 	store := resources.NewStore(bundleScheme.DeepCopy)
+
+	var wgStore sync.WaitGroup
+	defer wgStore.Wait() // await store termination
+
+	ctxStore, cancelStore := context.WithCancel(context.Background())
+	defer cancelStore() // signal store to stop
+	wgStore.Add(1)
+	go store.Run(ctxStore, &wgStore)
+
 	store.AddInformer(smith.TprGVK, tprInf)
 	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Deployment"), deploymentInf)
 	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Ingress"), ingressInf)
