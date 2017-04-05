@@ -11,14 +11,15 @@ echo "mode: count" > coverage.out
 # Initialize error tracking
 ERROR=""
 
-declare -a packages=('' \
-    'pkg/processor/graph' \
-    );
-
 # Test each package and append coverage profile info to coverage.out
-for pkg in "${packages[@]}"
+for pkg in `find . -d -name \*_test.go |
+    grep -ve '^./vendor/' |
+    grep -v integration_tests |
+    sed -e 's/^\.\/\(\(.*\)\/\)\{0,1\}[^/]*$/github.com\/atlassian\/smith\/\2/' |
+    sort -u`
 do
-    go test -v -covermode=count -coverprofile=coverage_tmp.out "github.com/atlassian/smith/$pkg" || ERROR="Error testing $pkg"
+    echo "Testing $pkg"
+    go test -v -covermode=count -coverprofile=coverage_tmp.out "$pkg" || ERROR="Error testing $pkg"
     tail -n +2 coverage_tmp.out >> coverage.out 2> /dev/null ||:
 done
 
