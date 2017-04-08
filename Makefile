@@ -62,10 +62,10 @@ minikube-sleeper-run:
 	go run -race examples/tprattribute/main/*
 
 test-race:
-	go test -race $$(glide nv)
+	go test -race $$(glide nv | grep -v integration_tests)
 
 test:
-	go test $$(glide nv)
+	go test $$(glide nv | grep -v integration_tests)
 
 check:
 	go install ./cmd/smith ./examples/tprattribute/main
