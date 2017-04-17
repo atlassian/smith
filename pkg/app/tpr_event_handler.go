@@ -20,6 +20,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+type bundleIndex interface {
+	GetBundles(tprName string) ([]*smith.Bundle, error)
+}
+
 type informerStore interface {
 	AddInformer(schema.GroupVersionKind, cache.SharedIndexInformer)
 	RemoveInformer(schema.GroupVersionKind) bool
@@ -37,18 +41,22 @@ type tprEventHandler struct {
 	handler      cache.ResourceEventHandler
 	clients      dynamic.ClientPool
 	store        informerStore
+	processor    Processor
+	bundleIndex  bundleIndex
 	resyncPeriod time.Duration
 	mx           sync.Mutex
 	watchers     map[string]map[string]watchState // TPR name -> TPR version -> state
 }
 
 func newTprEventHandler(ctx context.Context, handler cache.ResourceEventHandler, clients dynamic.ClientPool,
-	store informerStore, resyncPeriod time.Duration) *tprEventHandler {
+	store informerStore, processor Processor, bundleIndex bundleIndex, resyncPeriod time.Duration) *tprEventHandler {
 	return &tprEventHandler{
 		ctx:          ctx,
 		handler:      handler,
 		clients:      clients,
 		store:        store,
+		processor:    processor,
+		bundleIndex:  bundleIndex,
 		resyncPeriod: resyncPeriod,
 		watchers:     make(map[string]map[string]watchState),
 	}
@@ -60,11 +68,12 @@ func (h *tprEventHandler) OnAdd(obj interface{}) {
 		return
 	}
 	log.Printf("[TPREH] Handling OnAdd for TPR %s", tpr.Name)
-	h.mx.Lock()
-	defer h.mx.Unlock()
-	h.watchVersions(tpr.Name, tpr.Versions...)
-
-	// TODO rebuild all bundles containing resources of this type
+	func() {
+		h.mx.Lock()
+		defer h.mx.Unlock()
+		h.watchVersions(tpr.Name, tpr.Versions...)
+	}()
+	h.rebuildBundles(tpr.Name, "added")
 }
 
 func (h *tprEventHandler) OnUpdate(oldObj, newObj interface{}) {
@@ -72,37 +81,38 @@ func (h *tprEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	if newTpr.Name == smith.BundleResourceName {
 		return
 	}
-	newVersions := versionsMap(newTpr)
+	func() {
+		newVersions := versionsMap(newTpr)
 
-	var added []extensions.APIVersion
-	var removed []extensions.APIVersion
+		var added []extensions.APIVersion
+		var removed []extensions.APIVersion
 
-	h.mx.Lock()
-	defer h.mx.Unlock()
+		h.mx.Lock()
+		defer h.mx.Unlock()
 
-	tprWatch := h.watchers[newTpr.Name]
+		tprWatch := h.watchers[newTpr.Name]
 
-	// Comparing to existing state, not to oldObj for better resiliency to errors
-	for versionName, state := range tprWatch {
-		if _, ok := newVersions[versionName]; !ok {
-			removed = append(removed, state.version)
+		// Comparing to existing state, not to oldObj for better resiliency to errors
+		for versionName, state := range tprWatch {
+			if _, ok := newVersions[versionName]; !ok {
+				removed = append(removed, state.version)
+			}
 		}
-	}
 
-	for _, v := range newVersions {
-		state, ok := tprWatch[v.Name]
-		if ok {
-			// If some fields are added in the future and this update changes them, we want to update our state
-			state.version = v
-		} else {
-			added = append(added, v)
+		for _, v := range newVersions {
+			state, ok := tprWatch[v.Name]
+			if ok {
+				// If some fields are added in the future and this update changes them, we want to update our state
+				state.version = v
+			} else {
+				added = append(added, v)
+			}
 		}
-	}
 
-	h.unwatchVersions(newTpr.Name, removed...)
-	h.watchVersions(newTpr.Name, added...)
-
-	// TODO rebuild all bundles containing resources of this type
+		h.unwatchVersions(newTpr.Name, removed...)
+		h.watchVersions(newTpr.Name, added...)
+	}()
+	h.rebuildBundles(newTpr.Name, "updated")
 }
 
 func versionsMap(tpr *extensions.ThirdPartyResource) map[string]extensions.APIVersion {
@@ -115,19 +125,21 @@ func versionsMap(tpr *extensions.ThirdPartyResource) map[string]extensions.APIVe
 
 func (h *tprEventHandler) OnDelete(obj interface{}) {
 	tpr := obj.(*extensions.ThirdPartyResource)
-	h.mx.Lock()
-	defer h.mx.Unlock()
+	func() {
+		h.mx.Lock()
+		defer h.mx.Unlock()
 
-	// Removing all watched versions for this TPR
-	tprWatch := h.watchers[tpr.Name]
-	versions := make([]extensions.APIVersion, 0, len(tprWatch))
+		// Removing all watched versions for this TPR
+		tprWatch := h.watchers[tpr.Name]
+		versions := make([]extensions.APIVersion, 0, len(tprWatch))
 
-	for _, state := range tprWatch {
-		versions = append(versions, state.version)
-	}
+		for _, state := range tprWatch {
+			versions = append(versions, state.version)
+		}
 
-	h.unwatchVersions(tpr.Name, versions...)
-	// TODO rebuild all bundles containing resources of this type
+		h.unwatchVersions(tpr.Name, versions...)
+	}()
+	h.rebuildBundles(tpr.Name, "deleted")
 }
 
 func (h *tprEventHandler) watchVersions(tprName string, versions ...extensions.APIVersion) {
@@ -136,7 +148,7 @@ func (h *tprEventHandler) watchVersions(tprName string, versions ...extensions.A
 	}
 	gk, err := resources.ExtractApiGroupAndKind(tprName)
 	if err != nil {
-		log.Printf("[TPREH] Failed parse TPR name %q: %v", tprName, err)
+		log.Printf("[TPREH] Failed to parse TPR name %s: %v", tprName, err)
 		return
 	}
 	tprWatch := h.watchers[tprName]
@@ -186,7 +198,7 @@ func (h *tprEventHandler) unwatchVersions(tprName string, versions ...extensions
 	}
 	gk, err := resources.ExtractApiGroupAndKind(tprName)
 	if err != nil {
-		log.Printf("[TPREH] Failed parse TPR name %q: %v", tprName, err)
+		log.Printf("[TPREH] Failed to parse TPR name %s: %v", tprName, err)
 		return
 	}
 	for _, version := range versions {
@@ -199,5 +211,19 @@ func (h *tprEventHandler) unwatchVersions(tprName string, versions ...extensions
 	}
 	if len(tprWatch) == 0 {
 		delete(h.watchers, tprName)
+	}
+}
+
+func (h *tprEventHandler) rebuildBundles(tprName, addUpdateDelete string) {
+	bundles, err := h.bundleIndex.GetBundles(tprName)
+	if err != nil {
+		log.Printf("[TPREH] Failed to get bundles by TPR name %s: %v", tprName, err)
+		return
+	}
+	for _, bundle := range bundles {
+		log.Printf("[TPREH][%s/%s] Rebuilding bundle because TPR %s was %s", bundle.Metadata.Namespace, bundle.Metadata.Name, tprName, addUpdateDelete)
+		if err := h.processor.Rebuild(h.ctx, bundle); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+			log.Printf("[TPREH][%s/%s] Error rebuilding bundle: %v", bundle.Metadata.Namespace, bundle.Metadata.Name, err)
+		}
 	}
 }

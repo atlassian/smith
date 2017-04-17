@@ -148,13 +148,15 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for Bundle Informer was cancelled")
 	}
 
-	sl := bundleStore{
-		store: store,
+	bs := &bundleStore{
+		store:         store,
+		bundleByIndex: bundleInf.GetIndexer().ByIndex,
+		deepCopy:      bundleScheme.DeepCopy,
 	}
 	reh := &resourceEventHandler{
 		ctx:         ctx,
 		processor:   bp,
-		name2bundle: sl.Get,
+		name2bundle: bs.Get,
 	}
 
 	// 6. Watch supported built-in resource types
@@ -170,7 +172,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 7. Watch Third Party Resources to add watches for supported ones
 
-	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients, store, ResyncPeriod))
+	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients, store, bp, bs, ResyncPeriod))
 
 	<-ctx.Done()
 	return ctx.Err()
@@ -181,5 +183,7 @@ func bundleInformer(bundleClient cache.Getter) cache.SharedIndexInformer {
 		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, metav1.NamespaceAll, fields.Everything()),
 		&smith.Bundle{},
 		ResyncPeriod,
-		cache.Indexers{})
+		cache.Indexers{
+			ByTprNameIndex: byTprNameIndex,
+		})
 }
