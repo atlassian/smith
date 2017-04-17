@@ -14,11 +14,11 @@ type bundleEventHandler struct {
 }
 
 func (h *bundleEventHandler) OnAdd(obj interface{}) {
-	h.handle(obj)
+	h.handle(obj, "added")
 }
 
 func (h *bundleEventHandler) OnUpdate(oldObj, newObj interface{}) {
-	h.handle(newObj)
+	h.handle(newObj, "updated")
 }
 
 func (h *bundleEventHandler) OnDelete(obj interface{}) {
@@ -28,16 +28,18 @@ func (h *bundleEventHandler) OnDelete(obj interface{}) {
 	//		// Maybe store bundle in annotation on each resource to help reconstruct the dependency graph for GC?
 }
 
-func (h *bundleEventHandler) handle(obj interface{}) {
+func (h *bundleEventHandler) handle(obj interface{}, addUpdate string) {
 	o, err := h.deepCopy(obj)
 	if err != nil {
-		log.Printf("[BEH] Failed to do deep copy of %#v: %v", obj, err)
+		bundle := o.(*smith.Bundle)
+		log.Printf("[BEH][%s/%s] Failed to deep copy %T: %v", bundle.Metadata.Namespace, bundle.Metadata.Name, obj, err)
 		return
 	}
 
-	out := o.(*smith.Bundle)
-	log.Printf("[BEH] Rebuilding %s/%s bundle because it was added/updated", out.Metadata.Namespace, out.Metadata.Name)
-	if err = h.processor.Rebuild(h.ctx, out); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-		log.Printf("[BEH] Error rebuilding bundle %s/%s: %v", out.Metadata.Namespace, out.Metadata.Name, err)
+	bundle := o.(*smith.Bundle)
+	meta := bundle.Metadata
+	log.Printf("[BEH][%s/%s] Rebuilding bundle because it was %s", meta.Namespace, meta.Name, addUpdate)
+	if err = h.processor.Rebuild(h.ctx, bundle); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+		log.Printf("[BEH][%s/%s] Error rebuilding bundle: %v", meta.Namespace, meta.Name, err)
 	}
 }
