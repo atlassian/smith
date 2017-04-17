@@ -21,7 +21,7 @@ type resourceEventHandler struct {
 
 func (h *resourceEventHandler) OnAdd(obj interface{}) {
 	bundleName, namespace := getBundleNameAndNamespace(obj)
-	h.rebuildByName(namespace, bundleName, obj)
+	h.rebuildByName(namespace, bundleName, "added", obj)
 }
 
 func (h *resourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
@@ -30,30 +30,30 @@ func (h *resourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	newTmplName, newNamespace := getBundleNameAndNamespace(oldObj)
 
 	if oldTmplName != newTmplName { // changed label on bundle
-		h.rebuildByName(oldNamespace, oldTmplName, oldObj)
+		h.rebuildByName(oldNamespace, oldTmplName, "updated", oldObj)
 	}
-	h.rebuildByName(newNamespace, newTmplName, newObj)
+	h.rebuildByName(newNamespace, newTmplName, "updated", newObj)
 }
 
 func (h *resourceEventHandler) OnDelete(obj interface{}) {
 	bundleName, namespace := getBundleNameAndNamespace(obj)
-	h.rebuildByName(namespace, bundleName, obj)
+	h.rebuildByName(namespace, bundleName, "deleted", obj)
 }
 
-func (h *resourceEventHandler) rebuildByName(namespace, bundleName string, obj interface{}) {
+func (h *resourceEventHandler) rebuildByName(namespace, bundleName, addUpdateDelete string, obj interface{}) {
 	if len(bundleName) == 0 {
 		return
 	}
 	bundle, err := h.name2bundle(namespace, bundleName)
 	if err != nil {
-		log.Printf("[REH] Failed to do bundle lookup for %s/%s: %v", namespace, bundleName, err)
+		log.Printf("[REH][%s/%s] Failed to do bundle lookup: %v", namespace, bundleName, err)
 		return
 	}
 	if bundle != nil {
-		log.Printf("[REH] Rebuilding %s/%s bundle because of resource %s add/update/delete",
-			namespace, bundleName, obj.(metav1.Object).GetName())
+		log.Printf("[REH][%s/%s] Rebuilding bundle because resource %s was %s",
+			namespace, bundleName, obj.(metav1.Object).GetName(), addUpdateDelete)
 		if err = h.processor.Rebuild(h.ctx, bundle); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-			log.Printf("[REH] Error rebuilding bundle %s/%s: %v", namespace, bundleName, err)
+			log.Printf("[REH][%s/%s] Error rebuilding bundle: %v", namespace, bundleName, err)
 		}
 		//} else {
 		// TODO bundle not found - handle deletion?
