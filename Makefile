@@ -31,7 +31,7 @@ build-race: fmt
 	go build -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
 build-all:
-	go build $$(glide nv)
+	go build $$(glide nv | grep -v integration_tests)
 
 fmt:
 	gofmt -w=true -s $$(find . -type f -name '*.go' -not -path "./vendor/*")
