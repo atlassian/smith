@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	ByNamespaceAndNameIndex string = "NamespaceNameIndex"
+	ByNamespaceAndNameIndex = "NamespaceNameIndex"
 )
 
 var (
