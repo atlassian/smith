@@ -1,36 +1,11 @@
 package tprattribute
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 )
-
-func GetSleeperScheme() *runtime.Scheme {
-	groupVersion := schema.GroupVersion{
-		Group:   SleeperResourceGroup,
-		Version: SleeperResourceVersion,
-	}
-
-	schemeBuilder := runtime.NewSchemeBuilder(func(scheme *runtime.Scheme) error {
-		scheme.AddKnownTypes(groupVersion,
-			&Sleeper{},
-			&SleeperList{},
-		)
-		scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
-		metav1.AddToGroupVersion(scheme, groupVersion)
-		return nil
-	})
-
-	scheme := runtime.NewScheme()
-	if err := schemeBuilder.AddToScheme(scheme); err != nil {
-		panic(err)
-	}
-	return scheme
-}
 
 func GetSleeperTprClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTClient, error) {
 	groupVersion := schema.GroupVersion{

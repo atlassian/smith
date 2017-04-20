@@ -29,7 +29,7 @@ func TestWorkflow(t *testing.T) {
 	config, err := resources.ConfigFromEnv()
 	require.NoError(t, err)
 
-	bundleClient, err := resources.GetBundleTprClient(config, resources.GetBundleScheme())
+	bundleClient, err := resources.GetBundleTprClient(config, smithScheme())
 	require.NoError(t, err)
 
 	clients := dynamic.NewClientPool(config, nil, dynamic.LegacyAPIPathResolverFunc)

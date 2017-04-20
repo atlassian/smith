@@ -7,7 +7,10 @@ import (
 
 	"github.com/atlassian/smith"
 
+	"github.com/atlassian/smith/examples/tprattribute"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 )
 
@@ -20,4 +23,18 @@ func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.Bun
 	if assert.NotNil(t, condition) {
 		assert.Equal(t, status, condition.Status)
 	}
+}
+
+func smithScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+	smith.AddToScheme(scheme)
+	return scheme
+}
+
+func sleeperScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+	tprattribute.AddToScheme(scheme)
+	return scheme
 }
