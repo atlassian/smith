@@ -1,5 +1,5 @@
 hash: 0148d6f3d9dc81617fef21b1a10c079b1b386e58d8fd66dd3feb6fa59c067aac
-updated: 2017-04-05T23:42:48.643962567+10:00
+updated: 2017-04-20T22:06:11.843155509+10:00
 imports:
 - name: github.com/cenk/backoff
   version: 5d150e7eec023ce7a124856b37c68e54b4050ac7
@@ -28,7 +28,7 @@ imports:
 - name: github.com/go-openapi/swag
   version: 1d0bd113de87027671077d3c71eb3ac5d7dbba72
 - name: github.com/gogo/protobuf
-  version: e18d7aa8f8c624c915db340349aad4c49b10d173
+  version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
   - proto
   - sortkeys
@@ -55,7 +55,7 @@ imports:
   subpackages:
   - codec
 - name: golang.org/x/net
-  version: e90d6d0afc4c315a0d87a568ae68577cc15149a0
+  version: f2499483f923065a842d38eb4c7f1927e6fc6e6d
   subpackages:
   - context
   - http2
@@ -80,7 +80,7 @@ imports:
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/apimachinery
-  version: 20e10d54608f05c3059443a6c0afb9979641e88d
+  version: 9c89140a45325f83409e90359888133478207c7a
   subpackages:
   - pkg/api/equality
   - pkg/api/errors
@@ -124,7 +124,7 @@ imports:
   - pkg/watch
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
-  version: 4e221f82e2ad6e61bd6190602de9c3400d79f1aa
+  version: 69f0a81e21e046e59fb102cddff3e138d7a327f5
   subpackages:
   - discovery
   - dynamic
@@ -191,6 +191,7 @@ imports:
   - pkg/api
   - pkg/api/install
   - pkg/api/v1
+  - pkg/api/v1/ref
   - pkg/apis/apps
   - pkg/apis/apps/install
   - pkg/apis/apps/v1beta1
