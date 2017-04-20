@@ -14,6 +14,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -38,8 +39,11 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	bundleScheme := resources.GetBundleScheme()
-	bundleClient, err := resources.GetBundleTprClient(a.RestConfig, bundleScheme)
+	scheme := runtime.NewScheme()
+	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+	smith.AddToScheme(scheme)
+
+	bundleClient, err := resources.GetBundleTprClient(a.RestConfig, scheme)
 	if err != nil {
 		return err
 	}
@@ -65,7 +69,7 @@ func (a *App) Run(ctx context.Context) error {
 	bundleInf := bundleInformer(bundleClient)
 
 	// 1.5 Store
-	store := resources.NewStore(bundleScheme.DeepCopy)
+	store := resources.NewStore(scheme.DeepCopy)
 
 	var wgStore sync.WaitGroup
 	defer wgStore.Wait() // await store termination
@@ -104,7 +108,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 3. Processor
 
-	bp := processor.New(bundleClient, clients, rc, bundleScheme.DeepCopy, store)
+	bp := processor.New(bundleClient, clients, rc, scheme.DeepCopy, store)
 	var wg sync.WaitGroup
 	defer wg.Wait() // await termination
 	wg.Add(1)
@@ -137,7 +141,7 @@ func (a *App) Run(ctx context.Context) error {
 	bundleInf.AddEventHandler(&bundleEventHandler{
 		ctx:       ctx,
 		processor: bp,
-		deepCopy:  bundleScheme.DeepCopy,
+		deepCopy:  scheme.DeepCopy,
 	})
 
 	go bundleInf.Run(ctx.Done())
@@ -151,7 +155,7 @@ func (a *App) Run(ctx context.Context) error {
 	bs := &bundleStore{
 		store:         store,
 		bundleByIndex: bundleInf.GetIndexer().ByIndex,
-		deepCopy:      bundleScheme.DeepCopy,
+		deepCopy:      scheme.DeepCopy,
 	}
 	reh := &resourceEventHandler{
 		ctx:         ctx,

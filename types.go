@@ -39,16 +39,25 @@ const (
 
 var TprGVK = extensions.SchemeGroupVersion.WithKind("ThirdPartyResource")
 
-var BundleGVK = schema.GroupVersionKind{
+var GV = schema.GroupVersion{
 	Group:   SmithResourceGroup,
 	Version: BundleResourceVersion,
-	Kind:    BundleResourceKind,
 }
+
+var BundleGVK = GV.WithKind(BundleResourceKind)
 
 type DeepCopy func(src interface{}) (interface{}, error)
 
 type ByNameStore interface {
 	Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error)
+}
+
+func AddToScheme(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(GV,
+		&Bundle{},
+		&BundleList{},
+	)
+	metav1.AddToGroupVersion(scheme, GV)
 }
 
 type BundleList struct {

@@ -10,8 +10,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -31,7 +33,9 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	scheme := GetSleeperScheme()
+	scheme := runtime.NewScheme()
+	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+	AddToScheme(scheme)
 	sClient, err := GetSleeperTprClient(a.RestConfig, scheme)
 	if err != nil {
 		return err

@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
@@ -27,7 +27,8 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 			desired := input2()
 			t.Run(fmt.Sprintf("%s actual, %s desired", kind1, kind2), func(t *testing.T) {
 				t.Parallel()
-				updated, err := updateResource(resources.GetBundleScheme().DeepCopy, &smith.Resource{Spec: desired}, &actual)
+				scheme := runtime.NewScheme()
+				updated, err := updateResource(scheme.DeepCopy, &smith.Resource{Spec: desired}, &actual)
 				require.NoError(t, err)
 				assert.Nil(t, updated)
 			})

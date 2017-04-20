@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -26,6 +27,19 @@ const (
 	Awake    SleeperState = "Awake!"
 	Error    SleeperState = "Error"
 )
+
+var GV = schema.GroupVersion{
+	Group:   SleeperResourceGroup,
+	Version: SleeperResourceVersion,
+}
+
+func AddToScheme(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(GV,
+		&Sleeper{},
+		&SleeperList{},
+	)
+	metav1.AddToGroupVersion(scheme, GV)
+}
 
 type SleeperList struct {
 	metav1.TypeMeta `json:",inline"`

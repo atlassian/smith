@@ -26,10 +26,10 @@ func TestTprAttribute(t *testing.T) {
 	config, err := resources.ConfigFromEnv()
 	require.NoError(t, err)
 
-	bundleClient, err := resources.GetBundleTprClient(config, resources.GetBundleScheme())
+	bundleClient, err := resources.GetBundleTprClient(config, smithScheme())
 	require.NoError(t, err)
 
-	sClient, err := tprattribute.GetSleeperTprClient(config, tprattribute.GetSleeperScheme())
+	sClient, err := tprattribute.GetSleeperTprClient(config, sleeperScheme())
 	require.NoError(t, err)
 
 	bundleName := "bundle-attribute"
