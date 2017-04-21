@@ -35,7 +35,7 @@ func TestStore(t *testing.T) {
 	ctxStore, cancelStore := context.WithCancel(context.Background())
 	defer cancelStore() // signal store to stop
 	wgStore.Add(1)
-	go store.Run(ctxStore, &wgStore)
+	go store.Run(ctxStore, wgStore.Done)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

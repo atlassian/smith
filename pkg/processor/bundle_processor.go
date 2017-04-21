@@ -34,8 +34,10 @@ func New(bundleClient *rest.RESTClient, clients dynamic.ClientPool, rc ReadyChec
 	}
 }
 
-func (bp *BundleProcessor) Run(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (bp *BundleProcessor) Run(ctx context.Context, done func()) {
+	defer done()
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	workers := make(map[bundleRef]*worker)
 	workRequests := make(chan workRequest)
 	notifyRequests := make(chan notifyRequest)
@@ -57,7 +59,7 @@ func (bp *BundleProcessor) Run(ctx context.Context, wg *sync.WaitGroup) {
 				}
 				workers[ref] = wrk
 				wg.Add(1)
-				go wrk.rebuildLoop(ctx, wg)
+				go wrk.rebuildLoop(ctx, wg.Done)
 			} else {
 				wrk.setNeedsRebuild()
 				wrk.pendingBundle = bundle

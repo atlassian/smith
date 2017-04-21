@@ -85,8 +85,8 @@ func NewStore(deepCopy smith.DeepCopy) *Store {
 	}
 }
 
-func (s *Store) Run(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (s *Store) Run(ctx context.Context, done func()) {
+	defer done()
 	// Store must not be used after Run exited
 	defer close(s.awaitRequests)
 	defer close(s.cancellations)

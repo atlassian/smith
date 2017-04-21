@@ -77,7 +77,7 @@ func (a *App) Run(ctx context.Context) error {
 	ctxStore, cancelStore := context.WithCancel(context.Background())
 	defer cancelStore() // signal store to stop
 	wgStore.Add(1)
-	go store.Run(ctxStore, &wgStore)
+	go store.Run(ctxStore, wgStore.Done)
 
 	store.AddInformer(smith.TprGVK, tprInf)
 	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Deployment"), deploymentInf)
@@ -112,7 +112,7 @@ func (a *App) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	defer wg.Wait() // await termination
 	wg.Add(1)
-	go bp.Run(ctx, &wg)
+	go bp.Run(ctx, wg.Done)
 	defer cancel() // cancel ctx to signal done to processor (and everything else)
 
 	// 4. Ensure ThirdPartyResource TEMPLATE exists

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -52,8 +51,8 @@ type worker struct {
 	needsRebuild int32 // must be accessed via atomics only
 }
 
-func (wrk *worker) rebuildLoop(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (wrk *worker) rebuildLoop(ctx context.Context, done func()) {
+	defer done()
 	var timer *time.Timer
 	defer func() {
 		if timer != nil {
