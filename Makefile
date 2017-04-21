@@ -30,14 +30,17 @@ build: fmt
 build-race: fmt
 	go build -i -v -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
-build-all:
+build-all: fmt
 	go install -v $$(glide nv | grep -v integration_tests)
+
+build-all-race: fmt
+	go install -v -race $$(glide nv | grep -v integration_tests)
 
 fmt:
 	gofmt -w=true -s $$(find . -type f -name '*.go' -not -path "./vendor/*")
 	goimports -w=true -d $$(find . -type f -name '*.go' -not -path "./vendor/*")
 
-minikube-test:
+minikube-test: build-all-race
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
@@ -45,7 +48,7 @@ minikube-test:
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	go test -tags=integration -race -v ./integration_tests
 
-minikube-run:
+minikube-run: build-all-race
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
@@ -53,7 +56,7 @@ minikube-run:
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	go run -race cmd/smith/*
 
-minikube-sleeper-run:
+minikube-sleeper-run: build-all-race
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
@@ -61,20 +64,18 @@ minikube-sleeper-run:
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	go run -race examples/tprattribute/main/*
 
-test-race:
+test-race: build-all-race
 	go test -race $$(glide nv | grep -v integration_tests)
 
-test:
+test: build-all
 	go test $$(glide nv | grep -v integration_tests)
 
-check:
-	go install ./cmd/smith ./examples/tprattribute/main
+check: build-all
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=600s ./... --vendor \
 		--linter='errcheck:errcheck:-ignore=net:Close' --cyclo-over=20 \
 		--disable=interfacer --disable=golint --dupl-threshold=200
 
-check-all:
-	go install ./cmd/smith ./examples/tprattribute/main
+check-all: build-all
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=600s ./... --vendor --cyclo-over=20 \
 		--dupl-threshold=65
 
