@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 )
 
@@ -28,7 +27,7 @@ func TestStore(t *testing.T) {
 	clientset, err := kubernetes.NewForConfig(config)
 	require.NoError(t, err)
 
-	store := resources.NewStore(api.Scheme.DeepCopy)
+	store := resources.NewStore(smithScheme().DeepCopy)
 
 	var wgStore sync.WaitGroup
 	defer wgStore.Wait() // await store termination
