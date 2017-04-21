@@ -16,12 +16,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 )
 
@@ -29,7 +27,11 @@ func TestWorkflow(t *testing.T) {
 	config, err := resources.ConfigFromEnv()
 	require.NoError(t, err)
 
-	bundleClient, err := resources.GetBundleTprClient(config, smithScheme())
+	clientset, err := kubernetes.NewForConfig(config)
+	require.NoError(t, err)
+
+	scheme := smithScheme()
+	bundleClient, err := resources.GetBundleTprClient(config, scheme)
 	require.NoError(t, err)
 
 	clients := dynamic.NewClientPool(config, nil, dynamic.LegacyAPIPathResolverFunc)
@@ -37,7 +39,6 @@ func TestWorkflow(t *testing.T) {
 	bundleName := "bundle1"
 	bundleNamespace := "default"
 
-	var bundleCreated bool
 	bundle := smith.Bundle{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       smith.BundleResourceKind,
@@ -66,34 +67,8 @@ func TestWorkflow(t *testing.T) {
 	} else if !errors.IsNotFound(err) {
 		require.NoError(t, err)
 	}
-	defer func() {
-		if bundleCreated {
-			t.Logf("Deleting bundle %s", bundleName)
-			assert.NoError(t, bundleClient.Delete().
-				Namespace(bundleNamespace).
-				Resource(smith.BundleResourcePath).
-				Name(bundleName).
-				Do().
-				Error())
-			for _, resource := range bundle.Spec.Resources {
-				t.Logf("Deleting resource %s", resource.Spec.GetName())
-				gv, err := schema.ParseGroupVersion(resource.Spec.GetAPIVersion())
-				if !assert.NoError(t, err) {
-					continue
-				}
-				client, err := clients.ClientForGroupVersionKind(gv.WithKind(resource.Spec.GetKind()))
-				if !assert.NoError(t, err) {
-					continue
-				}
-				plural, _ := meta.KindToResource(resource.Spec.GroupVersionKind())
-				assert.NoError(t, client.Resource(&metav1.APIResource{
-					Name:       plural.Resource,
-					Namespaced: true,
-					Kind:       resource.Spec.GetKind(),
-				}, bundleNamespace).Delete(resource.Spec.GetName(), &metav1.DeleteOptions{}))
-			}
-		}
-	}()
+	var bundleCreated bool
+	defer cleanupBundle(t, bundleClient, clients, &bundleCreated, &bundle, bundleNamespace)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -107,83 +82,66 @@ func TestWorkflow(t *testing.T) {
 		apl := app.App{
 			RestConfig: config,
 		}
-		if err := apl.Run(ctx); err != context.Canceled && err != context.DeadlineExceeded {
-			assert.NoError(t, err)
+		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
+			assert.NoError(t, e)
 		}
 	}()
 
 	time.Sleep(1 * time.Second) // Wait until the app starts and creates the Bundle TPR
 
 	t.Log("Creating a new bundle")
-	var bundleRes smith.Bundle
 	require.NoError(t, bundleClient.Post().
 		Namespace(bundleNamespace).
 		Resource(smith.BundleResourcePath).
 		Body(&bundle).
 		Do().
-		Into(&bundleRes))
+		Error())
 
 	bundleCreated = true
 
-	for _, resource := range bundle.Spec.Resources {
-		func() {
-			c, err := clients.ClientForGroupVersionKind(resource.Spec.GroupVersionKind())
-			require.NoError(t, err)
-			plural, _ := meta.KindToResource(resource.Spec.GroupVersionKind())
-			w, err := c.Resource(&metav1.APIResource{
-				Name:       plural.Resource,
-				Namespaced: true,
-				Kind:       resource.Spec.GetKind(),
-			}, bundleNamespace).Watch(metav1.ListOptions{})
-			require.NoError(t, err)
-			defer w.Stop()
-			ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
-			defer cancel()
-			for {
-				select {
-				case <-ctxTimeout.Done():
-					t.Fatalf("Timeout waiting for events for resource %s", resource.Name)
-				case ev := <-w.ResultChan():
-					t.Logf("event %#v", ev)
-					if ev.Type != watch.Added || ev.Object.GetObjectKind().GroupVersionKind() != resource.Spec.GroupVersionKind() {
-						continue
-					}
-					obj := ev.Object.(*unstructured.Unstructured)
-					if obj.GetName() != resource.Spec.GetName() {
-						continue
-					}
-					t.Logf("received event for resource %q of kind %q", resource.Spec.GetName(), resource.Spec.GetKind())
-					assert.Equal(t, map[string]string{
-						"configLabel":         "configValue",
-						"bundleLabel":         "bundleValue",
-						"overlappingLabel":    "overlappingConfigValue",
-						smith.BundleNameLabel: bundleName,
-					}, obj.GetLabels())
-					// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/39816 is fixed
-					//a.Equal([]metav1.OwnerReference{
-					//	{
-					//		APIVersion: smith.BundleResourceVersion,
-					//		Kind:       smith.BundleResourceKind,
-					//		Name:       bundleName,
-					//		UID:        bundleRes.Metadata.UID,
-					//	},
-					//}, obj.GetOwnerReferences())
-					return
-				}
-			}
-		}()
-	}
-	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
-	require.NoError(t, bundleClient.Get().
-		Namespace(bundleNamespace).
-		Resource(smith.BundleResourcePath).
-		Name(bundleName).
-		Do().
-		Into(&bundleRes))
-	assertCondition(t, &bundleRes, smith.BundleReady, apiv1.ConditionTrue)
-	assertCondition(t, &bundleRes, smith.BundleInProgress, apiv1.ConditionFalse)
-	assertCondition(t, &bundleRes, smith.BundleError, apiv1.ConditionFalse)
-	require.Equal(t, bundle.Spec, bundleRes.Spec, "%#v", bundleRes)
+	store := resources.NewStore(scheme.DeepCopy)
+	bundleInf := bundleInformer(bundleClient)
+
+	var wgStore sync.WaitGroup
+	defer wgStore.Wait() // await store termination
+
+	ctxStore, cancelStore := context.WithCancel(context.Background())
+	defer cancelStore() // signal store to stop
+	wgStore.Add(1)
+	go store.Run(ctxStore, wgStore.Done)
+
+	store.AddInformer(smith.BundleGVK, bundleInf)
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	go bundleInf.Run(ctxTimeout.Done())
+
+	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, bundleNamespace, bundleName, awaitBundleReady)
+	require.NoError(t, err)
+	bundleRes := obj.(*smith.Bundle)
+
+	assertCondition(t, bundleRes, smith.BundleReady, apiv1.ConditionTrue)
+	assertCondition(t, bundleRes, smith.BundleInProgress, apiv1.ConditionFalse)
+	assertCondition(t, bundleRes, smith.BundleError, apiv1.ConditionFalse)
+	assert.Equal(t, bundle.Spec, bundleRes.Spec, "%#v", bundleRes)
+
+	cfMap, err := clientset.CoreV1().ConfigMaps(bundleNamespace).Get("config1", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"configLabel":         "configValue",
+		"bundleLabel":         "bundleValue",
+		"overlappingLabel":    "overlappingConfigValue",
+		smith.BundleNameLabel: bundleName,
+	}, cfMap.GetLabels())
+	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/39816 is fixed
+	//assert.Equal(t, []metav1.OwnerReference{
+	//	{
+	//		APIVersion: smith.BundleResourceVersion,
+	//		Kind:       smith.BundleResourceKind,
+	//		Name:       bundleName,
+	//		UID:        bundleRes.Metadata.UID,
+	//	},
+	//}, cfMap.GetOwnerReferences())
 }
 
 func bundleResources(t *testing.T) []smith.Resource {

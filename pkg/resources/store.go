@@ -26,9 +26,12 @@ var (
 
 type AwaitCallback func(runtime.Object, error)
 
+type AwaitCondition func(runtime.Object) bool
+
 type awaitRequest struct {
 	gvk      schema.GroupVersionKind
 	name     types.NamespacedName
+	cond     AwaitCondition
 	callback AwaitCallback
 }
 
@@ -124,11 +127,11 @@ func (s *Store) handleAwaitRequest(ar *awaitRequest) {
 		return
 	}
 	obj, exists, err := s.getFromIndexer(informer.GetIndexer(), ar.gvk, ar.name.Namespace, ar.name.Name)
-	if err != nil || exists {
+	if err != nil || (exists && ar.cond(obj)) {
 		ar.callback(obj, err)
 		return
 	}
-	// Object is not in the store (yet)
+	// Object is not in the store (yet) OR does not satisfy the condition
 	m := s.gvk2request[ar.gvk]
 	if m == nil {
 		m = make(map[types.NamespacedName]map[*awaitRequest]struct{})
@@ -150,12 +153,18 @@ func (s *Store) handleEvent(gvk schema.GroupVersionKind, obj runtime.Object) {
 	}
 	name := types.NamespacedName{Namespace: metaObj.GetNamespace(), Name: metaObj.GetName()}
 	m := s.gvk2request[gvk]
-	for ar := range m[name] {
-		ar.callback(obj, nil)
+	n := m[name]
+	for ar := range n {
+		if ar.cond(obj) {
+			delete(n, ar)
+			ar.callback(obj, nil)
+		}
 	}
-	delete(m, name)
-	if len(m) == 0 {
-		delete(s.gvk2request, gvk)
+	if len(n) == 0 {
+		delete(m, name)
+		if len(m) == 0 {
+			delete(s.gvk2request, gvk)
+		}
 	}
 }
 
@@ -165,9 +174,9 @@ func (s *Store) handleCancellation(ar *awaitRequest) {
 	delete(n, ar)
 	if len(n) == 0 {
 		delete(m, ar.name)
-	}
-	if len(m) == 0 {
-		delete(s.gvk2request, ar.gvk)
+		if len(m) == 0 {
+			delete(s.gvk2request, ar.gvk)
+		}
 	}
 }
 
@@ -243,13 +252,23 @@ func (s *Store) GetInformer(gvk schema.GroupVersionKind) (cache.SharedIndexInfor
 }
 
 // AwaitObject looks up object of specified GVK in the specified namespace by name.
-// This is a variant of Get method blocks until the object is available or context signals "done".
+// This is a variant of Get method that blocks until the object is available or context signals "done".
 // A deep copy of the object is returned so it is safe to modify it.
 func (s *Store) AwaitObject(ctx context.Context, gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error) {
+	return s.AwaitObjectCondition(ctx, gvk, namespace, name, func(obj runtime.Object) bool {
+		return true
+	})
+}
+
+// AwaitObjectCondition looks up object of specified GVK in the specified namespace by name.
+// This is a variant of AwaitObject method that blocks until the object is available and satisfies the condition or context signals "done".
+// A deep copy of the object is returned so it is safe to modify it.
+func (s *Store) AwaitObjectCondition(ctx context.Context, gvk schema.GroupVersionKind, namespace, name string, cond AwaitCondition) (runtime.Object, error) {
 	result := make(chan awaitResult)
 	ar := &awaitRequest{
 		gvk:  gvk,
 		name: types.NamespacedName{Namespace: namespace, Name: name},
+		cond: cond,
 		callback: func(obj runtime.Object, err error) {
 			result <- awaitResult{obj: obj, err: err}
 		},
@@ -316,6 +335,10 @@ func (l *listener) OnAdd(obj interface{}) {
 }
 
 func (l *listener) OnUpdate(oldObj, newObj interface{}) {
+	select {
+	case <-l.ctx.Done():
+	case l.events <- informerEvent{gvk: l.gvk, obj: newObj.(runtime.Object)}:
+	}
 }
 
 func (l *listener) OnDelete(obj interface{}) {

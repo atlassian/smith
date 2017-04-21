@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/dynamic"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 )
 
@@ -26,16 +27,18 @@ func TestTprAttribute(t *testing.T) {
 	config, err := resources.ConfigFromEnv()
 	require.NoError(t, err)
 
-	bundleClient, err := resources.GetBundleTprClient(config, smithScheme())
+	scheme := smithScheme()
+	bundleClient, err := resources.GetBundleTprClient(config, scheme)
 	require.NoError(t, err)
 
 	sClient, err := tprattribute.GetSleeperTprClient(config, sleeperScheme())
 	require.NoError(t, err)
 
+	clients := dynamic.NewClientPool(config, nil, dynamic.LegacyAPIPathResolverFunc)
+
 	bundleName := "bundle-attribute"
 	bundleNamespace := "default"
 
-	var bundleCreated bool
 	sleeper, sleeperU := bundleAttrResources(t)
 	bundle := smith.Bundle{
 		TypeMeta: metav1.TypeMeta{
@@ -65,24 +68,8 @@ func TestTprAttribute(t *testing.T) {
 	} else if !errors.IsNotFound(err) {
 		require.NoError(t, err)
 	}
-	defer func() {
-		if bundleCreated {
-			t.Logf("Deleting bundle %s", bundleName)
-			assert.NoError(t, bundleClient.Delete().
-				Namespace(bundleNamespace).
-				Resource(smith.BundleResourcePath).
-				Name(bundleName).
-				Do().
-				Error())
-			t.Logf("Deleting resource %s", sleeper.Metadata.Name)
-			assert.NoError(t, sClient.Delete().
-				Namespace(bundleNamespace).
-				Resource(tprattribute.SleeperResourcePath).
-				Name(sleeper.Metadata.Name).
-				Do().
-				Error())
-		}
-	}()
+	var bundleCreated bool
+	defer cleanupBundle(t, bundleClient, clients, &bundleCreated, &bundle, bundleNamespace)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -97,8 +84,8 @@ func TestTprAttribute(t *testing.T) {
 		apl := app.App{
 			RestConfig: config,
 		}
-		if err := apl.Run(ctx); err != context.Canceled && err != context.DeadlineExceeded {
-			assert.NoError(t, err)
+		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
+			assert.NoError(t, e)
 		}
 	}()
 	go func() {
@@ -107,12 +94,12 @@ func TestTprAttribute(t *testing.T) {
 		apl := tprattribute.App{
 			RestConfig: config,
 		}
-		if err := apl.Run(ctx); err != context.Canceled && err != context.DeadlineExceeded {
-			assert.NoError(t, err)
+		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
+			assert.NoError(t, e)
 		}
 	}()
 
-	time.Sleep(5 * time.Second) // Wait until apps start and creates the Bundle TPR and Sleeper TPR
+	time.Sleep(5 * time.Second) // Wait until apps start and create the Bundle TPR and Sleeper TPR
 
 	t.Log("Creating a new bundle")
 	require.NoError(t, bundleClient.Post().
@@ -124,47 +111,43 @@ func TestTprAttribute(t *testing.T) {
 
 	bundleCreated = true
 
-	func() {
-		w, err := sClient.Get().
-			Namespace(bundleNamespace).
-			Prefix("watch").
-			Resource(tprattribute.SleeperResourcePath).
-			Watch()
-		require.NoError(t, err)
-		defer w.Stop()
-		ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+1)*time.Second)
-		defer cancel()
-		for {
-			select {
-			case <-ctxTimeout.Done():
-				t.Fatalf("Timeout waiting for events for resource %q", sleeper.Metadata.Name)
-			case ev := <-w.ResultChan():
-				t.Logf("event %#v", ev)
-				obj := ev.Object.(*tprattribute.Sleeper)
-				if obj.Metadata.Name != sleeper.Metadata.Name {
-					continue
-				}
-				t.Logf("received event with status.state == %q for resource %q of kind %q", obj.Status.State, sleeper.Metadata.Name, sleeper.Kind)
-				assert.EqualValues(t, map[string]string{
-					smith.BundleNameLabel: bundleName,
-				}, obj.Metadata.Labels)
-				if obj.Status.State == tprattribute.Awake {
-					return
-				}
-			}
-		}
-	}()
-	time.Sleep(500 * time.Millisecond) // Wait a bit to let the server update the status
-	var bundleRes smith.Bundle
-	require.NoError(t, bundleClient.Get().
+	store := resources.NewStore(scheme.DeepCopy)
+	bundleInf := bundleInformer(bundleClient)
+
+	var wgStore sync.WaitGroup
+	defer wgStore.Wait() // await store termination
+
+	ctxStore, cancelStore := context.WithCancel(context.Background())
+	defer cancelStore() // signal store to stop
+	wgStore.Add(1)
+	go store.Run(ctxStore, wgStore.Done)
+
+	store.AddInformer(smith.BundleGVK, bundleInf)
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+1)*time.Second)
+	defer cancel()
+	go bundleInf.Run(ctxTimeout.Done())
+
+	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, bundleNamespace, bundleName, awaitBundleReady)
+	require.NoError(t, err)
+	bundleRes := obj.(*smith.Bundle)
+
+	assertCondition(t, bundleRes, smith.BundleReady, apiv1.ConditionTrue)
+	assertCondition(t, bundleRes, smith.BundleInProgress, apiv1.ConditionFalse)
+	assertCondition(t, bundleRes, smith.BundleError, apiv1.ConditionFalse)
+
+	var sleeperObj tprattribute.Sleeper
+	require.NoError(t, sClient.Get().
 		Namespace(bundleNamespace).
-		Resource(smith.BundleResourcePath).
-		Name(bundleName).
+		Resource(tprattribute.SleeperResourcePath).
+		Name(sleeper.Metadata.Name).
 		Do().
-		Into(&bundleRes))
-	assertCondition(t, &bundleRes, smith.BundleReady, apiv1.ConditionTrue)
-	assertCondition(t, &bundleRes, smith.BundleInProgress, apiv1.ConditionFalse)
-	assertCondition(t, &bundleRes, smith.BundleError, apiv1.ConditionFalse)
+		Into(&sleeperObj))
+
+	assert.Equal(t, map[string]string{
+		smith.BundleNameLabel: bundleName,
+	}, sleeperObj.Metadata.Labels)
+	assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
 }
 
 func bundleAttrResources(t *testing.T) (*tprattribute.Sleeper, *unstructured.Unstructured) {
