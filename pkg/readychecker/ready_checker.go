@@ -23,9 +23,10 @@ var knownTypes = map[schema.GroupKind]IsObjectReady{
 	{Group: "", Kind: "ConfigMap"}:            alwaysReady,
 	{Group: "", Kind: "Secret"}:               alwaysReady,
 	{Group: "", Kind: "Service"}:              alwaysReady,
+	{Group: "apps", Kind: "Deployment"}:       isDeploymentAppsReady,
 	{Group: "settings", Kind: "PodPreset"}:    alwaysReady,
 	{Group: "extensions", Kind: "Ingress"}:    alwaysReady,
-	{Group: "extensions", Kind: "Deployment"}: isDeploymentReady,
+	{Group: "extensions", Kind: "Deployment"}: isDeploymentExtReady,
 }
 
 // TprStore gets a TPR definition for a Group and Kind of the resource (TPR instance).
