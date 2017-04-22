@@ -136,7 +136,7 @@ func (wrk *worker) rebuildLoop(ctx context.Context, done func()) {
 // that a field "State" in the Status of the resource is set to "Ready". It may be customizable via
 // annotations with some defaults.
 func (wrk *worker) rebuild(bundle *smith.Bundle) (isReady, retriableError bool, e error) {
-	log.Printf("[WORKER] Rebuilding the bundle %s/%s", wrk.namespace, wrk.bundleName)
+	log.Printf("[WORKER][%s/%s] Rebuilding bundle", wrk.namespace, wrk.bundleName)
 
 	// Build resource map by name
 	resourceMap := make(map[smith.ResourceName]smith.Resource, len(bundle.Spec.Resources))
@@ -167,18 +167,18 @@ nextVertex:
 		for _, dependency := range graphData.Graph.Vertices[v].Edges() {
 			if _, ok := readyResources[dependency]; !ok {
 				allReady = false
-				log.Printf("[WORKER] bundle %s/%s: dependencies are not ready for resource %q", wrk.namespace, wrk.bundleName, v)
+				log.Printf("[WORKER][%s/%s] Dependencies are not ready for resource %q", wrk.namespace, wrk.bundleName, v)
 				continue nextVertex // Move to the next resource
 			}
 		}
 		// Process the resource
-		log.Printf("[WORKER] bundle %s/%s: checking resource %q", wrk.namespace, wrk.bundleName, v)
+		log.Printf("[WORKER][%s/%s] Checking resource %q", wrk.namespace, wrk.bundleName, v)
 		res := resourceMap[v]
 		readyResource, retriable, err := wrk.checkResource(bundle, &res, readyResources)
 		if err != nil {
 			return false, retriable, err
 		}
-		log.Printf("[WORKER] bundle %s/%s: resource %q, ready: %t", wrk.namespace, wrk.bundleName, v, readyResource != nil)
+		log.Printf("[WORKER][%s/%s] Resource %q, ready: %t", wrk.namespace, wrk.bundleName, v, readyResource != nil)
 		if readyResource != nil {
 			readyResources[v] = readyResource
 		} else {
@@ -283,15 +283,15 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 			}
 		}
 	} else {
-		log.Printf("[WORKER] bundle %s/%s: resource %q not found, creating", wrk.namespace, wrk.bundleName, res.Name)
+		log.Printf("[WORKER][%s/%s] Resource %q not found, creating", wrk.namespace, wrk.bundleName, res.Name)
 		// 3. Create if does not exist
 		response, err = resClient.Create(&res.Spec)
 		if err == nil {
-			log.Printf("[WORKER] bundle %s/%s: resource %q created", wrk.namespace, wrk.bundleName, res.Name)
+			log.Printf("[WORKER][%s/%s] Resource %q created", wrk.namespace, wrk.bundleName, res.Name)
 			return response, false, nil
 		}
 		if errors.IsAlreadyExists(err) {
-			log.Printf("[WORKER] bundle %s/%s: resource %q found, but not in Store yet", wrk.namespace, wrk.bundleName, res.Name)
+			log.Printf("[WORKER][%s/%s] Resource %q found, but not in Store yet", wrk.namespace, wrk.bundleName, res.Name)
 			// We let the next rebuild() iteration, triggered by someone else creating the resource, to finish the work.
 			return nil, false, nil
 		}
@@ -306,7 +306,7 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 		return nil, false, err
 	}
 	if updated == nil {
-		log.Printf("[WORKER] bundle %s/%s: resource %q has correct spec", wrk.namespace, wrk.bundleName, res.Name)
+		log.Printf("[WORKER][%s/%s] Resource %q has correct spec", wrk.namespace, wrk.bundleName, res.Name)
 		return response, false, nil
 	}
 
@@ -314,19 +314,19 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 	response, err = resClient.Update(updated)
 	if err != nil {
 		if errors.IsConflict(err) {
-			log.Printf("[WORKER] bundle %s/%s: resource %q update resulted in conflict, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
+			log.Printf("[WORKER][%s/%s] Resource %q update resulted in conflict, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
 			// We let the next rebuild() iteration, triggered by someone else creating the resource, to finish the work.
 			return nil, false, nil
 		}
 		// Unexpected error, will retry
 		return nil, true, err
 	}
-	log.Printf("[WORKER] bundle %s/%s: resource %q updated", wrk.namespace, wrk.bundleName, res.Name)
+	log.Printf("[WORKER][%s/%s] Resource %q updated", wrk.namespace, wrk.bundleName, res.Name)
 	return response, false, nil
 }
 
 func (wrk *worker) setBundleStatus(bundle *smith.Bundle) error {
-	log.Printf("[WORKER] setting bundle %s/%s status to %v", wrk.namespace, wrk.bundleName, bundle.Status)
+	log.Printf("[WORKER][%s/%s] Setting bundle status to %v", wrk.namespace, wrk.bundleName, bundle.Status)
 	err := wrk.bundleClient.Put().
 		Namespace(wrk.namespace).
 		Resource(smith.BundleResourcePath).
@@ -423,7 +423,7 @@ func (wrk *worker) handleRebuildResult(bundle *smith.Bundle, isReady, retriableE
 		return false
 	}
 
-	log.Printf("[WORKER] Failed to rebuild the bundle %s/%s: %v", wrk.namespace, wrk.bundleName, err)
+	log.Printf("[WORKER][%s/%s] Failed to rebuild bundle: %v", wrk.namespace, wrk.bundleName, err)
 	// If error is not retriable then we just tell the external loop to re-iterate without backoff
 	// and terminates naturally unless new work is available.
 	return retriableError
