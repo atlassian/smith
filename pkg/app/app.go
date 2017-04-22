@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
+	appsv1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	settings "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	"k8s.io/client-go/rest"
@@ -57,11 +58,12 @@ func (a *App) Run(ctx context.Context) error {
 
 	informerFactory := informers.NewSharedInformerFactory(clientset, ResyncPeriod)
 	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
-	deploymentInf := informerFactory.Extensions().V1beta1().Deployments().Informer()
+	deploymentExtInf := informerFactory.Extensions().V1beta1().Deployments().Informer()
 	ingressInf := informerFactory.Extensions().V1beta1().Ingresses().Informer()
 	serviceInf := informerFactory.Core().V1().Services().Informer()
 	configMapInf := informerFactory.Core().V1().ConfigMaps().Informer()
 	secretInf := informerFactory.Core().V1().Secrets().Informer()
+	deploymentAppsInf := informerFactory.Apps().V1beta1().Deployments().Informer()
 	var podPresetInf cache.SharedIndexInformer
 	if PodPresetEnabled {
 		podPresetInf = informerFactory.Settings().V1alpha1().PodPresets().Informer()
@@ -80,11 +82,12 @@ func (a *App) Run(ctx context.Context) error {
 	go store.Run(ctxStore, wgStore.Done)
 
 	store.AddInformer(smith.TprGVK, tprInf)
-	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Deployment"), deploymentInf)
+	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Deployment"), deploymentExtInf)
 	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Ingress"), ingressInf)
 	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("Service"), serviceInf)
 	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("ConfigMap"), configMapInf)
 	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("Secret"), secretInf)
+	store.AddInformer(appsv1beta1.SchemeGroupVersion.WithKind("Deployment"), deploymentAppsInf)
 	if PodPresetEnabled {
 		store.AddInformer(settings.SchemeGroupVersion.WithKind("PodPreset"), podPresetInf)
 	}
@@ -165,11 +168,12 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 6. Watch supported built-in resource types
 
-	deploymentInf.AddEventHandler(reh)
+	deploymentExtInf.AddEventHandler(reh)
 	ingressInf.AddEventHandler(reh)
 	serviceInf.AddEventHandler(reh)
 	configMapInf.AddEventHandler(reh)
 	secretInf.AddEventHandler(reh)
+	deploymentAppsInf.AddEventHandler(reh)
 	if PodPresetEnabled {
 		podPresetInf.AddEventHandler(reh)
 	}
