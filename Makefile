@@ -25,16 +25,16 @@ setup-ci:
 	glide install --strip-vendor
 
 build: fmt
-	go build -i -v -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
+	go build -i -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
 build-race: fmt
-	go build -i -v -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
+	go build -i -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
 build-all: fmt
-	go install -v $$(glide nv | grep -v integration_tests)
+	go install $$(glide nv | grep -v integration_tests)
 
 build-all-race: fmt
-	go install -v -race $$(glide nv | grep -v integration_tests)
+	go install -race $$(glide nv | grep -v integration_tests)
 
 fmt:
 	gofmt -w=true -s $$(find . -type f -name '*.go' -not -path "./vendor/*")
