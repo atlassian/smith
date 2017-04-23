@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -51,23 +52,7 @@ func (a *App) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// 1. Informers
-
-	informerFactory := informers.NewSharedInformerFactory(clientset, a.ResyncPeriod)
-	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
-	deploymentExtInf := informerFactory.Extensions().V1beta1().Deployments().Informer()
-	ingressInf := informerFactory.Extensions().V1beta1().Ingresses().Informer()
-	serviceInf := informerFactory.Core().V1().Services().Informer()
-	configMapInf := informerFactory.Core().V1().ConfigMaps().Informer()
-	secretInf := informerFactory.Core().V1().Secrets().Informer()
-	deploymentAppsInf := informerFactory.Apps().V1beta1().Deployments().Informer()
-	var podPresetInf cache.SharedIndexInformer
-	if !a.DisablePodPreset {
-		podPresetInf = informerFactory.Settings().V1alpha1().PodPresets().Informer()
-	}
-	bundleInf := a.bundleInformer(bundleClient)
-
-	// 1.5 Store
+	// 1. Store
 	store := resources.NewStore(scheme.DeepCopy)
 
 	var wgStore sync.WaitGroup
@@ -78,19 +63,16 @@ func (a *App) Run(ctx context.Context) error {
 	wgStore.Add(1)
 	go store.Run(ctxStore, wgStore.Done)
 
-	store.AddInformer(smith.TprGVK, tprInf)
-	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Deployment"), deploymentExtInf)
-	store.AddInformer(extensions.SchemeGroupVersion.WithKind("Ingress"), ingressInf)
-	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("Service"), serviceInf)
-	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("ConfigMap"), configMapInf)
-	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("Secret"), secretInf)
-	store.AddInformer(appsv1beta1.SchemeGroupVersion.WithKind("Deployment"), deploymentAppsInf)
-	if !a.DisablePodPreset {
-		store.AddInformer(settings.SchemeGroupVersion.WithKind("PodPreset"), podPresetInf)
-	}
+	// 1.5. Informers
+	bundleInf := a.bundleInformer(bundleClient)
 	store.AddInformer(smith.BundleGVK, bundleInf)
 
-	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
+	infs, err := a.resourceInformers(ctx, store, clientset)
+	if err != nil {
+		return err
+	}
+	tprInf := infs[smith.TprGVK]
+	delete(infs, smith.TprGVK) // To avoid adding generic event handler later
 
 	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
 	// in Ready Checker.
@@ -165,14 +147,8 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 6. Watch supported built-in resource types
 
-	deploymentExtInf.AddEventHandler(reh)
-	ingressInf.AddEventHandler(reh)
-	serviceInf.AddEventHandler(reh)
-	configMapInf.AddEventHandler(reh)
-	secretInf.AddEventHandler(reh)
-	deploymentAppsInf.AddEventHandler(reh)
-	if !a.DisablePodPreset {
-		podPresetInf.AddEventHandler(reh)
+	for _, inf := range infs {
+		inf.AddEventHandler(reh)
 	}
 
 	// 7. Watch Third Party Resources to add watches for supported ones
@@ -191,4 +167,31 @@ func (a *App) bundleInformer(bundleClient cache.Getter) cache.SharedIndexInforme
 		cache.Indexers{
 			ByTprNameIndex: byTprNameIndex,
 		})
+}
+
+func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mainClient kubernetes.Interface) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
+	mainSif := informers.NewSharedInformerFactory(mainClient, a.ResyncPeriod)
+
+	// Core API types
+	infs := map[schema.GroupVersionKind]cache.SharedIndexInformer{
+		smith.TprGVK: mainSif.Extensions().V1beta1().ThirdPartyResources().Informer(),
+		extensions.SchemeGroupVersion.WithKind("Deployment"):  mainSif.Extensions().V1beta1().Deployments().Informer(),
+		extensions.SchemeGroupVersion.WithKind("Ingress"):     mainSif.Extensions().V1beta1().Ingresses().Informer(),
+		apiv1.SchemeGroupVersion.WithKind("Service"):          mainSif.Core().V1().Services().Informer(),
+		apiv1.SchemeGroupVersion.WithKind("ConfigMap"):        mainSif.Core().V1().ConfigMaps().Informer(),
+		apiv1.SchemeGroupVersion.WithKind("Secret"):           mainSif.Core().V1().Secrets().Informer(),
+		appsv1beta1.SchemeGroupVersion.WithKind("Deployment"): mainSif.Apps().V1beta1().Deployments().Informer(),
+	}
+	if !a.DisablePodPreset {
+		infs[settings.SchemeGroupVersion.WithKind("PodPreset")] = mainSif.Settings().V1alpha1().PodPresets().Informer()
+	}
+
+	// Add all to Store
+	for gvk, inf := range infs {
+		store.AddInformer(gvk, inf)
+	}
+
+	// Start informers
+	mainSif.Start(ctx.Done()) // Must be after store.AddInformer()
+	return infs, nil
 }
