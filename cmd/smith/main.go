@@ -39,7 +39,7 @@ func runWithContext(ctx context.Context) error {
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.BoolVar(&a.DisablePodPreset, "disable-pod-preset", false, "Disable PodPreset support")
 	fs.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Set resync period for informers")
-	_ = fs.Parse(os.Args[1:])
+	fs.Parse(os.Args[1:]) // nolint: gas
 
 	config, err := resources.ConfigFromEnv()
 	if err != nil {
