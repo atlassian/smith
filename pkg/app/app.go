@@ -26,13 +26,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const (
-	ResyncPeriod     = 1 * time.Minute
-	PodPresetEnabled = true
-)
-
 type App struct {
-	RestConfig *rest.Config
+	RestConfig       *rest.Config
+	ResyncPeriod     time.Duration
+	DisablePodPreset bool
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -56,7 +53,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 1. Informers
 
-	informerFactory := informers.NewSharedInformerFactory(clientset, ResyncPeriod)
+	informerFactory := informers.NewSharedInformerFactory(clientset, a.ResyncPeriod)
 	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
 	deploymentExtInf := informerFactory.Extensions().V1beta1().Deployments().Informer()
 	ingressInf := informerFactory.Extensions().V1beta1().Ingresses().Informer()
@@ -65,10 +62,10 @@ func (a *App) Run(ctx context.Context) error {
 	secretInf := informerFactory.Core().V1().Secrets().Informer()
 	deploymentAppsInf := informerFactory.Apps().V1beta1().Deployments().Informer()
 	var podPresetInf cache.SharedIndexInformer
-	if PodPresetEnabled {
+	if !a.DisablePodPreset {
 		podPresetInf = informerFactory.Settings().V1alpha1().PodPresets().Informer()
 	}
-	bundleInf := bundleInformer(bundleClient)
+	bundleInf := a.bundleInformer(bundleClient)
 
 	// 1.5 Store
 	store := resources.NewStore(scheme.DeepCopy)
@@ -88,7 +85,7 @@ func (a *App) Run(ctx context.Context) error {
 	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("ConfigMap"), configMapInf)
 	store.AddInformer(apiv1.SchemeGroupVersion.WithKind("Secret"), secretInf)
 	store.AddInformer(appsv1beta1.SchemeGroupVersion.WithKind("Deployment"), deploymentAppsInf)
-	if PodPresetEnabled {
+	if !a.DisablePodPreset {
 		store.AddInformer(settings.SchemeGroupVersion.WithKind("PodPreset"), podPresetInf)
 	}
 	store.AddInformer(smith.BundleGVK, bundleInf)
@@ -174,23 +171,23 @@ func (a *App) Run(ctx context.Context) error {
 	configMapInf.AddEventHandler(reh)
 	secretInf.AddEventHandler(reh)
 	deploymentAppsInf.AddEventHandler(reh)
-	if PodPresetEnabled {
+	if !a.DisablePodPreset {
 		podPresetInf.AddEventHandler(reh)
 	}
 
 	// 7. Watch Third Party Resources to add watches for supported ones
 
-	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients, store, bp, bs, ResyncPeriod))
+	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients, store, bp, bs, a.ResyncPeriod))
 
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func bundleInformer(bundleClient cache.Getter) cache.SharedIndexInformer {
+func (a *App) bundleInformer(bundleClient cache.Getter) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, metav1.NamespaceAll, fields.Everything()),
 		&smith.Bundle{},
-		ResyncPeriod,
+		a.ResyncPeriod,
 		cache.Indexers{
 			ByTprNameIndex: byTprNameIndex,
 		})
