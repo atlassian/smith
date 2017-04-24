@@ -30,7 +30,7 @@ func TestWorkflow(t *testing.T) {
 	clientset, err := kubernetes.NewForConfig(config)
 	require.NoError(t, err)
 
-	scheme := smithScheme()
+	scheme := resources.BundleScheme()
 	bundleClient, err := resources.GetBundleTprClient(config, scheme)
 	require.NoError(t, err)
 

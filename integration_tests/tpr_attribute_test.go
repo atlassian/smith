@@ -27,7 +27,7 @@ func TestTprAttribute(t *testing.T) {
 	config, err := resources.ConfigFromEnv()
 	require.NoError(t, err)
 
-	scheme := smithScheme()
+	scheme := resources.BundleScheme()
 	bundleClient, err := resources.GetBundleTprClient(config, scheme)
 	require.NoError(t, err)
 

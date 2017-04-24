@@ -38,11 +38,11 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	scheme := runtime.NewScheme()
-	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
-	smith.AddToScheme(scheme)
-
-	bundleClient, err := resources.GetBundleTprClient(a.RestConfig, scheme)
+	scheme, err := a.fullScheme()
+	if err != nil {
+		return err
+	}
+	bundleClient, err := resources.GetBundleTprClient(a.RestConfig, resources.BundleScheme())
 	if err != nil {
 		return err
 	}
@@ -167,6 +167,21 @@ func (a *App) bundleInformer(bundleClient cache.Getter) cache.SharedIndexInforme
 		cache.Indexers{
 			ByTprNameIndex: byTprNameIndex,
 		})
+}
+
+func (a *App) fullScheme() (*runtime.Scheme, error) {
+	scheme := runtime.NewScheme()
+	smith.AddToScheme(scheme)
+	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+	var sb runtime.SchemeBuilder
+	sb.Register(extensions.SchemeBuilder...)
+	sb.Register(apiv1.SchemeBuilder...)
+	sb.Register(appsv1beta1.SchemeBuilder...)
+	sb.Register(settings.SchemeBuilder...)
+	if err := sb.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+	return scheme, nil
 }
 
 func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mainClient kubernetes.Interface) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
