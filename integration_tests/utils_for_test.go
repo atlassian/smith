@@ -31,13 +31,6 @@ func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.Bun
 	}
 }
 
-func smithScheme() *runtime.Scheme {
-	scheme := runtime.NewScheme()
-	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
-	smith.AddToScheme(scheme)
-	return scheme
-}
-
 func sleeperScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})

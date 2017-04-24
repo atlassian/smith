@@ -7,11 +7,20 @@ import (
 
 	"github.com/atlassian/smith"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 )
+
+func BundleScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	smith.AddToScheme(scheme)
+	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+	return scheme
+}
 
 func GetBundleTprClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTClient, error) {
 	groupVersion := schema.GroupVersion{

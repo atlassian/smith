@@ -27,7 +27,7 @@ func TestStore(t *testing.T) {
 	clientset, err := kubernetes.NewForConfig(config)
 	require.NoError(t, err)
 
-	store := resources.NewStore(smithScheme().DeepCopy)
+	store := resources.NewStore(resources.BundleScheme().DeepCopy)
 
 	var wgStore sync.WaitGroup
 	defer wgStore.Wait() // await store termination
