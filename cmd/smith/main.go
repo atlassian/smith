@@ -38,6 +38,7 @@ func runWithContext(ctx context.Context) error {
 
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.BoolVar(&a.DisablePodPreset, "disable-pod-preset", false, "Disable PodPreset support")
+	scUrl := fs.String("service-catalog-url", "", "Service Catalog API server URL")
 	fs.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Set resync period for informers")
 	fs.Parse(os.Args[1:]) // nolint: gas
 
@@ -50,6 +51,11 @@ func runWithContext(ctx context.Context) error {
 	}
 	config.UserAgent = "smith/" + Version + "/" + GitCommit
 	a.RestConfig = config
+	if *scUrl != "" {
+		scConfig := *config // shallow copy
+		scConfig.Host = *scUrl
+		a.ServiceCatalogConfig = &scConfig
+	}
 
 	return a.Run(ctx)
 }

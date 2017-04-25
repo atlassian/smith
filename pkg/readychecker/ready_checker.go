@@ -1,6 +1,7 @@
 package readychecker
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -12,22 +13,9 @@ import (
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
+// IsObjectReady checks if an object is Ready.
+// Each function is responsible for handling different versions of objects itself.
 type IsObjectReady func(*unstructured.Unstructured) (isReady, retriableError bool, e error)
-
-func alwaysReady(_ *unstructured.Unstructured) (isReady, retriableError bool, e error) {
-	return true, false, nil
-}
-
-// each function is responsible for handling different versions of objects itself.
-var knownTypes = map[schema.GroupKind]IsObjectReady{
-	{Group: "", Kind: "ConfigMap"}:            alwaysReady,
-	{Group: "", Kind: "Secret"}:               alwaysReady,
-	{Group: "", Kind: "Service"}:              alwaysReady,
-	{Group: "apps", Kind: "Deployment"}:       isDeploymentAppsReady,
-	{Group: "settings", Kind: "PodPreset"}:    alwaysReady,
-	{Group: "extensions", Kind: "Ingress"}:    alwaysReady,
-	{Group: "extensions", Kind: "Deployment"}: isDeploymentExtReady,
-}
 
 // TprStore gets a TPR definition for a Group and Kind of the resource (TPR instance).
 // Returns nil if TPR definition was not found.
@@ -36,14 +24,31 @@ type TprStore interface {
 }
 
 type ReadyChecker struct {
-	Store TprStore
+	Store      TprStore
+	KnownTypes map[schema.GroupKind]IsObjectReady
+}
+
+func New(store TprStore, kts ...map[schema.GroupKind]IsObjectReady) *ReadyChecker {
+	kt := make(map[schema.GroupKind]IsObjectReady)
+	for _, knownTypes := range kts {
+		for knownGK, f := range knownTypes {
+			if kt[knownGK] != nil {
+				panic(fmt.Errorf("GK specified more than once: %s", knownGK))
+			}
+			kt[knownGK] = f
+		}
+	}
+	return &ReadyChecker{
+		Store:      store,
+		KnownTypes: kt,
+	}
 }
 
 func (rc *ReadyChecker) IsReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	gk := obj.GroupVersionKind().GroupKind()
 
 	// 1. Check if it is a known built-in resource
-	if isObjectReady, ok := knownTypes[gk]; ok {
+	if isObjectReady, ok := rc.KnownTypes[gk]; ok {
 		return isObjectReady(obj)
 	}
 
