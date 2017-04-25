@@ -12,6 +12,9 @@ import (
 	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/resources"
 
+	scv1alpha1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	scInf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,9 +31,10 @@ import (
 )
 
 type App struct {
-	RestConfig       *rest.Config
-	ResyncPeriod     time.Duration
-	DisablePodPreset bool
+	RestConfig           *rest.Config
+	ServiceCatalogConfig *rest.Config
+	ResyncPeriod         time.Duration
+	DisablePodPreset     bool
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -81,12 +85,11 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 2. Ready Checker
-
-	rc := &readychecker.ReadyChecker{
-		Store: &tprStore{
-			store: store,
-		},
+	types := []map[schema.GroupKind]readychecker.IsObjectReady{readychecker.MainKnownTypes}
+	if a.ServiceCatalogConfig != nil {
+		types = append(types, readychecker.ServiceCatalogKnownTypes)
 	}
+	rc := readychecker.New(&tprStore{store: store}, types...)
 
 	// 3. Processor
 
@@ -97,7 +100,7 @@ func (a *App) Run(ctx context.Context) error {
 	go bp.Run(ctx, wg.Done)
 	defer cancel() // cancel ctx to signal done to processor (and everything else)
 
-	// 4. Ensure ThirdPartyResource TEMPLATE exists
+	// 4. Ensure ThirdPartyResource Bundle exists
 	bundleTpr := &extensions.ThirdPartyResource{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: smith.BundleResourceName,
@@ -172,12 +175,16 @@ func (a *App) bundleInformer(bundleClient cache.Getter) cache.SharedIndexInforme
 func (a *App) fullScheme() (*runtime.Scheme, error) {
 	scheme := runtime.NewScheme()
 	smith.AddToScheme(scheme)
-	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
 	var sb runtime.SchemeBuilder
 	sb.Register(extensions.SchemeBuilder...)
 	sb.Register(apiv1.SchemeBuilder...)
 	sb.Register(appsv1beta1.SchemeBuilder...)
 	sb.Register(settings.SchemeBuilder...)
+	if a.ServiceCatalogConfig != nil {
+		sb.Register(scv1alpha1.SchemeBuilder...)
+	} else {
+		scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+	}
 	if err := sb.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
@@ -201,12 +208,27 @@ func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mai
 		infs[settings.SchemeGroupVersion.WithKind("PodPreset")] = mainSif.Settings().V1alpha1().PodPresets().Informer()
 	}
 
+	// Service Catalog types
+	var scSif scInf.SharedInformerFactory
+	if a.ServiceCatalogConfig != nil {
+		scClient, err := scClientset.NewForConfig(a.ServiceCatalogConfig)
+		if err != nil {
+			return nil, err
+		}
+		scSif = scInf.NewSharedInformerFactory(scClient, a.ResyncPeriod)
+		infs[scv1alpha1.SchemeGroupVersion.WithKind("Binding")] = scSif.Servicecatalog().V1alpha1().Bindings().Informer()
+		infs[scv1alpha1.SchemeGroupVersion.WithKind("Instance")] = scSif.Servicecatalog().V1alpha1().Instances().Informer()
+	}
+
 	// Add all to Store
 	for gvk, inf := range infs {
 		store.AddInformer(gvk, inf)
 	}
 
 	// Start informers
+	if scSif != nil {
+		scSif.Start(ctx.Done()) // Must be after store.AddInformer()
+	}
 	mainSif.Start(ctx.Done()) // Must be after store.AddInformer()
 	return infs, nil
 }
