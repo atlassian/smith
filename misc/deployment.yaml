@@ -12,5 +12,8 @@ spec:
     spec:
       containers:
       - name: smith
-        image: "atlassianlabs/smith:2104283-race"
+        image: "atlassianlabs/smith:4fddcf8-race"
         imagePullPolicy: Always
+        args:
+        - '-service-catalog-url'
+        - 'http://catalog-catalog-apiserver.catalog'
