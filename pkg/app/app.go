@@ -17,7 +17,6 @@ import (
 	scInf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -42,7 +41,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	scheme, err := a.fullScheme()
+	scheme, err := resources.FullScheme(a.ServiceCatalogConfig != nil)
 	if err != nil {
 		return err
 	}
@@ -170,25 +169,6 @@ func (a *App) bundleInformer(bundleClient cache.Getter) cache.SharedIndexInforme
 		cache.Indexers{
 			ByTprNameIndex: byTprNameIndex,
 		})
-}
-
-func (a *App) fullScheme() (*runtime.Scheme, error) {
-	scheme := runtime.NewScheme()
-	smith.AddToScheme(scheme)
-	var sb runtime.SchemeBuilder
-	sb.Register(extensions.SchemeBuilder...)
-	sb.Register(apiv1.SchemeBuilder...)
-	sb.Register(appsv1beta1.SchemeBuilder...)
-	sb.Register(settings.SchemeBuilder...)
-	if a.ServiceCatalogConfig != nil {
-		sb.Register(scv1alpha1.SchemeBuilder...)
-	} else {
-		scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
-	}
-	if err := sb.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-	return scheme, nil
 }
 
 func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mainClient kubernetes.Interface) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
