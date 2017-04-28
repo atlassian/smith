@@ -16,16 +16,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 )
 
 func TestStore(t *testing.T) {
-	config, err := resources.ConfigFromEnv()
-	require.NoError(t, err)
-
-	clientset, err := kubernetes.NewForConfig(config)
-	require.NoError(t, err)
+	_, clientset, _, _ := testSetup(t)
 
 	store := resources.NewStore(resources.BundleScheme().DeepCopy)
 
@@ -48,10 +43,10 @@ func TestStore(t *testing.T) {
 	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
 
 	t.Run("timeout", func(t *testing.T) {
-		ctxTimeout, cancelTimeout1 := context.WithTimeout(ctx, 5*time.Second)
+		ctxTimeout, cancelTimeout1 := context.WithTimeout(ctx, 1*time.Second)
 		defer cancelTimeout1()
 
-		_, err = store.AwaitObject(ctxTimeout, configMapGvk, useNamespace, "i-do-not-exist-13123123123")
+		_, err := store.AwaitObject(ctxTimeout, configMapGvk, useNamespace, "i-do-not-exist-13123123123")
 		assert.EqualError(t, err, context.DeadlineExceeded.Error())
 	})
 	t.Run("create", func(t *testing.T) {
@@ -65,7 +60,7 @@ func TestStore(t *testing.T) {
 			},
 		}
 
-		err = clientset.CoreV1().ConfigMaps(useNamespace).Delete(mapName, &metav1.DeleteOptions{})
+		err := clientset.CoreV1().ConfigMaps(useNamespace).Delete(mapName, &metav1.DeleteOptions{})
 		if err != nil && !kerrors.IsNotFound(err) {
 			require.NoError(t, err)
 		}
@@ -93,6 +88,7 @@ func TestStore(t *testing.T) {
 		assert.Equal(t, cm, obj)
 	})
 	t.Run("remove informer", func(t *testing.T) {
+		var err error
 		mapName := "i-do-not-exist-234234"
 		ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 5*time.Second)
 		defer cancelTimeout()
@@ -112,7 +108,7 @@ func TestStore(t *testing.T) {
 		ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 5*time.Second)
 		defer cancelTimeout()
 
-		_, err = store.AwaitObject(ctxTimeout, apiv1.SchemeGroupVersion.WithKind("Secret"), useNamespace, mapName)
+		_, err := store.AwaitObject(ctxTimeout, apiv1.SchemeGroupVersion.WithKind("Secret"), useNamespace, mapName)
 		require.EqualError(t, err, "no informer for /v1, Kind=Secret is registered")
 	})
 }
