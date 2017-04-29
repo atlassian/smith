@@ -18,6 +18,8 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -166,4 +168,12 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog bool, test test
 	bundleCreated = true
 
 	test(t, ctx, bundle, config, clientset, clients, bundleClient, store, args...)
+}
+
+func toUnstructured(t *testing.T, obj runtime.Object) unstructured.Unstructured {
+	result := unstructured.Unstructured{
+		Object: make(map[string]interface{}),
+	}
+	require.NoError(t, unstructured_conversion.NewConverter(true).ToUnstructured(obj, &result.Object))
+	return result
 }

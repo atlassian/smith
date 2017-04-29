@@ -4,7 +4,6 @@ package integration_tests
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -37,7 +36,7 @@ func TestTprAttribute(t *testing.T) {
 			Resources: []smith.Resource{
 				{
 					Name: smith.ResourceName(sleeper.Metadata.Name),
-					Spec: *sleeperU,
+					Spec: sleeperU,
 				},
 			},
 		},
@@ -97,7 +96,7 @@ func testTprAttribute(t *testing.T, ctx context.Context, bundle *smith.Bundle, c
 	assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
 }
 
-func bundleAttrResources(t *testing.T) (*tprattribute.Sleeper, *unstructured.Unstructured) {
+func bundleAttrResources(t *testing.T) (*tprattribute.Sleeper, unstructured.Unstructured) {
 	c := &tprattribute.Sleeper{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       tprattribute.SleeperResourceKind,
@@ -111,10 +110,5 @@ func bundleAttrResources(t *testing.T) (*tprattribute.Sleeper, *unstructured.Uns
 			WakeupMessage: "Hello, Infravators!",
 		},
 	}
-	data, err := json.Marshal(c)
-	require.NoError(t, err)
-
-	u := &unstructured.Unstructured{}
-	require.NoError(t, u.UnmarshalJSON(data))
-	return c, u
+	return c, toUnstructured(t, c)
 }

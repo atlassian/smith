@@ -4,7 +4,6 @@ package integration_tests
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
@@ -100,15 +98,10 @@ func bundleResources(t *testing.T) []smith.Resource {
 			"a": "b",
 		},
 	}
-	data, err := json.Marshal(&c)
-	require.NoError(t, err)
-
-	r1 := unstructured.Unstructured{}
-	require.NoError(t, r1.UnmarshalJSON(data))
 	return []smith.Resource{
 		{
 			Name: "resource1",
-			Spec: r1,
+			Spec: toUnstructured(t, &c),
 		},
 	}
 }
