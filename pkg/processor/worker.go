@@ -20,7 +20,6 @@ import (
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -356,53 +355,53 @@ func (wrk *worker) handleRebuildResult(bundle *smith.Bundle, isReady, retriableE
 	if err == nil {
 		errorCond = smith.BundleCondition{
 			Type:   smith.BundleError,
-			Status: apiv1.ConditionFalse,
+			Status: smith.ConditionFalse,
 		}
 		if isReady {
 			inProgressCond = smith.BundleCondition{
 				Type:   smith.BundleInProgress,
-				Status: apiv1.ConditionFalse,
+				Status: smith.ConditionFalse,
 			}
 			readyCond = smith.BundleCondition{
 				Type:   smith.BundleReady,
-				Status: apiv1.ConditionTrue,
+				Status: smith.ConditionTrue,
 			}
 		} else {
 			inProgressCond = smith.BundleCondition{
 				Type:   smith.BundleInProgress,
-				Status: apiv1.ConditionTrue,
+				Status: smith.ConditionTrue,
 			}
 			readyCond = smith.BundleCondition{
 				Type:   smith.BundleReady,
-				Status: apiv1.ConditionFalse,
+				Status: smith.ConditionFalse,
 			}
 		}
 	} else {
 		readyCond = smith.BundleCondition{
 			Type:   smith.BundleReady,
-			Status: apiv1.ConditionFalse,
+			Status: smith.ConditionFalse,
 		}
 		if retriableError {
 			errorCond = smith.BundleCondition{
 				Type:    smith.BundleError,
-				Status:  apiv1.ConditionTrue,
+				Status:  smith.ConditionTrue,
 				Reason:  "RetriableError",
 				Message: err.Error(),
 			}
 			inProgressCond = smith.BundleCondition{
 				Type:   smith.BundleInProgress,
-				Status: apiv1.ConditionTrue,
+				Status: smith.ConditionTrue,
 			}
 		} else {
 			errorCond = smith.BundleCondition{
 				Type:    smith.BundleError,
-				Status:  apiv1.ConditionTrue,
+				Status:  smith.ConditionTrue,
 				Reason:  "TerminalError",
 				Message: err.Error(),
 			}
 			inProgressCond = smith.BundleCondition{
 				Type:   smith.BundleInProgress,
-				Status: apiv1.ConditionFalse,
+				Status: smith.ConditionFalse,
 			}
 		}
 	}
@@ -423,7 +422,7 @@ func (wrk *worker) handleRebuildResult(bundle *smith.Bundle, isReady, retriableE
 		return false
 	}
 
-	log.Printf("[WORKER][%s/%s] Failed to rebuild bundle: %v", wrk.namespace, wrk.bundleName, err)
+	log.Printf("[WORKER][%s/%s] Failed to rebuild bundle (retriable: %t): %v", wrk.namespace, wrk.bundleName, retriableError, err)
 	// If error is not retriable then we just tell the external loop to re-iterate without backoff
 	// and terminates naturally unless new work is available.
 	return retriableError

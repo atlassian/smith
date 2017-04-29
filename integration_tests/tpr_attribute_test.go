@@ -19,7 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -80,9 +79,9 @@ func testTprAttribute(t *testing.T, ctx context.Context, bundle *smith.Bundle, c
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
 
-	assertCondition(t, bundleRes, smith.BundleReady, apiv1.ConditionTrue)
-	assertCondition(t, bundleRes, smith.BundleInProgress, apiv1.ConditionFalse)
-	assertCondition(t, bundleRes, smith.BundleError, apiv1.ConditionFalse)
+	assertCondition(t, bundleRes, smith.BundleReady, smith.ConditionTrue)
+	assertCondition(t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
+	assertCondition(t, bundleRes, smith.BundleError, smith.ConditionFalse)
 
 	var sleeperObj tprattribute.Sleeper
 	require.NoError(t, sClient.Get().

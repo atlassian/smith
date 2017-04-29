@@ -29,12 +29,12 @@ import (
 )
 
 const (
-	useNamespace = apiv1.NamespaceDefault
+	useNamespace = metav1.NamespaceDefault
 )
 
 type testFunc func(*testing.T, context.Context, *smith.Bundle, *rest.Config, *kubernetes.Clientset, dynamic.ClientPool, *rest.RESTClient, *resources.Store, ...interface{})
 
-func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status apiv1.ConditionStatus) {
+func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) {
 	_, condition := bundle.GetCondition(conditionType)
 	if assert.NotNil(t, condition) {
 		assert.Equal(t, status, condition.Status)
@@ -89,7 +89,7 @@ func cleanupBundle(t *testing.T, bundleClient *rest.RESTClient, clients dynamic.
 func isBundleReady(obj runtime.Object) bool {
 	b := obj.(*smith.Bundle)
 	_, cond := b.GetCondition(smith.BundleReady)
-	return cond != nil && cond.Status == apiv1.ConditionTrue
+	return cond != nil && cond.Status == smith.ConditionTrue
 }
 
 func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, dynamic.ClientPool, *rest.RESTClient) {

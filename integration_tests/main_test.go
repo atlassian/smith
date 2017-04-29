@@ -58,9 +58,9 @@ func testWorkflow(t *testing.T, ctx context.Context, bundle *smith.Bundle, confi
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
 
-	assertCondition(t, bundleRes, smith.BundleReady, apiv1.ConditionTrue)
-	assertCondition(t, bundleRes, smith.BundleInProgress, apiv1.ConditionFalse)
-	assertCondition(t, bundleRes, smith.BundleError, apiv1.ConditionFalse)
+	assertCondition(t, bundleRes, smith.BundleReady, smith.ConditionTrue)
+	assertCondition(t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
+	assertCondition(t, bundleRes, smith.BundleError, smith.ConditionFalse)
 	assert.Equal(t, bundle.Spec, bundleRes.Spec, "%#v", bundleRes)
 
 	cfMap, err := clientset.CoreV1().ConfigMaps(bundle.Metadata.Namespace).Get("config1", metav1.GetOptions{})

@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
@@ -18,6 +17,18 @@ const (
 	BundleInProgress BundleConditionType = "InProgress"
 	BundleReady      BundleConditionType = "Ready"
 	BundleError      BundleConditionType = "Error"
+)
+
+type ConditionStatus string
+
+// These are valid condition statuses. "ConditionTrue" means a resource is in the condition.
+// "ConditionFalse" means a resource is not in the condition. "ConditionUnknown" means kubernetes
+// can't decide if a resource is in the condition or not. In the future, we could add other
+// intermediate conditions, e.g. ConditionDegraded.
+const (
+	ConditionTrue    ConditionStatus = "True"
+	ConditionFalse   ConditionStatus = "False"
+	ConditionUnknown ConditionStatus = "Unknown"
 )
 
 const (
@@ -154,8 +165,8 @@ type BundleSpec struct {
 type BundleCondition struct {
 	// Type of Bundle condition.
 	Type BundleConditionType `json:"type"`
-	// Status of the condition, one of True, False, Unknown.
-	Status apiv1.ConditionStatus `json:"status"`
+	// Status of the condition.
+	Status ConditionStatus `json:"status"`
 	// The last time this condition was updated.
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
 	// Last time the condition transitioned from one status to another.
