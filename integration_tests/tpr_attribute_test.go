@@ -30,7 +30,7 @@ func TestTprAttribute(t *testing.T) {
 		},
 		Metadata: metav1.ObjectMeta{
 			Name:      "bundle-attribute",
-			Namespace: "default",
+			Namespace: useNamespace,
 		},
 		Spec: smith.BundleSpec{
 			Resources: []smith.Resource{
@@ -66,13 +66,8 @@ func testTprAttribute(t *testing.T, ctx context.Context, bundle *smith.Bundle, c
 		}
 	}()
 
-	bundleInf := bundleInformer(bundleClient)
-
-	store.AddInformer(smith.BundleGVK, bundleInf)
-
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+3)*time.Second)
 	defer cancel()
-	go bundleInf.Run(ctxTimeout.Done())
 
 	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, bundle.Metadata.Namespace, bundle.Metadata.Name, isBundleReady)
 	require.NoError(t, err)

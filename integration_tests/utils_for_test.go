@@ -167,6 +167,10 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog bool, test test
 
 	bundleCreated = true
 
+	bundleInf := bundleInformer(bundleClient)
+	store.AddInformer(smith.BundleGVK, bundleInf)
+	go bundleInf.Run(ctx.Done())
+
 	test(t, ctx, bundle, config, clientset, clients, bundleClient, store, args...)
 }
 
