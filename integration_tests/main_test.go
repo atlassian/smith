@@ -27,7 +27,7 @@ func TestWorkflow(t *testing.T) {
 		},
 		Metadata: metav1.ObjectMeta{
 			Name:      "bundle1",
-			Namespace: "default",
+			Namespace: useNamespace,
 			Labels: map[string]string{
 				"bundleLabel":         "bundleValue",
 				"overlappingLabel":    "overlappingBundleValue",
@@ -44,13 +44,8 @@ func TestWorkflow(t *testing.T) {
 func testWorkflow(t *testing.T, ctx context.Context, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
 	clients dynamic.ClientPool, bundleClient *rest.RESTClient, store *resources.Store, args ...interface{}) {
 
-	bundleInf := bundleInformer(bundleClient)
-
-	store.AddInformer(smith.BundleGVK, bundleInf)
-
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	go bundleInf.Run(ctxTimeout.Done())
 
 	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, bundle.Metadata.Namespace, bundle.Metadata.Name, isBundleReady)
 	require.NoError(t, err)
