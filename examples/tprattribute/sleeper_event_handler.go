@@ -14,8 +14,22 @@ type SleeperEventHandler struct {
 }
 
 func (h *SleeperEventHandler) OnAdd(obj interface{}) {
+	h.handle(obj)
+}
+
+func (h *SleeperEventHandler) OnUpdate(oldObj, newObj interface{}) {
+	in := *newObj.(*Sleeper)
+	if in.Status.State == New {
+		h.handle(newObj)
+	}
+}
+
+func (h *SleeperEventHandler) OnDelete(obj interface{}) {
+}
+
+func (h *SleeperEventHandler) handle(obj interface{}) {
 	in := *obj.(*Sleeper)
-	log.Printf("[Sleeper] %s/%s was added. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Metadata.Namespace, in.Metadata.Name, Sleeping, in.Spec.SleepFor)
+	log.Printf("[Sleeper] %s/%s was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Metadata.Namespace, in.Metadata.Name, Sleeping, in.Spec.SleepFor)
 	in.Status.State = Sleeping
 	err := h.client.Put().
 		Namespace(in.Metadata.Namespace).
@@ -50,10 +64,4 @@ func (h *SleeperEventHandler) OnAdd(obj interface{}) {
 
 		}
 	}()
-}
-
-func (h *SleeperEventHandler) OnUpdate(oldObj, newObj interface{}) {
-}
-
-func (h *SleeperEventHandler) OnDelete(obj interface{}) {
 }
