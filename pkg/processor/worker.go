@@ -9,16 +9,14 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/processor/graph"
+	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/cenk/backoff"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -29,6 +27,7 @@ var (
 
 type workerConfig struct {
 	bundleClient *rest.RESTClient
+	scDynamic    dynamic.ClientPool
 	clients      dynamic.ClientPool
 	rc           ReadyChecker
 	deepCopy     smith.DeepCopy
@@ -243,24 +242,11 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 
 func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
 	// 1. Prepare client
-	gv, err := schema.ParseGroupVersion(res.Spec.GetAPIVersion())
+	resClient, err := resources.ClientForResource(&res.Spec, wrk.clients, wrk.scDynamic, wrk.namespace)
 	if err != nil {
 		return nil, false, err
 	}
-	kind := res.Spec.GetKind()
-	gvk := gv.WithKind(kind)
-	client, err := wrk.clients.ClientForGroupVersionKind(gvk)
-	if err != nil {
-		return nil, false, err
-	}
-
-	plural, _ := meta.KindToResource(gvk)
-
-	resClient := client.Resource(&metav1.APIResource{
-		Name:       plural.Resource,
-		Namespaced: true,
-		Kind:       kind,
-	}, wrk.namespace)
+	gvk := res.Spec.GetObjectKind().GroupVersionKind()
 
 	// 2. Try to get the resource. We do read first to avoid generating unnecessary events.
 	obj, exists, err := wrk.store.Get(gvk, wrk.namespace, res.Spec.GetName())
@@ -462,8 +448,8 @@ func updateResource(deepCopy smith.DeepCopy, desired *smith.Resource, actual *un
 	actualClone := actClone.(*unstructured.Unstructured)
 
 	// This is to ensure those fields actually exist in underlying map whether they are nil or empty slices/map
-	actualClone.SetKind(actualClone.GetKind())
-	actualClone.SetAPIVersion(actualClone.GetAPIVersion())
+	actualClone.SetKind(spec.GetKind())             // Objects from type-specific informers don't have kind/api version
+	actualClone.SetAPIVersion(spec.GetAPIVersion()) // Objects from type-specific informers don't have kind/api version
 	actualClone.SetName(actualClone.GetName())
 	actualClone.SetLabels(actualClone.GetLabels())
 	actualClone.SetAnnotations(actualClone.GetAnnotations())

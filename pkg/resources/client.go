@@ -2,16 +2,20 @@ package resources
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"os"
 
 	"github.com/atlassian/smith"
 
+	sc_v0 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog"
 	scv1alpha1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/dynamic"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	appsv1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
@@ -83,4 +87,29 @@ func ConfigFromEnv() (*rest.Config, error) {
 			KeyFile:  KeyFile,
 		},
 	}, nil
+}
+
+func ClientForResource(obj runtime.Object, coreDynamic, scDynamic dynamic.ClientPool, namespace string) (*dynamic.ResourceClient, error) {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	var clients dynamic.ClientPool
+	if gvk.Group == sc_v0.GroupName {
+		if scDynamic == nil {
+			return nil, fmt.Errorf("client for Service Catalog is not configured, cannot work with object %s", gvk)
+		}
+		clients = scDynamic
+	} else {
+		clients = coreDynamic
+	}
+	client, err := clients.ClientForGroupVersionKind(gvk)
+	if err != nil {
+		return nil, err
+	}
+
+	plural, _ := meta.KindToResource(gvk)
+
+	return client.Resource(&metav1.APIResource{
+		Name:       plural.Resource,
+		Namespaced: true,
+		Kind:       gvk.Kind,
+	}, namespace), nil
 }

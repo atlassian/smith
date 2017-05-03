@@ -29,8 +29,7 @@ func TestTprAttribute(t *testing.T) {
 			APIVersion: smith.BundleResourceGroupVersion,
 		},
 		Metadata: metav1.ObjectMeta{
-			Name:      "bundle-attribute",
-			Namespace: useNamespace,
+			Name: "bundle-attribute",
 		},
 		Spec: smith.BundleSpec{
 			Resources: []smith.Resource{
@@ -41,11 +40,11 @@ func TestTprAttribute(t *testing.T) {
 			},
 		},
 	}
-	setupApp(t, bundle, false, testTprAttribute, sleeper)
+	setupApp(t, bundle, false, true, testTprAttribute, sleeper)
 }
 
-func testTprAttribute(t *testing.T, ctx context.Context, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
-	clients dynamic.ClientPool, bundleClient *rest.RESTClient, store *resources.Store, args ...interface{}) {
+func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
+	clients dynamic.ClientPool, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
 
 	sleeper := args[0].(*tprattribute.Sleeper)
 	sClient, err := tprattribute.GetSleeperTprClient(config, sleeperScheme())
@@ -69,7 +68,7 @@ func testTprAttribute(t *testing.T, ctx context.Context, bundle *smith.Bundle, c
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+3)*time.Second)
 	defer cancel()
 
-	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, bundle.Metadata.Namespace, bundle.Metadata.Name, isBundleReady)
+	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Metadata.Name, isBundleReady)
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
 
@@ -79,7 +78,7 @@ func testTprAttribute(t *testing.T, ctx context.Context, bundle *smith.Bundle, c
 
 	var sleeperObj tprattribute.Sleeper
 	require.NoError(t, sClient.Get().
-		Namespace(bundle.Metadata.Namespace).
+		Namespace(namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Name(sleeper.Metadata.Name).
 		Do().
