@@ -1,9 +1,8 @@
-// +build integration
-
 package integration_tests
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -22,7 +21,6 @@ import (
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
@@ -31,10 +29,11 @@ import (
 )
 
 const (
-	useNamespace = metav1.NamespaceDefault
+	useNamespace              = metav1.NamespaceDefault
+	serviceCatalogUrlEnvParam = "SERVICE_CATALOG_URL"
 )
 
-type testFunc func(*testing.T, context.Context, *smith.Bundle, *rest.Config, *kubernetes.Clientset, dynamic.ClientPool, *rest.RESTClient, *resources.Store, ...interface{})
+type testFunc func(*testing.T, context.Context, string, *smith.Bundle, *rest.Config, *kubernetes.Clientset, dynamic.ClientPool, *rest.RESTClient, *bool, *resources.Store, ...interface{})
 
 func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) {
 	_, condition := bundle.GetCondition(conditionType)
@@ -58,33 +57,24 @@ func bundleInformer(bundleClient cache.Getter) cache.SharedIndexInformer {
 		cache.Indexers{})
 }
 
-func cleanupBundle(t *testing.T, bundleClient *rest.RESTClient, clients dynamic.ClientPool, bundleCreated *bool, bundle *smith.Bundle) {
+func cleanupBundle(t *testing.T, namespace string, bundleClient *rest.RESTClient, clients, scDynamic dynamic.ClientPool, bundleCreated *bool, bundle *smith.Bundle) {
 	if !*bundleCreated {
 		return
 	}
 	t.Logf("Deleting bundle %s", bundle.Metadata.Name)
 	assert.NoError(t, bundleClient.Delete().
-		Namespace(bundle.Metadata.Namespace).
+		Namespace(namespace).
 		Resource(smith.BundleResourcePath).
 		Name(bundle.Metadata.Name).
 		Do().
 		Error())
 	for _, resource := range bundle.Spec.Resources {
 		t.Logf("Deleting resource %s", resource.Spec.GetName())
-		gv, err := schema.ParseGroupVersion(resource.Spec.GetAPIVersion())
+		client, err := resources.ClientForResource(&resource.Spec, clients, scDynamic, namespace)
 		if !assert.NoError(t, err) {
 			continue
 		}
-		client, err := clients.ClientForGroupVersionKind(gv.WithKind(resource.Spec.GetKind()))
-		if !assert.NoError(t, err) {
-			continue
-		}
-		plural, _ := meta.KindToResource(resource.Spec.GroupVersionKind())
-		assert.NoError(t, client.Resource(&metav1.APIResource{
-			Name:       plural.Resource,
-			Namespaced: true,
-			Kind:       resource.Spec.GetKind(),
-		}, bundle.Metadata.Namespace).Delete(resource.Spec.GetName(), nil))
+		assert.NoError(t, client.Delete(resource.Spec.GetName(), nil))
 	}
 }
 
@@ -110,8 +100,17 @@ func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, dynamic.Clien
 	return config, clientset, clients, bundleClient
 }
 
-func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog bool, test testFunc, args ...interface{}) {
+func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle bool, test testFunc, args ...interface{}) {
 	config, clientset, clients, bundleClient := testSetup(t)
+	var serviceCatalogConfig *rest.Config
+	var scDynamic dynamic.ClientPool
+	if serviceCatalog {
+		scConfig := *config // shallow copy
+		scConfig.Host = os.Getenv(serviceCatalogUrlEnvParam)
+		require.NotEmpty(t, scConfig.Host, "required environment variable %s is not set", serviceCatalogUrlEnvParam)
+		serviceCatalogConfig = &scConfig
+		scDynamic = dynamic.NewClientPool(serviceCatalogConfig, nil, dynamic.LegacyAPIPathResolverFunc)
+	}
 
 	scheme, err := resources.FullScheme(serviceCatalog)
 	require.NoError(t, err)
@@ -125,7 +124,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog bool, test test
 	go store.Run(ctxStore, wgStore.Done)
 
 	err = bundleClient.Delete().
-		Namespace(bundle.Metadata.Namespace).
+		Namespace(useNamespace).
 		Resource(smith.BundleResourcePath).
 		Name(bundle.Metadata.Name).
 		Do().
@@ -136,7 +135,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog bool, test test
 		require.NoError(t, err)
 	}
 	var bundleCreated bool
-	defer cleanupBundle(t, bundleClient, clients, &bundleCreated, bundle)
+	defer cleanupBundle(t, useNamespace, bundleClient, clients, scDynamic, &bundleCreated, bundle)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -148,30 +147,26 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog bool, test test
 	go func() {
 		defer wg.Done()
 		apl := app.App{
-			RestConfig: config,
+			RestConfig:           config,
+			ServiceCatalogConfig: serviceCatalogConfig,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
 		}
 	}()
 
-	time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle TPR
+	if createBundle {
+		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle TPR
 
-	t.Logf("Creating a new bundle %s/%s", bundle.Metadata.Namespace, bundle.Metadata.Name)
-	require.NoError(t, bundleClient.Post().
-		Namespace(bundle.Metadata.Namespace).
-		Resource(smith.BundleResourcePath).
-		Body(bundle).
-		Do().
-		Error())
-
-	bundleCreated = true
+		createObject(t, bundle, useNamespace, smith.BundleResourcePath, bundleClient)
+		bundleCreated = true
+	}
 
 	bundleInf := bundleInformer(bundleClient)
 	store.AddInformer(smith.BundleGVK, bundleInf)
 	go bundleInf.Run(ctx.Done())
 
-	test(t, ctx, bundle, config, clientset, clients, bundleClient, store, args...)
+	test(t, ctx, useNamespace, bundle, config, clientset, clients, bundleClient, &bundleCreated, store, args...)
 }
 
 func toUnstructured(t *testing.T, obj runtime.Object) unstructured.Unstructured {
@@ -180,4 +175,17 @@ func toUnstructured(t *testing.T, obj runtime.Object) unstructured.Unstructured 
 	}
 	require.NoError(t, unstructured_conversion.NewConverter(true).ToUnstructured(obj, &result.Object))
 	return result
+}
+
+func createObject(t *testing.T, obj runtime.Object, namespace, resourcePath string, client *rest.RESTClient) {
+	metaObj, err := meta.Accessor(obj)
+	require.NoError(t, err)
+
+	t.Logf("Creating a new object %s/%s of kind %s", namespace, metaObj.GetName(), obj.GetObjectKind().GroupVersionKind().Kind)
+	require.NoError(t, client.Post().
+		Namespace(namespace).
+		Resource(resourcePath).
+		Body(obj).
+		Do().
+		Error())
 }

@@ -48,6 +48,15 @@ minikube-test: build-all-race
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	go test -tags=integration -race -v ./integration_tests
 
+minikube-test-sc: build-all-race
+	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
+	KUBERNETES_SERVICE_PORT=8443 \
+	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
+	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
+	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
+	SERVICE_CATALOG_URL="http://$$(minikube ip):30080" \
+	go test -tags=integration_sc -race -v ./integration_tests
+
 minikube-run: build-all-race
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \

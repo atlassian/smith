@@ -37,9 +37,19 @@ type App struct {
 }
 
 func (a *App) Run(ctx context.Context) error {
+	// 0. Clients
 	clientset, err := kubernetes.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
+	}
+	var scClient *scClientset.Clientset
+	var scDynamic dynamic.ClientPool
+	if a.ServiceCatalogConfig != nil {
+		scClient, err = scClientset.NewForConfig(a.ServiceCatalogConfig)
+		if err != nil {
+			return err
+		}
+		scDynamic = dynamic.NewClientPool(a.ServiceCatalogConfig, nil, dynamic.LegacyAPIPathResolverFunc)
 	}
 	scheme, err := resources.FullScheme(a.ServiceCatalogConfig != nil)
 	if err != nil {
@@ -70,10 +80,7 @@ func (a *App) Run(ctx context.Context) error {
 	bundleInf := a.bundleInformer(bundleClient)
 	store.AddInformer(smith.BundleGVK, bundleInf)
 
-	infs, err := a.resourceInformers(ctx, store, clientset)
-	if err != nil {
-		return err
-	}
+	infs := a.resourceInformers(ctx, store, clientset, scClient)
 	tprInf := infs[smith.TprGVK]
 	delete(infs, smith.TprGVK) // To avoid adding generic event handler later
 
@@ -92,7 +99,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 3. Processor
 
-	bp := processor.New(bundleClient, clients, rc, scheme.DeepCopy, store)
+	bp := processor.New(bundleClient, scDynamic, clients, rc, scheme.DeepCopy, store)
 	var wg sync.WaitGroup
 	defer wg.Wait() // await termination
 	wg.Add(1)
@@ -171,7 +178,7 @@ func (a *App) bundleInformer(bundleClient cache.Getter) cache.SharedIndexInforme
 		})
 }
 
-func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mainClient kubernetes.Interface) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
+func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mainClient kubernetes.Interface, scClient *scClientset.Clientset) map[schema.GroupVersionKind]cache.SharedIndexInformer {
 	mainSif := informers.NewSharedInformerFactory(mainClient, a.ResyncPeriod)
 
 	// Core API types
@@ -190,11 +197,7 @@ func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mai
 
 	// Service Catalog types
 	var scSif scInf.SharedInformerFactory
-	if a.ServiceCatalogConfig != nil {
-		scClient, err := scClientset.NewForConfig(a.ServiceCatalogConfig)
-		if err != nil {
-			return nil, err
-		}
+	if scClient != nil {
 		scSif = scInf.NewSharedInformerFactory(scClient, a.ResyncPeriod)
 		infs[scv1alpha1.SchemeGroupVersion.WithKind("Binding")] = scSif.Servicecatalog().V1alpha1().Bindings().Informer()
 		infs[scv1alpha1.SchemeGroupVersion.WithKind("Instance")] = scSif.Servicecatalog().V1alpha1().Instances().Informer()
@@ -210,5 +213,5 @@ func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mai
 		scSif.Start(ctx.Done()) // Must be after store.AddInformer()
 	}
 	mainSif.Start(ctx.Done()) // Must be after store.AddInformer()
-	return infs, nil
+	return infs
 }

@@ -26,8 +26,7 @@ func TestWorkflow(t *testing.T) {
 			APIVersion: smith.BundleResourceGroupVersion,
 		},
 		Metadata: metav1.ObjectMeta{
-			Name:      "bundle1",
-			Namespace: useNamespace,
+			Name: "bundle1",
 			Labels: map[string]string{
 				"bundleLabel":         "bundleValue",
 				"overlappingLabel":    "overlappingBundleValue",
@@ -38,16 +37,16 @@ func TestWorkflow(t *testing.T) {
 			Resources: bundleResources(t),
 		},
 	}
-	setupApp(t, bundle, false, testWorkflow)
+	setupApp(t, bundle, false, true, testWorkflow)
 }
 
-func testWorkflow(t *testing.T, ctx context.Context, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
-	clients dynamic.ClientPool, bundleClient *rest.RESTClient, store *resources.Store, args ...interface{}) {
+func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
+	clients dynamic.ClientPool, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, bundle.Metadata.Namespace, bundle.Metadata.Name, isBundleReady)
+	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Metadata.Name, isBundleReady)
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
 
@@ -56,7 +55,7 @@ func testWorkflow(t *testing.T, ctx context.Context, bundle *smith.Bundle, confi
 	assertCondition(t, bundleRes, smith.BundleError, smith.ConditionFalse)
 	assert.Equal(t, bundle.Spec, bundleRes.Spec, "%#v", bundleRes)
 
-	cfMap, err := clientset.CoreV1().ConfigMaps(bundle.Metadata.Namespace).Get("config1", metav1.GetOptions{})
+	cfMap, err := clientset.CoreV1().ConfigMaps(namespace).Get("config1", metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
 		"configLabel":         "configValue",
