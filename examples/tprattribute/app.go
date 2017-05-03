@@ -2,6 +2,7 @@ package tprattribute
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -60,6 +61,13 @@ func (a *App) Run(ctx context.Context) error {
 	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
 
 	// 1. Ensure ThirdPartyResource Sleeper exists
+
+	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
+	// in resources.EnsureTprExists().
+	if !cache.WaitForCacheSync(ctx.Done(), tprInf.HasSynced) {
+		return errors.New("wait for TPR Informer was cancelled")
+	}
+
 	tpr := &extensions.ThirdPartyResource{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: SleeperResourceName,
