@@ -60,7 +60,7 @@ func TestStore(t *testing.T) {
 			},
 		}
 
-		err := clientset.CoreV1().ConfigMaps(useNamespace).Delete(mapName, &metav1.DeleteOptions{})
+		err := clientset.CoreV1().ConfigMaps(useNamespace).Delete(mapName, nil)
 		if err != nil && !kerrors.IsNotFound(err) {
 			require.NoError(t, err)
 		}
@@ -80,11 +80,12 @@ func TestStore(t *testing.T) {
 		require.NoError(t, errCreate)
 		defer func() {
 			// Cleanup after successful create
-			err = clientset.CoreV1().ConfigMaps(useNamespace).Delete(mapName, &metav1.DeleteOptions{})
+			err = clientset.CoreV1().ConfigMaps(useNamespace).Delete(mapName, nil)
 			assert.NoError(t, err)
 		}()
 		wg.Wait()
 		require.NoError(t, err)
+		cm.GetObjectKind().SetGroupVersionKind(apiv1.SchemeGroupVersion.WithKind("ConfigMap"))
 		assert.Equal(t, cm, obj)
 	})
 	t.Run("remove informer", func(t *testing.T) {

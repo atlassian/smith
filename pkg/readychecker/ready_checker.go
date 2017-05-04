@@ -45,7 +45,12 @@ func New(store TprStore, kts ...map[schema.GroupKind]IsObjectReady) *ReadyChecke
 }
 
 func (rc *ReadyChecker) IsReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
-	gk := obj.GroupVersionKind().GroupKind()
+	gvk := obj.GroupVersionKind()
+	gk := gvk.GroupKind()
+
+	if gk.Kind == "" || gvk.Version == "" { // Group can be empty e.g. built-in objects like ConfigMap
+		return false, false, fmt.Errorf("object %q has empty kind/version: %v", obj.GetName(), gvk)
+	}
 
 	// 1. Check if it is a known built-in resource
 	if isObjectReady, ok := rc.KnownTypes[gk]; ok {

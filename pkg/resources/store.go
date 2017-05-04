@@ -155,9 +155,19 @@ func (s *Store) handleEvent(gvk schema.GroupVersionKind, obj runtime.Object) {
 	m := s.gvk2request[gvk]
 	n := m[name]
 	for ar := range n {
-		if ar.cond(obj) {
+		// Must deep copy and set GVK before checking cond() to be consistent with how handleAwaitRequest() works.
+		// And it makes sense in any case.
+		o, err := s.deepCopy(obj) // Each callback gets its own copy
+		if err != nil {
 			delete(n, ar)
-			ar.callback(obj, nil)
+			ar.callback(nil, fmt.Errorf("failed to deep copy %T: %v", obj, err))
+			continue
+		}
+		ro := o.(runtime.Object)
+		ro.GetObjectKind().SetGroupVersionKind(gvk) // Objects from type-specific informers don't have GVK set
+		if ar.cond(ro) {
+			delete(n, ar)
+			ar.callback(ro, nil)
 		}
 	}
 	if len(n) == 0 {
@@ -312,9 +322,11 @@ func (s *Store) getFromIndexer(indexer cache.Indexer, gvk schema.GroupVersionKin
 	case 1:
 		obj, err := s.deepCopy(objs[0])
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to do deep copy of %#v: %v", objs[0], err)
+			return nil, false, fmt.Errorf("failed to deep copy %T: %v", objs[0], err)
 		}
-		return obj.(runtime.Object), true, nil
+		ro := obj.(runtime.Object)
+		ro.GetObjectKind().SetGroupVersionKind(gvk) // Objects from type-specific informers don't have GVK set
+		return ro, true, nil
 	default:
 		// Must never happen
 		panic(fmt.Errorf("multiple objects by namespace/name key for %v: %s", gvk, objs))
@@ -352,7 +364,7 @@ func MetaNamespaceKeyFunc(obj interface{}) ([]string, error) {
 	}
 	m, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get meta of object: %v", err)
+		return nil, fmt.Errorf("failed get meta of object: %v", err)
 	}
 	return []string{ByNamespaceAndNameIndexKey(m.GetNamespace(), m.GetName())}, nil
 }

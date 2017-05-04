@@ -240,6 +240,8 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 	return nil
 }
 
+// createOrUpdate creates or updates a resources.
+// May return nil resource without any errors if an update/create conflict happened.
 func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
 	// 1. Prepare client
 	resClient, err := resources.ClientForResource(&res.Spec, wrk.clients, wrk.scDynamic, wrk.namespace)
@@ -276,7 +278,7 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 			return response, false, nil
 		}
 		if errors.IsAlreadyExists(err) {
-			log.Printf("[WORKER][%s/%s] Resource %q found, but not in Store yet", wrk.namespace, wrk.bundleName, res.Name)
+			log.Printf("[WORKER][%s/%s] Resource %q found, but not in Store yet, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
 			// We let the next rebuild() iteration, triggered by someone else creating the resource, to finish the work.
 			return nil, false, nil
 		}
@@ -300,7 +302,7 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 	if err != nil {
 		if errors.IsConflict(err) {
 			log.Printf("[WORKER][%s/%s] Resource %q update resulted in conflict, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
-			// We let the next rebuild() iteration, triggered by someone else creating the resource, to finish the work.
+			// We let the next rebuild() iteration, triggered by someone else updating the resource, to finish the work.
 			return nil, false, nil
 		}
 		// Unexpected error, will retry

@@ -44,7 +44,7 @@ func TestTprAttribute(t *testing.T) {
 }
 
 func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
-	clients dynamic.ClientPool, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
+	clients, scDynamic dynamic.ClientPool, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
 
 	sleeper := args[0].(*tprattribute.Sleeper)
 	sClient, err := tprattribute.GetSleeperTprClient(config, sleeperScheme())

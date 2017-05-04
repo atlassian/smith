@@ -40,7 +40,7 @@ func (s *bundleStore) GetBundles(tprName string) ([]*smith.Bundle, error) {
 	for _, bundle := range bundles {
 		b, err := s.deepCopy(bundle)
 		if err != nil {
-			log.Printf("Failed to make a deep copy of %T: %v", bundle, err)
+			log.Printf("Failed to deep copy %T: %v", bundle, err)
 			continue
 		}
 		result = append(result, b.(*smith.Bundle))

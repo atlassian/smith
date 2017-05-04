@@ -33,7 +33,7 @@ const (
 	serviceCatalogUrlEnvParam = "SERVICE_CATALOG_URL"
 )
 
-type testFunc func(*testing.T, context.Context, string, *smith.Bundle, *rest.Config, *kubernetes.Clientset, dynamic.ClientPool, *rest.RESTClient, *bool, *resources.Store, ...interface{})
+type testFunc func(*testing.T, context.Context, string, *smith.Bundle, *rest.Config, *kubernetes.Clientset, dynamic.ClientPool, dynamic.ClientPool, *rest.RESTClient, *bool, *resources.Store, ...interface{})
 
 func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) {
 	_, condition := bundle.GetCondition(conditionType)
@@ -166,7 +166,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	store.AddInformer(smith.BundleGVK, bundleInf)
 	go bundleInf.Run(ctx.Done())
 
-	test(t, ctx, useNamespace, bundle, config, clientset, clients, bundleClient, &bundleCreated, store, args...)
+	test(t, ctx, useNamespace, bundle, config, clientset, clients, scDynamic, bundleClient, &bundleCreated, store, args...)
 }
 
 func toUnstructured(t *testing.T, obj runtime.Object) unstructured.Unstructured {
