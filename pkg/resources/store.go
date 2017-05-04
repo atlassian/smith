@@ -328,20 +328,21 @@ type listener struct {
 }
 
 func (l *listener) OnAdd(obj interface{}) {
+	l.handle(obj)
+}
+
+func (l *listener) OnUpdate(oldObj, newObj interface{}) {
+	l.handle(newObj)
+}
+
+func (l *listener) OnDelete(obj interface{}) {
+}
+
+func (l *listener) handle(obj interface{}) {
 	select {
 	case <-l.ctx.Done():
 	case l.events <- informerEvent{gvk: l.gvk, obj: obj.(runtime.Object)}:
 	}
-}
-
-func (l *listener) OnUpdate(oldObj, newObj interface{}) {
-	select {
-	case <-l.ctx.Done():
-	case l.events <- informerEvent{gvk: l.gvk, obj: newObj.(runtime.Object)}:
-	}
-}
-
-func (l *listener) OnDelete(obj interface{}) {
 }
 
 // MetaNamespaceKeyFunc is a slightly modified cache.MetaNamespaceKeyFunc().
