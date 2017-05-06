@@ -124,7 +124,19 @@ func versionsMap(tpr *extensions.ThirdPartyResource) map[string]extensions.APIVe
 }
 
 func (h *tprEventHandler) OnDelete(obj interface{}) {
-	tpr := obj.(*extensions.ThirdPartyResource)
+	tpr, ok := obj.(*extensions.ThirdPartyResource)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			log.Printf("[TPREH] Delete event with unrecognized object type: %T", obj)
+			return
+		}
+		tpr, ok = tombstone.Obj.(*extensions.ThirdPartyResource)
+		if !ok {
+			log.Printf("[TPREH] Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			return
+		}
+	}
 	func() {
 		h.mx.Lock()
 		defer h.mx.Unlock()
