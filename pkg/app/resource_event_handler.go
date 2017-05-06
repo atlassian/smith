@@ -7,6 +7,7 @@ import (
 	"github.com/atlassian/smith"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 )
 
 // Name2Bundle is a function that does a lookup of Bundle based on its namespace and name.
@@ -36,7 +37,20 @@ func (h *resourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
 }
 
 func (h *resourceEventHandler) OnDelete(obj interface{}) {
-	bundleName, namespace := getBundleNameAndNamespace(obj)
+	meta, ok := obj.(metav1.Object)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			log.Printf("[REH] Delete event with unrecognized object type: %T", obj)
+			return
+		}
+		meta, ok = tombstone.Obj.(metav1.Object)
+		if !ok {
+			log.Printf("[REH] Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			return
+		}
+	}
+	bundleName, namespace := getBundleNameAndNamespace(meta)
 	h.rebuildByName(namespace, bundleName, "deleted", obj)
 }
 
