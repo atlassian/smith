@@ -123,7 +123,7 @@ individual resources and much better than polling individual resources.
 
 ## Missing features
 
-See [milestone v1.0](https://github.com/atlassian/smith/milestones/1) and previous milestones.
+See [milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0) and previous milestones.
 
 ## Notes
 
