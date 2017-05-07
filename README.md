@@ -115,6 +115,16 @@ Smith is watching all supported resource types and inspects labels on events to 
 bundle should be re-processed because of the event. This scales better than watching
 individual resources and much better than polling individual resources.
 
+## Features
+
+- Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `PodPreset`, `Ingress`
+- [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `Instance` and `Binding`
+- Dynamic TPR support via [special annotations](https://github.com/atlassian/smith/blob/master/docs/design/managing-resources.md#defined-annotations)
+
+## Missing features
+
+See [milestone v1.0](https://github.com/atlassian/smith/milestones/1) and previous milestones.
+
 ## Notes
 
 ### On [App Controller](https://github.com/Mirantis/k8s-AppController)
@@ -144,6 +154,12 @@ make setup-ci
 ```bash
 make minikube-test
 ```
+* To run integration tests for [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support run
+```bash
+make minikube-test-sc
+```
+This command assumes Service Catalog and UPS Broker are installed on your minikube. To install them follow the
+[Service Catalog walkthrough](https://github.com/kubernetes-incubator/service-catalog/blob/master/docs/walkthrough.md).
 * To run against minikube run
 ```bash
 make minikube-run
