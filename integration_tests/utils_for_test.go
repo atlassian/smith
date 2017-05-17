@@ -49,9 +49,9 @@ func sleeperScheme() *runtime.Scheme {
 	return scheme
 }
 
-func bundleInformer(bundleClient cache.Getter) cache.SharedIndexInformer {
+func bundleInformer(bundleClient cache.Getter, namespace string) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, metav1.NamespaceAll, fields.Everything()),
+		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, namespace, fields.Everything()),
 		&smith.Bundle{},
 		0,
 		cache.Indexers{})
@@ -162,7 +162,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		bundleCreated = true
 	}
 
-	bundleInf := bundleInformer(bundleClient)
+	bundleInf := bundleInformer(bundleClient, useNamespace)
 	store.AddInformer(smith.BundleGVK, bundleInf)
 	go bundleInf.Run(ctx.Done())
 
