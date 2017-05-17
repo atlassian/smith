@@ -180,7 +180,7 @@ func (h *tprEventHandler) watchVersions(tprName string, versions ...extensions.A
 		res := dc.Resource(&metav1.APIResource{
 			Name: plural.Resource,
 			Kind: gk.Kind,
-		}, metav1.NamespaceAll)
+		}, metav1.NamespaceNone)
 		tprInf := cache.NewSharedIndexInformer(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return res.List(options)
