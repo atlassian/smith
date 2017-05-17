@@ -27,6 +27,8 @@ func (a *App) bundleInformer(bundleClient cache.Getter) cache.SharedIndexInforme
 		})
 }
 
+// TODO replace methods below with upstream functions https://github.com/kubernetes/kubernetes/issues/45939
+
 func (a *App) deploymentExtInformer(mainClient kubernetes.Interface) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
