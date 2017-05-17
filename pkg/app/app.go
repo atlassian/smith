@@ -14,9 +14,7 @@ import (
 
 	scv1alpha1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
-	scInf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -33,6 +31,7 @@ type App struct {
 	RestConfig           *rest.Config
 	ServiceCatalogConfig *rest.Config
 	ResyncPeriod         time.Duration
+	Namespace            string
 	DisablePodPreset     bool
 }
 
@@ -42,7 +41,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var scClient *scClientset.Clientset
+	var scClient scClientset.Interface
 	var scDynamic dynamic.ClientPool
 	if a.ServiceCatalogConfig != nil {
 		scClient, err = scClientset.NewForConfig(a.ServiceCatalogConfig)
@@ -168,50 +167,34 @@ func (a *App) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (a *App) bundleInformer(bundleClient cache.Getter) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, metav1.NamespaceAll, fields.Everything()),
-		&smith.Bundle{},
-		a.ResyncPeriod,
-		cache.Indexers{
-			ByTprNameIndex: byTprNameIndex,
-		})
-}
-
-func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mainClient kubernetes.Interface, scClient *scClientset.Clientset) map[schema.GroupVersionKind]cache.SharedIndexInformer {
+func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mainClient kubernetes.Interface, scClient scClientset.Interface) map[schema.GroupVersionKind]cache.SharedIndexInformer {
 	mainSif := informers.NewSharedInformerFactory(mainClient, a.ResyncPeriod)
 
 	// Core API types
 	infs := map[schema.GroupVersionKind]cache.SharedIndexInformer{
 		tprGVK: mainSif.Extensions().V1beta1().ThirdPartyResources().Informer(),
-		extensions.SchemeGroupVersion.WithKind("Deployment"):  mainSif.Extensions().V1beta1().Deployments().Informer(),
-		extensions.SchemeGroupVersion.WithKind("Ingress"):     mainSif.Extensions().V1beta1().Ingresses().Informer(),
-		apiv1.SchemeGroupVersion.WithKind("Service"):          mainSif.Core().V1().Services().Informer(),
-		apiv1.SchemeGroupVersion.WithKind("ConfigMap"):        mainSif.Core().V1().ConfigMaps().Informer(),
-		apiv1.SchemeGroupVersion.WithKind("Secret"):           mainSif.Core().V1().Secrets().Informer(),
-		appsv1beta1.SchemeGroupVersion.WithKind("Deployment"): mainSif.Apps().V1beta1().Deployments().Informer(),
+		extensions.SchemeGroupVersion.WithKind("Deployment"):  a.deploymentExtInformer(mainClient),
+		extensions.SchemeGroupVersion.WithKind("Ingress"):     a.ingressInformer(mainClient),
+		apiv1.SchemeGroupVersion.WithKind("Service"):          a.serviceInformer(mainClient),
+		apiv1.SchemeGroupVersion.WithKind("ConfigMap"):        a.configMapInformer(mainClient),
+		apiv1.SchemeGroupVersion.WithKind("Secret"):           a.secretInformer(mainClient),
+		appsv1beta1.SchemeGroupVersion.WithKind("Deployment"): a.deploymentAppsInformer(mainClient),
 	}
 	if !a.DisablePodPreset {
-		infs[settings.SchemeGroupVersion.WithKind("PodPreset")] = mainSif.Settings().V1alpha1().PodPresets().Informer()
+		infs[settings.SchemeGroupVersion.WithKind("PodPreset")] = a.podPresetInformer(mainClient)
 	}
 
 	// Service Catalog types
-	var scSif scInf.SharedInformerFactory
 	if scClient != nil {
-		scSif = scInf.NewSharedInformerFactory(scClient, a.ResyncPeriod)
-		infs[scv1alpha1.SchemeGroupVersion.WithKind("Binding")] = scSif.Servicecatalog().V1alpha1().Bindings().Informer()
-		infs[scv1alpha1.SchemeGroupVersion.WithKind("Instance")] = scSif.Servicecatalog().V1alpha1().Instances().Informer()
+		infs[scv1alpha1.SchemeGroupVersion.WithKind("Binding")] = a.bindingInformer(scClient)
+		infs[scv1alpha1.SchemeGroupVersion.WithKind("Instance")] = a.instanceInformer(scClient)
 	}
 
 	// Add all to Store
 	for gvk, inf := range infs {
 		store.AddInformer(gvk, inf)
+		go inf.Run(ctx.Done()) // Must be after store.AddInformer()
 	}
 
-	// Start informers
-	if scSif != nil {
-		scSif.Start(ctx.Done()) // Must be after store.AddInformer()
-	}
-	mainSif.Start(ctx.Done()) // Must be after store.AddInformer()
 	return infs
 }
