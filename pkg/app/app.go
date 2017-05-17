@@ -81,8 +81,8 @@ func (a *App) Run(ctx context.Context) error {
 	store.AddInformer(smith.BundleGVK, bundleInf)
 
 	infs := a.resourceInformers(ctx, store, clientset, scClient)
-	tprInf := infs[smith.TprGVK]
-	delete(infs, smith.TprGVK) // To avoid adding generic event handler later
+	tprInf := infs[tprGVK]
+	delete(infs, tprGVK) // To avoid adding generic event handler later
 
 	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
 	// in Ready Checker.
@@ -183,7 +183,7 @@ func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mai
 
 	// Core API types
 	infs := map[schema.GroupVersionKind]cache.SharedIndexInformer{
-		smith.TprGVK: mainSif.Extensions().V1beta1().ThirdPartyResources().Informer(),
+		tprGVK: mainSif.Extensions().V1beta1().ThirdPartyResources().Informer(),
 		extensions.SchemeGroupVersion.WithKind("Deployment"):  mainSif.Extensions().V1beta1().Deployments().Informer(),
 		extensions.SchemeGroupVersion.WithKind("Ingress"):     mainSif.Extensions().V1beta1().Ingresses().Informer(),
 		apiv1.SchemeGroupVersion.WithKind("Service"):          mainSif.Core().V1().Services().Informer(),

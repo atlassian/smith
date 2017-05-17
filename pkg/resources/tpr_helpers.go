@@ -39,8 +39,9 @@ func GroupKindToTprName(gk schema.GroupKind) string {
 }
 
 func EnsureTprExists(ctx context.Context, clientset kubernetes.Interface, store smith.ByNameStore, tpr *extensions.ThirdPartyResource) error {
+	tprGVK := extensions.SchemeGroupVersion.WithKind("ThirdPartyResource")
 	for {
-		obj, exists, err := store.Get(smith.TprGVK, metav1.NamespaceNone, tpr.Name)
+		obj, exists, err := store.Get(tprGVK, metav1.NamespaceNone, tpr.Name)
 		if err != nil {
 			return err
 		}

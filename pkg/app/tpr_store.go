@@ -14,7 +14,7 @@ type tprStore struct {
 }
 
 func (ts *tprStore) Get(resource schema.GroupKind) (*extensions.ThirdPartyResource, error) {
-	tpr, exists, err := ts.store.Get(smith.TprGVK, metav1.NamespaceNone, resources.GroupKindToTprName(resource))
+	tpr, exists, err := ts.store.Get(tprGVK, metav1.NamespaceNone, resources.GroupKindToTprName(resource))
 	if err != nil || !exists {
 		return nil, err
 	}

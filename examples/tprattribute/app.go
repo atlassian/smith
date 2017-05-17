@@ -57,7 +57,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	informerFactory := informers.NewSharedInformerFactory(clientset, ResyncPeriod)
 	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
-	store.AddInformer(smith.TprGVK, tprInf)
+	store.AddInformer(extensions.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
 	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
 
 	// 1. Ensure ThirdPartyResource Sleeper exists

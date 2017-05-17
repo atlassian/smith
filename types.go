@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 type BundleConditionType string
@@ -47,8 +46,6 @@ const (
 	TprFieldPathAnnotation  = SmithDomain + "/TprReadyWhenFieldPath"
 	TprFieldValueAnnotation = SmithDomain + "/TprReadyWhenFieldValue"
 )
-
-var TprGVK = extensions.SchemeGroupVersion.WithKind("ThirdPartyResource")
 
 var GV = schema.GroupVersion{
 	Group:   SmithResourceGroup,
