@@ -28,13 +28,13 @@ func TestTprAttribute(t *testing.T) {
 			Kind:       smith.BundleResourceKind,
 			APIVersion: smith.BundleResourceGroupVersion,
 		},
-		Metadata: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "bundle-attribute",
 		},
 		Spec: smith.BundleSpec{
 			Resources: []smith.Resource{
 				{
-					Name: smith.ResourceName(sleeper.Metadata.Name),
+					Name: smith.ResourceName(sleeper.Name),
 					Spec: sleeperU,
 				},
 			},
@@ -68,7 +68,7 @@ func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundl
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+3)*time.Second)
 	defer cancel()
 
-	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Metadata.Name, isBundleReady)
+	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Name, isBundleReady)
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
 
@@ -80,13 +80,13 @@ func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundl
 	require.NoError(t, sClient.Get().
 		Namespace(namespace).
 		Resource(tprattribute.SleeperResourcePath).
-		Name(sleeper.Metadata.Name).
+		Name(sleeper.Name).
 		Do().
 		Into(&sleeperObj))
 
 	assert.Equal(t, map[string]string{
-		smith.BundleNameLabel: bundle.Metadata.Name,
-	}, sleeperObj.Metadata.Labels)
+		smith.BundleNameLabel: bundle.Name,
+	}, sleeperObj.Labels)
 	assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
 }
 
@@ -96,7 +96,7 @@ func bundleAttrResources(t *testing.T) (*tprattribute.Sleeper, unstructured.Unst
 			Kind:       tprattribute.SleeperResourceKind,
 			APIVersion: tprattribute.SleeperResourceGroupVersion,
 		},
-		Metadata: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "sleeper1",
 		},
 		Spec: tprattribute.SleeperSpec{

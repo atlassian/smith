@@ -61,11 +61,11 @@ func cleanupBundle(t *testing.T, namespace string, bundleClient *rest.RESTClient
 	if !*bundleCreated {
 		return
 	}
-	t.Logf("Deleting bundle %s", bundle.Metadata.Name)
+	t.Logf("Deleting bundle %s", bundle.Name)
 	assert.NoError(t, bundleClient.Delete().
 		Namespace(namespace).
 		Resource(smith.BundleResourcePath).
-		Name(bundle.Metadata.Name).
+		Name(bundle.Name).
 		Do().
 		Error())
 	for _, resource := range bundle.Spec.Resources {
@@ -126,7 +126,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	err = bundleClient.Delete().
 		Namespace(useNamespace).
 		Resource(smith.BundleResourcePath).
-		Name(bundle.Metadata.Name).
+		Name(bundle.Name).
 		Do().
 		Error()
 	if err == nil {

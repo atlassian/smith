@@ -233,9 +233,9 @@ func (h *tprEventHandler) rebuildBundles(tprName, addUpdateDelete string) {
 		return
 	}
 	for _, bundle := range bundles {
-		log.Printf("[TPREH][%s/%s] Rebuilding bundle because TPR %s was %s", bundle.Metadata.Namespace, bundle.Metadata.Name, tprName, addUpdateDelete)
+		log.Printf("[TPREH][%s/%s] Rebuilding bundle because TPR %s was %s", bundle.Namespace, bundle.Name, tprName, addUpdateDelete)
 		if err := h.processor.Rebuild(h.ctx, bundle); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-			log.Printf("[TPREH][%s/%s] Error rebuilding bundle: %v", bundle.Metadata.Namespace, bundle.Metadata.Name, err)
+			log.Printf("[TPREH][%s/%s] Error rebuilding bundle: %v", bundle.Namespace, bundle.Name, err)
 		}
 	}
 }

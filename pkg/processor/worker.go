@@ -223,7 +223,7 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 
 	// 2. Update label to point at the parent bundle
 	res.Spec.SetLabels(mergeLabels(
-		bundle.Metadata.Labels,
+		bundle.Labels,
 		res.Spec.GetLabels(),
 		map[string]string{smith.BundleNameLabel: wrk.bundleName}))
 
@@ -233,8 +233,8 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 	//res.Spec.SetOwnerReferences(append(res.Spec.GetOwnerReferences(), metav1.OwnerReference{
 	//	APIVersion: smith.BundleResourceVersion,
 	//	Kind:       smith.BundleResourceKind,
-	//	Name:       bundle.Metadata.Name,
-	//	UID:        bundle.Metadata.UID,
+	//	Name:       bundle.Name,
+	//	UID:        bundle.UID,
 	//}))
 
 	return nil
