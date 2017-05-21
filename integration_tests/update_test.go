@@ -60,7 +60,7 @@ func TestUpdate(t *testing.T) {
 			Kind:       tprattribute.SleeperResourceKind,
 			APIVersion: tprattribute.SleeperResourceGroupVersion,
 		},
-		Metadata: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "sleeper2",
 			Labels: map[string]string{
 				"labelx": "labelxValue",
@@ -76,8 +76,8 @@ func TestUpdate(t *testing.T) {
 			Kind:       tprattribute.SleeperResourceKind,
 			APIVersion: tprattribute.SleeperResourceGroupVersion,
 		},
-		Metadata: metav1.ObjectMeta{
-			Name: existingSleeper.Metadata.Name,
+		ObjectMeta: metav1.ObjectMeta{
+			Name: existingSleeper.Name,
 			Labels: map[string]string{
 				"configLabel":         "configValue",
 				"overlappingLabel":    "overlappingConfigValue",
@@ -94,7 +94,7 @@ func TestUpdate(t *testing.T) {
 			Kind:       smith.BundleResourceKind,
 			APIVersion: smith.BundleResourceGroupVersion,
 		},
-		Metadata: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "bundle1",
 			Labels: map[string]string{
 				"bundleLabel":         "bundleValue",
@@ -109,7 +109,7 @@ func TestUpdate(t *testing.T) {
 					Spec: toUnstructured(t, bundleConfigMap),
 				},
 				{
-					Name: smith.ResourceName(bundleSleeper.Metadata.Name),
+					Name: smith.ResourceName(bundleSleeper.Name),
 					Spec: toUnstructured(t, bundleSleeper),
 				},
 			},
@@ -159,11 +159,11 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 
 	createObject(t, existingSleeper, namespace, tprattribute.SleeperResourcePath, sClient)
 	defer func() {
-		t.Logf("Maybe deleting resource %q", existingSleeper.Metadata.Name)
+		t.Logf("Maybe deleting resource %q", existingSleeper.Name)
 		e := sClient.Delete().
 			Namespace(namespace).
 			Resource(tprattribute.SleeperResourcePath).
-			Name(existingSleeper.Metadata.Name).
+			Name(existingSleeper.Name).
 			Do().
 			Error()
 		if !kerrors.IsNotFound(e) { // May have been cleanup by cleanupBundle
@@ -178,7 +178,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(bundleSleeper.Spec.SleepFor+existingSleeper.Spec.SleepFor+2)*time.Second)
 	defer cancel()
 
-	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Metadata.Name, isBundleReady)
+	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Name, isBundleReady)
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
 
@@ -193,7 +193,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 			"configLabel":         "configValue",
 			"bundleLabel":         "bundleValue",
 			"overlappingLabel":    "overlappingConfigValue",
-			smith.BundleNameLabel: bundle.Metadata.Name,
+			smith.BundleNameLabel: bundle.Name,
 		}, cfMap.Labels)
 		assert.Equal(t, bundleConfigMap.Data, cfMap.Data)
 	}
@@ -202,7 +202,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 	err = sClient.Get().
 		Namespace(namespace).
 		Resource(tprattribute.SleeperResourcePath).
-		Name(bundleSleeper.Metadata.Name).
+		Name(bundleSleeper.Name).
 		Do().
 		Into(&sleeperObj)
 	if assert.NoError(t, err) {
@@ -210,8 +210,8 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 			"configLabel":         "configValue",
 			"bundleLabel":         "bundleValue",
 			"overlappingLabel":    "overlappingConfigValue",
-			smith.BundleNameLabel: bundle.Metadata.Name,
-		}, sleeperObj.Metadata.Labels)
+			smith.BundleNameLabel: bundle.Name,
+		}, sleeperObj.Labels)
 		assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
 		assert.Equal(t, bundleSleeper.Spec, sleeperObj.Spec)
 	}

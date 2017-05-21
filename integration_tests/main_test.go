@@ -25,7 +25,7 @@ func TestWorkflow(t *testing.T) {
 			Kind:       smith.BundleResourceKind,
 			APIVersion: smith.BundleResourceGroupVersion,
 		},
-		Metadata: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "bundle1",
 			Labels: map[string]string{
 				"bundleLabel":         "bundleValue",
@@ -46,7 +46,7 @@ func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *s
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Metadata.Name, isBundleReady)
+	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Name, isBundleReady)
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
 
@@ -61,7 +61,7 @@ func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *s
 		"configLabel":         "configValue",
 		"bundleLabel":         "bundleValue",
 		"overlappingLabel":    "overlappingConfigValue",
-		smith.BundleNameLabel: bundle.Metadata.Name,
+		smith.BundleNameLabel: bundle.Name,
 	}, cfMap.GetLabels())
 	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/39816 is fixed
 	//assert.Equal(t, []metav1.OwnerReference{
@@ -69,7 +69,7 @@ func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *s
 	//		APIVersion: smith.BundleResourceVersion,
 	//		Kind:       smith.BundleResourceKind,
 	//		Name:       bundleName,
-	//		UID:        bundleRes.Metadata.UID,
+	//		UID:        bundleRes.UID,
 	//	},
 	//}, cfMap.GetOwnerReferences())
 }

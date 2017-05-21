@@ -47,7 +47,7 @@ func (bp *BundleProcessor) Run(ctx context.Context, done func()) {
 		case <-ctx.Done():
 			return
 		case bundle := <-bp.incomingWork:
-			ref := bundleRef{namespace: bundle.Metadata.Namespace, bundleName: bundle.Metadata.Name}
+			ref := bundleRef{namespace: bundle.Namespace, bundleName: bundle.Name}
 			wrk := workers[ref]
 			if wrk == nil {
 				wrk = &worker{

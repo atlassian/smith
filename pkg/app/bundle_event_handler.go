@@ -32,14 +32,13 @@ func (h *bundleEventHandler) handle(obj interface{}, addUpdate string) {
 	o, err := h.deepCopy(obj)
 	if err != nil {
 		bundle := o.(*smith.Bundle)
-		log.Printf("[BEH][%s/%s] Failed to deep copy %T: %v", bundle.Metadata.Namespace, bundle.Metadata.Name, obj, err)
+		log.Printf("[BEH][%s/%s] Failed to deep copy %T: %v", bundle.Namespace, bundle.Name, obj, err)
 		return
 	}
 
 	bundle := o.(*smith.Bundle)
-	meta := bundle.Metadata
-	log.Printf("[BEH][%s/%s] Rebuilding bundle because it was %s", meta.Namespace, meta.Name, addUpdate)
+	log.Printf("[BEH][%s/%s] Rebuilding bundle because it was %s", bundle.Namespace, bundle.Name, addUpdate)
 	if err = h.processor.Rebuild(h.ctx, bundle); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-		log.Printf("[BEH][%s/%s] Error rebuilding bundle: %v", meta.Namespace, meta.Name, err)
+		log.Printf("[BEH][%s/%s] Error rebuilding bundle: %v", bundle.Namespace, bundle.Name, err)
 	}
 }

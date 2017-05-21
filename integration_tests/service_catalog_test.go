@@ -53,7 +53,7 @@ func TestServiceCatalog(t *testing.T) {
 			Kind:       smith.BundleResourceKind,
 			APIVersion: smith.BundleResourceGroupVersion,
 		},
-		Metadata: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "bundle-cs",
 		},
 		Spec: smith.BundleSpec{
@@ -79,7 +79,7 @@ func testServiceCatalog(t *testing.T, ctx context.Context, namespace string, bun
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Metadata.Name, isBundleReady)
+	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Name, isBundleReady)
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
 

@@ -1,8 +1,6 @@
 package smith
 
 import (
-	"encoding/json"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,20 +69,10 @@ func AddToScheme(scheme *runtime.Scheme) {
 type BundleList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	Metadata metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of bundles.
 	Items []Bundle `json:"items"`
-}
-
-// GetObjectKind is required to satisfy Object interface.
-func (bl *BundleList) GetObjectKind() schema.ObjectKind {
-	return &bl.TypeMeta
-}
-
-// GetListMeta is required to satisfy ListMetaAccessor interface.
-func (bl *BundleList) GetListMeta() metav1.List {
-	return &bl.Metadata
 }
 
 // Bundle describes a resources bundle.
@@ -92,23 +80,13 @@ type Bundle struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Standard object metadata
-	Metadata metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the specification of the desired behavior of the Bundle.
 	Spec BundleSpec `json:"spec,omitempty"`
 
 	// Status is most recently observed status of the Bundle.
 	Status BundleStatus `json:"status,omitempty"`
-}
-
-// Required to satisfy Object interface
-func (b *Bundle) GetObjectKind() schema.ObjectKind {
-	return &b.TypeMeta
-}
-
-// Required to satisfy ObjectMetaAccessor interface
-func (b *Bundle) GetObjectMeta() metav1.Object {
-	return &b.Metadata
 }
 
 func (b *Bundle) GetCondition(conditionType BundleConditionType) (int, *BundleCondition) {
@@ -190,31 +168,4 @@ type Resource struct {
 	DependsOn []ResourceName `json:"dependsOn,omitempty"`
 
 	Spec unstructured.Unstructured `json:"spec"`
-}
-
-// The code below is used only to work around a known problem with third-party
-// resources and ugorji. If/when these issues are resolved, the code below
-// should no longer be required.
-
-type bundleListCopy BundleList
-type bundleCopy Bundle
-
-func (b *Bundle) UnmarshalJSON(data []byte) error {
-	tmp := bundleCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	*b = Bundle(tmp)
-	return nil
-}
-
-func (bl *BundleList) UnmarshalJSON(data []byte) error {
-	tmp := bundleListCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	*bl = BundleList(tmp)
-	return nil
 }
