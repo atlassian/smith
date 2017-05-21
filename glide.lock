@@ -1,5 +1,5 @@
 hash: 452775db7352002969d41a0310c6ca4f33885e767721451daea0122bf8302e20
-updated: 2017-04-28T14:59:10.025547677+10:00
+updated: 2017-05-21T17:53:36.021519052+10:00
 imports:
 - name: github.com/cenk/backoff
   version: 5d150e7eec023ce7a124856b37c68e54b4050ac7
@@ -39,18 +39,13 @@ imports:
 - name: github.com/juju/ratelimit
   version: 77ed1c8a01217656d2080ad51981f6e99adaa177
 - name: github.com/kubernetes-incubator/service-catalog
-  version: 6c3d5fe929d1095386df4722e410402ca1e7af1b
+  version: c3b84ae91023d928042af0e6814271bc775b1b41
   subpackages:
   - pkg/apis/servicecatalog
   - pkg/apis/servicecatalog/v1alpha1
   - pkg/client/clientset_generated/clientset
   - pkg/client/clientset_generated/clientset/scheme
   - pkg/client/clientset_generated/clientset/typed/servicecatalog/v1alpha1
-  - pkg/client/informers_generated/externalversions
-  - pkg/client/informers_generated/externalversions/internalinterfaces
-  - pkg/client/informers_generated/externalversions/servicecatalog
-  - pkg/client/informers_generated/externalversions/servicecatalog/v1alpha1
-  - pkg/client/listers_generated/servicecatalog/v1alpha1
 - name: github.com/mailru/easyjson
   version: d5b7844b561a7bc640052f1b935f7b800330d7e0
   subpackages:
