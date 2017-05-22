@@ -47,9 +47,8 @@ type addInformerRequest struct {
 	informer cache.SharedIndexInformer
 }
 
-type getInformerRequest struct {
-	gvk    schema.GroupVersionKind
-	result chan<- cache.SharedIndexInformer
+type getInformersRequest struct {
+	result chan<- map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
 type removeInformerRequest struct {
@@ -71,7 +70,7 @@ type Store struct {
 	informerEvents         chan informerEvent
 	cancellations          chan *awaitRequest // must be a pointer because it is used as a key in map
 	addInformerRequests    chan addInformerRequest
-	getInformerRequests    chan getInformerRequest
+	getInformersRequests   chan getInformersRequest
 	removeInformerRequests chan removeInformerRequest
 }
 
@@ -84,7 +83,7 @@ func NewStore(deepCopy smith.DeepCopy) *Store {
 		informerEvents:         make(chan informerEvent),
 		cancellations:          make(chan *awaitRequest),
 		addInformerRequests:    make(chan addInformerRequest),
-		getInformerRequests:    make(chan getInformerRequest),
+		getInformersRequests:   make(chan getInformersRequest),
 		removeInformerRequests: make(chan removeInformerRequest),
 	}
 }
@@ -95,7 +94,7 @@ func (s *Store) Run(ctx context.Context, done func()) {
 	defer close(s.awaitRequests)
 	defer close(s.cancellations)
 	defer close(s.addInformerRequests)
-	defer close(s.getInformerRequests)
+	defer close(s.getInformersRequests)
 	defer close(s.removeInformerRequests)
 	for {
 		select {
@@ -113,8 +112,8 @@ func (s *Store) Run(ctx context.Context, done func()) {
 			s.handleCancellation(ar)
 		case air := <-s.addInformerRequests:
 			s.handleAddInformer(ctx, air.gvk, air.informer, air.wg)
-		case gir := <-s.getInformerRequests:
-			s.handleGetInformer(gir.gvk, gir.result)
+		case gir := <-s.getInformersRequests:
+			s.handleGetInformers(gir.result)
 		case rir := <-s.removeInformerRequests:
 			s.handleRemoveInformer(rir.gvk, rir.result)
 		}
@@ -208,8 +207,12 @@ func (s *Store) handleAddInformer(ctx context.Context, gvk schema.GroupVersionKi
 	s.informers[gvk] = informer
 }
 
-func (s *Store) handleGetInformer(gvk schema.GroupVersionKind, result chan<- cache.SharedIndexInformer) {
-	result <- s.informers[gvk]
+func (s *Store) handleGetInformers(result chan<- map[schema.GroupVersionKind]cache.SharedIndexInformer) {
+	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer, len(s.informers))
+	for gvk, inf := range s.informers {
+		informers[gvk] = inf
+	}
+	result <- informers
 }
 
 func (s *Store) handleRemoveInformer(gvk schema.GroupVersionKind, result chan<- bool) {
@@ -253,13 +256,11 @@ func (s *Store) RemoveInformer(gvk schema.GroupVersionKind) bool {
 	return <-result
 }
 
-// GetInformer gets an informer for the specified GVK.
-// Returns false of no informer is registered.
-func (s *Store) GetInformer(gvk schema.GroupVersionKind) (cache.SharedIndexInformer, bool) {
-	result := make(chan cache.SharedIndexInformer)
-	s.getInformerRequests <- getInformerRequest{gvk: gvk, result: result}
-	informer := <-result
-	return informer, informer != nil
+// GetInformers gets all registered Informers.
+func (s *Store) GetInformers() map[schema.GroupVersionKind]cache.SharedIndexInformer {
+	result := make(chan map[schema.GroupVersionKind]cache.SharedIndexInformer)
+	s.getInformersRequests <- getInformersRequest{result: result}
+	return <-result
 }
 
 // AwaitObject looks up object of specified GVK in the specified namespace by name.
@@ -305,8 +306,8 @@ func (s *Store) AwaitObjectCondition(ctx context.Context, gvk schema.GroupVersio
 // Get looks up object of specified GVK in the specified namespace by name.
 // A deep copy of the object is returned so it is safe to modify it.
 func (s *Store) Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, e error) {
-	informer, ok := s.GetInformer(gvk)
-	if !ok {
+	informer := s.GetInformers()[gvk]
+	if informer == nil {
 		return nil, false, fmt.Errorf("no informer for %v is registered", gvk)
 	}
 	return s.getFromIndexer(informer.GetIndexer(), gvk, namespace, name)
