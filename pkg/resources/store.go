@@ -230,7 +230,7 @@ func removeAllCallbacks(m map[types.NamespacedName]map[*awaitRequest]struct{}) {
 	}
 }
 
-// AddInformer add an Informer to the store.
+// AddInformer adds an Informer to the store.
 // Can only be called with a not yet started informer. Otherwise bad things will happen.
 func (s *Store) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer) {
 	air := addInformerRequest{
