@@ -140,7 +140,7 @@ func (wrk *worker) rebuild(bundle *smith.Bundle) (isReady, retriableError bool, 
 	resourceMap := make(map[smith.ResourceName]smith.Resource, len(bundle.Spec.Resources))
 	for _, res := range bundle.Spec.Resources {
 		if _, exist := resourceMap[res.Name]; exist {
-			return false, false, fmt.Errorf("bundle %s/%s contains two resources with the same name %q", wrk.namespace, wrk.bundleName, res.Name)
+			return false, false, fmt.Errorf("bundle contains two resources with the same name %q", res.Name)
 		}
 		resourceMap[res.Name] = res
 	}
@@ -165,7 +165,7 @@ nextVertex:
 		for _, dependency := range graphData.Graph.Vertices[v].Edges() {
 			if _, ok := readyResources[dependency]; !ok {
 				allReady = false
-				log.Printf("[WORKER][%s/%s] Dependencies are not ready for resource %q", wrk.namespace, wrk.bundleName, v)
+				log.Printf("[WORKER][%s/%s] Dependency %q is required by resource %q but it's not ready", wrk.namespace, wrk.bundleName, dependency, v)
 				continue nextVertex // Move to the next resource
 			}
 		}
