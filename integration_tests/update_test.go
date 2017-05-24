@@ -178,14 +178,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(bundleSleeper.Spec.SleepFor+existingSleeper.Spec.SleepFor+2)*time.Second)
 	defer cancel()
 
-	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Name, isBundleReady)
-	require.NoError(t, err)
-	bundleRes := obj.(*smith.Bundle)
-
-	assertCondition(t, bundleRes, smith.BundleReady, smith.ConditionTrue)
-	assertCondition(t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
-	assertCondition(t, bundleRes, smith.BundleError, smith.ConditionFalse)
-	assert.Equal(t, bundle.Spec, bundleRes.Spec, "%#v", bundleRes)
+	assertBundle(t, ctxTimeout, store, namespace, bundle)
 
 	cfMap, err := cmClient.Get(bundleConfigMap.Name, metav1.GetOptions{})
 	if assert.NoError(t, err) {

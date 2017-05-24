@@ -189,3 +189,22 @@ func createObject(t *testing.T, obj runtime.Object, namespace, resourcePath stri
 		Do().
 		Error())
 }
+
+func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle) *smith.Bundle {
+	obj, err := store.AwaitObjectCondition(ctx, smith.BundleGVK, namespace, bundle.Name, isBundleReady)
+	require.NoError(t, err)
+	bundleRes := obj.(*smith.Bundle)
+
+	assertCondition(t, bundleRes, smith.BundleReady, smith.ConditionTrue)
+	assertCondition(t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
+	assertCondition(t, bundleRes, smith.BundleError, smith.ConditionFalse)
+	assert.Equal(t, bundle.Spec, bundleRes.Spec, "%#v", bundleRes)
+
+	return bundleRes
+}
+
+func assertBundleTimeout(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle) *smith.Bundle {
+	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return assertBundle(t, ctxTimeout, store, namespace, bundle)
+}

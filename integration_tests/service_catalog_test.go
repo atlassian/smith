@@ -5,13 +5,11 @@ package integration_tests
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
 	scv1alpha1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
-	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -76,14 +74,5 @@ func TestServiceCatalog(t *testing.T) {
 func testServiceCatalog(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
 	clients, scDynamic dynamic.ClientPool, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
 
-	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Name, isBundleReady)
-	require.NoError(t, err)
-	bundleRes := obj.(*smith.Bundle)
-
-	assertCondition(t, bundleRes, smith.BundleReady, smith.ConditionTrue)
-	assertCondition(t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
-	assertCondition(t, bundleRes, smith.BundleError, smith.ConditionFalse)
+	assertBundleTimeout(t, ctx, store, namespace, bundle)
 }
