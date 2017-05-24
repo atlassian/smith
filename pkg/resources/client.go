@@ -89,8 +89,7 @@ func ConfigFromEnv() (*rest.Config, error) {
 	}, nil
 }
 
-func ClientForResource(obj runtime.Object, coreDynamic, scDynamic dynamic.ClientPool, namespace string) (*dynamic.ResourceClient, error) {
-	gvk := obj.GetObjectKind().GroupVersionKind()
+func ClientForGVK(gvk schema.GroupVersionKind, coreDynamic, scDynamic dynamic.ClientPool, namespace string) (*dynamic.ResourceClient, error) {
 	var clients dynamic.ClientPool
 	if gvk.Group == sc_v0.GroupName {
 		if scDynamic == nil {

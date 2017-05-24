@@ -74,5 +74,5 @@ func TestServiceCatalog(t *testing.T) {
 func testServiceCatalog(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
 	clients, scDynamic dynamic.ClientPool, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
 
-	assertBundleTimeout(t, ctx, store, namespace, bundle)
+	assertBundleTimeout(t, ctx, store, namespace, bundle, "")
 }

@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/atlassian/smith"
+
+	"k8s.io/client-go/tools/cache"
 )
 
 type bundleEventHandler struct {
@@ -22,22 +24,32 @@ func (h *bundleEventHandler) OnUpdate(oldObj, newObj interface{}) {
 }
 
 func (h *bundleEventHandler) OnDelete(obj interface{}) {
-	//		// TODO Somehow use finalizers to prevent direct deletion?
-	//		// "No direct deletion" convention? Use ObjectMeta.DeletionTimestamp like Namespace does?
-	//		// Somehow implement GC to do cleanup after bundle is deleted?
-	//		// Maybe store bundle in annotation on each resource to help reconstruct the dependency graph for GC?
+	_, ok := obj.(*smith.Bundle)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			log.Printf("[BEH] Delete event with unrecognized object type: %T", obj)
+			return
+		}
+		obj, ok = tombstone.Obj.(*smith.Bundle)
+		if !ok {
+			log.Printf("[BEH] Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			return
+		}
+	}
+	h.handle(obj, "deleted")
 }
 
-func (h *bundleEventHandler) handle(obj interface{}, addUpdate string) {
+func (h *bundleEventHandler) handle(obj interface{}, addUpdateDelete string) {
 	o, err := h.deepCopy(obj)
 	if err != nil {
-		bundle := o.(*smith.Bundle)
+		bundle := obj.(*smith.Bundle)
 		log.Printf("[BEH][%s/%s] Failed to deep copy %T: %v", bundle.Namespace, bundle.Name, obj, err)
 		return
 	}
 
 	bundle := o.(*smith.Bundle)
-	log.Printf("[BEH][%s/%s] Rebuilding bundle because it was %s", bundle.Namespace, bundle.Name, addUpdate)
+	log.Printf("[BEH][%s/%s] Rebuilding bundle because it was %s", bundle.Namespace, bundle.Name, addUpdateDelete)
 	if err = h.processor.Rebuild(h.ctx, bundle); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 		log.Printf("[BEH][%s/%s] Error rebuilding bundle: %v", bundle.Namespace, bundle.Name, err)
 	}

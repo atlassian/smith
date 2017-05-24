@@ -145,7 +145,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 	_, err := cmClient.Create(existingConfigMap)
 	require.NoError(t, err)
 	defer func() {
-		t.Logf("Maybe deleting resource %q", existingConfigMap.Name)
+		t.Logf("Deleting resource %q", existingConfigMap.Name)
 		e := cmClient.Delete(existingConfigMap.Name, nil)
 		if !kerrors.IsNotFound(e) { // May have been cleanup by cleanupBundle
 			assert.NoError(t, e)
@@ -178,7 +178,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(bundleSleeper.Spec.SleepFor+existingSleeper.Spec.SleepFor+2)*time.Second)
 	defer cancel()
 
-	assertBundle(t, ctxTimeout, store, namespace, bundle)
+	bundleRes := assertBundle(t, ctxTimeout, store, namespace, bundle, "")
 
 	cfMap, err := cmClient.Get(bundleConfigMap.Name, metav1.GetOptions{})
 	if assert.NoError(t, err) {
@@ -207,5 +207,34 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 		}, sleeperObj.Labels)
 		assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
 		assert.Equal(t, bundleSleeper.Spec, sleeperObj.Spec)
+	}
+	emptyBundle := *bundle
+	emptyBundle.Spec.Resources = []smith.Resource{}
+	require.NoError(t, bundleClient.Put().
+		Namespace(namespace).
+		Resource(smith.BundleResourcePath).
+		Name(bundle.Name).
+		Body(&emptyBundle).
+		Do().
+		Error())
+
+	assertBundleTimeout(t, ctx, store, namespace, &emptyBundle, bundleRes.ResourceVersion)
+
+	cfMap, err = cmClient.Get(bundleConfigMap.Name, metav1.GetOptions{})
+	if err == nil {
+		assert.NotNil(t, cfMap.DeletionTimestamp) // Still in api but marked for deletion
+	} else {
+		assert.True(t, kerrors.IsNotFound(err)) // Has been removed from api already
+	}
+	err = sClient.Get().
+		Namespace(namespace).
+		Resource(tprattribute.SleeperResourcePath).
+		Name(bundleSleeper.Name).
+		Do().
+		Into(&sleeperObj)
+	if err == nil {
+		assert.NotNil(t, sleeperObj.DeletionTimestamp) // Still in api but marked for deletion
+	} else {
+		assert.True(t, kerrors.IsNotFound(err)) // Has been removed from api already
 	}
 }

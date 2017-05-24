@@ -42,7 +42,7 @@ func TestWorkflow(t *testing.T) {
 func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
 	clients, scDynamic dynamic.ClientPool, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
 
-	assertBundleTimeout(t, ctx, store, namespace, bundle)
+	bundleRes := assertBundleTimeout(t, ctx, store, namespace, bundle, "")
 
 	cfMap, err := clientset.CoreV1().ConfigMaps(namespace).Get("config1", metav1.GetOptions{})
 	require.NoError(t, err)
@@ -50,17 +50,16 @@ func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *s
 		"configLabel":         "configValue",
 		"bundleLabel":         "bundleValue",
 		"overlappingLabel":    "overlappingConfigValue",
-		smith.BundleNameLabel: bundle.Name,
+		smith.BundleNameLabel: bundleRes.Name,
 	}, cfMap.GetLabels())
-	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/39816 is fixed
-	//assert.Equal(t, []metav1.OwnerReference{
-	//	{
-	//		APIVersion: smith.BundleResourceVersion,
-	//		Kind:       smith.BundleResourceKind,
-	//		Name:       bundleName,
-	//		UID:        bundleRes.UID,
-	//	},
-	//}, cfMap.GetOwnerReferences())
+	assert.Equal(t, []metav1.OwnerReference{
+		{
+			APIVersion: smith.BundleResourceGroupVersion,
+			Kind:       smith.BundleResourceKind,
+			Name:       bundleRes.Name,
+			UID:        bundleRes.UID,
+		},
+	}, cfMap.GetOwnerReferences())
 }
 
 func bundleResources(t *testing.T) []smith.Resource {

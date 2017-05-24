@@ -20,7 +20,7 @@ type BundleProcessor struct {
 
 // New creates a new bundle processor.
 // Instances are safe for concurrent use.
-func New(bundleClient *rest.RESTClient, scDynamic, clients dynamic.ClientPool, rc ReadyChecker, deepCopy smith.DeepCopy, store smith.ByNameStore) *BundleProcessor {
+func New(bundleClient *rest.RESTClient, scDynamic, clients dynamic.ClientPool, rc ReadyChecker, deepCopy smith.DeepCopy, store Store) *BundleProcessor {
 	return &BundleProcessor{
 		workerConfig: workerConfig{
 			bundleClient: bundleClient,

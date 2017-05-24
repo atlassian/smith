@@ -69,12 +69,15 @@ func cleanupBundle(t *testing.T, namespace string, bundleClient *rest.RESTClient
 		Do().
 		Error())
 	for _, resource := range bundle.Spec.Resources {
-		t.Logf("Deleting resource %s", resource.Spec.GetName())
-		client, err := resources.ClientForResource(&resource.Spec, clients, scDynamic, namespace)
+		t.Logf("Deleting resource %q", resource.Spec.GetName())
+		client, err := resources.ClientForGVK(resource.Spec.GroupVersionKind(), clients, scDynamic, namespace)
 		if !assert.NoError(t, err) {
 			continue
 		}
-		assert.NoError(t, client.Delete(resource.Spec.GetName(), nil))
+		err = client.Delete(resource.Spec.GetName(), nil)
+		if !kerrors.IsNotFound(err) {
+			assert.NoError(t, err)
+		}
 	}
 }
 
@@ -82,6 +85,20 @@ func isBundleReady(obj runtime.Object) bool {
 	b := obj.(*smith.Bundle)
 	_, cond := b.GetCondition(smith.BundleReady)
 	return cond != nil && cond.Status == smith.ConditionTrue
+}
+
+func isBundleReadyAndNewer(resourceVersion string) resources.AwaitCondition {
+	return func(obj runtime.Object) bool {
+		b := obj.(*smith.Bundle)
+		if b.ResourceVersion == resourceVersion {
+			// TODO Should be using Generation here once it is available
+			// https://github.com/kubernetes/kubernetes/issues/7328
+			// https://github.com/kubernetes/features/issues/95
+			return false
+		}
+		_, cond := b.GetCondition(smith.BundleReady)
+		return cond != nil && cond.Status == smith.ConditionTrue
+	}
 }
 
 func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, dynamic.ClientPool, *rest.RESTClient) {
@@ -190,8 +207,8 @@ func createObject(t *testing.T, obj runtime.Object, namespace, resourcePath stri
 		Error())
 }
 
-func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle) *smith.Bundle {
-	obj, err := store.AwaitObjectCondition(ctx, smith.BundleGVK, namespace, bundle.Name, isBundleReady)
+func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle, resourceVersion string) *smith.Bundle {
+	obj, err := store.AwaitObjectCondition(ctx, smith.BundleGVK, namespace, bundle.Name, isBundleReadyAndNewer(resourceVersion))
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
 
@@ -203,8 +220,8 @@ func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, nam
 	return bundleRes
 }
 
-func assertBundleTimeout(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle) *smith.Bundle {
+func assertBundleTimeout(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle, resourceVersion string) *smith.Bundle {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	return assertBundle(t, ctxTimeout, store, namespace, bundle)
+	return assertBundle(t, ctxTimeout, store, namespace, bundle, resourceVersion)
 }
