@@ -68,13 +68,7 @@ func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundl
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+3)*time.Second)
 	defer cancel()
 
-	obj, err := store.AwaitObjectCondition(ctxTimeout, smith.BundleGVK, namespace, bundle.Name, isBundleReady)
-	require.NoError(t, err)
-	bundleRes := obj.(*smith.Bundle)
-
-	assertCondition(t, bundleRes, smith.BundleReady, smith.ConditionTrue)
-	assertCondition(t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
-	assertCondition(t, bundleRes, smith.BundleError, smith.ConditionFalse)
+	assertBundle(t, ctxTimeout, store, namespace, bundle)
 
 	var sleeperObj tprattribute.Sleeper
 	require.NoError(t, sClient.Get().
