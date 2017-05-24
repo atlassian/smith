@@ -5,6 +5,8 @@ import (
 
 	"github.com/cenk/backoff"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type ReadyChecker interface {
@@ -12,6 +14,11 @@ type ReadyChecker interface {
 }
 
 type BackOffFactory func() backoff.BackOff
+
+type Store interface {
+	smith.ByNameStore
+	GetObjectsForBundle(namespace, bundleName string) ([]runtime.Object, error)
+}
 
 type bundleRef struct {
 	namespace  string
@@ -27,4 +34,9 @@ type notifyRequest struct {
 	bundleRef
 	bundle *smith.Bundle
 	notify chan<- struct{}
+}
+
+type objectRef struct {
+	schema.GroupVersionKind
+	Name string
 }

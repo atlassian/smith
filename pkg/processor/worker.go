@@ -15,8 +15,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -31,7 +34,7 @@ type workerConfig struct {
 	clients      dynamic.ClientPool
 	rc           ReadyChecker
 	deepCopy     smith.DeepCopy
-	store        smith.ByNameStore
+	store        Store
 }
 
 type worker struct {
@@ -96,6 +99,9 @@ func (wrk *worker) rebuildLoop(ctx context.Context, done func()) {
 				return
 			}
 			// Work available
+			if bundle.DeletionTimestamp != nil {
+				continue
+			}
 			isReady, retriable, err := wrk.rebuild(bundle)
 			if wrk.handleRebuildResult(bundle, isReady, retriable, err) {
 				// There was a retriable error
@@ -183,6 +189,12 @@ nextVertex:
 			allReady = false
 		}
 	}
+	// Delete objects which were removed from the bundle
+	retriable, err := wrk.deleteRemovedResources(bundle)
+	if err != nil {
+		return false, retriable, err
+	}
+
 	return allReady, false, nil
 }
 
@@ -229,13 +241,12 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 
 	// 3. Update OwnerReferences
 	// Hardcode APIVersion/Kind because of https://github.com/kubernetes/client-go/issues/60
-	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/39816 is fixed
-	//res.Spec.SetOwnerReferences(append(res.Spec.GetOwnerReferences(), metav1.OwnerReference{
-	//	APIVersion: smith.BundleResourceVersion,
-	//	Kind:       smith.BundleResourceKind,
-	//	Name:       bundle.Name,
-	//	UID:        bundle.UID,
-	//}))
+	res.Spec.SetOwnerReferences(append(res.Spec.GetOwnerReferences(), metav1.OwnerReference{
+		APIVersion: smith.BundleResourceGroupVersion,
+		Kind:       smith.BundleResourceKind,
+		Name:       bundle.Name,
+		UID:        bundle.UID,
+	}))
 
 	return nil
 }
@@ -244,7 +255,7 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 // May return nil resource without any errors if an update/create conflict happened.
 func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
 	// 1. Prepare client
-	resClient, err := resources.ClientForResource(&res.Spec, wrk.clients, wrk.scDynamic, wrk.namespace)
+	resClient, err := resources.ClientForGVK(res.Spec.GroupVersionKind(), wrk.clients, wrk.scDynamic, wrk.namespace)
 	if err != nil {
 		return nil, false, err
 	}
@@ -310,6 +321,76 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 	}
 	log.Printf("[WORKER][%s/%s] Resource %q updated", wrk.namespace, wrk.bundleName, res.Name)
 	return response, false, nil
+}
+
+func (wrk *worker) deleteRemovedResources(bundle *smith.Bundle) (retriableError bool, e error) {
+	objs, err := wrk.store.GetObjectsForBundle(wrk.namespace, wrk.bundleName)
+	if err != nil {
+		return false, err
+	}
+	existingObjs := make(map[objectRef]types.UID, len(objs))
+	for _, obj := range objs {
+		m, err := meta.Accessor(obj)
+		if err != nil {
+			return false, fmt.Errorf("failed to get meta of object: %v", err)
+		}
+		if m.GetDeletionTimestamp() != nil {
+			// Object is marked for deletion already
+			continue
+		}
+		if !isOwner(m, bundle) {
+			// Object is not owned by that bundle
+			log.Printf("[WORKER][%s/%s] Object %v %q is not owned by the bundle with UID=%q. Owner references: %v",
+				wrk.namespace, wrk.bundleName, obj.GetObjectKind().GroupVersionKind(), m.GetName(), bundle.GetUID(), m.GetOwnerReferences())
+			continue
+		}
+		ref := objectRef{
+			GroupVersionKind: obj.GetObjectKind().GroupVersionKind(),
+			Name:             m.GetName(),
+		}
+		existingObjs[ref] = m.GetUID()
+	}
+	for _, res := range bundle.Spec.Resources {
+		ref := objectRef{
+			GroupVersionKind: res.Spec.GroupVersionKind(),
+			Name:             res.Spec.GetName(),
+		}
+		delete(existingObjs, ref)
+	}
+	var firstErr error
+	retriable := true
+	policy := metav1.DeletePropagationForeground
+	for ref, uid := range existingObjs {
+		log.Printf("[WORKER][%s/%s] Deleting object %v %q", wrk.namespace, wrk.bundleName, ref.GroupVersionKind, ref.Name)
+		resClient, err := resources.ClientForGVK(ref.GroupVersionKind, wrk.clients, wrk.scDynamic, wrk.namespace)
+		if err != nil {
+			if firstErr == nil {
+				retriable = false
+				firstErr = err
+			} else {
+				log.Printf("[WORKER][%s/%s] Failed to get client for object %s: %v", wrk.namespace, wrk.bundleName, ref.GroupVersionKind, err)
+			}
+			continue
+		}
+
+		err = resClient.Delete(ref.Name, &metav1.DeleteOptions{
+			Preconditions: &metav1.Preconditions{
+				UID: &uid,
+			},
+			PropagationPolicy: &policy,
+		})
+		if err != nil && !kerrors.IsNotFound(err) && !kerrors.IsConflict(err) {
+			// not found means object has been deleted already
+			// conflict means it has been deleted and re-created (UID does not match)
+			if firstErr == nil {
+				firstErr = err
+			} else {
+				log.Printf("[WORKER][%s/%s] Failed to delete object %v %q: %v", wrk.namespace, wrk.bundleName, ref.GroupVersionKind, ref.Name, err)
+			}
+			continue
+		}
+	}
+	return retriable, firstErr
 }
 
 func (wrk *worker) setBundleStatus(bundle *smith.Bundle) error {
@@ -505,4 +586,16 @@ func mergeLabels(labels ...map[string]string) map[string]string {
 		}
 	}
 	return result
+}
+
+func isOwner(obj metav1.Object, bundle *smith.Bundle) bool {
+	for _, ref := range obj.GetOwnerReferences() {
+		if ref.APIVersion == smith.BundleResourceGroupVersion &&
+			ref.Kind == smith.BundleResourceKind &&
+			ref.Name == bundle.Name &&
+			ref.UID == bundle.UID {
+			return true
+		}
+	}
+	return false
 }

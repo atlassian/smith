@@ -68,7 +68,7 @@ func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundl
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+3)*time.Second)
 	defer cancel()
 
-	assertBundle(t, ctxTimeout, store, namespace, bundle)
+	assertBundle(t, ctxTimeout, store, namespace, bundle, "")
 
 	var sleeperObj tprattribute.Sleeper
 	require.NoError(t, sClient.Get().

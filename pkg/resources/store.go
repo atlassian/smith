@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	ByNamespaceAndNameIndex = "NamespaceNameIndex"
+	ByNamespaceAndNameIndex       = "NamespaceNameIndex"
+	ByNamespaceAndBundleNameIndex = "NamespaceBundleNameIndex"
 )
 
 var (
@@ -197,7 +198,8 @@ func (s *Store) handleAddInformer(ctx context.Context, gvk schema.GroupVersionKi
 		panic(fmt.Errorf("Informer for %v is already registered", gvk))
 	}
 	err := informer.AddIndexers(cache.Indexers{
-		ByNamespaceAndNameIndex: MetaNamespaceKeyFunc,
+		ByNamespaceAndNameIndex:       byNamespaceAndNameIndex,
+		ByNamespaceAndBundleNameIndex: byNamespaceAndBundleNameIndex,
 	})
 	if err != nil {
 		// Must never happen in our case
@@ -335,6 +337,27 @@ func (s *Store) getFromIndexer(indexer cache.Indexer, gvk schema.GroupVersionKin
 	}
 }
 
+func (s *Store) GetObjectsForBundle(namespace, bundleName string) ([]runtime.Object, error) {
+	var result []runtime.Object
+	indexKey := ByNamespaceAndBundleNameIndexKey(namespace, bundleName)
+	for gvk, inf := range s.GetInformers() {
+		objs, err := inf.GetIndexer().ByIndex(ByNamespaceAndBundleNameIndex, indexKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get objects for bundle from %s informer: %v", gvk, err)
+		}
+		for _, obj := range objs {
+			o, err := s.deepCopy(obj)
+			if err != nil {
+				return nil, fmt.Errorf("failed to deep copy %T: %v", obj, err)
+			}
+			ro := o.(runtime.Object)
+			ro.GetObjectKind().SetGroupVersionKind(gvk) // Objects from type-specific informers don't have GVK set
+			result = append(result, ro)
+		}
+	}
+	return result, nil
+}
+
 type listener struct {
 	ctx    context.Context
 	gvk    schema.GroupVersionKind
@@ -359,14 +382,33 @@ func (l *listener) handle(obj interface{}) {
 	}
 }
 
-// MetaNamespaceKeyFunc is a slightly modified cache.MetaNamespaceKeyFunc().
-func MetaNamespaceKeyFunc(obj interface{}) ([]string, error) {
+func byNamespaceAndBundleNameIndex(obj interface{}) ([]string, error) {
 	if key, ok := obj.(cache.ExplicitKey); ok {
 		return []string{string(key)}, nil
 	}
 	m, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, fmt.Errorf("failed get meta of object: %v", err)
+		return nil, fmt.Errorf("failed to get meta of object: %v", err)
+	}
+	bundleName := m.GetLabels()[smith.BundleNameLabel]
+	if bundleName == "" {
+		return nil, nil
+	}
+	return []string{ByNamespaceAndBundleNameIndexKey(m.GetNamespace(), bundleName)}, nil
+}
+
+func ByNamespaceAndBundleNameIndexKey(namespace, bundleName string) string {
+	return namespace + "|" + bundleName // Different separator to avoid clashes with ByNamespaceAndNameIndexKey
+}
+
+// byNamespaceAndNameIndex is a slightly modified cache.byNamespaceAndNameIndex().
+func byNamespaceAndNameIndex(obj interface{}) ([]string, error) {
+	if key, ok := obj.(cache.ExplicitKey); ok {
+		return []string{string(key)}, nil
+	}
+	m, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get meta of object: %v", err)
 	}
 	return []string{ByNamespaceAndNameIndexKey(m.GetNamespace(), m.GetName())}, nil
 }
