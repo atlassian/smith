@@ -19,6 +19,35 @@ import (
 )
 
 func TestWorkflow(t *testing.T) {
+	c1 := apiv1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "config1",
+			Labels: map[string]string{
+				"configLabel":         "configValue",
+				"overlappingLabel":    "overlappingConfigValue",
+				smith.BundleNameLabel: "configLabel123",
+			},
+		},
+		Data: map[string]string{
+			"a": "b",
+		},
+	}
+	s1 := apiv1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "secret1",
+		},
+		StringData: map[string]string{
+			"a": "b",
+		},
+	}
 	bundle := &smith.Bundle{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       smith.BundleResourceKind,
@@ -33,7 +62,17 @@ func TestWorkflow(t *testing.T) {
 			},
 		},
 		Spec: smith.BundleSpec{
-			Resources: bundleResources(t),
+			Resources: []smith.Resource{
+				{
+					Name:      "config1res",
+					DependsOn: []smith.ResourceName{"secret2res"},
+					Spec:      toUnstructured(t, &c1),
+				},
+				{
+					Name: "secret2res",
+					Spec: toUnstructured(t, &s1),
+				},
+			},
 		},
 	}
 	setupApp(t, bundle, false, true, testWorkflow)
@@ -52,38 +91,24 @@ func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *s
 		"overlappingLabel":    "overlappingConfigValue",
 		smith.BundleNameLabel: bundleRes.Name,
 	}, cfMap.GetLabels())
+
+	secret, err := clientset.CoreV1().Secrets(namespace).Get("secret1", metav1.GetOptions{})
+	require.NoError(t, err)
+	trueRef := true
 	assert.Equal(t, []metav1.OwnerReference{
 		{
-			APIVersion: smith.BundleResourceGroupVersion,
-			Kind:       smith.BundleResourceKind,
-			Name:       bundleRes.Name,
-			UID:        bundleRes.UID,
+			APIVersion:         smith.BundleResourceGroupVersion,
+			Kind:               smith.BundleResourceKind,
+			Name:               bundleRes.Name,
+			UID:                bundleRes.UID,
+			BlockOwnerDeletion: &trueRef,
+		},
+		{
+			APIVersion:         "v1",
+			Kind:               "Secret",
+			Name:               secret.Name,
+			UID:                secret.UID,
+			BlockOwnerDeletion: &trueRef,
 		},
 	}, cfMap.GetOwnerReferences())
-}
-
-func bundleResources(t *testing.T) []smith.Resource {
-	c := apiv1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "config1",
-			Labels: map[string]string{
-				"configLabel":         "configValue",
-				"overlappingLabel":    "overlappingConfigValue",
-				smith.BundleNameLabel: "configLabel123",
-			},
-		},
-		Data: map[string]string{
-			"a": "b",
-		},
-	}
-	return []smith.Resource{
-		{
-			Name: "resource1",
-			Spec: toUnstructured(t, &c),
-		},
-	}
 }

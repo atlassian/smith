@@ -240,13 +240,30 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 		map[string]string{smith.BundleNameLabel: wrk.bundleName}))
 
 	// 3. Update OwnerReferences
+	trueRef := true
+	refs := res.Spec.GetOwnerReferences()
+	for _, ref := range refs {
+		ref.BlockOwnerDeletion = &trueRef
+	}
 	// Hardcode APIVersion/Kind because of https://github.com/kubernetes/client-go/issues/60
-	res.Spec.SetOwnerReferences(append(res.Spec.GetOwnerReferences(), metav1.OwnerReference{
-		APIVersion: smith.BundleResourceGroupVersion,
-		Kind:       smith.BundleResourceKind,
-		Name:       bundle.Name,
-		UID:        bundle.UID,
-	}))
+	refs = append(refs, metav1.OwnerReference{
+		APIVersion:         smith.BundleResourceGroupVersion,
+		Kind:               smith.BundleResourceKind,
+		Name:               bundle.Name,
+		UID:                bundle.UID,
+		BlockOwnerDeletion: &trueRef,
+	})
+	for _, dep := range res.DependsOn {
+		obj := readyResources[dep] // this is ok because we've checked earlier that readyResources contains all dependencies
+		refs = append(refs, metav1.OwnerReference{
+			APIVersion:         obj.GetAPIVersion(),
+			Kind:               obj.GetKind(),
+			Name:               obj.GetName(),
+			UID:                obj.GetUID(),
+			BlockOwnerDeletion: &trueRef,
+		})
+	}
+	res.Spec.SetOwnerReferences(refs)
 
 	return nil
 }
