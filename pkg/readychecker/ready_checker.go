@@ -10,7 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 // IsObjectReady checks if an object is Ready.
@@ -20,7 +20,7 @@ type IsObjectReady func(*unstructured.Unstructured) (isReady, retriableError boo
 // TprStore gets a TPR definition for a Group and Kind of the resource (TPR instance).
 // Returns nil if TPR definition was not found.
 type TprStore interface {
-	Get(resource schema.GroupKind) (*extensions.ThirdPartyResource, error)
+	Get(resource schema.GroupKind) (*ext_v1b1.ThirdPartyResource, error)
 }
 
 type ReadyChecker struct {

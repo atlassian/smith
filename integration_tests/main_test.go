@@ -11,20 +11,20 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 )
 
 func TestWorkflow(t *testing.T) {
-	c1 := apiv1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
+	c1 := api_v1.ConfigMap{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "config1",
 			Labels: map[string]string{
 				"configLabel":         "configValue",
@@ -36,12 +36,12 @@ func TestWorkflow(t *testing.T) {
 			"a": "b",
 		},
 	}
-	s1 := apiv1.Secret{
-		TypeMeta: metav1.TypeMeta{
+	s1 := api_v1.Secret{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "secret1",
 		},
 		StringData: map[string]string{
@@ -49,11 +49,11 @@ func TestWorkflow(t *testing.T) {
 		},
 	}
 	bundle := &smith.Bundle{
-		TypeMeta: metav1.TypeMeta{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       smith.BundleResourceKind,
 			APIVersion: smith.BundleResourceGroupVersion,
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle1",
 			Labels: map[string]string{
 				"bundleLabel":         "bundleValue",
@@ -83,7 +83,7 @@ func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *s
 
 	bundleRes := assertBundleTimeout(t, ctx, store, namespace, bundle, "")
 
-	cfMap, err := clientset.CoreV1().ConfigMaps(namespace).Get("config1", metav1.GetOptions{})
+	cfMap, err := clientset.CoreV1().ConfigMaps(namespace).Get("config1", meta_v1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
 		"configLabel":         "configValue",
@@ -92,10 +92,10 @@ func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *s
 		smith.BundleNameLabel: bundleRes.Name,
 	}, cfMap.GetLabels())
 
-	secret, err := clientset.CoreV1().Secrets(namespace).Get("secret1", metav1.GetOptions{})
+	secret, err := clientset.CoreV1().Secrets(namespace).Get("secret1", meta_v1.GetOptions{})
 	require.NoError(t, err)
 	trueRef := true
-	assert.Equal(t, []metav1.OwnerReference{
+	assert.Equal(t, []meta_v1.OwnerReference{
 		{
 			APIVersion:         smith.BundleResourceGroupVersion,
 			Kind:               smith.BundleResourceKind,

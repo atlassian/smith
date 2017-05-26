@@ -9,13 +9,13 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
+	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -35,7 +35,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	scheme := runtime.NewScheme()
-	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
 	AddToScheme(scheme)
 	sClient, err := GetSleeperTprClient(a.RestConfig, scheme)
 	if err != nil {
@@ -57,7 +57,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	informerFactory := informers.NewSharedInformerFactory(clientset, ResyncPeriod)
 	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
-	store.AddInformer(extensions.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
+	store.AddInformer(ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
 	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
 
 	// 1. Ensure ThirdPartyResource Sleeper exists
@@ -68,8 +68,8 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for TPR Informer was cancelled")
 	}
 
-	tpr := &extensions.ThirdPartyResource{
-		ObjectMeta: metav1.ObjectMeta{
+	tpr := &ext_v1b1.ThirdPartyResource{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: SleeperResourceName,
 			Annotations: map[string]string{
 				smith.TprFieldPathAnnotation:  "status.state",
@@ -77,7 +77,7 @@ func (a *App) Run(ctx context.Context) error {
 			},
 		},
 		Description: "Sleeper TPR Informer example",
-		Versions: []extensions.APIVersion{
+		Versions: []ext_v1b1.APIVersion{
 			{Name: SleeperResourceVersion},
 		},
 	}
@@ -99,7 +99,7 @@ func (a *App) Run(ctx context.Context) error {
 
 func sleeperInformer(ctx context.Context, sClient *rest.RESTClient) error {
 	tmplInf := cache.NewSharedInformer(
-		cache.NewListWatchFromClient(sClient, SleeperResourcePath, metav1.NamespaceAll, fields.Everything()),
+		cache.NewListWatchFromClient(sClient, SleeperResourcePath, meta_v1.NamespaceAll, fields.Everything()),
 		&Sleeper{}, 0)
 
 	seh := &SleeperEventHandler{

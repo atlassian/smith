@@ -8,25 +8,24 @@ import (
 
 	"github.com/atlassian/smith"
 
-	sc_v0 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog"
-	scv1alpha1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/dynamic"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
-	appsv1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	settings "k8s.io/client-go/pkg/apis/settings/v1alpha1"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
+	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
+	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	"k8s.io/client-go/rest"
 )
 
 func BundleScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	smith.AddToScheme(scheme)
-	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
 	return scheme
 }
 
@@ -34,14 +33,14 @@ func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
 	scheme := runtime.NewScheme()
 	smith.AddToScheme(scheme)
 	var sb runtime.SchemeBuilder
-	sb.Register(extensions.SchemeBuilder...)
-	sb.Register(apiv1.SchemeBuilder...)
-	sb.Register(appsv1beta1.SchemeBuilder...)
-	sb.Register(settings.SchemeBuilder...)
+	sb.Register(ext_v1b1.SchemeBuilder...)
+	sb.Register(api_v1.SchemeBuilder...)
+	sb.Register(apps_v1b1.SchemeBuilder...)
+	sb.Register(settings_v1a1.SchemeBuilder...)
 	if serviceCatalog {
-		sb.Register(scv1alpha1.SchemeBuilder...)
+		sb.Register(sc_v1a1.SchemeBuilder...)
 	} else {
-		scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+		scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
 	}
 	if err := sb.AddToScheme(scheme); err != nil {
 		return nil, err
@@ -91,7 +90,7 @@ func ConfigFromEnv() (*rest.Config, error) {
 
 func ClientForGVK(gvk schema.GroupVersionKind, coreDynamic, scDynamic dynamic.ClientPool, namespace string) (*dynamic.ResourceClient, error) {
 	var clients dynamic.ClientPool
-	if gvk.Group == sc_v0.GroupName {
+	if gvk.Group == sc_v1a1.GroupName {
 		if scDynamic == nil {
 			return nil, fmt.Errorf("client for Service Catalog is not configured, cannot work with object %s", gvk)
 		}
@@ -106,7 +105,7 @@ func ClientForGVK(gvk schema.GroupVersionKind, coreDynamic, scDynamic dynamic.Cl
 
 	plural, _ := meta.KindToResource(gvk)
 
-	return client.Resource(&metav1.APIResource{
+	return client.Resource(&meta_v1.APIResource{
 		Name:       plural.Resource,
 		Namespaced: true,
 		Kind:       gvk.Kind,

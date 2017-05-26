@@ -15,20 +15,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 )
 
 func TestUpdate(t *testing.T) {
-	existingConfigMap := &apiv1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
+	existingConfigMap := &api_v1.ConfigMap{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "config2",
 			Labels: map[string]string{
 				"labelx": "labelxValue",
@@ -38,12 +38,12 @@ func TestUpdate(t *testing.T) {
 			"a": "b",
 		},
 	}
-	bundleConfigMap := &apiv1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
+	bundleConfigMap := &api_v1.ConfigMap{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: existingConfigMap.Name,
 			Labels: map[string]string{
 				"configLabel":         "configValue",
@@ -56,11 +56,11 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 	existingSleeper := &tprattribute.Sleeper{
-		TypeMeta: metav1.TypeMeta{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       tprattribute.SleeperResourceKind,
 			APIVersion: tprattribute.SleeperResourceGroupVersion,
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "sleeper2",
 			Labels: map[string]string{
 				"labelx": "labelxValue",
@@ -72,11 +72,11 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 	bundleSleeper := &tprattribute.Sleeper{
-		TypeMeta: metav1.TypeMeta{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       tprattribute.SleeperResourceKind,
 			APIVersion: tprattribute.SleeperResourceGroupVersion,
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: existingSleeper.Name,
 			Labels: map[string]string{
 				"configLabel":         "configValue",
@@ -90,11 +90,11 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 	bundle := &smith.Bundle{
-		TypeMeta: metav1.TypeMeta{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       smith.BundleResourceKind,
 			APIVersion: smith.BundleResourceGroupVersion,
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle1",
 			Labels: map[string]string{
 				"bundleLabel":         "bundleValue",
@@ -136,8 +136,8 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 		}
 	}()
 
-	existingConfigMap := args[0].(*apiv1.ConfigMap)
-	bundleConfigMap := args[1].(*apiv1.ConfigMap)
+	existingConfigMap := args[0].(*api_v1.ConfigMap)
+	bundleConfigMap := args[1].(*api_v1.ConfigMap)
 	existingSleeper := args[2].(*tprattribute.Sleeper)
 	bundleSleeper := args[3].(*tprattribute.Sleeper)
 
@@ -180,7 +180,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 
 	bundleRes := assertBundle(t, ctxTimeout, store, namespace, bundle, "")
 
-	cfMap, err := cmClient.Get(bundleConfigMap.Name, metav1.GetOptions{})
+	cfMap, err := cmClient.Get(bundleConfigMap.Name, meta_v1.GetOptions{})
 	if assert.NoError(t, err) {
 		assert.Equal(t, map[string]string{
 			"configLabel":         "configValue",
@@ -220,7 +220,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 
 	assertBundleTimeout(t, ctx, store, namespace, &emptyBundle, bundleRes.ResourceVersion)
 
-	cfMap, err = cmClient.Get(bundleConfigMap.Name, metav1.GetOptions{})
+	cfMap, err = cmClient.Get(bundleConfigMap.Name, meta_v1.GetOptions{})
 	if err == nil {
 		assert.NotNil(t, cfMap.DeletionTimestamp) // Still in api but marked for deletion
 	} else {

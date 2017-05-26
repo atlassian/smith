@@ -12,10 +12,10 @@ import (
 	"github.com/atlassian/smith"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 func GroupKindToTprName(gk schema.GroupKind) string {
@@ -38,15 +38,15 @@ func GroupKindToTprName(gk schema.GroupKind) string {
 	return buf.String()
 }
 
-func EnsureTprExists(ctx context.Context, clientset kubernetes.Interface, store smith.ByNameStore, tpr *extensions.ThirdPartyResource) error {
-	tprGVK := extensions.SchemeGroupVersion.WithKind("ThirdPartyResource")
+func EnsureTprExists(ctx context.Context, clientset kubernetes.Interface, store smith.ByNameStore, tpr *ext_v1b1.ThirdPartyResource) error {
+	tprGVK := ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource")
 	for {
-		obj, exists, err := store.Get(tprGVK, metav1.NamespaceNone, tpr.Name)
+		obj, exists, err := store.Get(tprGVK, meta_v1.NamespaceNone, tpr.Name)
 		if err != nil {
 			return err
 		}
 		if exists {
-			o := obj.(*extensions.ThirdPartyResource)
+			o := obj.(*ext_v1b1.ThirdPartyResource)
 			// Ignoring labels and annotations for now
 			if o.Description != tpr.Description || !reflect.DeepEqual(o.Versions, tpr.Versions) {
 				log.Printf("Updating ThirdPartyResource %s", tpr.Name)

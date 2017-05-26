@@ -12,7 +12,7 @@ import (
 	"github.com/atlassian/smith/pkg/app"
 	"github.com/atlassian/smith/pkg/resources"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -41,7 +41,7 @@ func runWithContext(ctx context.Context) error {
 	fs.BoolVar(&a.DisablePodPreset, "disable-pod-preset", false, "Disable PodPreset support")
 	scUrl := fs.String("service-catalog-url", "", "Service Catalog API server URL")
 	fs.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
-	fs.StringVar(&a.Namespace, "namespace", metav1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
+	fs.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
 	fs.Parse(os.Args[1:]) // nolint: gas
 
 	config, err := resources.ConfigFromEnv()

@@ -6,7 +6,7 @@ import (
 
 	"github.com/atlassian/smith"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -37,14 +37,14 @@ func (h *resourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
 }
 
 func (h *resourceEventHandler) OnDelete(obj interface{}) {
-	meta, ok := obj.(metav1.Object)
+	meta, ok := obj.(meta_v1.Object)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			log.Printf("[REH] Delete event with unrecognized object type: %T", obj)
 			return
 		}
-		meta, ok = tombstone.Obj.(metav1.Object)
+		meta, ok = tombstone.Obj.(meta_v1.Object)
 		if !ok {
 			log.Printf("[REH] Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
@@ -65,7 +65,7 @@ func (h *resourceEventHandler) rebuildByName(namespace, bundleName, addUpdateDel
 	}
 	if bundle != nil {
 		log.Printf("[REH][%s/%s] Rebuilding bundle because resource %s was %s",
-			namespace, bundleName, obj.(metav1.Object).GetName(), addUpdateDelete)
+			namespace, bundleName, obj.(meta_v1.Object).GetName(), addUpdateDelete)
 		if err = h.processor.Rebuild(h.ctx, bundle); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 			log.Printf("[REH][%s/%s] Error rebuilding bundle: %v", namespace, bundleName, err)
 		}
@@ -80,6 +80,6 @@ func (h *resourceEventHandler) rebuildByName(namespace, bundleName, addUpdateDel
 }
 
 func getBundleNameAndNamespace(obj interface{}) (string, string) {
-	meta := obj.(metav1.Object)
+	meta := obj.(meta_v1.Object)
 	return meta.GetLabels()[smith.BundleNameLabel], meta.GetNamespace()
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/atlassian/smith"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -414,7 +414,7 @@ func byNamespaceAndNameIndex(obj interface{}) ([]string, error) {
 }
 
 func ByNamespaceAndNameIndexKey(namespace, name string) string {
-	if namespace == metav1.NamespaceNone {
+	if namespace == meta_v1.NamespaceNone {
 		return name
 	}
 	return namespace + "/" + name

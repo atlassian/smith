@@ -16,20 +16,20 @@ import (
 	"github.com/stretchr/testify/require"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
 const (
-	useNamespace              = metav1.NamespaceDefault
+	useNamespace              = meta_v1.NamespaceDefault
 	serviceCatalogUrlEnvParam = "SERVICE_CATALOG_URL"
 )
 
@@ -44,7 +44,7 @@ func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.Bun
 
 func sleeperScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
-	scheme.AddUnversionedTypes(apiv1.SchemeGroupVersion, &metav1.Status{})
+	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
 	tprattribute.AddToScheme(scheme)
 	return scheme
 }

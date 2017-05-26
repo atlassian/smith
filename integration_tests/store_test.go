@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
 )
 
 func TestStore(t *testing.T) {
@@ -35,7 +35,7 @@ func TestStore(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	configMapGvk := apiv1.SchemeGroupVersion.WithKind("ConfigMap")
+	configMapGvk := api_v1.SchemeGroupVersion.WithKind("ConfigMap")
 
 	informerFactory := informers.NewSharedInformerFactory(clientset, 1*time.Minute)
 	configMapInf := informerFactory.Core().V1().ConfigMaps().Informer()
@@ -51,8 +51,8 @@ func TestStore(t *testing.T) {
 	})
 	t.Run("create", func(t *testing.T) {
 		mapName := "i-do-not-exist-yet"
-		cm := &apiv1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
+		cm := &api_v1.ConfigMap{
+			ObjectMeta: meta_v1.ObjectMeta{
 				Name: mapName,
 			},
 			Data: map[string]string{
@@ -85,7 +85,7 @@ func TestStore(t *testing.T) {
 		}()
 		wg.Wait()
 		require.NoError(t, err)
-		cm.GetObjectKind().SetGroupVersionKind(apiv1.SchemeGroupVersion.WithKind("ConfigMap"))
+		cm.GetObjectKind().SetGroupVersionKind(api_v1.SchemeGroupVersion.WithKind("ConfigMap"))
 		assert.Equal(t, cm, obj)
 	})
 	t.Run("remove informer", func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestStore(t *testing.T) {
 		ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 5*time.Second)
 		defer cancelTimeout()
 
-		_, err := store.AwaitObject(ctxTimeout, apiv1.SchemeGroupVersion.WithKind("Secret"), useNamespace, mapName)
+		_, err := store.AwaitObject(ctxTimeout, api_v1.SchemeGroupVersion.WithKind("Secret"), useNamespace, mapName)
 		require.EqualError(t, err, "no informer for /v1, Kind=Secret is registered")
 	})
 }

@@ -12,17 +12,17 @@ import (
 	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/resources"
 
-	scv1alpha1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
-	appsv1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	settings "k8s.io/client-go/pkg/apis/settings/v1alpha1"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
+	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
+	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -106,12 +106,12 @@ func (a *App) Run(ctx context.Context) error {
 	defer cancel() // cancel ctx to signal done to processor (and everything else)
 
 	// 4. Ensure ThirdPartyResource Bundle exists
-	bundleTpr := &extensions.ThirdPartyResource{
-		ObjectMeta: metav1.ObjectMeta{
+	bundleTpr := &ext_v1b1.ThirdPartyResource{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: smith.BundleResourceName,
 		},
 		Description: "Smith resource manager",
-		Versions: []extensions.APIVersion{
+		Versions: []ext_v1b1.APIVersion{
 			{Name: smith.BundleResourceVersion},
 		},
 	}
@@ -173,21 +173,21 @@ func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mai
 	// Core API types
 	infs := map[schema.GroupVersionKind]cache.SharedIndexInformer{
 		tprGVK: mainSif.Extensions().V1beta1().ThirdPartyResources().Informer(),
-		extensions.SchemeGroupVersion.WithKind("Deployment"):  a.deploymentExtInformer(mainClient),
-		extensions.SchemeGroupVersion.WithKind("Ingress"):     a.ingressInformer(mainClient),
-		apiv1.SchemeGroupVersion.WithKind("Service"):          a.serviceInformer(mainClient),
-		apiv1.SchemeGroupVersion.WithKind("ConfigMap"):        a.configMapInformer(mainClient),
-		apiv1.SchemeGroupVersion.WithKind("Secret"):           a.secretInformer(mainClient),
-		appsv1beta1.SchemeGroupVersion.WithKind("Deployment"): a.deploymentAppsInformer(mainClient),
+		ext_v1b1.SchemeGroupVersion.WithKind("Deployment"):  a.deploymentExtInformer(mainClient),
+		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):     a.ingressInformer(mainClient),
+		api_v1.SchemeGroupVersion.WithKind("Service"):       a.serviceInformer(mainClient),
+		api_v1.SchemeGroupVersion.WithKind("ConfigMap"):     a.configMapInformer(mainClient),
+		api_v1.SchemeGroupVersion.WithKind("Secret"):        a.secretInformer(mainClient),
+		apps_v1b1.SchemeGroupVersion.WithKind("Deployment"): a.deploymentAppsInformer(mainClient),
 	}
 	if !a.DisablePodPreset {
-		infs[settings.SchemeGroupVersion.WithKind("PodPreset")] = a.podPresetInformer(mainClient)
+		infs[settings_v1a1.SchemeGroupVersion.WithKind("PodPreset")] = a.podPresetInformer(mainClient)
 	}
 
 	// Service Catalog types
 	if scClient != nil {
-		infs[scv1alpha1.SchemeGroupVersion.WithKind("Binding")] = a.bindingInformer(scClient)
-		infs[scv1alpha1.SchemeGroupVersion.WithKind("Instance")] = a.instanceInformer(scClient)
+		infs[sc_v1a1.SchemeGroupVersion.WithKind("Binding")] = a.bindingInformer(scClient)
+		infs[sc_v1a1.SchemeGroupVersion.WithKind("Instance")] = a.instanceInformer(scClient)
 	}
 
 	// Add all to Store

@@ -1,7 +1,7 @@
 package smith
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -63,13 +63,13 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&Bundle{},
 		&BundleList{},
 	)
-	metav1.AddToGroupVersion(scheme, GV)
+	meta_v1.AddToGroupVersion(scheme, GV)
 }
 
 type BundleList struct {
-	metav1.TypeMeta `json:",inline"`
+	meta_v1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	metav1.ListMeta `json:"metadata,omitempty"`
+	meta_v1.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of bundles.
 	Items []Bundle `json:"items"`
@@ -77,10 +77,10 @@ type BundleList struct {
 
 // Bundle describes a resources bundle.
 type Bundle struct {
-	metav1.TypeMeta `json:",inline"`
+	meta_v1.TypeMeta `json:",inline"`
 
 	// Standard object metadata
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	meta_v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the specification of the desired behavior of the Bundle.
 	Spec BundleSpec `json:"spec,omitempty"`
@@ -102,7 +102,7 @@ func (b *Bundle) GetCondition(conditionType BundleConditionType) (int, *BundleCo
 // status has changed.
 // Returns true if Bundle condition has changed or has been added.
 func (b *Bundle) UpdateCondition(condition *BundleCondition) bool {
-	now := metav1.Now()
+	now := meta_v1.Now()
 	condition.LastTransitionTime = now
 	// Try to find this bundle condition.
 	conditionIndex, oldCondition := b.GetCondition(condition.Type)
@@ -143,9 +143,9 @@ type BundleCondition struct {
 	// Status of the condition.
 	Status ConditionStatus `json:"status"`
 	// The last time this condition was updated.
-	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+	LastUpdateTime meta_v1.Time `json:"lastUpdateTime,omitempty"`
 	// Last time the condition transitioned from one status to another.
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	LastTransitionTime meta_v1.Time `json:"lastTransitionTime,omitempty"`
 	// The reason for the condition's last transition.
 	Reason string `json:"reason,omitempty"`
 	// A human readable message indicating details about the transition.

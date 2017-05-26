@@ -14,7 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -24,11 +24,11 @@ import (
 func TestTprAttribute(t *testing.T) {
 	sleeper, sleeperU := bundleAttrResources(t)
 	bundle := &smith.Bundle{
-		TypeMeta: metav1.TypeMeta{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       smith.BundleResourceKind,
 			APIVersion: smith.BundleResourceGroupVersion,
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle-attribute",
 		},
 		Spec: smith.BundleSpec{
@@ -86,11 +86,11 @@ func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundl
 
 func bundleAttrResources(t *testing.T) (*tprattribute.Sleeper, unstructured.Unstructured) {
 	c := &tprattribute.Sleeper{
-		TypeMeta: metav1.TypeMeta{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       tprattribute.SleeperResourceKind,
 			APIVersion: tprattribute.SleeperResourceGroupVersion,
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "sleeper1",
 		},
 		Spec: tprattribute.SleeperSpec{
