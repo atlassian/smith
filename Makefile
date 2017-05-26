@@ -42,6 +42,7 @@ fmt:
 
 minikube-test: fmt
 	go test -i -tags=integration -race -v ./integration_tests
+	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
@@ -51,6 +52,7 @@ minikube-test: fmt
 
 minikube-test-sc: fmt
 	go test -i -tags=integration_sc -race -v ./integration_tests
+	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
@@ -60,6 +62,7 @@ minikube-test-sc: fmt
 	go test -tags=integration_sc -race -v ./integration_tests
 
 minikube-run: build-all-race
+	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
@@ -68,6 +71,7 @@ minikube-run: build-all-race
 	go run -race cmd/smith/*
 
 minikube-sleeper-run: build-all-race
+	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
@@ -77,10 +81,12 @@ minikube-sleeper-run: build-all-race
 
 test-race: fmt
 	go test -i -race $$(glide nv | grep -v integration_tests)
+	KUBE_CACHE_MUTATION_DETECTOR=true \
 	go test -race $$(glide nv | grep -v integration_tests)
 
 test: fmt
 	go test -i $$(glide nv | grep -v integration_tests)
+	KUBE_CACHE_MUTATION_DETECTOR=true \
 	go test $$(glide nv | grep -v integration_tests)
 
 check: build-all

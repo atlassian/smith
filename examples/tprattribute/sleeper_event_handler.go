@@ -5,12 +5,15 @@ import (
 	"log"
 	"time"
 
+	"github.com/atlassian/smith"
+
 	"k8s.io/client-go/rest"
 )
 
 type SleeperEventHandler struct {
-	ctx    context.Context
-	client *rest.RESTClient
+	ctx      context.Context
+	client   *rest.RESTClient
+	deepCopy smith.DeepCopy
 }
 
 func (h *SleeperEventHandler) OnAdd(obj interface{}) {
@@ -28,17 +31,22 @@ func (h *SleeperEventHandler) OnDelete(obj interface{}) {
 }
 
 func (h *SleeperEventHandler) handle(obj interface{}) {
-	in := *obj.(*Sleeper)
+	obj, err := h.deepCopy(obj)
+	if err != nil {
+		log.Printf("[Sleeper] Failed to deep copy %T: %v", obj, err)
+		return
+	}
+	in := obj.(*Sleeper)
 	log.Printf("[Sleeper] %s/%s was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Namespace, in.Name, Sleeping, in.Spec.SleepFor)
 	in.Status.State = Sleeping
-	err := h.client.Put().
+	err = h.client.Put().
 		Namespace(in.Namespace).
 		Resource(SleeperResourcePath).
 		Name(in.Name).
 		Context(h.ctx).
-		Body(&in).
+		Body(in).
 		Do().
-		Into(&in)
+		Into(in)
 	if err != nil {
 		log.Printf("[Sleeper] Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
 	}
@@ -55,7 +63,7 @@ func (h *SleeperEventHandler) handle(obj interface{}) {
 				Resource(SleeperResourcePath).
 				Name(in.Name).
 				Context(h.ctx).
-				Body(&in).
+				Body(in).
 				Do().
 				Error()
 			if err != nil {
