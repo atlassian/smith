@@ -40,7 +40,8 @@ fmt:
 	gofmt -w=true -s $$(find . -type f -name '*.go' -not -path "./vendor/*")
 	goimports -w=true -d $$(find . -type f -name '*.go' -not -path "./vendor/*")
 
-minikube-test: build-all-race
+minikube-test: fmt
+	go test -i -tags=integration -race -v ./integration_tests
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
@@ -48,7 +49,8 @@ minikube-test: build-all-race
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	go test -tags=integration -race -v ./integration_tests
 
-minikube-test-sc: build-all-race
+minikube-test-sc: fmt
+	go test -i -tags=integration_sc -race -v ./integration_tests
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
@@ -73,10 +75,12 @@ minikube-sleeper-run: build-all-race
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	go run -race examples/tprattribute/main/*
 
-test-race: build-all-race
+test-race: fmt
+	go test -i -race $$(glide nv | grep -v integration_tests)
 	go test -race $$(glide nv | grep -v integration_tests)
 
-test: build-all
+test: fmt
+	go test -i $$(glide nv | grep -v integration_tests)
 	go test $$(glide nv | grep -v integration_tests)
 
 check: build-all
