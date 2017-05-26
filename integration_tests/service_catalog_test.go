@@ -9,49 +9,49 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
-	scv1alpha1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 )
 
 func TestServiceCatalog(t *testing.T) {
-	instance := &scv1alpha1.Instance{
-		TypeMeta: metav1.TypeMeta{
+	instance := &sc_v1a1.Instance{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Instance",
-			APIVersion: scv1alpha1.SchemeGroupVersion.String(),
+			APIVersion: sc_v1a1.SchemeGroupVersion.String(),
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "instance1",
 		},
-		Spec: scv1alpha1.InstanceSpec{
+		Spec: sc_v1a1.InstanceSpec{
 			ServiceClassName: "user-provided-service",
 			PlanName:         "default",
 		},
 	}
-	binding := &scv1alpha1.Binding{
-		TypeMeta: metav1.TypeMeta{
+	binding := &sc_v1a1.Binding{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Binding",
-			APIVersion: scv1alpha1.SchemeGroupVersion.String(),
+			APIVersion: sc_v1a1.SchemeGroupVersion.String(),
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "binding1",
 		},
-		Spec: scv1alpha1.BindingSpec{
-			InstanceRef: apiv1.LocalObjectReference{
+		Spec: sc_v1a1.BindingSpec{
+			InstanceRef: api_v1.LocalObjectReference{
 				Name: instance.Name,
 			},
 			SecretName: "secret1",
 		},
 	}
 	bundle := &smith.Bundle{
-		TypeMeta: metav1.TypeMeta{
+		TypeMeta: meta_v1.TypeMeta{
 			Kind:       smith.BundleResourceKind,
 			APIVersion: smith.BundleResourceGroupVersion,
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle-cs",
 		},
 		Spec: smith.BundleSpec{

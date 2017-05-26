@@ -10,13 +10,13 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -31,7 +31,7 @@ type informerStore interface {
 
 type watchState struct {
 	cancel  context.CancelFunc
-	version extensions.APIVersion
+	version ext_v1b1.APIVersion
 }
 
 // tprEventHandler handles events for objects with Kind: ThirdPartyResource.
@@ -63,7 +63,7 @@ func newTprEventHandler(ctx context.Context, handler cache.ResourceEventHandler,
 }
 
 func (h *tprEventHandler) OnAdd(obj interface{}) {
-	tpr := obj.(*extensions.ThirdPartyResource)
+	tpr := obj.(*ext_v1b1.ThirdPartyResource)
 	if tpr.Name == smith.BundleResourceName {
 		return
 	}
@@ -77,15 +77,15 @@ func (h *tprEventHandler) OnAdd(obj interface{}) {
 }
 
 func (h *tprEventHandler) OnUpdate(oldObj, newObj interface{}) {
-	newTpr := newObj.(*extensions.ThirdPartyResource)
+	newTpr := newObj.(*ext_v1b1.ThirdPartyResource)
 	if newTpr.Name == smith.BundleResourceName {
 		return
 	}
 	func() {
 		newVersions := versionsMap(newTpr)
 
-		var added []extensions.APIVersion
-		var removed []extensions.APIVersion
+		var added []ext_v1b1.APIVersion
+		var removed []ext_v1b1.APIVersion
 
 		h.mx.Lock()
 		defer h.mx.Unlock()
@@ -115,8 +115,8 @@ func (h *tprEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	h.rebuildBundles(newTpr.Name, "updated")
 }
 
-func versionsMap(tpr *extensions.ThirdPartyResource) map[string]extensions.APIVersion {
-	v := make(map[string]extensions.APIVersion, len(tpr.Versions))
+func versionsMap(tpr *ext_v1b1.ThirdPartyResource) map[string]ext_v1b1.APIVersion {
+	v := make(map[string]ext_v1b1.APIVersion, len(tpr.Versions))
 	for _, ver := range tpr.Versions {
 		v[ver.Name] = ver
 	}
@@ -124,14 +124,14 @@ func versionsMap(tpr *extensions.ThirdPartyResource) map[string]extensions.APIVe
 }
 
 func (h *tprEventHandler) OnDelete(obj interface{}) {
-	tpr, ok := obj.(*extensions.ThirdPartyResource)
+	tpr, ok := obj.(*ext_v1b1.ThirdPartyResource)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			log.Printf("[TPREH] Delete event with unrecognized object type: %T", obj)
 			return
 		}
-		tpr, ok = tombstone.Obj.(*extensions.ThirdPartyResource)
+		tpr, ok = tombstone.Obj.(*ext_v1b1.ThirdPartyResource)
 		if !ok {
 			log.Printf("[TPREH] Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
@@ -143,7 +143,7 @@ func (h *tprEventHandler) OnDelete(obj interface{}) {
 
 		// Removing all watched versions for this TPR
 		tprWatch := h.watchers[tpr.Name]
-		versions := make([]extensions.APIVersion, 0, len(tprWatch))
+		versions := make([]ext_v1b1.APIVersion, 0, len(tprWatch))
 
 		for _, state := range tprWatch {
 			versions = append(versions, state.version)
@@ -154,7 +154,7 @@ func (h *tprEventHandler) OnDelete(obj interface{}) {
 	h.rebuildBundles(tpr.Name, "deleted")
 }
 
-func (h *tprEventHandler) watchVersions(tprName string, versions ...extensions.APIVersion) {
+func (h *tprEventHandler) watchVersions(tprName string, versions ...ext_v1b1.APIVersion) {
 	if len(versions) == 0 {
 		return
 	}
@@ -177,15 +177,15 @@ func (h *tprEventHandler) watchVersions(tprName string, versions ...extensions.A
 			continue
 		}
 		plural, _ := meta.KindToResource(gvk)
-		res := dc.Resource(&metav1.APIResource{
+		res := dc.Resource(&meta_v1.APIResource{
 			Name: plural.Resource,
 			Kind: gk.Kind,
-		}, metav1.NamespaceNone)
+		}, meta_v1.NamespaceNone)
 		tprInf := cache.NewSharedIndexInformer(&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
 				return res.List(options)
 			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
 				return res.Watch(options)
 			},
 		}, &unstructured.Unstructured{}, h.resyncPeriod, cache.Indexers{})
@@ -202,7 +202,7 @@ func (h *tprEventHandler) watchVersions(tprName string, versions ...extensions.A
 	}
 }
 
-func (h *tprEventHandler) unwatchVersions(tprName string, versions ...extensions.APIVersion) {
+func (h *tprEventHandler) unwatchVersions(tprName string, versions ...ext_v1b1.APIVersion) {
 	tprWatch := h.watchers[tprName]
 	if tprWatch == nil {
 		// Nothing to do. This can happen if there was an error adding a watch

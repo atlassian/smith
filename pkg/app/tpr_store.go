@@ -4,19 +4,19 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 type tprStore struct {
 	store smith.ByNameStore
 }
 
-func (ts *tprStore) Get(resource schema.GroupKind) (*extensions.ThirdPartyResource, error) {
-	tpr, exists, err := ts.store.Get(tprGVK, metav1.NamespaceNone, resources.GroupKindToTprName(resource))
+func (ts *tprStore) Get(resource schema.GroupKind) (*ext_v1b1.ThirdPartyResource, error) {
+	tpr, exists, err := ts.store.Get(tprGVK, meta_v1.NamespaceNone, resources.GroupKindToTprName(resource))
 	if err != nil || !exists {
 		return nil, err
 	}
-	return tpr.(*extensions.ThirdPartyResource), nil
+	return tpr.(*ext_v1b1.ThirdPartyResource), nil
 }

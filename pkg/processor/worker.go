@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -246,7 +246,7 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 		ref.BlockOwnerDeletion = &trueRef
 	}
 	// Hardcode APIVersion/Kind because of https://github.com/kubernetes/client-go/issues/60
-	refs = append(refs, metav1.OwnerReference{
+	refs = append(refs, meta_v1.OwnerReference{
 		APIVersion:         smith.BundleResourceGroupVersion,
 		Kind:               smith.BundleResourceKind,
 		Name:               bundle.Name,
@@ -255,7 +255,7 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 	})
 	for _, dep := range res.DependsOn {
 		obj := readyResources[dep] // this is ok because we've checked earlier that readyResources contains all dependencies
-		refs = append(refs, metav1.OwnerReference{
+		refs = append(refs, meta_v1.OwnerReference{
 			APIVersion:         obj.GetAPIVersion(),
 			Kind:               obj.GetKind(),
 			Name:               obj.GetName(),
@@ -376,7 +376,7 @@ func (wrk *worker) deleteRemovedResources(bundle *smith.Bundle) (retriableError 
 	}
 	var firstErr error
 	retriable := true
-	policy := metav1.DeletePropagationForeground
+	policy := meta_v1.DeletePropagationForeground
 	for ref, uid := range existingObjs {
 		log.Printf("[WORKER][%s/%s] Deleting object %v %q", wrk.namespace, wrk.bundleName, ref.GroupVersionKind, ref.Name)
 		resClient, err := resources.ClientForGVK(ref.GroupVersionKind, wrk.clients, wrk.scDynamic, wrk.namespace)
@@ -390,8 +390,8 @@ func (wrk *worker) deleteRemovedResources(bundle *smith.Bundle) (retriableError 
 			continue
 		}
 
-		err = resClient.Delete(ref.Name, &metav1.DeleteOptions{
-			Preconditions: &metav1.Preconditions{
+		err = resClient.Delete(ref.Name, &meta_v1.DeleteOptions{
+			Preconditions: &meta_v1.Preconditions{
 				UID: &uid,
 			},
 			PropagationPolicy: &policy,
@@ -605,7 +605,7 @@ func mergeLabels(labels ...map[string]string) map[string]string {
 	return result
 }
 
-func isOwner(obj metav1.Object, bundle *smith.Bundle) bool {
+func isOwner(obj meta_v1.Object, bundle *smith.Bundle) bool {
 	for _, ref := range obj.GetOwnerReferences() {
 		if ref.APIVersion == smith.BundleResourceGroupVersion &&
 			ref.Kind == smith.BundleResourceKind &&

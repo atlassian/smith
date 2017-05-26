@@ -1,7 +1,7 @@
 package tprattribute
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -36,13 +36,13 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&Sleeper{},
 		&SleeperList{},
 	)
-	metav1.AddToGroupVersion(scheme, GV)
+	meta_v1.AddToGroupVersion(scheme, GV)
 }
 
 type SleeperList struct {
-	metav1.TypeMeta `json:",inline"`
+	meta_v1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	metav1.ListMeta `json:"metadata,omitempty"`
+	meta_v1.ListMeta `json:"metadata,omitempty"`
 
 	// Items is a list of sleepers.
 	Items []Sleeper `json:"items"`
@@ -50,10 +50,10 @@ type SleeperList struct {
 
 // Sleeper describes a sleeping resource.
 type Sleeper struct {
-	metav1.TypeMeta `json:",inline"`
+	meta_v1.TypeMeta `json:",inline"`
 
 	// Standard object metadata
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	meta_v1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the specification of the desired behavior of the Sleeper.
 	Spec SleeperSpec `json:"spec,omitempty"`
