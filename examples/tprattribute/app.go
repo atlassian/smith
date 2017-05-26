@@ -87,7 +87,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 2. Create an Informer for Sleeper objects
-	err = sleeperInformer(ctx, sClient)
+	err = sleeperInformer(ctx, sClient, scheme.DeepCopy)
 	if err != nil {
 		return err
 	}
@@ -97,14 +97,15 @@ func (a *App) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func sleeperInformer(ctx context.Context, sClient *rest.RESTClient) error {
+func sleeperInformer(ctx context.Context, sClient *rest.RESTClient, deepCopy smith.DeepCopy) error {
 	tmplInf := cache.NewSharedInformer(
 		cache.NewListWatchFromClient(sClient, SleeperResourcePath, meta_v1.NamespaceAll, fields.Everything()),
 		&Sleeper{}, 0)
 
 	seh := &SleeperEventHandler{
-		ctx:    ctx,
-		client: sClient,
+		ctx:      ctx,
+		client:   sClient,
+		deepCopy: deepCopy,
 	}
 
 	tmplInf.AddEventHandler(seh)
