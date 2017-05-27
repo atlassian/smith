@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/util"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,8 +30,7 @@ func TestStore(t *testing.T) {
 
 	ctxStore, cancelStore := context.WithCancel(context.Background())
 	defer cancelStore() // signal store to stop
-	wgStore.Add(1)
-	go store.Run(ctxStore, wgStore.Done)
+	util.StartAsync(ctxStore, &wgStore, store.Run)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -70,11 +70,9 @@ func TestStore(t *testing.T) {
 
 		var obj runtime.Object
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			obj, err = store.AwaitObject(ctxTimeout, configMapGvk, useNamespace, mapName)
-		}()
+		util.StartAsync(ctxTimeout, &wg, func(ctx context.Context) {
+			obj, err = store.AwaitObject(ctx, configMapGvk, useNamespace, mapName)
+		})
 		time.Sleep(1 * time.Second)
 		cm, errCreate := clientset.CoreV1().ConfigMaps(useNamespace).Create(cm)
 		require.NoError(t, errCreate)
@@ -94,11 +92,9 @@ func TestStore(t *testing.T) {
 		ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 5*time.Second)
 		defer cancelTimeout()
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, err = store.AwaitObject(ctxTimeout, configMapGvk, useNamespace, mapName)
-		}()
+		util.StartAsync(ctxTimeout, &wg, func(ctx context.Context) {
+			_, err = store.AwaitObject(ctx, configMapGvk, useNamespace, mapName)
+		})
 		time.Sleep(1 * time.Second)
 		assert.True(t, store.RemoveInformer(configMapGvk))
 		wg.Wait()

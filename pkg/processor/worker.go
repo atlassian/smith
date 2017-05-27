@@ -52,8 +52,7 @@ type worker struct {
 	needsRebuild int32 // must be accessed via atomics only
 }
 
-func (wrk *worker) rebuildLoop(ctx context.Context, done func()) {
-	defer done()
+func (wrk *worker) rebuildLoop(ctx context.Context) {
 	var timer *time.Timer
 	defer func() {
 		if timer != nil {

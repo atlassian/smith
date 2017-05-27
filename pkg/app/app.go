@@ -11,6 +11,7 @@ import (
 	"github.com/atlassian/smith/pkg/processor"
 	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/util"
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -72,8 +73,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	ctxStore, cancelStore := context.WithCancel(context.Background())
 	defer cancelStore() // signal store to stop
-	wgStore.Add(1)
-	go store.Run(ctxStore, wgStore.Done)
+	util.StartAsync(ctxStore, &wgStore, store.Run)
 
 	// 1.5. Informers
 	bundleInf := a.bundleInformer(bundleClient)
@@ -101,8 +101,7 @@ func (a *App) Run(ctx context.Context) error {
 	bp := processor.New(bundleClient, scDynamic, clients, rc, scheme.DeepCopy, store)
 	var wg sync.WaitGroup
 	defer wg.Wait() // await termination
-	wg.Add(1)
-	go bp.Run(ctx, wg.Done)
+	util.StartAsync(ctx, &wg, bp.Run)
 	defer cancel() // cancel ctx to signal done to processor (and everything else)
 
 	// 4. Ensure ThirdPartyResource Bundle exists

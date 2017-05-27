@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/util"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,7 +60,7 @@ func EnsureTprExists(ctx context.Context, clientset kubernetes.Interface, store 
 					}
 					log.Printf("Conflict updating ThirdPartyResource %s", tpr.Name)
 					// wait for store to pick up the object and re-iterate
-					if err := Sleep(ctx, 1*time.Second); err != nil {
+					if err := util.Sleep(ctx, 1*time.Second); err != nil {
 						return err
 					}
 					continue
@@ -74,14 +75,14 @@ func EnsureTprExists(ctx context.Context, clientset kubernetes.Interface, store 
 				}
 				log.Printf("ThirdPartyResource %s was created concurrently", tpr.Name)
 				// wait for store to pick up the object and re-iterate
-				if err := Sleep(ctx, 1*time.Second); err != nil {
+				if err := util.Sleep(ctx, 1*time.Second); err != nil {
 					return err
 				}
 				continue
 			}
 			log.Printf("ThirdPartyResource %s created", tpr.Name)
 			// TODO It takes a while for k8s to add a new rest endpoint. Polling?
-			if err := Sleep(ctx, 15*time.Second); err != nil {
+			if err := util.Sleep(ctx, 15*time.Second); err != nil {
 				return err
 			}
 		}

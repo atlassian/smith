@@ -11,6 +11,7 @@ import (
 	"github.com/atlassian/smith/examples/tprattribute"
 	"github.com/atlassian/smith/pkg/app"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/util"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -137,8 +138,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	defer wgStore.Wait() // await store termination
 	ctxStore, cancelStore := context.WithCancel(context.Background())
 	defer cancelStore() // signal store to stop
-	wgStore.Add(1)
-	go store.Run(ctxStore, wgStore.Done)
+	util.StartAsync(ctxStore, &wgStore, store.Run)
 
 	err = bundleClient.Delete().
 		Namespace(useNamespace).

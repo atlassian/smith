@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/util"
 
 	"github.com/cenk/backoff"
 	"k8s.io/client-go/dynamic"
@@ -35,8 +36,7 @@ func New(bundleClient *rest.RESTClient, scDynamic, clients dynamic.ClientPool, r
 	}
 }
 
-func (bp *BundleProcessor) Run(ctx context.Context, done func()) {
-	defer done()
+func (bp *BundleProcessor) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	workers := make(map[bundleRef]*worker)
@@ -59,8 +59,7 @@ func (bp *BundleProcessor) Run(ctx context.Context, done func()) {
 					pendingBundle:  bundle,
 				}
 				workers[ref] = wrk
-				wg.Add(1)
-				go wrk.rebuildLoop(ctx, wg.Done)
+				util.StartAsync(ctx, &wg, wrk.rebuildLoop)
 			} else {
 				wrk.setNeedsRebuild()
 				wrk.pendingBundle = bundle

@@ -1,7 +1,8 @@
-package resources
+package util
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -14,4 +15,12 @@ func Sleep(ctx context.Context, d time.Duration) error {
 	case <-timer.C:
 		return nil
 	}
+}
+
+func StartAsync(ctx context.Context, wg *sync.WaitGroup, f func(context.Context)) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		f(ctx)
+	}()
 }

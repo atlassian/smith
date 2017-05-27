@@ -8,6 +8,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/util"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -49,8 +50,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	ctxStore, cancelStore := context.WithCancel(context.Background())
 	defer cancelStore() // signal store to stop
-	wgStore.Add(1)
-	go store.Run(ctxStore, wgStore.Done)
+	util.StartAsync(ctxStore, &wgStore, store.Run)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
