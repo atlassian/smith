@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -44,7 +43,7 @@ func TestTprAttribute(t *testing.T) {
 }
 
 func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
-	clients, scDynamic dynamic.ClientPool, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
+	sc smith.SmartClient, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
 
 	sleeper := args[0].(*tprattribute.Sleeper)
 	sClient, err := tprattribute.GetSleeperTprClient(config, sleeperScheme())

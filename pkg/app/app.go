@@ -17,7 +17,6 @@ import (
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
@@ -42,25 +41,22 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	bundleClient, err := resources.GetBundleTprClient(a.RestConfig, resources.BundleScheme())
+	if err != nil {
+		return err
+	}
 	var scClient scClientset.Interface
-	var scDynamic dynamic.ClientPool
 	if a.ServiceCatalogConfig != nil {
 		scClient, err = scClientset.NewForConfig(a.ServiceCatalogConfig)
 		if err != nil {
 			return err
 		}
-		scDynamic = dynamic.NewClientPool(a.ServiceCatalogConfig, nil, dynamic.LegacyAPIPathResolverFunc)
 	}
+	sc := resources.NewSmartClient(a.RestConfig, a.ServiceCatalogConfig, clientset, scClient)
 	scheme, err := resources.FullScheme(a.ServiceCatalogConfig != nil)
 	if err != nil {
 		return err
 	}
-	bundleClient, err := resources.GetBundleTprClient(a.RestConfig, resources.BundleScheme())
-	if err != nil {
-		return err
-	}
-
-	clients := dynamic.NewClientPool(a.RestConfig, nil, dynamic.LegacyAPIPathResolverFunc)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -98,7 +94,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 3. Processor
 
-	bp := processor.New(bundleClient, scDynamic, clients, rc, scheme.DeepCopy, store)
+	bp := processor.New(bundleClient, sc, rc, scheme.DeepCopy, store)
 	var wg sync.WaitGroup
 	defer wg.Wait() // await termination
 	util.StartAsync(ctx, &wg, bp.Run)
@@ -160,7 +156,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// 7. Watch Third Party Resources to add watches for supported ones
 
-	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, clients, store, bp, bs, a.ResyncPeriod))
+	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, sc, store, bp, bs, a.ResyncPeriod))
 
 	<-ctx.Done()
 	return ctx.Err()

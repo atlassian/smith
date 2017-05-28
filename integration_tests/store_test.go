@@ -21,7 +21,7 @@ import (
 )
 
 func TestStore(t *testing.T) {
-	_, clientset, _, _ := testSetup(t)
+	_, clientset, _ := testSetup(t)
 
 	store := resources.NewStore(resources.BundleScheme().DeepCopy)
 
