@@ -10,15 +10,12 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/tprattribute"
-	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/rest"
 )
 
 func TestUpdate(t *testing.T) {
@@ -117,9 +114,7 @@ func TestUpdate(t *testing.T) {
 	setupApp(t, bundle, false, false, testUpdate, existingConfigMap, bundleConfigMap, existingSleeper, bundleSleeper)
 }
 
-func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
-	sc smith.SmartClient, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
-
+func testUpdate(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	ctx, cancel := context.WithCancel(ctx)
@@ -128,7 +123,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 	go func() {
 		defer wg.Done()
 		apl := tprattribute.App{
-			RestConfig: config,
+			RestConfig: cfg.config,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
@@ -140,7 +135,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 	existingSleeper := args[2].(*tprattribute.Sleeper)
 	bundleSleeper := args[3].(*tprattribute.Sleeper)
 
-	cmClient := clientset.CoreV1().ConfigMaps(namespace)
+	cmClient := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace)
 	_, err := cmClient.Create(existingConfigMap)
 	require.NoError(t, err)
 	defer func() {
@@ -151,16 +146,16 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 		}
 	}()
 
-	sClient, err := tprattribute.GetSleeperTprClient(config, sleeperScheme())
+	sClient, err := tprattribute.GetSleeperTprClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
 	time.Sleep(500 * time.Millisecond) // Wait until apps start and create the Sleeper and Bundle TPRs
 
-	createObject(t, existingSleeper, namespace, tprattribute.SleeperResourcePath, sClient)
+	createObject(t, existingSleeper, cfg.namespace, tprattribute.SleeperResourcePath, sClient)
 	defer func() {
-		t.Logf("Maybe deleting resource %q", existingSleeper.Name)
+		t.Logf("Deleting resource %q", existingSleeper.Name)
 		e := sClient.Delete().
-			Namespace(namespace).
+			Namespace(cfg.namespace).
 			Resource(tprattribute.SleeperResourcePath).
 			Name(existingSleeper.Name).
 			Do().
@@ -170,14 +165,14 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 		}
 	}()
 
-	createObject(t, bundle, namespace, smith.BundleResourcePath, bundleClient)
-	created := true
-	defer cleanupBundle(t, namespace, bundleClient, sc, &created, bundle)
+	createObject(t, cfg.bundle, cfg.namespace, smith.BundleResourcePath, cfg.bundleClient)
+	cfg.bundleCreated = true
+	defer cleanupBundle(t, cfg)
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(bundleSleeper.Spec.SleepFor+existingSleeper.Spec.SleepFor+2)*time.Second)
 	defer cancel()
 
-	bundleRes := assertBundle(t, ctxTimeout, store, namespace, bundle, "")
+	bundleRes := assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, cfg.bundle, "")
 
 	cfMap, err := cmClient.Get(bundleConfigMap.Name, meta_v1.GetOptions{})
 	if assert.NoError(t, err) {
@@ -185,14 +180,14 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 			"configLabel":         "configValue",
 			"bundleLabel":         "bundleValue",
 			"overlappingLabel":    "overlappingConfigValue",
-			smith.BundleNameLabel: bundle.Name,
+			smith.BundleNameLabel: cfg.bundle.Name,
 		}, cfMap.Labels)
 		assert.Equal(t, bundleConfigMap.Data, cfMap.Data)
 	}
 
 	var sleeperObj tprattribute.Sleeper
 	err = sClient.Get().
-		Namespace(namespace).
+		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Name(bundleSleeper.Name).
 		Do().
@@ -202,22 +197,22 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 			"configLabel":         "configValue",
 			"bundleLabel":         "bundleValue",
 			"overlappingLabel":    "overlappingConfigValue",
-			smith.BundleNameLabel: bundle.Name,
+			smith.BundleNameLabel: cfg.bundle.Name,
 		}, sleeperObj.Labels)
 		assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
 		assert.Equal(t, bundleSleeper.Spec, sleeperObj.Spec)
 	}
-	emptyBundle := *bundle
+	emptyBundle := *cfg.bundle
 	emptyBundle.Spec.Resources = []smith.Resource{}
-	require.NoError(t, bundleClient.Put().
-		Namespace(namespace).
+	require.NoError(t, cfg.bundleClient.Put().
+		Namespace(cfg.namespace).
 		Resource(smith.BundleResourcePath).
-		Name(bundle.Name).
+		Name(emptyBundle.Name).
 		Body(&emptyBundle).
 		Do().
 		Error())
 
-	assertBundleTimeout(t, ctx, store, namespace, &emptyBundle, bundleRes.ResourceVersion)
+	assertBundleTimeout(t, ctx, cfg.store, cfg.namespace, &emptyBundle, bundleRes.ResourceVersion)
 
 	cfMap, err = cmClient.Get(bundleConfigMap.Name, meta_v1.GetOptions{})
 	if err == nil {
@@ -226,7 +221,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 		assert.True(t, kerrors.IsNotFound(err)) // Has been removed from api already
 	}
 	err = sClient.Get().
-		Namespace(namespace).
+		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Name(bundleSleeper.Name).
 		Do().

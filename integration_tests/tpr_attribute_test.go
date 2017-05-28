@@ -10,14 +10,11 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/tprattribute"
-	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 func TestTprAttribute(t *testing.T) {
@@ -42,11 +39,10 @@ func TestTprAttribute(t *testing.T) {
 	setupApp(t, bundle, false, true, testTprAttribute, sleeper)
 }
 
-func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
-	sc smith.SmartClient, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
+func testTprAttribute(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
 
 	sleeper := args[0].(*tprattribute.Sleeper)
-	sClient, err := tprattribute.GetSleeperTprClient(config, sleeperScheme())
+	sClient, err := tprattribute.GetSleeperTprClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -57,7 +53,7 @@ func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundl
 	go func() {
 		defer wg.Done()
 		apl := tprattribute.App{
-			RestConfig: config,
+			RestConfig: cfg.config,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
@@ -67,18 +63,18 @@ func testTprAttribute(t *testing.T, ctx context.Context, namespace string, bundl
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+3)*time.Second)
 	defer cancel()
 
-	assertBundle(t, ctxTimeout, store, namespace, bundle, "")
+	assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, cfg.bundle, "")
 
 	var sleeperObj tprattribute.Sleeper
 	require.NoError(t, sClient.Get().
-		Namespace(namespace).
+		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Name(sleeper.Name).
 		Do().
 		Into(&sleeperObj))
 
 	assert.Equal(t, map[string]string{
-		smith.BundleNameLabel: bundle.Name,
+		smith.BundleNameLabel: cfg.bundle.Name,
 	}, sleeperObj.Labels)
 	assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
 }
