@@ -34,7 +34,18 @@ const (
 	serviceCatalogUrlEnvParam = "SERVICE_CATALOG_URL"
 )
 
-type testFunc func(*testing.T, context.Context, string, *smith.Bundle, *rest.Config, *kubernetes.Clientset, smith.SmartClient, *rest.RESTClient, *bool, *resources.Store, ...interface{})
+type testFunc func(*testing.T, context.Context, *itConfig, ...interface{})
+
+type itConfig struct {
+	namespace     string
+	bundle        *smith.Bundle
+	config        *rest.Config
+	clientset     *kubernetes.Clientset
+	sc            smith.SmartClient
+	bundleClient  *rest.RESTClient
+	store         *resources.Store
+	bundleCreated bool
+}
 
 func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) {
 	_, condition := bundle.GetCondition(conditionType)
@@ -58,20 +69,23 @@ func bundleInformer(bundleClient cache.Getter, namespace string) cache.SharedInd
 		cache.Indexers{})
 }
 
-func cleanupBundle(t *testing.T, namespace string, bundleClient *rest.RESTClient, sc smith.SmartClient, bundleCreated *bool, bundle *smith.Bundle) {
-	if !*bundleCreated {
+func cleanupBundle(t *testing.T, cfg *itConfig) {
+	if !cfg.bundleCreated {
 		return
 	}
-	t.Logf("Deleting bundle %s", bundle.Name)
-	assert.NoError(t, bundleClient.Delete().
-		Namespace(namespace).
+	t.Logf("Deleting bundle %s", cfg.bundle.Name)
+	err := cfg.bundleClient.Delete().
+		Namespace(cfg.namespace).
 		Resource(smith.BundleResourcePath).
-		Name(bundle.Name).
+		Name(cfg.bundle.Name).
 		Do().
-		Error())
-	for _, resource := range bundle.Spec.Resources {
+		Error()
+	if !kerrors.IsNotFound(err) {
+		assert.NoError(t, err)
+	}
+	for _, resource := range cfg.bundle.Spec.Resources {
 		t.Logf("Deleting resource %q", resource.Spec.GetName())
-		client, err := sc.ClientForGVK(resource.Spec.GroupVersionKind(), namespace)
+		client, err := cfg.sc.ClientForGVK(resource.Spec.GroupVersionKind(), cfg.namespace)
 		if !assert.NoError(t, err) {
 			continue
 		}
@@ -153,8 +167,16 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	} else if !kerrors.IsNotFound(err) {
 		require.NoError(t, err)
 	}
-	var bundleCreated bool
-	defer cleanupBundle(t, useNamespace, bundleClient, sc, &bundleCreated, bundle)
+	cfg := &itConfig{
+		namespace:    useNamespace,
+		bundle:       bundle,
+		config:       config,
+		clientset:    clientset,
+		sc:           sc,
+		bundleClient: bundleClient,
+		store:        store,
+	}
+	defer cleanupBundle(t, cfg)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -178,14 +200,14 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle TPR
 
 		createObject(t, bundle, useNamespace, smith.BundleResourcePath, bundleClient)
-		bundleCreated = true
+		cfg.bundleCreated = true
 	}
 
 	bundleInf := bundleInformer(bundleClient, useNamespace)
 	store.AddInformer(smith.BundleGVK, bundleInf)
 	go bundleInf.Run(ctx.Done())
 
-	test(t, ctx, useNamespace, bundle, config, clientset, sc, bundleClient, &bundleCreated, store, args...)
+	test(t, ctx, cfg, args...)
 }
 
 func toUnstructured(t *testing.T, obj runtime.Object) unstructured.Unstructured {

@@ -7,14 +7,11 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/rest"
 )
 
 func TestWorkflow(t *testing.T) {
@@ -77,12 +74,10 @@ func TestWorkflow(t *testing.T) {
 	setupApp(t, bundle, false, true, testWorkflow)
 }
 
-func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
-	sc smith.SmartClient, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
+func testWorkflow(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
+	bundleRes := assertBundleTimeout(t, ctx, cfg.store, cfg.namespace, cfg.bundle, "")
 
-	bundleRes := assertBundleTimeout(t, ctx, store, namespace, bundle, "")
-
-	cfMap, err := clientset.CoreV1().ConfigMaps(namespace).Get("config1", meta_v1.GetOptions{})
+	cfMap, err := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace).Get("config1", meta_v1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
 		"configLabel":         "configValue",
@@ -91,7 +86,7 @@ func testWorkflow(t *testing.T, ctx context.Context, namespace string, bundle *s
 		smith.BundleNameLabel: bundleRes.Name,
 	}, cfMap.GetLabels())
 
-	secret, err := clientset.CoreV1().Secrets(namespace).Get("secret1", meta_v1.GetOptions{})
+	secret, err := cfg.clientset.CoreV1().Secrets(cfg.namespace).Get("secret1", meta_v1.GetOptions{})
 	require.NoError(t, err)
 	trueRef := true
 	assert.Equal(t, []meta_v1.OwnerReference{
