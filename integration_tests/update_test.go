@@ -122,7 +122,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	wg.Add(1)
 	go func() {
