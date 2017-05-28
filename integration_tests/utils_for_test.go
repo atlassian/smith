@@ -13,6 +13,7 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util"
 
+	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -22,7 +23,6 @@ import (
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
@@ -34,7 +34,7 @@ const (
 	serviceCatalogUrlEnvParam = "SERVICE_CATALOG_URL"
 )
 
-type testFunc func(*testing.T, context.Context, string, *smith.Bundle, *rest.Config, *kubernetes.Clientset, dynamic.ClientPool, dynamic.ClientPool, *rest.RESTClient, *bool, *resources.Store, ...interface{})
+type testFunc func(*testing.T, context.Context, string, *smith.Bundle, *rest.Config, *kubernetes.Clientset, smith.SmartClient, *rest.RESTClient, *bool, *resources.Store, ...interface{})
 
 func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) {
 	_, condition := bundle.GetCondition(conditionType)
@@ -58,7 +58,7 @@ func bundleInformer(bundleClient cache.Getter, namespace string) cache.SharedInd
 		cache.Indexers{})
 }
 
-func cleanupBundle(t *testing.T, namespace string, bundleClient *rest.RESTClient, clients, scDynamic dynamic.ClientPool, bundleCreated *bool, bundle *smith.Bundle) {
+func cleanupBundle(t *testing.T, namespace string, bundleClient *rest.RESTClient, sc smith.SmartClient, bundleCreated *bool, bundle *smith.Bundle) {
 	if !*bundleCreated {
 		return
 	}
@@ -71,7 +71,7 @@ func cleanupBundle(t *testing.T, namespace string, bundleClient *rest.RESTClient
 		Error())
 	for _, resource := range bundle.Spec.Resources {
 		t.Logf("Deleting resource %q", resource.Spec.GetName())
-		client, err := resources.ClientForGVK(resource.Spec.GroupVersionKind(), clients, scDynamic, namespace)
+		client, err := sc.ClientForGVK(resource.Spec.GroupVersionKind(), namespace)
 		if !assert.NoError(t, err) {
 			continue
 		}
@@ -102,7 +102,7 @@ func isBundleReadyAndNewer(resourceVersion string) resources.AwaitCondition {
 	}
 }
 
-func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, dynamic.ClientPool, *rest.RESTClient) {
+func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *rest.RESTClient) {
 	config, err := resources.ConfigFromEnv()
 	require.NoError(t, err)
 
@@ -113,22 +113,24 @@ func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, dynamic.Clien
 	bundleClient, err := resources.GetBundleTprClient(config, scheme)
 	require.NoError(t, err)
 
-	clients := dynamic.NewClientPool(config, nil, dynamic.LegacyAPIPathResolverFunc)
-
-	return config, clientset, clients, bundleClient
+	return config, clientset, bundleClient
 }
 
 func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle bool, test testFunc, args ...interface{}) {
-	config, clientset, clients, bundleClient := testSetup(t)
-	var serviceCatalogConfig *rest.Config
-	var scDynamic dynamic.ClientPool
+	config, clientset, bundleClient := testSetup(t)
+	var scConfig *rest.Config
+	var scClient scClientset.Interface
 	if serviceCatalog {
-		scConfig := *config // shallow copy
-		scConfig.Host = os.Getenv(serviceCatalogUrlEnvParam)
-		require.NotEmpty(t, scConfig.Host, "required environment variable %s is not set", serviceCatalogUrlEnvParam)
-		serviceCatalogConfig = &scConfig
-		scDynamic = dynamic.NewClientPool(serviceCatalogConfig, nil, dynamic.LegacyAPIPathResolverFunc)
+		scConfigTmp := *config // shallow copy
+		scConfigTmp.Host = os.Getenv(serviceCatalogUrlEnvParam)
+		require.NotEmpty(t, scConfigTmp.Host, "required environment variable %s is not set", serviceCatalogUrlEnvParam)
+		scConfig = &scConfigTmp
+		var err error
+		scClient, err = scClientset.NewForConfig(scConfig)
+		require.NoError(t, err)
 	}
+
+	sc := resources.NewSmartClient(config, scConfig, clientset, scClient)
 
 	scheme, err := resources.FullScheme(serviceCatalog)
 	require.NoError(t, err)
@@ -152,7 +154,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		require.NoError(t, err)
 	}
 	var bundleCreated bool
-	defer cleanupBundle(t, useNamespace, bundleClient, clients, scDynamic, &bundleCreated, bundle)
+	defer cleanupBundle(t, useNamespace, bundleClient, sc, &bundleCreated, bundle)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -165,7 +167,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		defer wg.Done()
 		apl := app.App{
 			RestConfig:           config,
-			ServiceCatalogConfig: serviceCatalogConfig,
+			ServiceCatalogConfig: scConfig,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
@@ -183,7 +185,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	store.AddInformer(smith.BundleGVK, bundleInf)
 	go bundleInf.Run(ctx.Done())
 
-	test(t, ctx, useNamespace, bundle, config, clientset, clients, scDynamic, bundleClient, &bundleCreated, store, args...)
+	test(t, ctx, useNamespace, bundle, config, clientset, sc, bundleClient, &bundleCreated, store, args...)
 }
 
 func toUnstructured(t *testing.T, obj runtime.Object) unstructured.Unstructured {

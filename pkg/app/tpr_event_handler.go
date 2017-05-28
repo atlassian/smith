@@ -9,13 +9,11 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
 	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -39,7 +37,7 @@ type watchState struct {
 type tprEventHandler struct {
 	ctx          context.Context
 	handler      cache.ResourceEventHandler
-	clients      dynamic.ClientPool
+	smartClient  smith.SmartClient
 	store        informerStore
 	processor    Processor
 	bundleIndex  bundleIndex
@@ -48,12 +46,12 @@ type tprEventHandler struct {
 	watchers     map[string]map[string]watchState // TPR name -> TPR version -> state
 }
 
-func newTprEventHandler(ctx context.Context, handler cache.ResourceEventHandler, clients dynamic.ClientPool,
+func newTprEventHandler(ctx context.Context, handler cache.ResourceEventHandler, smartClient smith.SmartClient,
 	store informerStore, processor Processor, bundleIndex bundleIndex, resyncPeriod time.Duration) *tprEventHandler {
 	return &tprEventHandler{
 		ctx:          ctx,
 		handler:      handler,
-		clients:      clients,
+		smartClient:  smartClient,
 		store:        store,
 		processor:    processor,
 		bundleIndex:  bundleIndex,
@@ -171,16 +169,11 @@ func (h *tprEventHandler) watchVersions(tprName string, versions ...ext_v1b1.API
 	for _, version := range versions {
 		log.Printf("[TPREH] Configuring watch for TPR %s version %s", tprName, version.Name)
 		gvk := gk.WithVersion(version.Name)
-		dc, err := h.clients.ClientForGroupVersionKind(gvk)
+		res, err := h.smartClient.ClientForGVK(gvk, meta_v1.NamespaceNone)
 		if err != nil {
-			log.Printf("[TPREH] Failed to instantiate client for TPR %s of version %s: %v", tprName, version.Name, err)
+			log.Printf("[TPREH] Failed to setup informer for TPR %s of version %s: %v", tprName, version.Name, err)
 			continue
 		}
-		plural, _ := meta.KindToResource(gvk)
-		res := dc.Resource(&meta_v1.APIResource{
-			Name: plural.Resource,
-			Kind: gk.Kind,
-		}, meta_v1.NamespaceNone)
 		tprInf := cache.NewSharedIndexInformer(&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
 				return res.List(options)

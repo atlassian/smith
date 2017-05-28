@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
@@ -119,7 +118,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smith.Bundle, config *rest.Config, clientset *kubernetes.Clientset,
-	clients, scDynamic dynamic.ClientPool, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
+	sc smith.SmartClient, bundleClient *rest.RESTClient, bundleCreated *bool, store *resources.Store, args ...interface{}) {
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -173,7 +172,7 @@ func testUpdate(t *testing.T, ctx context.Context, namespace string, bundle *smi
 
 	createObject(t, bundle, namespace, smith.BundleResourcePath, bundleClient)
 	created := true
-	defer cleanupBundle(t, namespace, bundleClient, clients, scDynamic, &created, bundle)
+	defer cleanupBundle(t, namespace, bundleClient, sc, &created, bundle)
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(bundleSleeper.Spec.SleepFor+existingSleeper.Spec.SleepFor+2)*time.Second)
 	defer cancel()

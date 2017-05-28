@@ -9,7 +9,6 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/processor/graph"
-	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/cenk/backoff"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -20,7 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
@@ -30,8 +28,7 @@ var (
 
 type workerConfig struct {
 	bundleClient *rest.RESTClient
-	scDynamic    dynamic.ClientPool
-	clients      dynamic.ClientPool
+	sc           smith.SmartClient
 	rc           ReadyChecker
 	deepCopy     smith.DeepCopy
 	store        Store
@@ -271,7 +268,7 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 // May return nil resource without any errors if an update/create conflict happened.
 func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
 	// 1. Prepare client
-	resClient, err := resources.ClientForGVK(res.Spec.GroupVersionKind(), wrk.clients, wrk.scDynamic, wrk.namespace)
+	resClient, err := wrk.sc.ClientForGVK(res.Spec.GroupVersionKind(), wrk.namespace)
 	if err != nil {
 		return nil, false, err
 	}
@@ -378,7 +375,7 @@ func (wrk *worker) deleteRemovedResources(bundle *smith.Bundle) (retriableError 
 	policy := meta_v1.DeletePropagationForeground
 	for ref, uid := range existingObjs {
 		log.Printf("[WORKER][%s/%s] Deleting object %v %q", wrk.namespace, wrk.bundleName, ref.GroupVersionKind, ref.Name)
-		resClient, err := resources.ClientForGVK(ref.GroupVersionKind, wrk.clients, wrk.scDynamic, wrk.namespace)
+		resClient, err := wrk.sc.ClientForGVK(ref.GroupVersionKind, wrk.namespace)
 		if err != nil {
 			if firstErr == nil {
 				retriable = false

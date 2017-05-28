@@ -52,12 +52,6 @@ var GV = schema.GroupVersion{
 
 var BundleGVK = GV.WithKind(BundleResourceKind)
 
-type DeepCopy func(src interface{}) (interface{}, error)
-
-type ByNameStore interface {
-	Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error)
-}
-
 func AddToScheme(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(GV,
 		&Bundle{},
