@@ -41,7 +41,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	bundleClient, err := resources.GetBundleTprClient(a.RestConfig, resources.BundleScheme())
+	bundleClient, err := resources.BundleClient(a.RestConfig, resources.BundleScheme())
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,10 @@ func (a *App) Run(ctx context.Context) error {
 	util.StartAsync(ctxStore, &wgStore, store.Run)
 
 	// 1.5. Informers
-	bundleInf := a.bundleInformer(bundleClient)
+	bundleInf := resources.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
+	bundleInf.AddIndexers(cache.Indexers{
+		ByTprNameIndex: byTprNameIndex,
+	})
 	store.AddInformer(smith.BundleGVK, bundleInf)
 
 	infs := a.resourceInformers(ctx, store, clientset, scClient)

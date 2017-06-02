@@ -124,7 +124,7 @@ func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *rest.RESTCli
 	require.NoError(t, err)
 
 	scheme := resources.BundleScheme()
-	bundleClient, err := resources.GetBundleTprClient(config, scheme)
+	bundleClient, err := resources.BundleClient(config, scheme)
 	require.NoError(t, err)
 
 	return config, clientset, bundleClient

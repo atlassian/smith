@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	"github.com/atlassian/smith"
 
@@ -12,6 +13,7 @@ import (
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -23,6 +25,7 @@ import (
 	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 )
 
 type Mapper interface {
@@ -56,7 +59,7 @@ func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
 	return scheme, nil
 }
 
-func GetBundleTprClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTClient, error) {
+func BundleClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTClient, error) {
 	groupVersion := schema.GroupVersion{
 		Group:   smith.SmithResourceGroup,
 		Version: smith.BundleResourceVersion,
@@ -75,6 +78,14 @@ func GetBundleTprClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTCli
 	}
 
 	return client, nil
+}
+
+func BundleInformer(bundleClient cache.Getter, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
+		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, namespace, fields.Everything()),
+		&smith.Bundle{},
+		resyncPeriod,
+		cache.Indexers{})
 }
 
 func ConfigFromEnv() (*rest.Config, error) {

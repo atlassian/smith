@@ -1,12 +1,9 @@
 package app
 
 import (
-	"github.com/atlassian/smith"
-
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -16,16 +13,6 @@ import (
 	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	"k8s.io/client-go/tools/cache"
 )
-
-func (a *App) bundleInformer(bundleClient cache.Getter) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, a.Namespace, fields.Everything()),
-		&smith.Bundle{},
-		a.ResyncPeriod,
-		cache.Indexers{
-			ByTprNameIndex: byTprNameIndex,
-		})
-}
 
 // TODO replace methods below with upstream functions https://github.com/kubernetes/kubernetes/issues/45939
 
