@@ -55,7 +55,7 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	}
 	sc := smart.NewClient(a.RestConfig, a.ServiceCatalogConfig, clientset, scClient)
-	scheme, err := resources.FullScheme(a.ServiceCatalogConfig != nil)
+	scheme, err := FullScheme(a.ServiceCatalogConfig != nil)
 	if err != nil {
 		return err
 	}

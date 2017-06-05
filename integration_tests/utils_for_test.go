@@ -148,7 +148,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 
 	sc := smart.NewClient(config, scConfig, clientset, scClient)
 
-	scheme, err := resources.FullScheme(serviceCatalog)
+	scheme, err := app.FullScheme(serviceCatalog)
 	require.NoError(t, err)
 
 	store := resources.NewStore(scheme.DeepCopy)
