@@ -18,7 +18,9 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
@@ -267,47 +269,54 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 // createOrUpdate creates or updates a resources.
 // May return nil resource without any errors if an update/create conflict happened.
 func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
-	// 1. Prepare client
+	// Prepare client
 	resClient, err := wrk.sc.ForGVK(res.Spec.GroupVersionKind(), wrk.namespace)
 	if err != nil {
 		return nil, false, err
 	}
 	gvk := res.Spec.GetObjectKind().GroupVersionKind()
 
-	// 2. Try to get the resource. We do read first to avoid generating unnecessary events.
+	// Try to get the resource. We do read first to avoid generating unnecessary events.
 	obj, exists, err := wrk.store.Get(gvk, wrk.namespace, res.Spec.GetName())
 	if err != nil {
 		// Unexpected error
 		return nil, true, err
 	}
 	if !exists {
-		log.Printf("[WORKER][%s/%s] Resource %q not found, creating", wrk.namespace, wrk.bundleName, res.Name)
-		// 3. Create if does not exist
-		response, err := resClient.Create(&res.Spec)
-		if err == nil {
-			log.Printf("[WORKER][%s/%s] Resource %q created", wrk.namespace, wrk.bundleName, res.Name)
-			return response, false, nil
-		}
-		if errors.IsAlreadyExists(err) {
-			log.Printf("[WORKER][%s/%s] Resource %q found, but not in Store yet, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
-			// We let the next rebuild() iteration, triggered by someone else creating the resource, to finish the work.
-			return nil, false, nil
-		}
-		// Unexpected error, will retry
-		return nil, true, err
+		return wrk.createResource(resClient, res)
 	}
+	return wrk.updateResource(resClient, res, obj)
+}
+
+func (wrk *worker) createResource(resClient *dynamic.ResourceClient, res *smith.Resource) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
+	log.Printf("[WORKER][%s/%s] Resource %q not found, creating", wrk.namespace, wrk.bundleName, res.Name)
+	response, err := resClient.Create(&res.Spec)
+	if err == nil {
+		log.Printf("[WORKER][%s/%s] Resource %q created", wrk.namespace, wrk.bundleName, res.Name)
+		return response, false, nil
+	}
+	if errors.IsAlreadyExists(err) {
+		log.Printf("[WORKER][%s/%s] Resource %q found, but not in Store yet, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
+		// We let the next rebuild() iteration, triggered by someone else creating the resource, to finish the work.
+		return nil, false, nil
+	}
+	// Unexpected error, will retry
+	return nil, true, err
+}
+
+func (wrk *worker) updateResource(resClient *dynamic.ResourceClient, res *smith.Resource, obj runtime.Object) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
 	response, ok := obj.(*unstructured.Unstructured)
 	if !ok {
 		response = &unstructured.Unstructured{
 			Object: make(map[string]interface{}),
 		}
-		if err = converter.ToUnstructured(obj, &response.Object); err != nil {
+		if err := converter.ToUnstructured(obj, &response.Object); err != nil {
 			// Unexpected error
 			return nil, false, err
 		}
 	}
 
-	// 4. Compare spec and existing resource
+	// Compare spec and existing resource
 	updated, err := updateResource(wrk.deepCopy, res, response)
 	if err != nil {
 		// Unexpected error
@@ -318,7 +327,7 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 		return response, false, nil
 	}
 
-	// 5. Update if different
+	// Update if different
 	response, err = resClient.Update(updated)
 	if err != nil {
 		if errors.IsConflict(err) {
