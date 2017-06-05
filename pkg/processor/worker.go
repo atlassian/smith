@@ -268,7 +268,7 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 // May return nil resource without any errors if an update/create conflict happened.
 func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
 	// 1. Prepare client
-	resClient, err := wrk.sc.ClientForGVK(res.Spec.GroupVersionKind(), wrk.namespace)
+	resClient, err := wrk.sc.ForGVK(res.Spec.GroupVersionKind(), wrk.namespace)
 	if err != nil {
 		return nil, false, err
 	}
@@ -372,7 +372,7 @@ func (wrk *worker) deleteRemovedResources(bundle *smith.Bundle) (retriableError 
 	policy := meta_v1.DeletePropagationForeground
 	for ref, uid := range existingObjs {
 		log.Printf("[WORKER][%s/%s] Deleting object %v %q", wrk.namespace, wrk.bundleName, ref.GroupVersionKind, ref.Name)
-		resClient, err := wrk.sc.ClientForGVK(ref.GroupVersionKind, wrk.namespace)
+		resClient, err := wrk.sc.ForGVK(ref.GroupVersionKind, wrk.namespace)
 		if err != nil {
 			if firstErr == nil {
 				retriable = false

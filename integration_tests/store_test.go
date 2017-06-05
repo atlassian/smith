@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util"
 
@@ -23,7 +24,7 @@ import (
 func TestStore(t *testing.T) {
 	_, clientset, _ := testSetup(t)
 
-	store := resources.NewStore(resources.BundleScheme().DeepCopy)
+	store := resources.NewStore(client.BundleScheme().DeepCopy)
 
 	var wgStore sync.WaitGroup
 	defer wgStore.Wait() // await store termination

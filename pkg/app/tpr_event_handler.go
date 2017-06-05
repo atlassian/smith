@@ -169,7 +169,7 @@ func (h *tprEventHandler) watchVersions(tprName string, versions ...ext_v1b1.API
 	for _, version := range versions {
 		log.Printf("[TPREH] Configuring watch for TPR %s version %s", tprName, version.Name)
 		gvk := gk.WithVersion(version.Name)
-		res, err := h.smartClient.ClientForGVK(gvk, meta_v1.NamespaceNone)
+		res, err := h.smartClient.ForGVK(gvk, meta_v1.NamespaceNone)
 		if err != nil {
 			log.Printf("[TPREH] Failed to setup informer for TPR %s of version %s: %v", tprName, version.Name, err)
 			continue

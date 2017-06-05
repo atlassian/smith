@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/client"
+	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/processor"
 	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/resources"
@@ -41,7 +43,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	bundleClient, err := resources.BundleClient(a.RestConfig, resources.BundleScheme())
+	bundleClient, err := client.BundleClient(a.RestConfig, client.BundleScheme())
 	if err != nil {
 		return err
 	}
@@ -52,7 +54,7 @@ func (a *App) Run(ctx context.Context) error {
 			return err
 		}
 	}
-	sc := resources.NewSmartClient(a.RestConfig, a.ServiceCatalogConfig, clientset, scClient)
+	sc := smart.NewClient(a.RestConfig, a.ServiceCatalogConfig, clientset, scClient)
 	scheme, err := resources.FullScheme(a.ServiceCatalogConfig != nil)
 	if err != nil {
 		return err
@@ -72,7 +74,7 @@ func (a *App) Run(ctx context.Context) error {
 	util.StartAsync(ctxStore, &wgStore, store.Run)
 
 	// 1.5. Informers
-	bundleInf := resources.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
+	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
 	bundleInf.AddIndexers(cache.Indexers{
 		ByTprNameIndex: byTprNameIndex,
 	})

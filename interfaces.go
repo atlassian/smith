@@ -13,5 +13,5 @@ type ByNameStore interface {
 }
 
 type SmartClient interface {
-	ClientForGVK(gvk schema.GroupVersionKind, namespace string) (*dynamic.ResourceClient, error)
+	ForGVK(gvk schema.GroupVersionKind, namespace string) (*dynamic.ResourceClient, error)
 }

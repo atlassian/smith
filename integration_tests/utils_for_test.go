@@ -10,6 +10,8 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/tprattribute"
 	"github.com/atlassian/smith/pkg/app"
+	"github.com/atlassian/smith/pkg/client"
+	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util"
 
@@ -85,7 +87,7 @@ func cleanupBundle(t *testing.T, cfg *itConfig) {
 	}
 	for _, resource := range cfg.bundle.Spec.Resources {
 		t.Logf("Deleting resource %q", resource.Spec.GetName())
-		client, err := cfg.sc.ClientForGVK(resource.Spec.GroupVersionKind(), cfg.namespace)
+		client, err := cfg.sc.ForGVK(resource.Spec.GroupVersionKind(), cfg.namespace)
 		if !assert.NoError(t, err) {
 			continue
 		}
@@ -123,8 +125,8 @@ func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *rest.RESTCli
 	clientset, err := kubernetes.NewForConfig(config)
 	require.NoError(t, err)
 
-	scheme := resources.BundleScheme()
-	bundleClient, err := resources.BundleClient(config, scheme)
+	scheme := client.BundleScheme()
+	bundleClient, err := client.BundleClient(config, scheme)
 	require.NoError(t, err)
 
 	return config, clientset, bundleClient
@@ -144,7 +146,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		require.NoError(t, err)
 	}
 
-	sc := resources.NewSmartClient(config, scConfig, clientset, scClient)
+	sc := smart.NewClient(config, scConfig, clientset, scClient)
 
 	scheme, err := resources.FullScheme(serviceCatalog)
 	require.NoError(t, err)
