@@ -280,23 +280,10 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 		// Unexpected error
 		return nil, true, err
 	}
-	var response *unstructured.Unstructured
-	if exists {
-		var ok bool
-		response, ok = obj.(*unstructured.Unstructured)
-		if !ok {
-			response = &unstructured.Unstructured{
-				Object: make(map[string]interface{}),
-			}
-			if err = converter.ToUnstructured(obj, &response.Object); err != nil {
-				// Unexpected error
-				return nil, false, err
-			}
-		}
-	} else {
+	if !exists {
 		log.Printf("[WORKER][%s/%s] Resource %q not found, creating", wrk.namespace, wrk.bundleName, res.Name)
 		// 3. Create if does not exist
-		response, err = resClient.Create(&res.Spec)
+		response, err := resClient.Create(&res.Spec)
 		if err == nil {
 			log.Printf("[WORKER][%s/%s] Resource %q created", wrk.namespace, wrk.bundleName, res.Name)
 			return response, false, nil
@@ -308,6 +295,16 @@ func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured
 		}
 		// Unexpected error, will retry
 		return nil, true, err
+	}
+	response, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		response = &unstructured.Unstructured{
+			Object: make(map[string]interface{}),
+		}
+		if err = converter.ToUnstructured(obj, &response.Object); err != nil {
+			// Unexpected error
+			return nil, false, err
+		}
 	}
 
 	// 4. Compare spec and existing resource
