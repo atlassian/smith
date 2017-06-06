@@ -90,12 +90,12 @@ test: fmt
 	go test $$(glide nv | grep -v integration_tests)
 
 check: build-all
-	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=600s ./... --vendor \
+	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor \
 		--linter='errcheck:errcheck:-ignore=net:Close' --cyclo-over=20 \
 		--disable=interfacer --disable=golint --dupl-threshold=200
 
 check-all: build-all
-	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=600s ./... --vendor --cyclo-over=20 \
+	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor --cyclo-over=20 \
 		--dupl-threshold=65
 
 coveralls:
