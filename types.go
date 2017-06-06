@@ -96,34 +96,34 @@ func (b *Bundle) GetCondition(conditionType BundleConditionType) (int, *BundleCo
 // status has changed.
 // Returns true if Bundle condition has changed or has been added.
 func (b *Bundle) UpdateCondition(condition *BundleCondition) bool {
+	cond := *condition // copy to avoid mutating the original
 	now := meta_v1.Now()
-	condition.LastTransitionTime = now
+	cond.LastTransitionTime = now
 	// Try to find this bundle condition.
-	conditionIndex, oldCondition := b.GetCondition(condition.Type)
+	conditionIndex, oldCondition := b.GetCondition(cond.Type)
 
 	if oldCondition == nil {
 		// We are adding new bundle condition.
-		b.Status.Conditions = append(b.Status.Conditions, *condition)
+		b.Status.Conditions = append(b.Status.Conditions, cond)
 		return true
 	}
 	// We are updating an existing condition, so we need to check if it has changed.
-	if condition.Status == oldCondition.Status {
-		condition.LastTransitionTime = oldCondition.LastTransitionTime
+	if cond.Status == oldCondition.Status {
+		cond.LastTransitionTime = oldCondition.LastTransitionTime
 	}
 
-	isEqual := condition.Status == oldCondition.Status &&
-		condition.Reason == oldCondition.Reason &&
-		condition.Message == oldCondition.Message &&
-		condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+	isEqual := cond.Status == oldCondition.Status &&
+		cond.Reason == oldCondition.Reason &&
+		cond.Message == oldCondition.Message &&
+		cond.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
 
 	if !isEqual {
-		condition.LastUpdateTime = now
+		cond.LastUpdateTime = now
 	}
 
-	b.Status.Conditions[conditionIndex] = *condition
+	b.Status.Conditions[conditionIndex] = cond
 	// Return true if one of the fields have changed.
 	return !isEqual
-
 }
 
 type BundleSpec struct {
