@@ -12,7 +12,7 @@ echo "mode: count" > coverage.out
 ERROR=""
 
 # Test each package and append coverage profile info to coverage.out
-for pkg in `find . -d -name \*.go |
+for pkg in `find . -depth -name \*.go |
     grep -ve '^./vendor/' |
     grep -v integration_tests |
     sed -e 's/^\.\/\(\(.*\)\/\)\{0,1\}[^/]*$/github.com\/atlassian\/smith\/\2/' |
