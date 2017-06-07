@@ -32,9 +32,13 @@ build-race: fmt
 
 build-all: fmt
 	go install $$(glide nv | grep -v integration_tests)
+	go test -i $$(glide nv)
+	go test -i -tags=integration $$(glide nv)
 
 build-all-race: fmt
 	go install -race $$(glide nv | grep -v integration_tests)
+	go test -i -race $$(glide nv)
+	go test -i -race -tags=integration $$(glide nv)
 
 fmt:
 	gofmt -w=true -s $$(find . -type f -name '*.go' -not -path "./vendor/*")
