@@ -19,6 +19,18 @@ import (
 	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
+func BundleTpr() *ext_v1b1.ThirdPartyResource {
+	return &ext_v1b1.ThirdPartyResource{
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: smith.BundleResourceName,
+		},
+		Description: "Smith resource manager",
+		Versions: []ext_v1b1.APIVersion{
+			{Name: smith.BundleResourceVersion},
+		},
+	}
+}
+
 func GroupKindToTprName(gk schema.GroupKind) string {
 	isFirst := true
 	var buf bytes.Buffer

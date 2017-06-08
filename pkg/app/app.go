@@ -17,7 +17,6 @@ import (
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -106,17 +105,8 @@ func (a *App) Run(ctx context.Context) error {
 	defer cancel() // cancel ctx to signal done to processor (and everything else)
 
 	// 4. Ensure ThirdPartyResource Bundle exists
-	bundleTpr := &ext_v1b1.ThirdPartyResource{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name: smith.BundleResourceName,
-		},
-		Description: "Smith resource manager",
-		Versions: []ext_v1b1.APIVersion{
-			{Name: smith.BundleResourceVersion},
-		},
-	}
 	err = retryUntilSuccessOrDone(ctx, func() error {
-		return resources.EnsureTprExists(ctx, clientset, store, bundleTpr)
+		return resources.EnsureTprExists(ctx, clientset, store, resources.BundleTpr())
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to create resource %s: %v", smith.BundleResourceName, e)
