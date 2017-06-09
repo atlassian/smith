@@ -258,6 +258,8 @@ func assertBundleTimeout(t *testing.T, ctx context.Context, store *resources.Sto
 	return assertBundle(t, ctxTimeout, store, namespace, bundle, resourceVersion)
 }
 
+// noCopy is a noop implementation of DeepCopy.
+// Can be used when a real copy is not needed.
 func noCopy(src interface{}) (interface{}, error) {
 	return src, nil
 }
