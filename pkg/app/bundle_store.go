@@ -52,7 +52,7 @@ func byTprNameIndex(obj interface{}) ([]string, error) {
 	bundle := obj.(*smith.Bundle)
 	var result []string
 	for _, resource := range bundle.Spec.Resources {
-		gvk := resource.Spec.GroupVersionKind()
+		gvk := resource.Spec.GetObjectKind().GroupVersionKind()
 		if !strings.ContainsRune(gvk.Group, '.') {
 			// TPR names are of form <kind>.<domain>.<tld> so there should be at least
 			// one dot between domain and tld

@@ -197,20 +197,14 @@ nextVertex:
 }
 
 func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) (readyResource *unstructured.Unstructured, retriableError bool, e error) {
-	// 0. Clone before mutating
-	resClone, err := wrk.deepCopy(res)
-	if err != nil {
-		return nil, false, err
-	}
-	res = resClone.(*smith.Resource)
-
 	// 1. Eval spec
-	if err = wrk.evalSpec(bundle, res, readyResources); err != nil {
+	spec, err := wrk.evalSpec(bundle, res, readyResources)
+	if err != nil {
 		return nil, false, err
 	}
 
 	// 2. Create or update resource
-	resUpdated, retriable, err := wrk.createOrUpdate(res)
+	resUpdated, retriable, err := wrk.createOrUpdate(spec)
 	if err != nil || resUpdated == nil {
 		return nil, retriable, err
 	}
@@ -223,23 +217,29 @@ func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource, read
 	return resUpdated, false, nil
 }
 
-// Mutates spec in place.
-func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) error {
+// evalSpec evaluates the resource specification and returns the result.
+func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	// 0. Convert to Unstructured
+	spec, err := res.ToUnstructured(wrk.deepCopy)
+	if err != nil {
+		return nil, err
+	}
+
 	// 1. Process references
 	sp := NewSpec(res.Name, readyResources, res.DependsOn)
-	if err := sp.ProcessObject(res.Spec.Object); err != nil {
-		return err
+	if err := sp.ProcessObject(spec.Object); err != nil {
+		return nil, err
 	}
 
 	// 2. Update label to point at the parent bundle
-	res.Spec.SetLabels(mergeLabels(
+	spec.SetLabels(mergeLabels(
 		bundle.Labels,
-		res.Spec.GetLabels(),
+		spec.GetLabels(),
 		map[string]string{smith.BundleNameLabel: wrk.bundleName}))
 
 	// 3. Update OwnerReferences
 	trueRef := true
-	refs := res.Spec.GetOwnerReferences()
+	refs := spec.GetOwnerReferences()
 	for _, ref := range refs {
 		ref.BlockOwnerDeletion = &trueRef
 	}
@@ -261,42 +261,42 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 			BlockOwnerDeletion: &trueRef,
 		})
 	}
-	res.Spec.SetOwnerReferences(refs)
+	spec.SetOwnerReferences(refs)
 
-	return nil
+	return spec, nil
 }
 
 // createOrUpdate creates or updates a resources.
 // May return nil resource without any errors if an update/create conflict happened.
-func (wrk *worker) createOrUpdate(res *smith.Resource) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
+func (wrk *worker) createOrUpdate(spec *unstructured.Unstructured) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
 	// Prepare client
-	resClient, err := wrk.sc.ForGVK(res.Spec.GroupVersionKind(), wrk.namespace)
+	resClient, err := wrk.sc.ForGVK(spec.GroupVersionKind(), wrk.namespace)
 	if err != nil {
 		return nil, false, err
 	}
-	gvk := res.Spec.GetObjectKind().GroupVersionKind()
+	gvk := spec.GetObjectKind().GroupVersionKind()
 
 	// Try to get the resource. We do read first to avoid generating unnecessary events.
-	obj, exists, err := wrk.store.Get(gvk, wrk.namespace, res.Spec.GetName())
+	obj, exists, err := wrk.store.Get(gvk, wrk.namespace, spec.GetName())
 	if err != nil {
 		// Unexpected error
-		return nil, true, err
+		return nil, false, err
 	}
-	if !exists {
-		return wrk.createResource(resClient, res)
+	if exists {
+		return wrk.updateResource(resClient, spec, obj)
 	}
-	return wrk.updateResource(resClient, res, obj)
+	return wrk.createResource(resClient, spec)
 }
 
-func (wrk *worker) createResource(resClient *dynamic.ResourceClient, res *smith.Resource) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
-	log.Printf("[WORKER][%s/%s] Resource %q not found, creating", wrk.namespace, wrk.bundleName, res.Name)
-	response, err := resClient.Create(&res.Spec)
+func (wrk *worker) createResource(resClient *dynamic.ResourceClient, spec *unstructured.Unstructured) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
+	log.Printf("[WORKER][%s/%s] Object %q not found, creating", wrk.namespace, wrk.bundleName, spec.GetName())
+	response, err := resClient.Create(spec)
 	if err == nil {
-		log.Printf("[WORKER][%s/%s] Resource %q created", wrk.namespace, wrk.bundleName, res.Name)
+		log.Printf("[WORKER][%s/%s] Object %q created", wrk.namespace, wrk.bundleName, spec.GetName())
 		return response, false, nil
 	}
 	if errors.IsAlreadyExists(err) {
-		log.Printf("[WORKER][%s/%s] Resource %q found, but not in Store yet, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
+		log.Printf("[WORKER][%s/%s] Object %q found, but not in Store yet, restarting loop", wrk.namespace, wrk.bundleName, spec.GetName())
 		// We let the next rebuild() iteration, triggered by someone else creating the resource, to finish the work.
 		return nil, false, nil
 	}
@@ -304,7 +304,7 @@ func (wrk *worker) createResource(resClient *dynamic.ResourceClient, res *smith.
 	return nil, true, err
 }
 
-func (wrk *worker) updateResource(resClient *dynamic.ResourceClient, res *smith.Resource, obj runtime.Object) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
+func (wrk *worker) updateResource(resClient *dynamic.ResourceClient, spec *unstructured.Unstructured, obj runtime.Object) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
 	response, ok := obj.(*unstructured.Unstructured)
 	if !ok {
 		response = &unstructured.Unstructured{
@@ -317,13 +317,13 @@ func (wrk *worker) updateResource(resClient *dynamic.ResourceClient, res *smith.
 	}
 
 	// Compare spec and existing resource
-	updated, err := updateResource(wrk.deepCopy, res, response)
+	updated, err := updateResource(wrk.deepCopy, spec, response)
 	if err != nil {
 		// Unexpected error
 		return nil, false, err
 	}
 	if updated == nil {
-		log.Printf("[WORKER][%s/%s] Resource %q has correct spec", wrk.namespace, wrk.bundleName, res.Name)
+		log.Printf("[WORKER][%s/%s] Object %q has correct spec", wrk.namespace, wrk.bundleName, spec.GetName())
 		return response, false, nil
 	}
 
@@ -331,14 +331,14 @@ func (wrk *worker) updateResource(resClient *dynamic.ResourceClient, res *smith.
 	response, err = resClient.Update(updated)
 	if err != nil {
 		if errors.IsConflict(err) {
-			log.Printf("[WORKER][%s/%s] Resource %q update resulted in conflict, restarting loop", wrk.namespace, wrk.bundleName, res.Name)
+			log.Printf("[WORKER][%s/%s] Object %q update resulted in conflict, restarting loop", wrk.namespace, wrk.bundleName, spec.GetName())
 			// We let the next rebuild() iteration, triggered by someone else updating the resource, to finish the work.
 			return nil, false, nil
 		}
 		// Unexpected error, will retry
 		return nil, true, err
 	}
-	log.Printf("[WORKER][%s/%s] Resource %q updated", wrk.namespace, wrk.bundleName, res.Name)
+	log.Printf("[WORKER][%s/%s] Object %q updated", wrk.namespace, wrk.bundleName, spec.GetName())
 	return response, false, nil
 }
 
@@ -370,9 +370,13 @@ func (wrk *worker) deleteRemovedResources(bundle *smith.Bundle) (retriableError 
 		existingObjs[ref] = m.GetUID()
 	}
 	for _, res := range bundle.Spec.Resources {
+		m, err := meta.Accessor(res.Spec)
+		if err != nil {
+			return false, fmt.Errorf("failed to get meta of object: %v", err)
+		}
 		ref := objectRef{
-			GroupVersionKind: res.Spec.GroupVersionKind(),
-			Name:             res.Spec.GetName(),
+			GroupVersionKind: res.Spec.GetObjectKind().GroupVersionKind(),
+			Name:             m.GetName(),
 		}
 		delete(existingObjs, ref)
 	}
@@ -531,9 +535,7 @@ func (wrk *worker) checkNeedsRebuild() bool {
 
 // updateResource checks if actual resource satisfies the desired spec.
 // Returns non-nil object with updates applied or nil if actual matches desired.
-func updateResource(deepCopy smith.DeepCopy, desired *smith.Resource, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	spec := desired.Spec
-
+func updateResource(deepCopy smith.DeepCopy, spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	// TODO Handle deleted or to be deleted object. We need to wait for the object to be gone.
 
 	upd, err := deepCopy(actual)
