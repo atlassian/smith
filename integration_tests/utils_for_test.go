@@ -21,8 +21,6 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -86,12 +84,16 @@ func cleanupBundle(t *testing.T, cfg *itConfig) {
 		assert.NoError(t, err)
 	}
 	for _, resource := range cfg.bundle.Spec.Resources {
-		t.Logf("Deleting resource %q", resource.Spec.GetName())
-		client, err := cfg.sc.ForGVK(resource.Spec.GroupVersionKind(), cfg.namespace)
+		m, err := meta.Accessor(resource.Spec)
 		if !assert.NoError(t, err) {
 			continue
 		}
-		err = client.Delete(resource.Spec.GetName(), nil)
+		t.Logf("Deleting resource %q", m.GetName())
+		client, err := cfg.sc.ForGVK(resource.Spec.GetObjectKind().GroupVersionKind(), cfg.namespace)
+		if !assert.NoError(t, err) {
+			continue
+		}
+		err = client.Delete(m.GetName(), nil)
 		if !kerrors.IsNotFound(err) {
 			assert.NoError(t, err)
 		}
@@ -212,14 +214,6 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	test(t, ctx, cfg, args...)
 }
 
-func toUnstructured(t *testing.T, obj runtime.Object) unstructured.Unstructured {
-	result := unstructured.Unstructured{
-		Object: make(map[string]interface{}),
-	}
-	require.NoError(t, unstructured_conversion.NewConverter(true).ToUnstructured(obj, &result.Object))
-	return result
-}
-
 func createObject(t *testing.T, obj runtime.Object, namespace, resourcePath string, client *rest.RESTClient) {
 	metaObj, err := meta.Accessor(obj)
 	require.NoError(t, err)
@@ -241,7 +235,19 @@ func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, nam
 	assertCondition(t, bundleRes, smith.BundleReady, smith.ConditionTrue)
 	assertCondition(t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
 	assertCondition(t, bundleRes, smith.BundleError, smith.ConditionFalse)
-	assert.Equal(t, bundle.Spec, bundleRes.Spec, "%#v", bundleRes)
+	if assert.Len(t, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
+		for i, res := range bundle.Spec.Resources {
+			spec, err := res.ToUnstructured(noCopy)
+			if !assert.NoError(t, err) {
+				continue
+			}
+			actual, err := bundleRes.Spec.Resources[i].ToUnstructured(noCopy)
+			if !assert.NoError(t, err) {
+				continue
+			}
+			assert.Equal(t, spec, actual, "%#v", bundleRes)
+		}
+	}
 
 	return bundleRes
 }
@@ -250,4 +256,10 @@ func assertBundleTimeout(t *testing.T, ctx context.Context, store *resources.Sto
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return assertBundle(t, ctxTimeout, store, namespace, bundle, resourceVersion)
+}
+
+// noCopy is a noop implementation of DeepCopy.
+// Can be used when a real copy is not needed.
+func noCopy(src interface{}) (interface{}, error) {
+	return src, nil
 }

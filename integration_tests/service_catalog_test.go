@@ -54,12 +54,12 @@ func TestServiceCatalog(t *testing.T) {
 			Resources: []smith.Resource{
 				{
 					Name: smith.ResourceName(instance.Name),
-					Spec: toUnstructured(t, instance),
+					Spec: instance,
 				},
 				{
 					Name:      smith.ResourceName(binding.Name),
 					DependsOn: []smith.ResourceName{smith.ResourceName(instance.Name)},
-					Spec:      toUnstructured(t, binding),
+					Spec:      binding,
 				},
 			},
 		},

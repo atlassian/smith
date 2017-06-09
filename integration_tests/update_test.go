@@ -102,11 +102,11 @@ func TestUpdate(t *testing.T) {
 			Resources: []smith.Resource{
 				{
 					Name: smith.ResourceName(bundleConfigMap.Name),
-					Spec: toUnstructured(t, bundleConfigMap),
+					Spec: bundleConfigMap,
 				},
 				{
 					Name: smith.ResourceName(bundleSleeper.Name),
-					Spec: toUnstructured(t, bundleSleeper),
+					Spec: bundleSleeper,
 				},
 			},
 		},

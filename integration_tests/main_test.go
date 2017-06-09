@@ -15,7 +15,7 @@ import (
 )
 
 func TestWorkflow(t *testing.T) {
-	c1 := api_v1.ConfigMap{
+	c1 := &api_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
@@ -32,7 +32,7 @@ func TestWorkflow(t *testing.T) {
 			"a": "b",
 		},
 	}
-	s1 := api_v1.Secret{
+	s1 := &api_v1.Secret{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",
@@ -62,11 +62,11 @@ func TestWorkflow(t *testing.T) {
 				{
 					Name:      "config1res",
 					DependsOn: []smith.ResourceName{"secret2res"},
-					Spec:      toUnstructured(t, &c1),
+					Spec:      c1,
 				},
 				{
 					Name: "secret2res",
-					Spec: toUnstructured(t, &s1),
+					Spec: s1,
 				},
 			},
 		},

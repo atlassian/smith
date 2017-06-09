@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/atlassian/smith"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -15,7 +13,7 @@ import (
 func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 	t.Parallel()
 
-	inputs := map[string]func() unstructured.Unstructured{
+	inputs := map[string]func() *unstructured.Unstructured{
 		"empty":   emptyMap,
 		"missing": missingMap,
 		"nil":     nilMap,
@@ -28,7 +26,7 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 			t.Run(fmt.Sprintf("%s actual, %s desired", kind1, kind2), func(t *testing.T) {
 				t.Parallel()
 				scheme := runtime.NewScheme()
-				updated, err := updateResource(scheme.DeepCopy, &smith.Resource{Spec: desired}, &actual)
+				updated, err := updateResource(scheme.DeepCopy, desired, actual)
 				require.NoError(t, err)
 				assert.Nil(t, updated)
 			})
@@ -36,8 +34,8 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 	}
 }
 
-func emptyMap() unstructured.Unstructured {
-	return unstructured.Unstructured{
+func emptyMap() *unstructured.Unstructured {
+	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
@@ -55,8 +53,8 @@ func emptyMap() unstructured.Unstructured {
 	}
 }
 
-func missingMap() unstructured.Unstructured {
-	return unstructured.Unstructured{
+func missingMap() *unstructured.Unstructured {
+	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
@@ -70,8 +68,8 @@ func missingMap() unstructured.Unstructured {
 	}
 }
 
-func nilMap() unstructured.Unstructured {
-	return unstructured.Unstructured{
+func nilMap() *unstructured.Unstructured {
+	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",

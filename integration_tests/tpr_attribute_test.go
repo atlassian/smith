@@ -14,11 +14,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestTprAttribute(t *testing.T) {
-	sleeper, sleeperU := bundleAttrResources(t)
+	sleeper := &tprattribute.Sleeper{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       tprattribute.SleeperResourceKind,
+			APIVersion: tprattribute.SleeperResourceGroupVersion,
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: "sleeper1",
+		},
+		Spec: tprattribute.SleeperSpec{
+			SleepFor:      1, // seconds,
+			WakeupMessage: "Hello, Infravators!",
+		},
+	}
 	bundle := &smith.Bundle{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       smith.BundleResourceKind,
@@ -31,7 +42,7 @@ func TestTprAttribute(t *testing.T) {
 			Resources: []smith.Resource{
 				{
 					Name: smith.ResourceName(sleeper.Name),
-					Spec: sleeperU,
+					Spec: sleeper,
 				},
 			},
 		},
@@ -77,21 +88,4 @@ func testTprAttribute(t *testing.T, ctx context.Context, cfg *itConfig, args ...
 		smith.BundleNameLabel: cfg.bundle.Name,
 	}, sleeperObj.Labels)
 	assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
-}
-
-func bundleAttrResources(t *testing.T) (*tprattribute.Sleeper, unstructured.Unstructured) {
-	c := &tprattribute.Sleeper{
-		TypeMeta: meta_v1.TypeMeta{
-			Kind:       tprattribute.SleeperResourceKind,
-			APIVersion: tprattribute.SleeperResourceGroupVersion,
-		},
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name: "sleeper1",
-		},
-		Spec: tprattribute.SleeperSpec{
-			SleepFor:      1, // seconds,
-			WakeupMessage: "Hello, Infravators!",
-		},
-	}
-	return c, toUnstructured(t, c)
 }

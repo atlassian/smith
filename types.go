@@ -1,8 +1,11 @@
 package smith
 
 import (
+	"encoding/json"
+
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -51,6 +54,8 @@ var GV = schema.GroupVersion{
 }
 
 var BundleGVK = GV.WithKind(BundleResourceKind)
+
+var converter = unstructured_conversion.NewConverter(false)
 
 func AddToScheme(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(GV,
@@ -161,5 +166,42 @@ type Resource struct {
 	// Explicit dependencies.
 	DependsOn []ResourceName `json:"dependsOn,omitempty"`
 
-	Spec unstructured.Unstructured `json:"spec"`
+	Spec runtime.Object `json:"spec"`
+}
+
+// ToUnstructured returns Spec field as an Unstructured object.
+// It makes a copy if it is an Unstructured already.
+func (r *Resource) ToUnstructured(copy DeepCopy) (*unstructured.Unstructured, error) {
+	if _, ok := r.Spec.(*unstructured.Unstructured); ok {
+		uCopy, err := copy(r.Spec)
+		if err != nil {
+			return nil, err
+		}
+		return uCopy.(*unstructured.Unstructured), nil
+	}
+	u := &unstructured.Unstructured{
+		Object: make(map[string]interface{}),
+	}
+	err := converter.ToUnstructured(r.Spec, &u.Object)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+func (r *Resource) UnmarshalJSON(data []byte) error {
+	type resource struct {
+		Name      ResourceName              `json:"name"`
+		DependsOn []ResourceName            `json:"dependsOn"`
+		Spec      unstructured.Unstructured `json:"spec"`
+	}
+	var res resource
+	err := json.Unmarshal(data, &res)
+	if err != nil {
+		return err
+	}
+	r.Name = res.Name
+	r.DependsOn = res.DependsOn
+	r.Spec = &res.Spec
+	return nil
 }
