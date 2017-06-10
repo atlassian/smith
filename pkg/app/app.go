@@ -58,9 +58,6 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// 1. Store
 	store := resources.NewStore(scheme.DeepCopy)
 
@@ -72,13 +69,18 @@ func (a *App) Run(ctx context.Context) error {
 	wgStore.StartWithContext(ctxStore, store.Run)
 
 	// 1.5. Informers
+	var wg wait.Group
+	defer wg.Wait() // await termination
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
 	bundleInf.AddIndexers(cache.Indexers{
 		ByTprNameIndex: byTprNameIndex,
 	})
 	store.AddInformer(smith.BundleGVK, bundleInf)
 
-	infs := a.resourceInformers(ctx, store, clientset, scClient)
+	infs := a.resourceInformers(ctx, &wg, store, clientset, scClient)
 	tprInf := infs[tprGVK]
 	delete(infs, tprGVK) // To avoid adding generic event handler later
 
@@ -96,11 +98,7 @@ func (a *App) Run(ctx context.Context) error {
 	rc := readychecker.New(&tprStore{store: store}, types...)
 
 	// 3. Processor
-
 	bp := processor.New(bundleClient, sc, rc, scheme.DeepCopy, store)
-	var wg wait.Group
-	defer wg.Wait() // await termination
-	defer cancel()  // cancel ctx to signal done to processor (and everything else)
 	wg.StartWithContext(ctx, bp.Run)
 
 	// 4. Ensure ThirdPartyResource Bundle exists
@@ -123,7 +121,7 @@ func (a *App) Run(ctx context.Context) error {
 		deepCopy:  scheme.DeepCopy,
 	})
 
-	go bundleInf.Run(ctx.Done())
+	wg.StartWithChannel(ctx.Done(), bundleInf.Run)
 
 	// We must wait for bundleInf to populate its cache to avoid reading from an empty cache
 	// in case of resource-generated events.
@@ -156,7 +154,7 @@ func (a *App) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mainClient kubernetes.Interface, scClient scClientset.Interface) map[schema.GroupVersionKind]cache.SharedIndexInformer {
+func (a *App) resourceInformers(ctx context.Context, wg *wait.Group, store *resources.Store, mainClient kubernetes.Interface, scClient scClientset.Interface) map[schema.GroupVersionKind]cache.SharedIndexInformer {
 	mainSif := informers.NewSharedInformerFactory(mainClient, a.ResyncPeriod)
 
 	// Core API types
@@ -182,7 +180,7 @@ func (a *App) resourceInformers(ctx context.Context, store *resources.Store, mai
 	// Add all to Store
 	for gvk, inf := range infs {
 		store.AddInformer(gvk, inf)
-		go inf.Run(ctx.Done()) // Must be after store.AddInformer()
+		wg.StartWithChannel(ctx.Done(), inf.Run) // Must be after store.AddInformer()
 	}
 
 	return infs
