@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/atlassian/smith"
@@ -13,7 +12,7 @@ import (
 	"github.com/atlassian/smith/pkg/processor"
 	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/resources"
-	"github.com/atlassian/smith/pkg/util"
+	"github.com/atlassian/smith/pkg/util/wait"
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -65,12 +64,12 @@ func (a *App) Run(ctx context.Context) error {
 	// 1. Store
 	store := resources.NewStore(scheme.DeepCopy)
 
-	var wgStore sync.WaitGroup
+	var wgStore wait.Group
 	defer wgStore.Wait() // await store termination
 
 	ctxStore, cancelStore := context.WithCancel(context.Background())
 	defer cancelStore() // signal store to stop
-	util.StartAsync(ctxStore, &wgStore, store.Run)
+	wgStore.StartWithContext(ctxStore, store.Run)
 
 	// 1.5. Informers
 	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
@@ -99,10 +98,10 @@ func (a *App) Run(ctx context.Context) error {
 	// 3. Processor
 
 	bp := processor.New(bundleClient, sc, rc, scheme.DeepCopy, store)
-	var wg sync.WaitGroup
+	var wg wait.Group
 	defer wg.Wait() // await termination
-	util.StartAsync(ctx, &wg, bp.Run)
-	defer cancel() // cancel ctx to signal done to processor (and everything else)
+	defer cancel()  // cancel ctx to signal done to processor (and everything else)
+	wg.StartWithContext(ctx, bp.Run)
 
 	// 4. Ensure ThirdPartyResource Bundle exists
 	err = retryUntilSuccessOrDone(ctx, func() error {

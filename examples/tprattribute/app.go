@@ -3,12 +3,11 @@ package tprattribute
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
-	"github.com/atlassian/smith/pkg/util"
+	"github.com/atlassian/smith/pkg/util/wait"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -45,12 +44,12 @@ func (a *App) Run(ctx context.Context) error {
 
 	store := resources.NewStore(scheme.DeepCopy)
 
-	var wgStore sync.WaitGroup
+	var wgStore wait.Group
 	defer wgStore.Wait() // await store termination
 
 	ctxStore, cancelStore := context.WithCancel(context.Background())
 	defer cancelStore() // signal store to stop
-	util.StartAsync(ctxStore, &wgStore, store.Run)
+	wgStore.StartWithContext(ctxStore, store.Run)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

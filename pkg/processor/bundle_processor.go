@@ -2,11 +2,10 @@ package processor
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/util"
+	"github.com/atlassian/smith/pkg/util/wait"
 
 	"github.com/cenk/backoff"
 	"k8s.io/client-go/rest"
@@ -35,7 +34,7 @@ func New(bundleClient *rest.RESTClient, sc smith.SmartClient, rc ReadyChecker, d
 }
 
 func (bp *BundleProcessor) Run(ctx context.Context) {
-	var wg sync.WaitGroup
+	var wg wait.Group
 	defer wg.Wait()
 	workers := make(map[bundleRef]*worker)
 	workRequests := make(chan workRequest)
@@ -57,7 +56,7 @@ func (bp *BundleProcessor) Run(ctx context.Context) {
 					pendingBundle:  bundle,
 				}
 				workers[ref] = wrk
-				util.StartAsync(ctx, &wg, wrk.rebuildLoop)
+				wg.StartWithContext(ctx, wrk.rebuildLoop)
 			} else {
 				wrk.setNeedsRebuild()
 				wrk.pendingBundle = bundle

@@ -4,12 +4,12 @@ package integration_tests
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/tprattribute"
+	"github.com/atlassian/smith/pkg/util/wait"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,20 +56,18 @@ func testTprAttribute(t *testing.T, ctx context.Context, cfg *itConfig, args ...
 	sClient, err := tprattribute.GetSleeperTprClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
-	var wg sync.WaitGroup
+	var wg wait.Group
 	defer wg.Wait()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Start(func() {
 		apl := tprattribute.App{
 			RestConfig: cfg.config,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
 		}
-	}()
+	})
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+3)*time.Second)
 	defer cancel()
