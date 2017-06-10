@@ -4,13 +4,12 @@ package integration_tests
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/resources"
-	"github.com/atlassian/smith/pkg/util"
+	"github.com/atlassian/smith/pkg/util/wait"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,12 +25,12 @@ func TestStore(t *testing.T) {
 
 	store := resources.NewStore(client.BundleScheme().DeepCopy)
 
-	var wgStore sync.WaitGroup
+	var wgStore wait.Group
 	defer wgStore.Wait() // await store termination
 
 	ctxStore, cancelStore := context.WithCancel(context.Background())
 	defer cancelStore() // signal store to stop
-	util.StartAsync(ctxStore, &wgStore, store.Run)
+	wgStore.StartWithContext(ctxStore, store.Run)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -70,9 +69,9 @@ func TestStore(t *testing.T) {
 		defer cancelTimeout2()
 
 		var obj runtime.Object
-		var wg sync.WaitGroup
-		util.StartAsync(ctxTimeout, &wg, func(ctx context.Context) {
-			obj, err = store.AwaitObject(ctx, configMapGvk, useNamespace, mapName)
+		var wg wait.Group
+		wg.Start(func() {
+			obj, err = store.AwaitObject(ctxTimeout, configMapGvk, useNamespace, mapName)
 		})
 		time.Sleep(1 * time.Second)
 		cm, errCreate := clientset.CoreV1().ConfigMaps(useNamespace).Create(cm)
@@ -92,9 +91,9 @@ func TestStore(t *testing.T) {
 		mapName := "i-do-not-exist-234234"
 		ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 5*time.Second)
 		defer cancelTimeout()
-		var wg sync.WaitGroup
-		util.StartAsync(ctxTimeout, &wg, func(ctx context.Context) {
-			_, err = store.AwaitObject(ctx, configMapGvk, useNamespace, mapName)
+		var wg wait.Group
+		wg.Start(func() {
+			_, err = store.AwaitObject(ctxTimeout, configMapGvk, useNamespace, mapName)
 		})
 		time.Sleep(1 * time.Second)
 		assert.True(t, store.RemoveInformer(configMapGvk))

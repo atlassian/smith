@@ -3,7 +3,6 @@ package integration_tests
 import (
 	"context"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
-	"github.com/atlassian/smith/pkg/util"
+	"github.com/atlassian/smith/pkg/util/wait"
 
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/stretchr/testify/assert"
@@ -156,11 +155,11 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	require.NoError(t, err)
 
 	store := resources.NewStore(scheme.DeepCopy)
-	var wgStore sync.WaitGroup
+	var wgStore wait.Group
 	defer wgStore.Wait() // await store termination
 	ctxStore, cancelStore := context.WithCancel(context.Background())
 	defer cancelStore() // signal store to stop
-	util.StartAsync(ctxStore, &wgStore, store.Run)
+	wgStore.StartWithContext(ctxStore, store.Run)
 
 	err = bundleClient.Delete().
 		Namespace(useNamespace).
@@ -184,15 +183,13 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	}
 	defer cleanupBundle(t, cfg)
 
-	var wg sync.WaitGroup
+	var wg wait.Group
 	defer wg.Wait()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Start(func() {
 		apl := app.App{
 			RestConfig:           config,
 			ServiceCatalogConfig: scConfig,
@@ -200,7 +197,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
 		}
-	}()
+	})
 
 	if createBundle {
 		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle TPR

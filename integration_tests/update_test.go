@@ -4,12 +4,12 @@ package integration_tests
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/tprattribute"
+	"github.com/atlassian/smith/pkg/util/wait"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -143,20 +143,18 @@ func TestUpdate(t *testing.T) {
 }
 
 func testUpdate(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
-	var wg sync.WaitGroup
+	var wg wait.Group
 	defer wg.Wait()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Start(func() {
 		apl := tprattribute.App{
 			RestConfig: cfg.config,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
 		}
-	}()
+	})
 
 	cm2 := args[0].(*api_v1.ConfigMap)
 	sleeper1 := args[1].(*tprattribute.Sleeper)
