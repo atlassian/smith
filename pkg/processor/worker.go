@@ -9,6 +9,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/processor/graph"
+	"github.com/atlassian/smith/pkg/resources"
 
 	"github.com/cenk/backoff"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -240,8 +241,11 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 	// 3. Update OwnerReferences
 	trueRef := true
 	refs := spec.GetOwnerReferences()
-	for _, ref := range refs {
-		ref.BlockOwnerDeletion = &trueRef
+	for i, ref := range refs {
+		if ref.Controller != nil && *ref.Controller {
+			return nil, fmt.Errorf("cannot create resource %q with controller owner reference %v", res.Name, ref)
+		}
+		refs[i].BlockOwnerDeletion = &trueRef
 	}
 	// Hardcode APIVersion/Kind because of https://github.com/kubernetes/client-go/issues/60
 	refs = append(refs, meta_v1.OwnerReference{
@@ -249,6 +253,7 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 		Kind:               smith.BundleResourceKind,
 		Name:               bundle.Name,
 		UID:                bundle.UID,
+		Controller:         &trueRef,
 		BlockOwnerDeletion: &trueRef,
 	})
 	for _, dep := range res.DependsOn {
@@ -577,7 +582,7 @@ func updateResource(deepCopy smith.DeepCopy, spec, actual *unstructured.Unstruct
 	updated.SetName(spec.GetName())
 	updated.SetLabels(spec.GetLabels())
 	updated.SetAnnotations(spec.GetAnnotations())
-	updated.SetOwnerReferences(spec.GetOwnerReferences()) // TODO Is this ok?
+	updated.SetOwnerReferences(spec.GetOwnerReferences()) // TODO Is this ok? Check that there is only one controller and it is THIS bundle
 	updated.SetFinalizers(spec.GetFinalizers())           // TODO Is this ok?
 
 	// 3. Everything else
@@ -610,13 +615,10 @@ func mergeLabels(labels ...map[string]string) map[string]string {
 }
 
 func isOwner(obj meta_v1.Object, bundle *smith.Bundle) bool {
-	for _, ref := range obj.GetOwnerReferences() {
-		if ref.APIVersion == smith.BundleResourceGroupVersion &&
-			ref.Kind == smith.BundleResourceKind &&
-			ref.Name == bundle.Name &&
-			ref.UID == bundle.UID {
-			return true
-		}
-	}
-	return false
+	ref := resources.GetControllerOf(obj)
+	return ref != nil &&
+		ref.APIVersion == smith.BundleResourceGroupVersion &&
+		ref.Kind == smith.BundleResourceKind &&
+		ref.Name == bundle.Name &&
+		ref.UID == bundle.UID
 }

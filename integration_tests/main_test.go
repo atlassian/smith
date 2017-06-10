@@ -75,7 +75,7 @@ func TestWorkflow(t *testing.T) {
 }
 
 func testWorkflow(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
-	bundleRes := assertBundleTimeout(t, ctx, cfg.store, cfg.namespace, cfg.bundle, "")
+	bundleRes := assertBundleTimeout(t, ctx, cfg.store, cfg.namespace, cfg.bundle, cfg.createdBundle.ResourceVersion)
 
 	cfMap, err := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace).Get("config1", meta_v1.GetOptions{})
 	require.NoError(t, err)
@@ -95,6 +95,7 @@ func testWorkflow(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 			Kind:               smith.BundleResourceKind,
 			Name:               bundleRes.Name,
 			UID:                bundleRes.UID,
+			Controller:         &trueRef,
 			BlockOwnerDeletion: &trueRef,
 		},
 		{
@@ -105,4 +106,15 @@ func testWorkflow(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 			BlockOwnerDeletion: &trueRef,
 		},
 	}, cfMap.GetOwnerReferences())
+	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/46817 is fixed
+	//assert.Equal(t, []meta_v1.OwnerReference{
+	//	{
+	//		APIVersion:         smith.BundleResourceGroupVersion,
+	//		Kind:               smith.BundleResourceKind,
+	//		Name:               bundleRes.Name,
+	//		UID:                bundleRes.UID,
+	//		Controller:         &trueRef,
+	//		BlockOwnerDeletion: &trueRef,
+	//	},
+	//}, secret.GetOwnerReferences())
 }
