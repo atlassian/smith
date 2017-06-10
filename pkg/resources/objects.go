@@ -7,7 +7,7 @@ import (
 // GetControllerOf returns the controllerRef if controllee has a controller, otherwise returns nil.
 func GetControllerOf(controllee meta_v1.Object) *meta_v1.OwnerReference {
 	for _, ref := range controllee.GetOwnerReferences() {
-		if ref.Controller != nil && *ref.Controller == true {
+		if ref.Controller != nil && *ref.Controller {
 			return &ref
 		}
 	}
