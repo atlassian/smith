@@ -19,7 +19,9 @@ import (
 )
 
 func TestUpdate(t *testing.T) {
-	existingConfigMap := &api_v1.ConfigMap{
+	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/46817 is fixed
+	t.SkipNow()
+	cm1 := &api_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
@@ -34,13 +36,13 @@ func TestUpdate(t *testing.T) {
 			"a": "b",
 		},
 	}
-	bundleConfigMap := &api_v1.ConfigMap{
+	cm2 := &api_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
-			Name: existingConfigMap.Name,
+			Name: cm1.Name,
 			Labels: map[string]string{
 				"configLabel":         "configValue",
 				"overlappingLabel":    "overlappingConfigValue",
@@ -51,7 +53,7 @@ func TestUpdate(t *testing.T) {
 			"x": "y",
 		},
 	}
-	existingSleeper := &tprattribute.Sleeper{
+	sleeper1 := &tprattribute.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       tprattribute.SleeperResourceKind,
 			APIVersion: tprattribute.SleeperResourceGroupVersion,
@@ -63,17 +65,17 @@ func TestUpdate(t *testing.T) {
 			},
 		},
 		Spec: tprattribute.SleeperSpec{
-			SleepFor:      10, // seconds,
+			SleepFor:      2, // seconds,
 			WakeupMessage: "Hello there!",
 		},
 	}
-	bundleSleeper := &tprattribute.Sleeper{
+	sleeper2 := &tprattribute.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       tprattribute.SleeperResourceKind,
 			APIVersion: tprattribute.SleeperResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
-			Name: existingSleeper.Name,
+			Name: sleeper1.Name,
 			Labels: map[string]string{
 				"configLabel":         "configValue",
 				"overlappingLabel":    "overlappingConfigValue",
@@ -85,7 +87,7 @@ func TestUpdate(t *testing.T) {
 			WakeupMessage: "Hello, martians!",
 		},
 	}
-	bundle := &smith.Bundle{
+	bundle1 := &smith.Bundle{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       smith.BundleResourceKind,
 			APIVersion: smith.BundleResourceGroupVersion,
@@ -93,25 +95,51 @@ func TestUpdate(t *testing.T) {
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle1",
 			Labels: map[string]string{
-				"bundleLabel":         "bundleValue",
-				"overlappingLabel":    "overlappingBundleValue",
-				smith.BundleNameLabel: "bundleLabel123",
+				"bundleLabel":         "bundleValue1",
+				"overlappingLabel":    "overlappingBundleValue1",
+				smith.BundleNameLabel: "bundleLabel1",
 			},
 		},
 		Spec: smith.BundleSpec{
 			Resources: []smith.Resource{
 				{
-					Name: smith.ResourceName(bundleConfigMap.Name),
-					Spec: bundleConfigMap,
+					Name: smith.ResourceName(cm1.Name),
+					Spec: cm1,
 				},
 				{
-					Name: smith.ResourceName(bundleSleeper.Name),
-					Spec: bundleSleeper,
+					Name: smith.ResourceName(sleeper1.Name),
+					Spec: sleeper1,
 				},
 			},
 		},
 	}
-	setupApp(t, bundle, false, false, testUpdate, existingConfigMap, bundleConfigMap, existingSleeper, bundleSleeper)
+	bundle2 := &smith.Bundle{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       smith.BundleResourceKind,
+			APIVersion: smith.BundleResourceGroupVersion,
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: "bundle1",
+			Labels: map[string]string{
+				"bundleLabel":         "bundleValue2",
+				"overlappingLabel":    "overlappingBundleValue2",
+				smith.BundleNameLabel: "bundleLabel2",
+			},
+		},
+		Spec: smith.BundleSpec{
+			Resources: []smith.Resource{
+				{
+					Name: smith.ResourceName(cm2.Name),
+					Spec: cm2,
+				},
+				{
+					Name: smith.ResourceName(sleeper2.Name),
+					Spec: sleeper2,
+				},
+			},
+		},
+	}
+	setupApp(t, bundle1, false, true, testUpdate, cm2, sleeper1, sleeper2, bundle2)
 }
 
 func testUpdate(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
@@ -130,91 +158,73 @@ func testUpdate(t *testing.T, ctx context.Context, cfg *itConfig, args ...interf
 		}
 	}()
 
-	existingConfigMap := args[0].(*api_v1.ConfigMap)
-	bundleConfigMap := args[1].(*api_v1.ConfigMap)
-	existingSleeper := args[2].(*tprattribute.Sleeper)
-	bundleSleeper := args[3].(*tprattribute.Sleeper)
+	cm2 := args[0].(*api_v1.ConfigMap)
+	sleeper1 := args[1].(*tprattribute.Sleeper)
+	sleeper2 := args[2].(*tprattribute.Sleeper)
+	bundle2 := args[3].(*smith.Bundle)
 
 	cmClient := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace)
-	_, err := cmClient.Create(existingConfigMap)
-	require.NoError(t, err)
-	defer func() {
-		t.Logf("Deleting resource %q", existingConfigMap.Name)
-		e := cmClient.Delete(existingConfigMap.Name, nil)
-		if !kerrors.IsNotFound(e) { // May have been cleanup by cleanupBundle
-			assert.NoError(t, e)
-		}
-	}()
-
 	sClient, err := tprattribute.GetSleeperTprClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
-	time.Sleep(500 * time.Millisecond) // Wait until apps start and create the Sleeper and Bundle TPRs
-
-	createObject(t, existingSleeper, cfg.namespace, tprattribute.SleeperResourcePath, sClient)
-	defer func() {
-		t.Logf("Deleting resource %q", existingSleeper.Name)
-		e := sClient.Delete().
-			Namespace(cfg.namespace).
-			Resource(tprattribute.SleeperResourcePath).
-			Name(existingSleeper.Name).
-			Do().
-			Error()
-		if !kerrors.IsNotFound(e) { // May have been cleanup by cleanupBundle
-			assert.NoError(t, e)
-		}
-	}()
-
-	createObject(t, cfg.bundle, cfg.namespace, smith.BundleResourcePath, cfg.bundleClient)
-	cfg.bundleCreated = true
-	defer cleanupBundle(t, cfg)
-
-	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(bundleSleeper.Spec.SleepFor+existingSleeper.Spec.SleepFor+2)*time.Second)
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
 	defer cancel()
 
-	bundleRes := assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, cfg.bundle, "")
+	bundleRes1 := assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, cfg.bundle, cfg.createdBundle.ResourceVersion)
 
-	cfMap, err := cmClient.Get(bundleConfigMap.Name, meta_v1.GetOptions{})
-	if assert.NoError(t, err) {
-		assert.Equal(t, map[string]string{
-			"configLabel":         "configValue",
-			"bundleLabel":         "bundleValue",
-			"overlappingLabel":    "overlappingConfigValue",
-			smith.BundleNameLabel: cfg.bundle.Name,
-		}, cfMap.Labels)
-		assert.Equal(t, bundleConfigMap.Data, cfMap.Data)
-	}
+	res := &smith.Bundle{}
+	bundle2.ResourceVersion = bundleRes1.ResourceVersion
+	require.NoError(t, cfg.bundleClient.Put().
+		Namespace(cfg.namespace).
+		Resource(smith.BundleResourcePath).
+		Name(bundle2.Name).
+		Body(bundle2).
+		Do().
+		Into(res))
+
+	bundleRes2 := assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, bundle2, bundle2.ResourceVersion, res.ResourceVersion)
+
+	cfMap, err := cmClient.Get(cm2.Name, meta_v1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"configLabel":         "configValue",
+		"bundleLabel":         "bundleValue2",
+		"overlappingLabel":    "overlappingConfigValue",
+		smith.BundleNameLabel: cfg.bundle.Name,
+	}, cfMap.Labels)
+	assert.Equal(t, cm2.Data, cfMap.Data)
 
 	var sleeperObj tprattribute.Sleeper
 	err = sClient.Get().
 		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
-		Name(bundleSleeper.Name).
+		Name(sleeper2.Name).
 		Do().
 		Into(&sleeperObj)
-	if assert.NoError(t, err) {
-		assert.Equal(t, map[string]string{
-			"configLabel":         "configValue",
-			"bundleLabel":         "bundleValue",
-			"overlappingLabel":    "overlappingConfigValue",
-			smith.BundleNameLabel: cfg.bundle.Name,
-		}, sleeperObj.Labels)
-		assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
-		assert.Equal(t, bundleSleeper.Spec, sleeperObj.Spec)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"configLabel":         "configValue",
+		"bundleLabel":         "bundleValue2",
+		"overlappingLabel":    "overlappingConfigValue",
+		smith.BundleNameLabel: cfg.bundle.Name,
+	}, sleeperObj.Labels)
+	assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
+	assert.Equal(t, sleeper2.Spec, sleeperObj.Spec)
+
 	emptyBundle := *cfg.bundle
 	emptyBundle.Spec.Resources = []smith.Resource{}
+	emptyBundle.ResourceVersion = bundleRes2.ResourceVersion
 	require.NoError(t, cfg.bundleClient.Put().
 		Namespace(cfg.namespace).
 		Resource(smith.BundleResourcePath).
 		Name(emptyBundle.Name).
 		Body(&emptyBundle).
 		Do().
-		Error())
+		Into(res))
 
-	assertBundleTimeout(t, ctx, cfg.store, cfg.namespace, &emptyBundle, bundleRes.ResourceVersion)
+	assertBundleTimeout(t, ctx, cfg.store, cfg.namespace, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
 
-	cfMap, err = cmClient.Get(bundleConfigMap.Name, meta_v1.GetOptions{})
+	cfMap, err = cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	if err == nil {
 		assert.NotNil(t, cfMap.DeletionTimestamp) // Still in api but marked for deletion
 	} else {
@@ -223,7 +233,7 @@ func testUpdate(t *testing.T, ctx context.Context, cfg *itConfig, args ...interf
 	err = sClient.Get().
 		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
-		Name(bundleSleeper.Name).
+		Name(sleeper2.Name).
 		Do().
 		Into(&sleeperObj)
 	if err == nil {

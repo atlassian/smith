@@ -39,12 +39,12 @@ type testFunc func(*testing.T, context.Context, *itConfig, ...interface{})
 type itConfig struct {
 	namespace     string
 	bundle        *smith.Bundle
+	createdBundle *smith.Bundle
 	config        *rest.Config
 	clientset     *kubernetes.Clientset
 	sc            smith.SmartClient
 	bundleClient  *rest.RESTClient
 	store         *resources.Store
-	bundleCreated bool
 }
 
 func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) {
@@ -70,7 +70,7 @@ func bundleInformer(bundleClient cache.Getter, namespace string) cache.SharedInd
 }
 
 func cleanupBundle(t *testing.T, cfg *itConfig) {
-	if !cfg.bundleCreated {
+	if cfg.createdBundle == nil {
 		return
 	}
 	t.Logf("Deleting bundle %s", cfg.bundle.Name)
@@ -106,14 +106,16 @@ func isBundleReady(obj runtime.Object) bool {
 	return cond != nil && cond.Status == smith.ConditionTrue
 }
 
-func isBundleReadyAndNewer(resourceVersion string) resources.AwaitCondition {
+func isBundleReadyAndNewer(resourceVersions ...string) resources.AwaitCondition {
 	return func(obj runtime.Object) bool {
 		b := obj.(*smith.Bundle)
-		if b.ResourceVersion == resourceVersion {
-			// TODO Should be using Generation here once it is available
-			// https://github.com/kubernetes/kubernetes/issues/7328
-			// https://github.com/kubernetes/features/issues/95
-			return false
+		for _, rv := range resourceVersions {
+			if b.ResourceVersion == rv {
+				// TODO Should be using Generation here once it is available
+				// https://github.com/kubernetes/kubernetes/issues/7328
+				// https://github.com/kubernetes/features/issues/95
+				return false
+			}
 		}
 		_, cond := b.GetCondition(smith.BundleReady)
 		return cond != nil && cond.Status == smith.ConditionTrue
@@ -202,9 +204,9 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 
 	if createBundle {
 		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle TPR
-
-		createObject(t, bundle, useNamespace, smith.BundleResourcePath, bundleClient)
-		cfg.bundleCreated = true
+		res := &smith.Bundle{}
+		createObject(t, bundle, res, useNamespace, smith.BundleResourcePath, bundleClient)
+		cfg.createdBundle = res
 	}
 
 	bundleInf := bundleInformer(bundleClient, useNamespace)
@@ -214,7 +216,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	test(t, ctx, cfg, args...)
 }
 
-func createObject(t *testing.T, obj runtime.Object, namespace, resourcePath string, client *rest.RESTClient) {
+func createObject(t *testing.T, obj, res runtime.Object, namespace, resourcePath string, client *rest.RESTClient) {
 	metaObj, err := meta.Accessor(obj)
 	require.NoError(t, err)
 
@@ -224,11 +226,11 @@ func createObject(t *testing.T, obj runtime.Object, namespace, resourcePath stri
 		Resource(resourcePath).
 		Body(obj).
 		Do().
-		Error())
+		Into(res))
 }
 
-func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle, resourceVersion string) *smith.Bundle {
-	obj, err := store.AwaitObjectCondition(ctx, smith.BundleGVK, namespace, bundle.Name, isBundleReadyAndNewer(resourceVersion))
+func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle, resourceVersions ...string) *smith.Bundle {
+	obj, err := store.AwaitObjectCondition(ctx, smith.BundleGVK, namespace, bundle.Name, isBundleReadyAndNewer(resourceVersions...))
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
 
@@ -252,10 +254,10 @@ func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, nam
 	return bundleRes
 }
 
-func assertBundleTimeout(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle, resourceVersion string) *smith.Bundle {
+func assertBundleTimeout(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle, resourceVersion ...string) *smith.Bundle {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	return assertBundle(t, ctxTimeout, store, namespace, bundle, resourceVersion)
+	return assertBundle(t, ctxTimeout, store, namespace, bundle, resourceVersion...)
 }
 
 // noCopy is a noop implementation of DeepCopy.
