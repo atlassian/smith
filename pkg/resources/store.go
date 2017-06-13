@@ -389,11 +389,11 @@ func byNamespaceAndBundleNameIndex(obj interface{}) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get meta of object: %v", err)
 	}
-	bundleName := m.GetLabels()[smith.BundleNameLabel]
-	if bundleName == "" {
-		return nil, nil
+	ref := GetControllerOf(m)
+	if ref != nil && ref.APIVersion == smith.BundleResourceGroupVersion && ref.Kind == smith.BundleResourceKind {
+		return []string{ByNamespaceAndBundleNameIndexKey(m.GetNamespace(), ref.Name)}, nil
 	}
-	return []string{ByNamespaceAndBundleNameIndexKey(m.GetNamespace(), bundleName)}, nil
+	return nil, nil
 }
 
 func ByNamespaceAndBundleNameIndexKey(namespace, bundleName string) string {

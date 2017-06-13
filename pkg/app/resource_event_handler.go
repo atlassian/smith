@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/resources"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -26,14 +27,14 @@ func (h *resourceEventHandler) OnAdd(obj interface{}) {
 }
 
 func (h *resourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
-	oldTmplName, oldNamespace := getBundleNameAndNamespace(oldObj)
+	oldBundleName, oldNamespace := getBundleNameAndNamespace(oldObj)
 
-	newTmplName, newNamespace := getBundleNameAndNamespace(oldObj)
+	newBundleName, newNamespace := getBundleNameAndNamespace(newObj)
 
-	if oldTmplName != newTmplName { // changed label on bundle
-		h.rebuildByName(oldNamespace, oldTmplName, "updated", oldObj)
+	if oldBundleName != newBundleName { // changed controller of the object
+		h.rebuildByName(oldNamespace, oldBundleName, "updated", oldObj)
 	}
-	h.rebuildByName(newNamespace, newTmplName, "updated", newObj)
+	h.rebuildByName(newNamespace, newBundleName, "updated", newObj)
 }
 
 func (h *resourceEventHandler) OnDelete(obj interface{}) {
@@ -80,6 +81,11 @@ func (h *resourceEventHandler) rebuildByName(namespace, bundleName, addUpdateDel
 }
 
 func getBundleNameAndNamespace(obj interface{}) (string, string) {
+	var bundleName string
 	meta := obj.(meta_v1.Object)
-	return meta.GetLabels()[smith.BundleNameLabel], meta.GetNamespace()
+	ref := resources.GetControllerOf(meta)
+	if ref != nil && ref.APIVersion == smith.BundleResourceGroupVersion && ref.Kind == smith.BundleResourceKind {
+		bundleName = ref.Name
+	}
+	return bundleName, meta.GetNamespace()
 }

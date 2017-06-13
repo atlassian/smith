@@ -28,9 +28,6 @@ func TestAdoption(t *testing.T) {
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "cm",
-			Labels: map[string]string{
-				smith.BundleNameLabel: "bundle",
-			},
 		},
 		Data: map[string]string{
 			"a": "b",
@@ -43,9 +40,6 @@ func TestAdoption(t *testing.T) {
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "sleeper2",
-			Labels: map[string]string{
-				smith.BundleNameLabel: "bundle",
-			},
 		},
 		Spec: tprattribute.SleeperSpec{
 			SleepFor:      1, // seconds,
@@ -133,7 +127,7 @@ func testAdoption(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 
 	// Point ConfigMap controller reference to Bundle
 	trueVar := true
-	refs := []meta_v1.OwnerReference{
+	cmActual.OwnerReferences = []meta_v1.OwnerReference{
 		{
 			APIVersion: smith.BundleResourceGroupVersion,
 			Kind:       smith.BundleResourceKind,
@@ -142,13 +136,20 @@ func testAdoption(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 			Controller: &trueVar,
 		},
 	}
-	cmActual.OwnerReferences = refs
 	cmActual, err = cmClient.Update(cmActual)
 	require.NoError(t, err)
 
 	// Point Sleeper controller reference to Bundle
 	for { // Retry loop to handle conflicts with Sleeper controller
-		sleeperActual.SetOwnerReferences(refs)
+		sleeperActual.SetOwnerReferences([]meta_v1.OwnerReference{
+			{
+				APIVersion: smith.BundleResourceGroupVersion,
+				Kind:       smith.BundleResourceKind,
+				Name:       bundleActual.Name,
+				UID:        bundleActual.UID,
+				Controller: &trueVar,
+			},
+		})
 		err = sClient.Put().
 			Namespace(cfg.namespace).
 			Resource(tprattribute.SleeperResourcePath).
