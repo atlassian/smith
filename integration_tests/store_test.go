@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
@@ -61,7 +61,7 @@ func TestStore(t *testing.T) {
 		}
 
 		err := clientset.CoreV1().ConfigMaps(useNamespace).Delete(mapName, nil)
-		if err != nil && !kerrors.IsNotFound(err) {
+		if err != nil && !api_errors.IsNotFound(err) {
 			require.NoError(t, err)
 		}
 

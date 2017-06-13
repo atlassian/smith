@@ -14,7 +14,7 @@ import (
 	"github.com/cenk/backoff"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -417,7 +417,7 @@ func (wrk *worker) deleteRemovedResources(bundle *smith.Bundle) (retriableError 
 			},
 			PropagationPolicy: &policy,
 		})
-		if err != nil && !kerrors.IsNotFound(err) && !kerrors.IsConflict(err) {
+		if err != nil && !api_errors.IsNotFound(err) && !api_errors.IsConflict(err) {
 			// not found means object has been deleted already
 			// conflict means it has been deleted and re-created (UID does not match)
 			if firstErr == nil {
@@ -441,7 +441,7 @@ func (wrk *worker) setBundleStatus(bundle *smith.Bundle) error {
 		Do().
 		Into(bundle)
 	if err != nil {
-		if kerrors.IsConflict(err) {
+		if api_errors.IsConflict(err) {
 			// Something updated the bundle concurrently.
 			// It is possible that it was us in previous iteration but we haven't observed the
 			// resulting update event for the bundle and this iteration was triggered by something

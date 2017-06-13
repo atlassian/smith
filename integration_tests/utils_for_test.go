@@ -17,7 +17,7 @@ import (
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -81,7 +81,7 @@ func cleanupBundle(t *testing.T, cfg *itConfig) {
 		Name(cfg.bundle.Name).
 		Do().
 		Error()
-	if !kerrors.IsNotFound(err) {
+	if !api_errors.IsNotFound(err) {
 		assert.NoError(t, err)
 	}
 	for _, resource := range cfg.bundle.Spec.Resources {
@@ -95,7 +95,7 @@ func cleanupBundle(t *testing.T, cfg *itConfig) {
 			continue
 		}
 		err = client.Delete(m.GetName(), nil)
-		if !kerrors.IsNotFound(err) {
+		if !api_errors.IsNotFound(err) {
 			assert.NoError(t, err)
 		}
 	}
@@ -177,7 +177,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		Error()
 	if err == nil {
 		t.Log("Bundle deleted")
-	} else if !kerrors.IsNotFound(err) {
+	} else if !api_errors.IsNotFound(err) {
 		require.NoError(t, err)
 	}
 	cfg := &itConfig{

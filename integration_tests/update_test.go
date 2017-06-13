@@ -13,14 +13,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 )
 
 func TestUpdate(t *testing.T) {
 	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/46817 is fixed
-	t.SkipNow()
+	//t.SkipNow()
 	cm1 := &api_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
@@ -226,7 +226,7 @@ func testUpdate(t *testing.T, ctx context.Context, cfg *itConfig, args ...interf
 	if err == nil {
 		assert.NotNil(t, cfMap.DeletionTimestamp) // Still in api but marked for deletion
 	} else {
-		assert.True(t, kerrors.IsNotFound(err)) // Has been removed from api already
+		assert.True(t, api_errors.IsNotFound(err)) // Has been removed from api already
 	}
 	err = sClient.Get().
 		Namespace(cfg.namespace).
@@ -237,6 +237,6 @@ func testUpdate(t *testing.T, ctx context.Context, cfg *itConfig, args ...interf
 	if err == nil {
 		assert.NotNil(t, sleeperObj.DeletionTimestamp) // Still in api but marked for deletion
 	} else {
-		assert.True(t, kerrors.IsNotFound(err)) // Has been removed from api already
+		assert.True(t, api_errors.IsNotFound(err)) // Has been removed from api already
 	}
 }

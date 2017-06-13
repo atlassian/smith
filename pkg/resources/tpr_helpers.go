@@ -12,7 +12,7 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/util"
 
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
@@ -67,7 +67,7 @@ func EnsureTprExists(ctx context.Context, clientset kubernetes.Interface, store 
 				o.Versions = tpr.Versions
 				_, err = clientset.ExtensionsV1beta1().ThirdPartyResources().Update(o) // This is a CAS
 				if err != nil {
-					if !kerrors.IsConflict(err) {
+					if !api_errors.IsConflict(err) {
 						return fmt.Errorf("failed to update ThirdPartyResource %s: %v", tpr.Name, err)
 					}
 					log.Printf("Conflict updating ThirdPartyResource %s", tpr.Name)
@@ -82,7 +82,7 @@ func EnsureTprExists(ctx context.Context, clientset kubernetes.Interface, store 
 			log.Printf("Creating ThirdPartyResource %s", tpr.Name)
 			_, err := clientset.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
 			if err != nil {
-				if !kerrors.IsAlreadyExists(err) {
+				if !api_errors.IsAlreadyExists(err) {
 					return fmt.Errorf("failed to create %s ThirdPartyResource: %v", tpr.Name, err)
 				}
 				log.Printf("ThirdPartyResource %s was created concurrently", tpr.Name)
