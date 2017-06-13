@@ -205,7 +205,7 @@ func (wrk *worker) checkResource(bundle *smith.Bundle, res *smith.Resource, read
 	}
 
 	// 2. Create or update resource
-	resUpdated, retriable, err := wrk.createOrUpdate(spec)
+	resUpdated, retriable, err := wrk.createOrUpdate(bundle, spec)
 	if err != nil || resUpdated == nil {
 		return nil, retriable, err
 	}
@@ -273,7 +273,7 @@ func (wrk *worker) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyReso
 
 // createOrUpdate creates or updates a resources.
 // May return nil resource without any errors if an update/create conflict happened.
-func (wrk *worker) createOrUpdate(spec *unstructured.Unstructured) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
+func (wrk *worker) createOrUpdate(bundle *smith.Bundle, spec *unstructured.Unstructured) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
 	// Prepare client
 	resClient, err := wrk.sc.ForGVK(spec.GroupVersionKind(), wrk.namespace)
 	if err != nil {
@@ -288,7 +288,7 @@ func (wrk *worker) createOrUpdate(spec *unstructured.Unstructured) (resUpdated *
 		return nil, false, err
 	}
 	if exists {
-		return wrk.updateResource(resClient, spec, obj)
+		return wrk.updateResource(bundle, resClient, spec, obj)
 	}
 	return wrk.createResource(resClient, spec)
 }
@@ -309,31 +309,41 @@ func (wrk *worker) createResource(resClient *dynamic.ResourceClient, spec *unstr
 	return nil, true, err
 }
 
-func (wrk *worker) updateResource(resClient *dynamic.ResourceClient, spec *unstructured.Unstructured, obj runtime.Object) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
-	response, ok := obj.(*unstructured.Unstructured)
+func (wrk *worker) updateResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured, obj runtime.Object) (resUpdated *unstructured.Unstructured, retriableError bool, e error) {
+	existingObj, ok := obj.(*unstructured.Unstructured)
 	if !ok {
-		response = &unstructured.Unstructured{
+		existingObj = &unstructured.Unstructured{
 			Object: make(map[string]interface{}),
 		}
-		if err := converter.ToUnstructured(obj, &response.Object); err != nil {
+		if err := converter.ToUnstructured(obj, &existingObj.Object); err != nil {
 			// Unexpected error
 			return nil, false, err
 		}
 	}
 
+	// Check that the object is not marked for deletion
+	if existingObj.GetDeletionTimestamp() != nil {
+		return nil, false, fmt.Errorf("object %v %q is marked for deletion", existingObj.GroupVersionKind(), existingObj.GetName())
+	}
+
+	// Check that this bundle owns the object
+	if !isOwner(existingObj, bundle) {
+		return nil, false, fmt.Errorf("object %v %q is not owned by the Bundle", existingObj.GroupVersionKind(), existingObj.GetName())
+	}
+
 	// Compare spec and existing resource
-	updated, err := updateResource(wrk.deepCopy, spec, response)
+	updated, err := updateResource(wrk.deepCopy, spec, existingObj)
 	if err != nil {
 		// Unexpected error
 		return nil, false, err
 	}
 	if updated == nil {
 		log.Printf("[WORKER][%s/%s] Object %q has correct spec", wrk.namespace, wrk.bundleName, spec.GetName())
-		return response, false, nil
+		return existingObj, false, nil
 	}
 
 	// Update if different
-	response, err = resClient.Update(updated)
+	existingObj, err = resClient.Update(updated)
 	if err != nil {
 		if errors.IsConflict(err) {
 			log.Printf("[WORKER][%s/%s] Object %q update resulted in conflict, restarting loop", wrk.namespace, wrk.bundleName, spec.GetName())
@@ -344,7 +354,7 @@ func (wrk *worker) updateResource(resClient *dynamic.ResourceClient, spec *unstr
 		return nil, true, err
 	}
 	log.Printf("[WORKER][%s/%s] Object %q updated", wrk.namespace, wrk.bundleName, spec.GetName())
-	return response, false, nil
+	return existingObj, false, nil
 }
 
 func (wrk *worker) deleteRemovedResources(bundle *smith.Bundle) (retriableError bool, e error) {
