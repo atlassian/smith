@@ -194,7 +194,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	var wg wait.Group
 	defer wg.Wait()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	wg.Start(func() {
