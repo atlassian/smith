@@ -46,11 +46,12 @@ type itConfig struct {
 	store         *resources.Store
 }
 
-func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) {
+func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) *smith.BundleCondition {
 	_, condition := bundle.GetCondition(conditionType)
 	if assert.NotNil(t, condition) {
 		assert.Equal(t, status, condition.Status)
 	}
+	return condition
 }
 
 func sleeperScheme() *runtime.Scheme {
@@ -70,6 +71,7 @@ func bundleInformer(bundleClient cache.Getter, namespace string) cache.SharedInd
 
 func cleanupBundle(t *testing.T, cfg *itConfig) {
 	if cfg.createdBundle == nil {
+		t.Logf("Not deleting bundle %s", cfg.bundle.Name)
 		return
 	}
 	t.Logf("Deleting bundle %s", cfg.bundle.Name)
@@ -102,6 +104,12 @@ func cleanupBundle(t *testing.T, cfg *itConfig) {
 func isBundleReady(obj runtime.Object) bool {
 	b := obj.(*smith.Bundle)
 	_, cond := b.GetCondition(smith.BundleReady)
+	return cond != nil && cond.Status == smith.ConditionTrue
+}
+
+func isBundleError(obj runtime.Object) bool {
+	b := obj.(*smith.Bundle)
+	_, cond := b.GetCondition(smith.BundleError)
 	return cond != nil && cond.Status == smith.ConditionTrue
 }
 
@@ -208,7 +216,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 
 	bundleInf := bundleInformer(bundleClient, useNamespace)
 	store.AddInformer(smith.BundleGVK, bundleInf)
-	go bundleInf.Run(ctx.Done())
+	wg.StartWithChannel(ctx.Done(), bundleInf.Run)
 
 	test(t, ctx, cfg, args...)
 }
