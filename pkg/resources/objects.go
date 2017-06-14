@@ -30,7 +30,7 @@ func GetJsonPathString(obj map[string]interface{}, path string) (string, error) 
 	var buf bytes.Buffer
 	err = j.Execute(&buf, obj)
 	if err != nil {
-		return "", fmt.Errorf("JsonPath execute error %v", err)
+		return "", fmt.Errorf("JsonPath execute error: %v", err)
 	}
 	return buf.String(), nil
 }
