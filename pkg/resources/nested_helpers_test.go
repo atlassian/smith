@@ -74,5 +74,5 @@ func TestGetJsonPathStringInvalid(t *testing.T) {
 	require.NoError(t, err)
 	// Invalid JsonPath format: missing quotes around "Ready"
 	_, err = GetJsonPathString(unstructured, `{$.status.conditions[?(@.type==Ready)].status}`)
-	require.EqualError(t, err, "JsonPath execute error unrecognized identifier Ready")
+	require.EqualError(t, err, "JsonPath execute error: unrecognized identifier Ready")
 }
