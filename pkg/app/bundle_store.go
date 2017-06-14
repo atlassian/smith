@@ -1,15 +1,19 @@
 package app
 
 import (
-	"log"
+	"fmt"
 	"strings"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
 	ByTprNameIndex = "TprNameIndex"
+	ByObjectIndex  = "ByObjectIndex"
 )
 
 type byIndex func(indexName, indexKey string) ([]interface{}, error)
@@ -32,7 +36,16 @@ func (s *bundleStore) Get(namespace, bundleName string) (*smith.Bundle, error) {
 
 // GetBundles returns bundles where a resource declared via TPR with specified name is used.
 func (s *bundleStore) GetBundles(tprName string) ([]*smith.Bundle, error) {
-	bundles, err := s.bundleByIndex(ByTprNameIndex, tprName)
+	return s.getBundles(ByTprNameIndex, tprName)
+}
+
+// GetBundlesByObject returns bundles where a resource with specified GVK, namespace and name is defined.
+func (s *bundleStore) GetBundlesByObject(gk schema.GroupKind, namespace, name string) ([]*smith.Bundle, error) {
+	return s.getBundles(ByObjectIndex, ByObjectIndexKey(gk, namespace, name))
+}
+
+func (s *bundleStore) getBundles(indexName, indexKey string) ([]*smith.Bundle, error) {
+	bundles, err := s.bundleByIndex(indexName, indexKey)
 	if err != nil {
 		return nil, err
 	}
@@ -40,8 +53,7 @@ func (s *bundleStore) GetBundles(tprName string) ([]*smith.Bundle, error) {
 	for _, bundle := range bundles {
 		b, err := s.deepCopy(bundle)
 		if err != nil {
-			log.Printf("Failed to deep copy %T: %v", bundle, err)
-			continue
+			return nil, fmt.Errorf("failed to deep copy %T: %v", bundle, err)
 		}
 		result = append(result, b.(*smith.Bundle))
 	}
@@ -61,4 +73,21 @@ func byTprNameIndex(obj interface{}) ([]string, error) {
 		result = append(result, resources.GroupKindToTprName(gvk.GroupKind()))
 	}
 	return result, nil
+}
+
+func byObjectIndex(obj interface{}) ([]string, error) {
+	bundle := obj.(*smith.Bundle)
+	result := make([]string, 0, len(bundle.Spec.Resources))
+	for _, resource := range bundle.Spec.Resources {
+		m, err := meta.Accessor(resource.Spec)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get meta of object: %v", err)
+		}
+		result = append(result, ByObjectIndexKey(resource.Spec.GetObjectKind().GroupVersionKind().GroupKind(), bundle.Namespace, m.GetName()))
+	}
+	return result, nil
+}
+
+func ByObjectIndexKey(gk schema.GroupKind, namespace, name string) string {
+	return fmt.Sprintf("%s/%s/%s/%s", gk.Group, gk.Kind, namespace, name)
 }

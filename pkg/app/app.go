@@ -77,6 +77,7 @@ func (a *App) Run(ctx context.Context) error {
 	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
 	bundleInf.AddIndexers(cache.Indexers{
 		ByTprNameIndex: byTprNameIndex,
+		ByObjectIndex:  byObjectIndex,
 	})
 	store.AddInformer(smith.BundleGVK, bundleInf)
 
@@ -137,7 +138,7 @@ func (a *App) Run(ctx context.Context) error {
 	reh := &resourceEventHandler{
 		ctx:         ctx,
 		processor:   bp,
-		name2bundle: bs.Get,
+		bundleStore: bs,
 	}
 
 	// 6. Watch supported built-in resource types
