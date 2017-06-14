@@ -76,7 +76,7 @@ kind: ThirdPartyResource
 metadata:
   name: cloud-formation.smith.atlassian.com
   annotations:
-    smith.atlassian.com/TprReadyWhenFieldPath: status.state
+    smith.atlassian.com/TprReadyWhenFieldPath: {$.status.state}
     smith.atlassian.com/TprReadyWhenFieldValue: Ready
 versions:
 - name: v1

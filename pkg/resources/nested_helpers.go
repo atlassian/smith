@@ -1,23 +1,32 @@
 package resources
 
+import (
+	"bytes"
+	"fmt"
+
+	"k8s.io/client-go/util/jsonpath"
+)
+
+// GetJsonPathString extracts the value from the object using given JsonPath template
+func GetJsonPathString(obj map[string]interface{}, path string) (string, error) {
+	j := jsonpath.New("GetJsonPathField")
+	// If the key is missing, return an empty string without errors
+	j.AllowMissingKeys(true)
+	err := j.Parse(path)
+	if err != nil {
+		return "", fmt.Errorf("JsonPath parse %s error: %v", path, err)
+	}
+	buf := new(bytes.Buffer)
+	err = j.Execute(buf, obj)
+	if err != nil {
+		return "", fmt.Errorf("JsonPath execute error %v", err)
+	}
+	out := buf.String()
+	return out, nil
+}
+
 // The rest of this file was copied from k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructured.go
 // Remove once https://github.com/kubernetes/kubernetes/issues/40790 is fixed and available for use.
-
-/*
-Copyright 2015 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 
 func GetNestedField(obj map[string]interface{}, fields ...string) interface{} {
 	var val interface{} = obj

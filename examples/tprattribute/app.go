@@ -71,8 +71,8 @@ func (a *App) Run(ctx context.Context) error {
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: SleeperResourceName,
 			Annotations: map[string]string{
-				smith.TprFieldPathAnnotation:  "status.state",
-				smith.TprFieldValueAnnotation: string(Awake),
+				smith.TprFieldPathAnnotation:  SleeperReadyStatePath,
+				smith.TprFieldValueAnnotation: string(SleeperReadyStateValue),
 			},
 		},
 		Description: "Sleeper TPR Informer example",
