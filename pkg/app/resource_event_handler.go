@@ -8,17 +8,22 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
 
-// Name2Bundle is a function that does a lookup of Bundle based on its namespace and name.
-type Name2Bundle func(namespace, bundleName string) (*smith.Bundle, error)
+type bundleStoreInterface interface {
+	// Get is a function that does a lookup of Bundle based on its namespace and name.
+	Get(namespace, bundleName string) (*smith.Bundle, error)
+	GetBundlesByObject(gk schema.GroupKind, namespace, name string) ([]*smith.Bundle, error)
+}
 
 // resourceEventHandler handles events for objects with various kinds.
 type resourceEventHandler struct {
 	ctx         context.Context
 	processor   Processor
-	name2bundle Name2Bundle
+	bundleStore bundleStoreInterface
 }
 
 func (h *resourceEventHandler) OnAdd(obj interface{}) {
@@ -38,34 +43,46 @@ func (h *resourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
 }
 
 func (h *resourceEventHandler) OnDelete(obj interface{}) {
-	meta, ok := obj.(meta_v1.Object)
+	metaObj, ok := obj.(meta_v1.Object)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			log.Printf("[REH] Delete event with unrecognized object type: %T", obj)
 			return
 		}
-		meta, ok = tombstone.Obj.(meta_v1.Object)
+		metaObj, ok = tombstone.Obj.(meta_v1.Object)
 		if !ok {
 			log.Printf("[REH] Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
 		}
 	}
-	bundleName, namespace := getBundleNameAndNamespace(meta)
-	h.rebuildByName(namespace, bundleName, "deleted", obj)
+	bundleName, namespace := getBundleNameAndNamespace(metaObj)
+	if bundleName == "" { // No controller bundle found
+		runtimeObj := metaObj.(runtime.Object)
+		bundles, err := h.bundleStore.GetBundlesByObject(runtimeObj.GetObjectKind().GroupVersionKind().GroupKind(), namespace, metaObj.GetName())
+		if err != nil {
+			log.Printf("[REH] Failed to get bundles by object: %v", err)
+			return
+		}
+		for _, bundle := range bundles {
+			h.rebuildByName(namespace, bundle.Name, "deleted", metaObj)
+		}
+	} else {
+		h.rebuildByName(namespace, bundleName, "deleted", metaObj)
+	}
 }
 
 func (h *resourceEventHandler) rebuildByName(namespace, bundleName, addUpdateDelete string, obj interface{}) {
 	if len(bundleName) == 0 {
 		return
 	}
-	bundle, err := h.name2bundle(namespace, bundleName)
+	bundle, err := h.bundleStore.Get(namespace, bundleName)
 	if err != nil {
 		log.Printf("[REH][%s/%s] Failed to do bundle lookup: %v", namespace, bundleName, err)
 		return
 	}
 	if bundle != nil {
-		log.Printf("[REH][%s/%s] Rebuilding bundle because resource %s was %s",
+		log.Printf("[REH][%s/%s] Rebuilding bundle because object %s was %s",
 			namespace, bundleName, obj.(meta_v1.Object).GetName(), addUpdateDelete)
 		if err = h.processor.Rebuild(h.ctx, bundle); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 			log.Printf("[REH][%s/%s] Error rebuilding bundle: %v", namespace, bundleName, err)
