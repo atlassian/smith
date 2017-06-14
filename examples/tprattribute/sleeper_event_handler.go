@@ -49,6 +49,7 @@ func (h *SleeperEventHandler) handle(obj interface{}) {
 		Into(in)
 	if err != nil {
 		log.Printf("[Sleeper] Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
+		return
 	}
 	go func() {
 		select {
