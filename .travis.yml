@@ -18,6 +18,6 @@ install:
   - make setup-ci
 
 script:
-  - make build-all
+  - make build-all-race
   - make test-race
   - make coveralls
