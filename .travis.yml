@@ -20,5 +20,4 @@ install:
 script:
   - make build-all
   - make test-race
-  - METALINTER_CONCURRENCY=1 travis_wait make check
   - make coveralls
