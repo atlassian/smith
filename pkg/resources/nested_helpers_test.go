@@ -1,16 +1,17 @@
 package resources
 
 import (
+	"encoding/json"
 	"testing"
 
-	"encoding/json"
-
 	"github.com/atlassian/smith"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetJsonPathStringBundle(t *testing.T) {
+	t.Parallel()
 	b := &smith.Bundle{
 		Status: smith.BundleStatus{
 			Conditions: []smith.BundleCondition{
@@ -40,6 +41,7 @@ func TestGetJsonPathStringBundle(t *testing.T) {
 }
 
 func TestGetJsonPathStringMissing(t *testing.T) {
+	t.Parallel()
 	// Bundle with empty status
 	b := &smith.Bundle{}
 	bytes, err := json.Marshal(b)
@@ -54,6 +56,7 @@ func TestGetJsonPathStringMissing(t *testing.T) {
 }
 
 func TestGetJsonPathStringInvalid(t *testing.T) {
+	t.Parallel()
 	b := &smith.Bundle{
 		Status: smith.BundleStatus{
 			Conditions: []smith.BundleCondition{
@@ -71,6 +74,5 @@ func TestGetJsonPathStringInvalid(t *testing.T) {
 	require.NoError(t, err)
 	// Invalid JsonPath format: missing quotes around "Ready"
 	_, err = GetJsonPathString(unstructured, `{$.status.conditions[?(@.type==Ready)].status}`)
-	require.Error(t, err)
-	require.Equal(t, "JsonPath execute error unrecognized identifier Ready", err.Error())
+	require.EqualError(t, err, "JsonPath execute error unrecognized identifier Ready")
 }
