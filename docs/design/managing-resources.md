@@ -65,7 +65,7 @@ spec:
 ### smith.a.c/TprReadyWhenFieldPath=`<FieldPath>`, smith.a.c/TprReadyWhenFieldValue=`<Value>`
 
 Applied to a TPR `T` to indicate that an instance of it `Tinst` is considered `READY` when it has a field,
-located by `<FieldPath>`, that equals `<Value>`.
+located by `<FieldPath>`, that equals `<Value>`. The `<FieldPath>` value must be specified in [JsonPath](http://goessner.net/articles/JsonPath/) format.
 
 Example of a TPR `T`:
 
