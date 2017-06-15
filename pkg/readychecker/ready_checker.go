@@ -3,7 +3,6 @@ package readychecker
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
@@ -85,7 +84,10 @@ func (rc *ReadyChecker) checkPathValue(gk schema.GroupKind, obj *unstructured.Un
 	if len(path) == 0 || len(value) == 0 {
 		return false, false, nil
 	}
-	actualValue := resources.GetNestedString(obj.Object, strings.Split(path, ".")...)
+	actualValue, err := resources.GetJsonPathString(obj.Object, path)
+	if err != nil {
+		return false, false, err
+	}
 	if actualValue != value {
 		// TODO this is for debugging, remove later
 		log.Printf("[IsReady] %q is not equal to expected %q", actualValue, value)

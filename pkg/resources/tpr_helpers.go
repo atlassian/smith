@@ -61,10 +61,15 @@ func EnsureTprExists(ctx context.Context, clientset kubernetes.Interface, store 
 		if exists {
 			o := obj.(*ext_v1b1.ThirdPartyResource)
 			// Ignoring labels and annotations for now
-			if o.Description != tpr.Description || !reflect.DeepEqual(o.Versions, tpr.Versions) {
+			if o.Description != tpr.Description ||
+				!reflect.DeepEqual(o.Versions, tpr.Versions) ||
+				!reflect.DeepEqual(o.Annotations, tpr.Annotations) ||
+				!reflect.DeepEqual(o.Labels, tpr.Labels) {
 				log.Printf("Updating ThirdPartyResource %s", tpr.Name)
 				o.Description = tpr.Description
 				o.Versions = tpr.Versions
+				o.Annotations = tpr.Annotations
+				o.Labels = tpr.Labels
 				_, err = clientset.ExtensionsV1beta1().ThirdPartyResources().Update(o) // This is a CAS
 				if err != nil {
 					if !api_errors.IsConflict(err) {

@@ -15,6 +15,9 @@ const (
 	SleeperResourceVersion      = "v1"
 	SleeperResourceKind         = "Sleeper"
 	SleeperResourceGroupVersion = SleeperResourceGroup + "/" + SleeperResourceVersion
+
+	SleeperReadyStatePath  = "{$.status.state}"
+	SleeperReadyStateValue = Awake
 )
 
 type SleeperState string
