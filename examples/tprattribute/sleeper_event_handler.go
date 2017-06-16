@@ -7,6 +7,7 @@ import (
 
 	"github.com/atlassian/smith"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
 )
 
@@ -37,16 +38,9 @@ func (h *SleeperEventHandler) handle(obj interface{}) {
 		return
 	}
 	in := obj.(*Sleeper)
+	msg := in.Spec.WakeupMessage
 	log.Printf("[Sleeper] %s/%s was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Namespace, in.Name, Sleeping, in.Spec.SleepFor)
-	in.Status.State = Sleeping
-	err = h.client.Put().
-		Namespace(in.Namespace).
-		Resource(SleeperResourcePath).
-		Name(in.Name).
-		Context(h.ctx).
-		Body(in).
-		Do().
-		Into(in)
+	err = h.retryUpdate(in, Sleeping, "")
 	if err != nil {
 		log.Printf("[Sleeper] Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
 		return
@@ -57,20 +51,39 @@ func (h *SleeperEventHandler) handle(obj interface{}) {
 			return
 		case <-time.After(time.Duration(in.Spec.SleepFor) * time.Second):
 			log.Printf("[Sleeper] %s Updating %s/%s Status to %q", in.Spec.WakeupMessage, in.Namespace, in.Name, Awake)
-			in.Status.State = Awake
-			in.Status.Message = in.Spec.WakeupMessage
-			err := h.client.Put().
-				Namespace(in.Namespace).
-				Resource(SleeperResourcePath).
-				Name(in.Name).
-				Context(h.ctx).
-				Body(in).
-				Do().
-				Error()
+			err = h.retryUpdate(in, Awake, msg)
 			if err != nil {
 				log.Printf("[Sleeper] Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
 			}
-
 		}
 	}()
+}
+
+func (h *SleeperEventHandler) retryUpdate(sleeper *Sleeper, state SleeperState, message string) error {
+	for {
+		sleeper.Status.State = state
+		sleeper.Status.Message = message
+		err := h.client.Put().
+			Namespace(sleeper.Namespace).
+			Resource(SleeperResourcePath).
+			Name(sleeper.Name).
+			Context(h.ctx).
+			Body(sleeper).
+			Do().
+			Into(sleeper)
+		if errors.IsConflict(err) {
+			err = h.client.Get().
+				Namespace(sleeper.Namespace).
+				Resource(SleeperResourcePath).
+				Name(sleeper.Name).
+				Context(h.ctx).
+				Do().
+				Into(sleeper)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		return err
+	}
 }
