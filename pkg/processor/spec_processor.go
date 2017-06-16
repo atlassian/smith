@@ -127,7 +127,7 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	// To avoid overcomplicated format of reference like this: {{{res1#{$.a.string}}}}
 	// And have something like this instead: {{{res1#a.string}}}
 	jsonPath := fmt.Sprintf("{$.%s}", parts[1])
-	fieldValue, err := resources.GetJsonPathValue(res.Object, jsonPath)
+	fieldValue, err := resources.GetJsonPathValue(res.Object, jsonPath, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process JsonPath reference %s: %v", selector, err)
 	}

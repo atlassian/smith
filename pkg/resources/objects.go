@@ -36,10 +36,10 @@ func GetJsonPathString(obj interface{}, path string) (string, error) {
 }
 
 // GetJsonPathValue extracts the value from the object using given JsonPath template
-func GetJsonPathValue(obj interface{}, path string) (interface{}, error) {
+func GetJsonPathValue(obj interface{}, path string, allowMissingKeys bool) (interface{}, error) {
 	j := jsonpath.New("GetJsonPathValue")
 	// If the key is missing, return an empty string without errors
-	j.AllowMissingKeys(true)
+	j.AllowMissingKeys(allowMissingKeys)
 	err := j.Parse(path)
 	if err != nil {
 		return nil, fmt.Errorf("JsonPath parse %s error: %v", path, err)
@@ -54,7 +54,7 @@ func GetJsonPathValue(obj interface{}, path string) (interface{}, error) {
 	if len(values) > 1 {
 		return nil, fmt.Errorf("single result expected, got %d", len(values))
 	}
-	if values[0] == nil {
+	if values[0] == nil || len(values[0]) == 0 || values[0][0].IsNil() {
 		return nil, nil
 	}
 	return values[0][0].Interface(), nil
