@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	"errors"
+
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/jsonpath"
 )
@@ -18,9 +20,9 @@ func GetControllerOf(controllee meta_v1.Object) *meta_v1.OwnerReference {
 	return nil
 }
 
-// GetJsonPathString extracts the value from the object using given JsonPath template
-func GetJsonPathString(obj map[string]interface{}, path string) (string, error) {
-	j := jsonpath.New("GetJsonPathField")
+// GetJsonPathString extracts the value from the object using given JsonPath template, in a string format
+func GetJsonPathString(obj interface{}, path string) (string, error) {
+	j := jsonpath.New("GetJsonPathString")
 	// If the key is missing, return an empty string without errors
 	j.AllowMissingKeys(true)
 	err := j.Parse(path)
@@ -33,4 +35,29 @@ func GetJsonPathString(obj map[string]interface{}, path string) (string, error) 
 		return "", fmt.Errorf("JsonPath execute error: %v", err)
 	}
 	return buf.String(), nil
+}
+
+// GetJsonPathValue extracts the value from the object using given JsonPath template
+func GetJsonPathValue(obj interface{}, path string) (interface{}, error) {
+	j := jsonpath.New("GetJsonPathValue")
+	// If the key is missing, return an empty string without errors
+	j.AllowMissingKeys(true)
+	err := j.Parse(path)
+	if err != nil {
+		return nil, fmt.Errorf("JsonPath parse %s error: %v", path, err)
+	}
+	values, err := j.FindResults(obj)
+	if err != nil {
+		return nil, fmt.Errorf("JsonPath execute error: %v", err)
+	}
+	if len(values) == 0 {
+		return nil, nil
+	}
+	if len(values) > 1 {
+		return nil, errors.New("single result expected, got many")
+	}
+	if values[0] == nil {
+		return nil, nil
+	}
+	return values[0][0].Interface(), nil
 }
