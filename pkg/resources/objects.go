@@ -2,7 +2,6 @@ package resources
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +52,7 @@ func GetJsonPathValue(obj interface{}, path string) (interface{}, error) {
 		return nil, nil
 	}
 	if len(values) > 1 {
-		return nil, errors.New("single result expected, got many")
+		return nil, fmt.Errorf("single result expected, got %d", len(values))
 	}
 	if values[0] == nil {
 		return nil, nil

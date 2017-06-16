@@ -11,30 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func TestSpecJsonPathProcessor(t *testing.T) {
-	t.Parallel()
-	sp := SpecProcessor{
-		selfName:       "abc",
-		readyResources: readyResources(),
-		allowedResources: map[smith.ResourceName]struct{}{
-			"res1": {},
-		},
-	}
-	obj := map[string]interface{}{
-		"ref": map[string]interface{}{
-			// TODO: This JsonPath is ignored, fix the regex match expression
-			"slice": "str>$(res1#a.slice[?(@.label==\"label2\")].value)<str",
-		},
-	}
-	expected := map[string]interface{}{
-		"ref": map[string]interface{}{
-			"slice": "str>value2<str",
-		},
-	}
-	require.NoError(t, sp.ProcessObject(obj))
-	assert.Equal(t, expected, obj)
-}
-
 func TestSpecProcessor(t *testing.T) {
 	t.Parallel()
 	sp := SpecProcessor{
@@ -46,39 +22,39 @@ func TestSpecProcessor(t *testing.T) {
 	}
 	obj := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"slice":      "str>$(res1#a.slice[?(@.label==\"label2\")].value)<str",
-			"string":     "str>$(res1#a.string)<str",
-			"intStr":     "str>$(res1#a.int)<str",
-			"boolStr":    "str>$(res1#a.bool)<str",
-			"float64Str": "str>$(res1#a.float64)<str",
+			"slice":      "str>{{res1#a.slice[?(@.label==\"label2\")].value}}<str",
+			"string":     "str>{{res1#a.string}}}}<str",
+			"intStr":     "str>{{res1#a.int}}}}<str",
+			"boolStr":    "str>{{res1#a.bool}}}}<str",
+			"float64Str": "str>{{res1#a.float64}}}}<str",
 
-			"int":     "$((res1#a.int))",
-			"bool":    "$((res1#a.bool))",
-			"float64": "$((res1#a.float64))",
-			"object":  "$((res1#a.object))",
+			"int":     "{{{res1#a.int}}}",
+			"bool":    "{{{res1#a.bool}}}",
+			"float64": "{{{res1#a.float64}}}",
+			"object":  "{{{res1#a.object}}}",
 
 			"slice1": []string{
-				"$((res1#a.int))",
+				"{{{res1#a.int}}}",
 				"23",
-				"$((res1#a.object))",
+				"{{{res1#a.object}}}",
 			},
 			"slice2": []interface{}{
 				map[string]interface{}{
-					"x": "$((res1#a.int))",
+					"x": "{{{res1#a.int}}}",
 				},
-				"$((res1#a.int))",
+				"{{{res1#a.int}}}",
 				23,
-				"$((res1#a.object))",
+				"{{{res1#a.object}}}",
 			},
 			"slice3": [][]interface{}{
-				{"$((res1#a.int))"},
+				{"{{{res1#a.int}}}"},
 				{23},
-				{"$((res1#a.object))"},
+				{"{{{res1#a.object}}}"},
 			},
 			"slice4": []interface{}{
-				[]interface{}{"$((res1#a.int))"},
+				[]interface{}{"{{{res1#a.int}}}"},
 				[]interface{}{23},
-				[]interface{}{"$((res1#a.object))"},
+				[]interface{}{"{{{res1#a.object}}}"},
 			},
 		},
 	}
@@ -123,7 +99,7 @@ func TestSpecProcessor(t *testing.T) {
 				[]interface{}{map[string]interface{}{
 					"a": 1,
 					"b": "str",
-				}},
+				}}},
 			},
 			"slice4": []interface{}{
 				[]interface{}{42},
@@ -131,7 +107,7 @@ func TestSpecProcessor(t *testing.T) {
 				[]interface{}{map[string]interface{}{
 					"a": 1,
 					"b": "str",
-				}},
+				},
 			},
 		},
 	}
@@ -148,73 +124,73 @@ func TestSpecProcessorErrors(t *testing.T) {
 	}{
 		{
 			obj: map[string]interface{}{
-				"invalid": "$((res1#something))",
+				"invalid": "{{{res1#something}}}",
 			},
 			err: `invalid reference at "invalid": field not found: res1/something`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "$((res1#a.string))",
+				"invalid": "{{{res1#a.string}}}",
 			},
 			err: `invalid reference at "invalid": cannot expand field res1/a/string of type string as naked reference`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "$((res1#a.string))b",
+				"invalid": "{{{res1#a.string}}}b",
 			},
 			err: `invalid reference at "invalid": naked reference in the middle of a string`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "a$((res1#a.string))",
+				"invalid": "a{{{res1#a.string}}}",
 			},
 			err: `invalid reference at "invalid": naked reference in the middle of a string`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "$((res2.a.string))",
+				"invalid": "{{{res2.a.string}}}",
 			},
 			err: `invalid reference at "invalid": object not found: res2/a/string`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "$((res1))",
+				"invalid": "{{{res1}}}",
 			},
 			err: `invalid reference at "invalid": cannot include whole object: res1`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "$(res1)",
+				"invalid": "{{res1)",
 			},
 			err: `invalid reference at "invalid": cannot include whole object: res1`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "$(self1#x.b)",
+				"invalid": "{{self1#x.b)",
 			},
 			err: `invalid reference at "invalid": self references are not allowed: self1/x/b`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "$((self1#x.b))",
+				"invalid": "{{{self1#x.b}}}",
 			},
 			err: `invalid reference at "invalid": self references are not allowed: self1/x/b`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "$((resX#a.string))",
+				"invalid": "{{{resX#a.string}}}",
 			},
 			err: `invalid reference at "invalid": references can only point at direct dependencies: resX/a/string`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "a$(resX#a.string)b",
+				"invalid": "a{{resX#a.string)b",
 			},
 			err: `invalid reference at "invalid": references can only point at direct dependencies: resX/a/string`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": []interface{}{"a$(resX#a.string)b"},
+				"invalid": []interface{}{"a{{resX#a.string)b"},
 			},
 			err: `invalid reference at "invalid/[0]": references can only point at direct dependencies: resX/a/string`,
 		},
