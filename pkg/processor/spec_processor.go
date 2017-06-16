@@ -14,16 +14,14 @@ import (
 )
 
 const (
-	// . is a valid character in a name, cannot use as a separator.
-	// See https://github.com/kubernetes/community/blob/master/contributors/design-proposals/identifiers.md
-	ReferenceSep = "/"
+	// Separator between reference to a resource by name and JsonPath within a resource
+	ReferenceSeparator = "#"
 )
 
 var (
-	// TODO a proper lexer should be use to allow escaping of $ to avoid substitution
-	reference             = regexp.MustCompile(`\$\([^()]+\)`)
-	nakedReference        = regexp.MustCompile(`^\$\(\([^()]+\)\)$`)
-	invalidNakedReference = regexp.MustCompile(`(\$\(\([^()]+\)\).|.\$\(\([^()]+\)\))`)
+	reference             = regexp.MustCompile(`\{\{.+}}`)
+	nakedReference        = regexp.MustCompile(`^\{\{\{.+}}}$`)
+	invalidNakedReference = regexp.MustCompile(`(\{\{\{.+}}}.|.\{\{\{.+}}})`)
 )
 
 type SpecProcessor struct {
@@ -93,10 +91,10 @@ func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{
 		err = errors.New("naked reference in the middle of a string")
 	} else {
 		if nakedReference.MatchString(value) {
-			processed, err = sp.processMatch(value[3:len(value)-2], false)
+			processed, err = sp.processMatch(value[3:len(value)-3], false)
 		} else {
 			processed = reference.ReplaceAllStringFunc(value, func(match string) string {
-				processedValue, e := sp.processMatch(match[2:len(match)-1], true)
+				processedValue, e := sp.processMatch(match[2:len(match)-2], true)
 				if err == nil {
 					err = e
 				}
@@ -105,17 +103,17 @@ func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{
 		}
 	}
 	if err != nil {
-		return nil, fmt.Errorf("invalid reference at %q: %v", strings.Join(path, ReferenceSep), err)
+		return nil, fmt.Errorf("invalid reference at %q: %v", strings.Join(path, ReferenceSeparator), err)
 	}
 	return processed, nil
 }
 
 func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (interface{}, error) {
-	names := strings.Split(selector, ReferenceSep)
-	if len(names) < 2 {
+	parts := strings.SplitN(selector, ReferenceSeparator, 2)
+	if len(parts) < 2 {
 		return nil, fmt.Errorf("cannot include whole object: %s", selector)
 	}
-	objName := smith.ResourceName(names[0])
+	objName := smith.ResourceName(parts[0])
 	if objName == sp.selfName {
 		return nil, fmt.Errorf("self references are not allowed: %s", selector)
 	}
@@ -126,7 +124,13 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	if _, allowed := sp.allowedResources[objName]; !allowed {
 		return nil, fmt.Errorf("references can only point at direct dependencies: %s", selector)
 	}
-	fieldValue := resources.GetNestedField(res.Object, names[1:]...)
+	// To avoid overcomplicated format of reference like this: {{{res1#{$.a.string}}}}
+	// And have something like this instead: {{{res1#a.string}}}
+	jsonPath := fmt.Sprintf("{$.%s}", parts[1])
+	fieldValue, err := resources.GetJsonPathValue(res.Object, jsonPath, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process JsonPath reference %s: %v", selector, err)
+	}
 	if fieldValue == nil {
 		return nil, fmt.Errorf("field not found: %s", selector)
 	}

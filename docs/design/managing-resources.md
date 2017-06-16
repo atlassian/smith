@@ -8,11 +8,13 @@ Cross-object field references are a way for an object to get output field(s) of 
 (or multiple dependencies) injected into it as a field (or multiple fields). References to only direct
 dependencies are supported.
 
-Syntax `"$({dependency1/fieldName})"` means that value of `fieldName` will be injected as a string instead
+Syntax `"{{dependency1#fieldName}}"` means that value of `fieldName` will be injected as a string instead
 of the placeholder. In this case value must be a string, boolean or number.
 
-Syntax `"$(({dependency1/fieldName}))"` means that value of `fieldName` will be injected without quotes
+Syntax `"{{{dependency1#fieldName}}}"` means that value of `fieldName` will be injected without quotes
 instead of the placeholder. In this case it can be a of any type including objects.
+
+The `fieldName` could be specified in JsonPath format (with `$.` prefix added by default), for example: `{{dependency1#status.conditions[?(@.type=="Ready")].status}}`
 
 This syntax is selected to be as close to
 [Templates proposal](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/templates.md)
@@ -48,7 +50,7 @@ spec:
         name: sleeper2
       spec:
         sleepFor: 4
-        wakeupMessage: "$(sleeper1/status/message)"
+        wakeupMessage: "$(sleeper1#status.message)"
   - name: sleeper3
     dependsOn:
     - sleeper2
@@ -57,7 +59,7 @@ spec:
       kind: Sleeper
       metadata:
         name: sleeper3
-      spec: "$((sleeper2/spec))"
+      spec: "$((sleeper2#spec))"
 ```
 
 ## Defined annotations
