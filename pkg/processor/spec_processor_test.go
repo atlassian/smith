@@ -46,7 +46,7 @@ func TestSpecProcessor(t *testing.T) {
 	}
 	obj := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"slice":     "str>$(res1#a.slice[?(@.label==\"label2\")].value)<str",
+			"slice":      "str>$(res1#a.slice[?(@.label==\"label2\")].value)<str",
 			"string":     "str>$(res1#a.string)<str",
 			"intStr":     "str>$(res1#a.int)<str",
 			"boolStr":    "str>$(res1#a.bool)<str",
@@ -84,7 +84,7 @@ func TestSpecProcessor(t *testing.T) {
 	}
 	expected := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"slice":     "str>value2<str",
+			"slice":      "str>value2<str",
 			"string":     "str>string1<str",
 			"intStr":     "str>42<str",
 			"boolStr":    "str>true<str",

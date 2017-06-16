@@ -2,9 +2,8 @@ package resources
 
 import (
 	"bytes"
-	"fmt"
-
 	"errors"
+	"fmt"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/jsonpath"
