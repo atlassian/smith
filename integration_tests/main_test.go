@@ -106,15 +106,14 @@ func testWorkflow(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 			BlockOwnerDeletion: &trueRef,
 		},
 	}, cfMap.GetOwnerReferences())
-	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/46817 is fixed
-	//assert.Equal(t, []meta_v1.OwnerReference{
-	//	{
-	//		APIVersion:         smith.BundleResourceGroupVersion,
-	//		Kind:               smith.BundleResourceKind,
-	//		Name:               bundleRes.Name,
-	//		UID:                bundleRes.UID,
-	//		Controller:         &trueRef,
-	//		BlockOwnerDeletion: &trueRef,
-	//	},
-	//}, secret.GetOwnerReferences())
+	assert.Equal(t, []meta_v1.OwnerReference{
+		{
+			APIVersion:         smith.BundleResourceGroupVersion,
+			Kind:               smith.BundleResourceKind,
+			Name:               bundleRes.Name,
+			UID:                bundleRes.UID,
+			Controller:         &trueRef,
+			BlockOwnerDeletion: &trueRef,
+		},
+	}, secret.GetOwnerReferences())
 }

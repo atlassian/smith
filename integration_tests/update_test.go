@@ -19,8 +19,6 @@ import (
 )
 
 func TestUpdate(t *testing.T) {
-	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/46817 is fixed
-	//t.SkipNow()
 	cm1 := &api_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
