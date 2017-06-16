@@ -12,7 +12,7 @@ Syntax `"{{dependency1#fieldName}}"` means that value of `fieldName` will be inj
 of the placeholder. In this case value must be a string, boolean or number.
 
 Syntax `"{{{dependency1#fieldName}}}"` means that value of `fieldName` will be injected without quotes
-instead of the placeholder. In this case it can be a of any type including objects.
+instead of the placeholder. In this case it can be of any type including objects.
 
 The `fieldName` could be specified in JsonPath format (with `$.` prefix added by default), for example: `{{dependency1#status.conditions[?(@.type=="Ready")].status}}`
 
