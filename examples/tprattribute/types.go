@@ -34,6 +34,8 @@ var GV = schema.GroupVersion{
 	Version: SleeperResourceVersion,
 }
 
+var SleeperGVK = GV.WithKind(SleeperResourceKind)
+
 func AddToScheme(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(GV,
 		&Sleeper{},

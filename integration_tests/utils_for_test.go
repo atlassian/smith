@@ -20,6 +20,8 @@ import (
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -33,9 +35,12 @@ const (
 	serviceCatalogUrlEnvParam = "SERVICE_CATALOG_URL"
 )
 
+var converter = unstructured_conversion.NewConverter(false)
+
 type testFunc func(*testing.T, context.Context, *itConfig, ...interface{})
 
 type itConfig struct {
+	t             *testing.T
 	namespace     string
 	bundle        *smith.Bundle
 	createdBundle *smith.Bundle
@@ -44,6 +49,83 @@ type itConfig struct {
 	sc            smith.SmartClient
 	bundleClient  *rest.RESTClient
 	store         *resources.Store
+	toCleanup     []runtime.Object
+}
+
+func (cfg *itConfig) cleanupLater(obj ...runtime.Object) {
+	cfg.toCleanup = append(cfg.toCleanup, obj...)
+}
+
+func (cfg *itConfig) cleanup() {
+	for _, obj := range cfg.toCleanup {
+		cfg.deleteObject(obj)
+		bundle, ok := obj.(*smith.Bundle)
+		if !ok {
+			u, ok := obj.(*unstructured.Unstructured)
+			if !ok || u.GetKind() != smith.BundleResourceKind || u.GetAPIVersion() != smith.BundleResourceGroupVersion {
+				continue
+			}
+			bundle = new(smith.Bundle)
+			if !assert.NoError(cfg.t, converter.FromUnstructured(u.Object, bundle)) {
+				continue
+			}
+		}
+		cfg.cleanupBundle(bundle)
+	}
+}
+func (cfg *itConfig) cleanupBundle(bundle *smith.Bundle) {
+	for _, resource := range bundle.Spec.Resources {
+		cfg.deleteObject(resource.Spec)
+	}
+}
+
+func (cfg *itConfig) deleteObject(obj runtime.Object) {
+	m, err := meta.Accessor(obj)
+	if !assert.NoError(cfg.t, err) {
+		return
+	}
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if gvk.Empty() {
+		switch obj.(type) {
+		case *api_v1.ConfigMap:
+			gvk = api_v1.SchemeGroupVersion.WithKind("ConfigMap")
+		case *api_v1.Secret:
+			gvk = api_v1.SchemeGroupVersion.WithKind("Secret")
+		case *smith.Bundle:
+			gvk = smith.BundleGVK
+		case *tprattribute.Sleeper:
+			gvk = tprattribute.SleeperGVK
+		default:
+			assert.Fail(cfg.t, "Unhandled object kind", "%T", obj)
+			return
+		}
+	}
+	cfg.t.Logf("Deleting object %q", m.GetName())
+	objClient, err := cfg.sc.ForGVK(gvk, cfg.namespace)
+	if !assert.NoError(cfg.t, err) {
+		return
+	}
+	policy := meta_v1.DeletePropagationForeground
+	err = objClient.Delete(m.GetName(), &meta_v1.DeleteOptions{
+		PropagationPolicy: &policy,
+	})
+	if !api_errors.IsNotFound(err) {
+		assert.NoError(cfg.t, err)
+	}
+}
+
+func (cfg *itConfig) createObject(obj, res runtime.Object, resourcePath string, client *rest.RESTClient) {
+	metaObj, err := meta.Accessor(obj)
+	require.NoError(cfg.t, err)
+
+	cfg.t.Logf("Creating a new object %s/%s of kind %s", cfg.namespace, metaObj.GetName(), obj.GetObjectKind().GroupVersionKind().Kind)
+	require.NoError(cfg.t, client.Post().
+		Namespace(cfg.namespace).
+		Resource(resourcePath).
+		Body(obj).
+		Do().
+		Into(res))
+	cfg.cleanupLater(res)
 }
 
 func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) *smith.BundleCondition {
@@ -67,38 +149,6 @@ func bundleInformer(bundleClient cache.Getter, namespace string) cache.SharedInd
 		&smith.Bundle{},
 		0,
 		cache.Indexers{})
-}
-
-func cleanupBundle(t *testing.T, cfg *itConfig) {
-	if cfg.createdBundle == nil {
-		t.Logf("Not deleting bundle %s", cfg.bundle.Name)
-		return
-	}
-	t.Logf("Deleting bundle %s", cfg.bundle.Name)
-	err := cfg.bundleClient.Delete().
-		Namespace(cfg.namespace).
-		Resource(smith.BundleResourcePath).
-		Name(cfg.bundle.Name).
-		Do().
-		Error()
-	if !api_errors.IsNotFound(err) {
-		assert.NoError(t, err)
-	}
-	for _, resource := range cfg.bundle.Spec.Resources {
-		m, err := meta.Accessor(resource.Spec)
-		if !assert.NoError(t, err) {
-			continue
-		}
-		t.Logf("Deleting resource %q", m.GetName())
-		client, err := cfg.sc.ForGVK(resource.Spec.GetObjectKind().GroupVersionKind(), cfg.namespace)
-		if !assert.NoError(t, err) {
-			continue
-		}
-		err = client.Delete(m.GetName(), nil)
-		if !api_errors.IsNotFound(err) {
-			assert.NoError(t, err)
-		}
-	}
 }
 
 func isBundleReady(obj runtime.Object) bool {
@@ -181,6 +231,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		require.NoError(t, err)
 	}
 	cfg := &itConfig{
+		t:            t,
 		namespace:    useNamespace,
 		bundle:       bundle,
 		config:       config,
@@ -189,7 +240,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		bundleClient: bundleClient,
 		store:        store,
 	}
-	defer cleanupBundle(t, cfg)
+	defer cfg.cleanup()
 
 	var wg wait.Group
 	defer wg.Wait()
@@ -210,7 +261,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	if createBundle {
 		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle TPR
 		res := &smith.Bundle{}
-		createObject(t, bundle, res, useNamespace, smith.BundleResourcePath, bundleClient)
+		cfg.createObject(bundle, res, smith.BundleResourcePath, bundleClient)
 		cfg.createdBundle = res
 	}
 
@@ -219,19 +270,6 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	wg.StartWithChannel(ctx.Done(), bundleInf.Run)
 
 	test(t, ctx, cfg, args...)
-}
-
-func createObject(t *testing.T, obj, res runtime.Object, namespace, resourcePath string, client *rest.RESTClient) {
-	metaObj, err := meta.Accessor(obj)
-	require.NoError(t, err)
-
-	t.Logf("Creating a new object %s/%s of kind %s", namespace, metaObj.GetName(), obj.GetObjectKind().GroupVersionKind().Kind)
-	require.NoError(t, client.Post().
-		Namespace(namespace).
-		Resource(resourcePath).
-		Body(obj).
-		Do().
-		Into(res))
 }
 
 func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle, resourceVersions ...string) *smith.Bundle {

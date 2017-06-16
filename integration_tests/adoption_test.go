@@ -19,8 +19,6 @@ import (
 )
 
 func TestAdoption(t *testing.T) {
-	// TODO uncomment when https://github.com/kubernetes/kubernetes/issues/46817 is fixed
-	//t.SkipNow()
 	cm := &api_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
@@ -94,6 +92,7 @@ func testAdoption(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 	// Create orphaned ConfigMap
 	cmActual, err := cmClient.Create(cm)
 	require.NoError(t, err)
+	cfg.cleanupLater(cmActual)
 
 	// Create orphaned Sleeper
 	sleeperActual := &tprattribute.Sleeper{}
@@ -104,10 +103,11 @@ func testAdoption(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 		Do().
 		Into(sleeperActual)
 	require.NoError(t, err)
+	cfg.cleanupLater(sleeperActual)
 
 	// Create Bundle with same resources
 	bundleActual := &smith.Bundle{}
-	createObject(t, cfg.bundle, bundleActual, cfg.namespace, smith.BundleResourcePath, cfg.bundleClient)
+	cfg.createObject(cfg.bundle, bundleActual, smith.BundleResourcePath, cfg.bundleClient)
 	cfg.createdBundle = bundleActual
 
 	time.Sleep(1 * time.Second) // TODO this should be removed once race with tpr informer is fixed "no informer for tpr.atlassian.com/v1, Kind=Sleeper is registered"
