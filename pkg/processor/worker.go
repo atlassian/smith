@@ -433,7 +433,7 @@ func (wrk *worker) deleteRemovedResources(bundle *smith.Bundle) (retriableError 
 }
 
 func (wrk *worker) setBundleStatus(bundle *smith.Bundle) error {
-	log.Printf("[WORKER][%s/%s] Setting bundle status to %v", wrk.namespace, wrk.bundleName, bundle.Status)
+	log.Printf("[WORKER][%s/%s] Setting bundle status to %s", wrk.namespace, wrk.bundleName, bundle.Status.ShortString())
 	err := wrk.bundleClient.Put().
 		Namespace(wrk.namespace).
 		Resource(smith.BundleResourcePath).

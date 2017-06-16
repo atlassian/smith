@@ -1,6 +1,7 @@
 package smith
 
 import (
+	"bytes"
 	"encoding/json"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -154,6 +155,30 @@ type BundleCondition struct {
 type BundleStatus struct {
 	// Represents the latest available observations of a Bundle's current state.
 	Conditions []BundleCondition `json:"conditions,omitempty"`
+}
+
+func (bs *BundleStatus) ShortString() string {
+	first := true
+	var buf bytes.Buffer
+	buf.WriteByte('[')
+	for _, cond := range bs.Conditions {
+		if first {
+			first = false
+		} else {
+			buf.WriteByte('|')
+		}
+		buf.WriteString(string(cond.Type))
+		buf.WriteByte(' ')
+		buf.WriteString(string(cond.Status))
+		if cond.Reason != "" {
+			buf.WriteByte(' ')
+			buf.WriteByte('"')
+			buf.WriteString(cond.Reason)
+			buf.WriteByte('"')
+		}
+	}
+	buf.WriteByte(']')
+	return buf.String()
 }
 
 // ResourceName is a reference to another Resource in the same bundle.
