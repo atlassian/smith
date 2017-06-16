@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	ResyncPeriod = 1 * time.Minute
+	ResyncPeriod = 20 * time.Minute
 )
 
 type App struct {

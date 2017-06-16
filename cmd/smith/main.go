@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultResyncPeriod = 1 * time.Minute
+	defaultResyncPeriod = 20 * time.Minute
 )
 
 func main() {
