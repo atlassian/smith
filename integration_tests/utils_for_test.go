@@ -252,6 +252,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		apl := app.App{
 			RestConfig:           config,
 			ServiceCatalogConfig: scConfig,
+			Workers:              2,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)

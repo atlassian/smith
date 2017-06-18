@@ -1,8 +1,6 @@
 package app
 
 import (
-	"context"
-
 	"github.com/atlassian/smith"
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
@@ -17,10 +15,6 @@ import (
 var (
 	tprGVK = ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource")
 )
-
-type Processor interface {
-	Rebuild(context.Context, *smith.Bundle) error
-}
 
 func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
 	scheme := runtime.NewScheme()

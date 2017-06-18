@@ -1,10 +1,9 @@
-package app
+package controller
 
 import (
 	"context"
 	"log"
 	"sync"
-	"time"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
@@ -12,52 +11,21 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 )
-
-type bundleIndex interface {
-	GetBundles(tprName string) ([]*smith.Bundle, error)
-}
-
-type informerStore interface {
-	AddInformer(schema.GroupVersionKind, cache.SharedIndexInformer)
-	RemoveInformer(schema.GroupVersionKind) bool
-}
 
 type watchState struct {
 	cancel  context.CancelFunc
 	version ext_v1b1.APIVersion
 }
 
-// tprEventHandler handles events for objects with Kind: ThirdPartyResource.
-// For each object a new informer is started to watch for events.
 type tprEventHandler struct {
-	ctx          context.Context
-	handler      cache.ResourceEventHandler
-	smartClient  smith.SmartClient
-	store        informerStore
-	processor    Processor
-	bundleIndex  bundleIndex
-	resyncPeriod time.Duration
-	mx           sync.Mutex
-	watchers     map[string]map[string]watchState // TPR name -> TPR version -> state
-}
-
-func newTprEventHandler(ctx context.Context, handler cache.ResourceEventHandler, smartClient smith.SmartClient,
-	store informerStore, processor Processor, bundleIndex bundleIndex, resyncPeriod time.Duration) *tprEventHandler {
-	return &tprEventHandler{
-		ctx:          ctx,
-		handler:      handler,
-		smartClient:  smartClient,
-		store:        store,
-		processor:    processor,
-		bundleIndex:  bundleIndex,
-		resyncPeriod: resyncPeriod,
-		watchers:     make(map[string]map[string]watchState),
-	}
+	ctx context.Context
+	*BundleController
+	mx       sync.Mutex // protects the map
+	watchers map[string]map[string]watchState
 }
 
 func (h *tprEventHandler) OnAdd(obj interface{}) {
@@ -181,9 +149,9 @@ func (h *tprEventHandler) watchVersions(tprName string, versions ...ext_v1b1.API
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
 				return res.Watch(options)
 			},
-		}, &unstructured.Unstructured{}, h.resyncPeriod, cache.Indexers{})
+		}, &unstructured.Unstructured{}, h.tprResyncPeriod, cache.Indexers{})
 
-		tprInf.AddEventHandler(h.handler)
+		tprInf.AddEventHandler(h.tprHandler)
 
 		ctx, cancel := context.WithCancel(h.ctx)
 
@@ -191,7 +159,7 @@ func (h *tprEventHandler) watchVersions(tprName string, versions ...ext_v1b1.API
 
 		h.store.AddInformer(gvk, tprInf)
 
-		go tprInf.Run(ctx.Done())
+		h.wg.StartWithChannel(ctx.Done(), tprInf.Run)
 	}
 }
 
@@ -220,15 +188,13 @@ func (h *tprEventHandler) unwatchVersions(tprName string, versions ...ext_v1b1.A
 }
 
 func (h *tprEventHandler) rebuildBundles(tprName, addUpdateDelete string) {
-	bundles, err := h.bundleIndex.GetBundles(tprName)
+	bundles, err := h.bundleStore.GetBundles(tprName)
 	if err != nil {
 		log.Printf("[TPREH] Failed to get bundles by TPR name %s: %v", tprName, err)
 		return
 	}
 	for _, bundle := range bundles {
 		log.Printf("[TPREH][%s/%s] Rebuilding bundle because TPR %s was %s", bundle.Namespace, bundle.Name, tprName, addUpdateDelete)
-		if err := h.processor.Rebuild(h.ctx, bundle); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-			log.Printf("[TPREH][%s/%s] Error rebuilding bundle: %v", bundle.Namespace, bundle.Name, err)
-		}
+		h.enqueue(bundle)
 	}
 }
