@@ -132,7 +132,6 @@ func (a *App) resourceInformers(mainClient kubernetes.Interface, scClient scClie
 
 	// Core API types
 	infs := map[schema.GroupVersionKind]cache.SharedIndexInformer{
-		ext_v1b1.SchemeGroupVersion.WithKind("Deployment"):  a.deploymentExtInformer(mainClient),
 		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):     a.ingressInformer(mainClient),
 		api_v1.SchemeGroupVersion.WithKind("Service"):       a.serviceInformer(mainClient),
 		api_v1.SchemeGroupVersion.WithKind("ConfigMap"):     a.configMapInformer(mainClient),

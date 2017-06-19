@@ -16,22 +16,6 @@ import (
 
 // TODO replace methods below with upstream functions https://github.com/kubernetes/kubernetes/issues/45939
 
-func (a *App) deploymentExtInformer(mainClient kubernetes.Interface) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return mainClient.ExtensionsV1beta1().Deployments(a.Namespace).List(options)
-			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return mainClient.ExtensionsV1beta1().Deployments(a.Namespace).Watch(options)
-			},
-		},
-		&ext_v1b1.Deployment{},
-		a.ResyncPeriod,
-		cache.Indexers{},
-	)
-}
-
 func (a *App) ingressInformer(mainClient kubernetes.Interface) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
