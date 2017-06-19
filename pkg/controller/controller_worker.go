@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -551,6 +552,9 @@ func updateResource(deepCopy smith.DeepCopy, spec, actual *unstructured.Unstruct
 	}
 
 	if !equality.Semantic.DeepEqual(updated, actualClone) {
+		fmt.Printf(
+			"Objects are different: %s",
+			diff.ObjectReflectDiff(updated, actualClone))
 		return updated, nil
 	}
 	return nil, nil
@@ -566,7 +570,8 @@ func processField(spec, actual interface{}) interface{} {
 		return spec
 	}
 	for field, specValue := range specObj {
-
+		// Check fields recursively
+		actualObj[field] = processField(specValue, actualObj[field])
 	}
 	return actualObj
 }
