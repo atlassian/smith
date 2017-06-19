@@ -155,4 +155,4 @@ spec:
 
 ### Screencast
 
-[![asciicast](https://asciinema.org/a/125263.png)](https://asciinema.org/a/125263)
+[![asciicast](img/asciinema.png)](https://asciinema.org/a/125263)
