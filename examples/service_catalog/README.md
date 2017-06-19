@@ -21,10 +21,12 @@ The resulting graph of Kubernetes and Service Catalog objects consists of:
 
 ![Kubernetes objects graph](img/Kubernetes_graph.png?raw=true "Kubernetes objects graph")
 
-## Demo
+## Problem
 
-The objects in this graph should be created in a particular order, in respect of dependencies between them (note: independent branches in the graph could be processed in parallel).
-There is no built-in generic way of making sure that the objects are created in a particular order. And **Smith** project was designed to solve exactly this problem.
+The objects in this graph should be created in particular order, in respect of dependencies between them (note: independent branches in the graph could be processed in parallel).
+There is no built-in generic way in Kubernetes of making sure that the objects are created in a particular order. And **Smith** project was designed to solve exactly this problem.
+
+## Demo
 
 Smith Bundle declaring the graph described above (see [application.yaml](application.yaml)):
 
