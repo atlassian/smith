@@ -21,11 +21,13 @@ type watchState struct {
 	version ext_v1b1.APIVersion
 }
 
+// tprEventHandler handles events for objects with Kind: ThirdPartyResource.
+// For each object a new informer is started to watch for events.
 type tprEventHandler struct {
 	ctx context.Context
 	*BundleController
 	mx       sync.Mutex // protects the map
-	watchers map[string]map[string]watchState
+	watchers map[string]map[string]watchState // TPR name -> TPR version -> state
 }
 
 func (h *tprEventHandler) OnAdd(obj interface{}) {
