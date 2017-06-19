@@ -26,7 +26,7 @@ type watchState struct {
 type tprEventHandler struct {
 	ctx context.Context
 	*BundleController
-	mx       sync.Mutex // protects the map
+	mx       sync.Mutex                       // protects the map
 	watchers map[string]map[string]watchState // TPR name -> TPR version -> state
 }
 
@@ -35,7 +35,6 @@ func (h *tprEventHandler) OnAdd(obj interface{}) {
 	if tpr.Name == smith.BundleResourceName {
 		return
 	}
-	log.Printf("[TPREH] Handling OnAdd for TPR %s", tpr.Name)
 	func() {
 		h.mx.Lock()
 		defer h.mx.Unlock()
