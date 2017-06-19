@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -532,28 +533,78 @@ func updateResource(deepCopy smith.DeepCopy, spec, actual *unstructured.Unstruct
 	// TODO Ignores added annotations/labels. Should be configurable per-object and/or per-object kind?
 	updated.SetName(spec.GetName())
 	updated.SetLabels(spec.GetLabels())
-	updated.SetAnnotations(spec.GetAnnotations())
+	updated.SetAnnotations(processAnnotations(spec.GetAnnotations(), updated.GetAnnotations()))
 	//updated.SetOwnerReferences(spec.GetOwnerReferences()) // TODO Is this ok? Check that there is only one controller and it is THIS bundle
 	setOwnerReferences(updated, spec.GetOwnerReferences())
 	updated.SetFinalizers(spec.GetFinalizers()) // TODO Is this ok?
 
 	// 3. Everything else
-	for field, value := range spec.Object {
+	for field, specValue := range spec.Object {
 		switch field {
 		case "kind", "apiVersion", "metadata":
 			continue
 		}
-		valueClone, err := deepCopy(value)
+		specValueClone, err := deepCopy(specValue)
 		if err != nil {
 			return nil, err
 		}
-		updated.Object[field] = valueClone
+		updated.Object[field] = processField(specValueClone, updated.Object[field])
 	}
 
 	if !equality.Semantic.DeepEqual(updated, actualClone) {
+		fmt.Printf(
+			"Objects are different: %s\n",
+			diff.ObjectReflectDiff(updated, actualClone))
+		fmt.Printf("updated: %v\n", updated)
+		fmt.Printf("actualClone: %v\n", actualClone)
 		return updated, nil
 	}
 	return nil, nil
+}
+
+func processAnnotations(spec, actual map[string]string) map[string]string {
+	for key, val := range spec {
+		actual[key] = val
+	}
+	return actual
+}
+
+func processField(spec, actual interface{}) interface{} {
+	specObj, specIsMap := spec.(map[string]interface{})
+	actualObj, actualIsMap := actual.(map[string]interface{})
+	if specIsMap != actualIsMap {
+		// TODO Error?
+		return spec
+	}
+	if !specIsMap {
+		specArray, specIsArray := spec.([]interface{})
+		actualArray, actualIsArray := actual.([]interface{})
+		if specIsArray != actualIsArray {
+			// TODO Error?
+			return spec
+		}
+		if !specIsArray {
+			return spec
+		}
+		return processArrayField(specArray, actualArray)
+	}
+	for field, specValue := range specObj {
+		// Check fields recursively
+		actualObj[field] = processField(specValue, actualObj[field])
+	}
+	// TODO mutate clone?
+	return actualObj
+}
+
+func processArrayField(spec, actual []interface{}) []interface{} {
+	for i, specVal := range spec {
+		if len(actual) <= i {
+			break
+		}
+		actual[i] = processField(specVal, actual[i])
+	}
+	// TODO mutate clone?
+	return actual
 }
 
 func mergeLabels(labels ...map[string]string) map[string]string {
