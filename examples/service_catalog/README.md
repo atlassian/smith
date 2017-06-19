@@ -11,7 +11,7 @@ Imagine that we want to deploy a service to Kubernetes, which consists of:
 
 For provisioning resources in AWS we can use [Service Catalog](https://github.com/kubernetes-incubator/service-catalog).
 It allows us to provision resources through [Open Service Broker API](https://github.com/openservicebrokerapi/servicebroker) 
-and produce Kubernetes Secret objects which we can inject into the Pods using PodPresets.
+and produce Kubernetes Secret objects with credentials which we can inject as environment variables into Pods using PodPresets.
 
 The resulting graph of Kubernetes and Service Catalog objects consists of:
 - Pods for running application instances
