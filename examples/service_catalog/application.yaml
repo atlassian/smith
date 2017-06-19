@@ -59,11 +59,11 @@ spec:
           matchLabels:
             role: app
         envFrom:
-        - secretRef:
-            prefix: BINDING1_
+        - prefix: BINDING1_
+          secretRef:
             name: "{{binding1#spec.secretName}}"
-        - secretRef:
-            prefix: BINDING2_
+        - prefix: BINDING2_
+          secretRef:
             name: "{{binding2#spec.secretName}}"
 
   - name: deployment1
@@ -98,7 +98,10 @@ spec:
         ports:
         - port: 80
           protocol: TCP
+          targetPort: 80
+          nodePort: 30090
         selector: "{{{deployment1#spec.template.metadata.labels}}}"
+        type: NodePort
 
   - name: ingress1
     dependsOn:
@@ -115,4 +118,4 @@ spec:
             - path: /
               backend:
                 serviceName: "{{service1#metadata.name}}"
-                servicePort: "{{service1#spec.ports[?(@.protocol==\"TCP\")].port}}"
+                servicePort: "{{{service1#spec.ports[?(@.protocol==\"TCP\")].port}}}"
