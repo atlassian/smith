@@ -61,6 +61,7 @@ func (c *BundleController) rebuildByName(namespace, bundleName, addUpdateDelete 
 	if len(bundleName) == 0 {
 		return
 	}
+	// TODO print GVK
 	log.Printf("[REH][%s/%s] Rebuilding bundle because object %s was %s",
 		namespace, bundleName, obj.(meta_v1.Object).GetName(), addUpdateDelete)
 	c.enqueue(&smith.Bundle{
