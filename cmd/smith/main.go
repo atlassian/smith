@@ -35,7 +35,9 @@ func run() error {
 }
 
 func runWithContext(ctx context.Context) error {
-	a := app.App{}
+	a := app.App{
+		Workers: 2,
+	}
 
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.BoolVar(&a.DisablePodPreset, "disable-pod-preset", false, "Disable PodPreset support")

@@ -1,4 +1,4 @@
-package app
+package store
 
 import (
 	"fmt"
@@ -9,24 +9,38 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
-	ByTprNameIndex = "TprNameIndex"
-	ByObjectIndex  = "ByObjectIndex"
+	byTprNameIndexName = "TprNameIndex"
+	byObjectIndexName  = "ByObjectIndex"
 )
 
-type byIndex func(indexName, indexKey string) ([]interface{}, error)
-
-type bundleStore struct {
+type BundleStore struct {
 	store         smith.ByNameStore
-	bundleByIndex byIndex
+	bundleByIndex func(indexName, indexKey string) ([]interface{}, error)
 	deepCopy      smith.DeepCopy
+}
+
+func NewBundleStore(bundleInf cache.SharedIndexInformer, store smith.ByNameStore, deepCopy smith.DeepCopy) (*BundleStore, error) {
+	err := bundleInf.AddIndexers(cache.Indexers{
+		byTprNameIndexName: byTprNameIndex,
+		byObjectIndexName:  byObjectIndex,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &BundleStore{
+		store:         store,
+		bundleByIndex: bundleInf.GetIndexer().ByIndex,
+		deepCopy:      deepCopy,
+	}, nil
 }
 
 // Get returns a bundle by its namespace and name.
 // nil is returned if bundle does not exist.
-func (s *bundleStore) Get(namespace, bundleName string) (*smith.Bundle, error) {
+func (s *BundleStore) Get(namespace, bundleName string) (*smith.Bundle, error) {
 	bundle, exists, err := s.store.Get(smith.BundleGVK, namespace, bundleName)
 	if err != nil || !exists {
 		return nil, err
@@ -35,16 +49,16 @@ func (s *bundleStore) Get(namespace, bundleName string) (*smith.Bundle, error) {
 }
 
 // GetBundles returns bundles where a resource declared via TPR with specified name is used.
-func (s *bundleStore) GetBundles(tprName string) ([]*smith.Bundle, error) {
-	return s.getBundles(ByTprNameIndex, tprName)
+func (s *BundleStore) GetBundles(tprName string) ([]*smith.Bundle, error) {
+	return s.getBundles(byTprNameIndexName, tprName)
 }
 
 // GetBundlesByObject returns bundles where a resource with specified GVK, namespace and name is defined.
-func (s *bundleStore) GetBundlesByObject(gk schema.GroupKind, namespace, name string) ([]*smith.Bundle, error) {
-	return s.getBundles(ByObjectIndex, ByObjectIndexKey(gk, namespace, name))
+func (s *BundleStore) GetBundlesByObject(gk schema.GroupKind, namespace, name string) ([]*smith.Bundle, error) {
+	return s.getBundles(byObjectIndexName, byObjectIndexKey(gk, namespace, name))
 }
 
-func (s *bundleStore) getBundles(indexName, indexKey string) ([]*smith.Bundle, error) {
+func (s *BundleStore) getBundles(indexName, indexKey string) ([]*smith.Bundle, error) {
 	bundles, err := s.bundleByIndex(indexName, indexKey)
 	if err != nil {
 		return nil, err
@@ -83,11 +97,11 @@ func byObjectIndex(obj interface{}) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get meta of object: %v", err)
 		}
-		result = append(result, ByObjectIndexKey(resource.Spec.GetObjectKind().GroupVersionKind().GroupKind(), bundle.Namespace, m.GetName()))
+		result = append(result, byObjectIndexKey(resource.Spec.GetObjectKind().GroupVersionKind().GroupKind(), bundle.Namespace, m.GetName()))
 	}
 	return result, nil
 }
 
-func ByObjectIndexKey(gk schema.GroupKind, namespace, name string) string {
+func byObjectIndexKey(gk schema.GroupKind, namespace, name string) string {
 	return fmt.Sprintf("%s/%s/%s/%s", gk.Group, gk.Kind, namespace, name)
 }

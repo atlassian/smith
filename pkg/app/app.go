@@ -9,9 +9,10 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/client/smart"
-	"github.com/atlassian/smith/pkg/processor"
+	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util/wait"
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
@@ -25,6 +26,7 @@ import (
 	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 )
 
 type App struct {
@@ -33,6 +35,7 @@ type App struct {
 	ResyncPeriod         time.Duration
 	Namespace            string
 	DisablePodPreset     bool
+	Workers              int
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -59,14 +62,12 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 1. Store
-	store := resources.NewStore(scheme.DeepCopy)
-
 	var wgStore wait.Group
-	defer wgStore.Wait() // await store termination
-
+	defer wgStore.Wait() // await rawStore termination
 	ctxStore, cancelStore := context.WithCancel(context.Background())
-	defer cancelStore() // signal store to stop
-	wgStore.StartWithContext(ctxStore, store.Run)
+	defer cancelStore() // signal rawStore to stop
+	rawStore := resources.NewStore(scheme.DeepCopy)
+	wgStore.StartWithContext(ctxStore, rawStore.Run)
 
 	// 1.5. Informers
 	var wg wait.Group
@@ -75,18 +76,14 @@ func (a *App) Run(ctx context.Context) error {
 	defer cancel()
 
 	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
-	bundleInf.AddIndexers(cache.Indexers{
-		ByTprNameIndex: byTprNameIndex,
-		ByObjectIndex:  byObjectIndex,
-	})
-	store.AddInformer(smith.BundleGVK, bundleInf)
+	rawStore.AddInformer(smith.BundleGVK, bundleInf)
 
-	infs := a.resourceInformers(ctx, &wg, store, clientset, scClient)
-	tprInf := infs[tprGVK]
-	delete(infs, tprGVK) // To avoid adding generic event handler later
+	resourceInfs, tprInf := a.resourceInformers(clientset, scClient)
+	rawStore.AddInformer(tprGVK, tprInf)
+	wg.StartWithChannel(ctx.Done(), tprInf.Run) // Must be after store.AddInformer()
 
 	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
-	// in Ready Checker.
+	// in Ready Checker and in EnsureTprExists().
 	if !cache.WaitForCacheSync(ctx.Done(), tprInf.HasSynced) {
 		return errors.New("wait for TPR Informer was cancelled")
 	}
@@ -96,15 +93,11 @@ func (a *App) Run(ctx context.Context) error {
 	if a.ServiceCatalogConfig != nil {
 		types = append(types, readychecker.ServiceCatalogKnownTypes)
 	}
-	rc := readychecker.New(&tprStore{store: store}, types...)
+	rc := readychecker.New(&tprStore{store: rawStore}, types...)
 
-	// 3. Processor
-	bp := processor.New(bundleClient, sc, rc, scheme.DeepCopy, store)
-	wg.StartWithContext(ctx, bp.Run)
-
-	// 4. Ensure ThirdPartyResource Bundle exists
+	// 3. Ensure ThirdPartyResource Bundle exists
 	err = retryUntilSuccessOrDone(ctx, func() error {
-		return resources.EnsureTprExists(ctx, clientset, store, resources.BundleTpr())
+		return resources.EnsureTprExists(ctx, clientset, rawStore, resources.BundleTpr())
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to create resource %s: %v", smith.BundleResourceName, e)
@@ -114,53 +107,31 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	// 5. Watch Bundles
+	// 4. Controller
+	bs, err := store.NewBundleStore(bundleInf, rawStore, scheme.DeepCopy)
+	if err != nil {
+		return err
+	}
 
-	bundleInf.AddEventHandler(&bundleEventHandler{
-		ctx:       ctx,
-		processor: bp,
-		deepCopy:  scheme.DeepCopy,
-	})
+	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
+	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme.DeepCopy, rawStore, queue, a.Workers, a.ResyncPeriod, resourceInfs)
 
+	// Add all to Store
+	for gvk, inf := range resourceInfs {
+		rawStore.AddInformer(gvk, inf)
+		wg.StartWithChannel(ctx.Done(), inf.Run) // Must be after store.AddInformer()
+	}
 	wg.StartWithChannel(ctx.Done(), bundleInf.Run)
 
-	// We must wait for bundleInf to populate its cache to avoid reading from an empty cache
-	// in case of resource-generated events.
-	if !cache.WaitForCacheSync(ctx.Done(), bundleInf.HasSynced) {
-		return errors.New("wait for Bundle Informer was cancelled")
-	}
-
-	bs := &bundleStore{
-		store:         store,
-		bundleByIndex: bundleInf.GetIndexer().ByIndex,
-		deepCopy:      scheme.DeepCopy,
-	}
-	reh := &resourceEventHandler{
-		ctx:         ctx,
-		processor:   bp,
-		bundleStore: bs,
-	}
-
-	// 6. Watch supported built-in resource types
-
-	for _, inf := range infs {
-		inf.AddEventHandler(reh)
-	}
-
-	// 7. Watch Third Party Resources to add watches for supported ones
-
-	tprInf.AddEventHandler(newTprEventHandler(ctx, reh, sc, store, bp, bs, a.ResyncPeriod))
-
-	<-ctx.Done()
+	cntrlr.Run(ctx)
 	return ctx.Err()
 }
 
-func (a *App) resourceInformers(ctx context.Context, wg *wait.Group, store *resources.Store, mainClient kubernetes.Interface, scClient scClientset.Interface) map[schema.GroupVersionKind]cache.SharedIndexInformer {
+func (a *App) resourceInformers(mainClient kubernetes.Interface, scClient scClientset.Interface) (map[schema.GroupVersionKind]cache.SharedIndexInformer, cache.SharedIndexInformer) {
 	mainSif := informers.NewSharedInformerFactory(mainClient, a.ResyncPeriod)
 
 	// Core API types
 	infs := map[schema.GroupVersionKind]cache.SharedIndexInformer{
-		tprGVK: mainSif.Extensions().V1beta1().ThirdPartyResources().Informer(),
 		ext_v1b1.SchemeGroupVersion.WithKind("Deployment"):  a.deploymentExtInformer(mainClient),
 		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):     a.ingressInformer(mainClient),
 		api_v1.SchemeGroupVersion.WithKind("Service"):       a.serviceInformer(mainClient),
@@ -178,11 +149,7 @@ func (a *App) resourceInformers(ctx context.Context, wg *wait.Group, store *reso
 		infs[sc_v1a1.SchemeGroupVersion.WithKind("Instance")] = a.instanceInformer(scClient)
 	}
 
-	// Add all to Store
-	for gvk, inf := range infs {
-		store.AddInformer(gvk, inf)
-		wg.StartWithChannel(ctx.Done(), inf.Run) // Must be after store.AddInformer()
-	}
+	tprInf := mainSif.Extensions().V1beta1().ThirdPartyResources().Informer()
 
-	return infs
+	return infs, tprInf
 }

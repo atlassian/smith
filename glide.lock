@@ -1,5 +1,5 @@
 hash: 452775db7352002969d41a0310c6ca4f33885e767721451daea0122bf8302e20
-updated: 2017-06-10T18:51:40.390907876+10:00
+updated: 2017-06-18T22:28:56.777039464+10:00
 imports:
 - name: github.com/cenk/backoff
   version: 5d150e7eec023ce7a124856b37c68e54b4050ac7
@@ -39,7 +39,7 @@ imports:
 - name: github.com/juju/ratelimit
   version: 77ed1c8a01217656d2080ad51981f6e99adaa177
 - name: github.com/kubernetes-incubator/service-catalog
-  version: 0c08788404c069f9380e5a41cd7a6222287fc4de
+  version: 77943ba2f09cf52a2c24c60f82183f5ce68e72fe
   subpackages:
   - pkg/apis/servicecatalog
   - pkg/apis/servicecatalog/v1alpha1
@@ -245,6 +245,7 @@ imports:
   - pkg/version
   - rest
   - rest/watch
+  - third_party/forked/golang/template
   - tools/cache
   - tools/clientcmd/api
   - tools/metrics
@@ -253,6 +254,8 @@ imports:
   - util/clock
   - util/flowcontrol
   - util/integer
+  - util/jsonpath
+  - util/workqueue
 testImports:
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
