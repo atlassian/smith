@@ -1,0 +1,118 @@
+apiVersion: smith.atlassian.com/v1
+kind: Bundle
+metadata:
+  name: sampleapp
+spec:
+  resources:
+
+  - name: instance1
+    spec:
+      apiVersion: servicecatalog.k8s.io/v1alpha1
+      kind: Instance
+      metadata:
+        name: instance1
+      spec:
+        externalID: 786abffa-ed42-4c70-a06f-3836fe3d641c
+        serviceClassName: user-provided-service
+        planName: default
+        parameters:
+          credentials:
+            token: token
+
+  - name: binding1
+    dependsOn:
+    - instance1
+    spec:
+      apiVersion: servicecatalog.k8s.io/v1alpha1
+      kind: Binding
+      metadata:
+        name: binding1
+      spec:
+        instanceRef:
+          name: "{{instance1#metadata.name}}"
+        secretName: secret1
+
+  - name: binding2
+    dependsOn:
+    - instance1
+    spec:
+      apiVersion: servicecatalog.k8s.io/v1alpha1
+      kind: Binding
+      metadata:
+        name: binding2
+      spec:
+        instanceRef:
+          name: "{{instance1#metadata.name}}"
+        secretName: secret2
+
+  - name: podpreset1
+    dependsOn:
+    - binding1
+    - binding2
+    spec:
+      apiVersion: settings.k8s.io/v1alpha1
+      kind: PodPreset
+      metadata:
+        name: podpreset1
+      spec:
+        selector:
+          matchLabels:
+            role: app
+        envFrom:
+        - secretRef:
+            prefix: BINDING1_
+            name: "{{binding1#spec.secretName}}"
+        - secretRef:
+            prefix: BINDING2_
+            name: "{{binding2#spec.secretName}}"
+
+  - name: deployment1
+    dependsOn:
+    - podpreset1
+    spec:
+      apiVersion: apps/v1beta1
+      kind: Deployment
+      metadata:
+        name: deployment1
+      spec:
+        replicas: 2
+        template:
+          metadata:
+            labels: "{{{podpreset1#spec.selector.matchLabels}}}"
+          spec:
+            containers:
+            - name: nginx
+              image: nginx:latest
+              ports:
+              - containerPort: 80
+
+  - name: service1
+    dependsOn:
+    - deployment1
+    spec:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: service1
+      spec:
+        ports:
+        - port: 80
+          protocol: TCP
+        selector: "{{{deployment1#spec.template.metadata.labels}}}"
+
+  - name: ingress1
+    dependsOn:
+    - service1
+    spec:
+      apiVersion: extensions/v1beta1
+      kind: Ingress
+      metadata:
+        name: ingress1
+      spec:
+        rules:
+        - http:
+            paths:
+            - path: /
+              backend:
+                serviceName: "{{service1#metadata.name}}"
+                servicePort: "{{service1#spec.ports[?(@.protocol==\"TCP\")].port}}"

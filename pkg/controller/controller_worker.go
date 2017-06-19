@@ -538,22 +538,37 @@ func updateResource(deepCopy smith.DeepCopy, spec, actual *unstructured.Unstruct
 	updated.SetFinalizers(spec.GetFinalizers()) // TODO Is this ok?
 
 	// 3. Everything else
-	for field, value := range spec.Object {
+	for field, specValue := range spec.Object {
 		switch field {
 		case "kind", "apiVersion", "metadata":
 			continue
 		}
-		valueClone, err := deepCopy(value)
+		specValueClone, err := deepCopy(specValue)
 		if err != nil {
 			return nil, err
 		}
-		updated.Object[field] = valueClone
+		updated.Object[field] = processField(specValueClone, updated.Object[field])
 	}
 
 	if !equality.Semantic.DeepEqual(updated, actualClone) {
 		return updated, nil
 	}
 	return nil, nil
+}
+
+func processField(spec, actual interface{}) interface{} {
+	specObj, ok := spec.(map[string]interface{})
+	if !ok {
+		return spec
+	}
+	actualObj, ok := actual.(map[string]interface{})
+	if !ok {
+		return spec
+	}
+	for field, specValue := range specObj {
+
+	}
+	return actualObj
 }
 
 func mergeLabels(labels ...map[string]string) map[string]string {
