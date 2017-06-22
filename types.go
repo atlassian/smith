@@ -56,8 +56,6 @@ var GV = schema.GroupVersion{
 
 var BundleGVK = GV.WithKind(BundleResourceKind)
 
-var converter = unstructured_conversion.NewConverter(false)
-
 func AddToScheme(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(GV,
 		&Bundle{},
@@ -213,7 +211,7 @@ func (r *Resource) ToUnstructured(copy DeepCopy) (*unstructured.Unstructured, er
 	u := &unstructured.Unstructured{
 		Object: make(map[string]interface{}),
 	}
-	err := converter.ToUnstructured(r.Spec, &u.Object)
+	err := unstructured_conversion.DefaultConverter.ToUnstructured(r.Spec, &u.Object)
 	if err != nil {
 		return nil, err
 	}

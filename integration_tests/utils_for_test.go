@@ -37,8 +37,6 @@ const (
 	serviceCatalogUrlEnvParam = "SERVICE_CATALOG_URL"
 )
 
-var converter = unstructured_conversion.NewConverter(false)
-
 type testFunc func(*testing.T, context.Context, *itConfig, ...interface{})
 
 type itConfig struct {
@@ -68,7 +66,7 @@ func (cfg *itConfig) cleanup() {
 				continue
 			}
 			bundle = new(smith.Bundle)
-			if !assert.NoError(cfg.t, converter.FromUnstructured(u.Object, bundle)) {
+			if !assert.NoError(cfg.t, unstructured_conversion.DefaultConverter.FromUnstructured(u.Object, bundle)) {
 				continue
 			}
 		}

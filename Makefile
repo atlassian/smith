@@ -44,6 +44,7 @@ fmt:
 
 minikube-test: fmt
 	go test -i -tags=integration -race -v ./integration_tests
+	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
@@ -54,6 +55,7 @@ minikube-test: fmt
 
 minikube-test-sc: fmt
 	go test -i -tags=integration_sc -race -v ./integration_tests
+	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
@@ -64,6 +66,7 @@ minikube-test-sc: fmt
 	go test -tags=integration_sc -race -v ./integration_tests
 
 minikube-run: build-all-race
+	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
@@ -73,6 +76,7 @@ minikube-run: build-all-race
 	go run -race cmd/smith/*
 
 minikube-run-sc: build-all-race
+	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
@@ -82,6 +86,7 @@ minikube-run-sc: build-all-race
 	go run -race cmd/smith/* -service-catalog-url="http://$$(minikube ip):30080"
 
 minikube-sleeper-run: build-all-race
+	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
 	KUBERNETES_SERVICE_PORT=8443 \
@@ -92,11 +97,13 @@ minikube-sleeper-run: build-all-race
 
 test-race: fmt
 	go test -i -race $$(glide nv | grep -v integration_tests)
+	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	go test -race $$(glide nv | grep -v integration_tests)
 
 test: fmt
 	go test -i $$(glide nv | grep -v integration_tests)
+	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	go test $$(glide nv | grep -v integration_tests)
 
