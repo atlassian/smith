@@ -1,4 +1,4 @@
-package resources
+package store
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/resources"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,7 +63,7 @@ type informerEvent struct {
 	obj runtime.Object
 }
 
-type Store struct {
+type Multi struct {
 	deepCopy    smith.DeepCopy
 	informers   map[schema.GroupVersionKind]cache.SharedIndexInformer
 	gvk2request map[schema.GroupVersionKind]map[types.NamespacedName]map[*awaitRequest]struct{} // GVK -> namespace/name -> requests
@@ -75,8 +76,8 @@ type Store struct {
 	removeInformerRequests chan removeInformerRequest
 }
 
-func NewStore(deepCopy smith.DeepCopy) *Store {
-	return &Store{
+func NewMulti(deepCopy smith.DeepCopy) *Multi {
+	return &Multi{
 		deepCopy:               deepCopy,
 		informers:              make(map[schema.GroupVersionKind]cache.SharedIndexInformer),
 		gvk2request:            make(map[schema.GroupVersionKind]map[types.NamespacedName]map[*awaitRequest]struct{}),
@@ -89,8 +90,8 @@ func NewStore(deepCopy smith.DeepCopy) *Store {
 	}
 }
 
-func (s *Store) Run(ctx context.Context) {
-	// Store must not be used after Run exited
+func (s *Multi) Run(ctx context.Context) {
+	// Multi must not be used after Run exited
 	defer close(s.awaitRequests)
 	defer close(s.cancellations)
 	defer close(s.addInformerRequests)
@@ -120,7 +121,7 @@ func (s *Store) Run(ctx context.Context) {
 	}
 }
 
-func (s *Store) handleAwaitRequest(ar *awaitRequest) {
+func (s *Multi) handleAwaitRequest(ar *awaitRequest) {
 	informer, ok := s.informers[ar.gvk]
 	if !ok {
 		ar.callback(nil, fmt.Errorf("no informer for %v is registered", ar.gvk))
@@ -145,7 +146,7 @@ func (s *Store) handleAwaitRequest(ar *awaitRequest) {
 	n[ar] = struct{}{}
 }
 
-func (s *Store) handleEvent(gvk schema.GroupVersionKind, obj runtime.Object) {
+func (s *Multi) handleEvent(gvk schema.GroupVersionKind, obj runtime.Object) {
 	metaObj, err := meta.Accessor(obj)
 	if err != nil {
 		log.Printf("Failed to get meta from %T: %v", obj, err)
@@ -178,7 +179,7 @@ func (s *Store) handleEvent(gvk schema.GroupVersionKind, obj runtime.Object) {
 	}
 }
 
-func (s *Store) handleCancellation(ar *awaitRequest) {
+func (s *Multi) handleCancellation(ar *awaitRequest) {
 	m := s.gvk2request[ar.gvk]
 	n := m[ar.name]
 	delete(n, ar)
@@ -190,7 +191,7 @@ func (s *Store) handleCancellation(ar *awaitRequest) {
 	}
 }
 
-func (s *Store) handleAddInformer(ctx context.Context, gvk schema.GroupVersionKind, informer cache.SharedIndexInformer, wg *sync.WaitGroup) {
+func (s *Multi) handleAddInformer(ctx context.Context, gvk schema.GroupVersionKind, informer cache.SharedIndexInformer, wg *sync.WaitGroup) {
 	defer wg.Done()
 	if _, ok := s.informers[gvk]; ok {
 		// This is a programming error hence panic
@@ -208,7 +209,7 @@ func (s *Store) handleAddInformer(ctx context.Context, gvk schema.GroupVersionKi
 	s.informers[gvk] = informer
 }
 
-func (s *Store) handleGetInformers(result chan<- map[schema.GroupVersionKind]cache.SharedIndexInformer) {
+func (s *Multi) handleGetInformers(result chan<- map[schema.GroupVersionKind]cache.SharedIndexInformer) {
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer, len(s.informers))
 	for gvk, inf := range s.informers {
 		informers[gvk] = inf
@@ -216,7 +217,7 @@ func (s *Store) handleGetInformers(result chan<- map[schema.GroupVersionKind]cac
 	result <- informers
 }
 
-func (s *Store) handleRemoveInformer(gvk schema.GroupVersionKind, result chan<- bool) {
+func (s *Multi) handleRemoveInformer(gvk schema.GroupVersionKind, result chan<- bool) {
 	_, ok := s.informers[gvk]
 	if ok {
 		delete(s.informers, gvk)
@@ -236,7 +237,7 @@ func removeAllCallbacks(m map[types.NamespacedName]map[*awaitRequest]struct{}) {
 
 // AddInformer adds an Informer to the store.
 // Can only be called with a not yet started informer. Otherwise bad things will happen.
-func (s *Store) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer) {
+func (s *Multi) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer) {
 	air := addInformerRequest{
 		wg:       &sync.WaitGroup{},
 		gvk:      gvk,
@@ -247,7 +248,7 @@ func (s *Store) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIn
 	air.wg.Wait() // Wait for the informer to be processed
 }
 
-func (s *Store) RemoveInformer(gvk schema.GroupVersionKind) bool {
+func (s *Multi) RemoveInformer(gvk schema.GroupVersionKind) bool {
 	result := make(chan bool)
 	rir := removeInformerRequest{
 		gvk:    gvk,
@@ -258,7 +259,7 @@ func (s *Store) RemoveInformer(gvk schema.GroupVersionKind) bool {
 }
 
 // GetInformers gets all registered Informers.
-func (s *Store) GetInformers() map[schema.GroupVersionKind]cache.SharedIndexInformer {
+func (s *Multi) GetInformers() map[schema.GroupVersionKind]cache.SharedIndexInformer {
 	result := make(chan map[schema.GroupVersionKind]cache.SharedIndexInformer)
 	s.getInformersRequests <- getInformersRequest{result: result}
 	return <-result
@@ -267,7 +268,7 @@ func (s *Store) GetInformers() map[schema.GroupVersionKind]cache.SharedIndexInfo
 // AwaitObject looks up object of specified GVK in the specified namespace by name.
 // This is a variant of Get method that blocks until the object is available or context signals "done".
 // A deep copy of the object is returned so it is safe to modify it.
-func (s *Store) AwaitObject(ctx context.Context, gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error) {
+func (s *Multi) AwaitObject(ctx context.Context, gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error) {
 	return s.AwaitObjectCondition(ctx, gvk, namespace, name, func(obj runtime.Object) bool {
 		return true
 	})
@@ -276,7 +277,7 @@ func (s *Store) AwaitObject(ctx context.Context, gvk schema.GroupVersionKind, na
 // AwaitObjectCondition looks up object of specified GVK in the specified namespace by name.
 // This is a variant of AwaitObject method that blocks until the object is available and satisfies the condition or context signals "done".
 // A deep copy of the object is returned so it is safe to modify it.
-func (s *Store) AwaitObjectCondition(ctx context.Context, gvk schema.GroupVersionKind, namespace, name string, cond AwaitCondition) (runtime.Object, error) {
+func (s *Multi) AwaitObjectCondition(ctx context.Context, gvk schema.GroupVersionKind, namespace, name string, cond AwaitCondition) (runtime.Object, error) {
 	result := make(chan awaitResult)
 	ar := &awaitRequest{
 		gvk:  gvk,
@@ -306,7 +307,7 @@ func (s *Store) AwaitObjectCondition(ctx context.Context, gvk schema.GroupVersio
 
 // Get looks up object of specified GVK in the specified namespace by name.
 // A deep copy of the object is returned so it is safe to modify it.
-func (s *Store) Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, e error) {
+func (s *Multi) Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, e error) {
 	informer := s.GetInformers()[gvk]
 	if informer == nil {
 		return nil, false, fmt.Errorf("no informer for %v is registered", gvk)
@@ -314,7 +315,7 @@ func (s *Store) Get(gvk schema.GroupVersionKind, namespace, name string) (obj ru
 	return s.getFromIndexer(informer.GetIndexer(), gvk, namespace, name)
 }
 
-func (s *Store) getFromIndexer(indexer cache.Indexer, gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, e error) {
+func (s *Multi) getFromIndexer(indexer cache.Indexer, gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, e error) {
 	objs, err := indexer.ByIndex(ByNamespaceAndNameIndex, ByNamespaceAndNameIndexKey(namespace, name))
 	if err != nil {
 		return nil, false, err
@@ -336,7 +337,7 @@ func (s *Store) getFromIndexer(indexer cache.Indexer, gvk schema.GroupVersionKin
 	}
 }
 
-func (s *Store) GetObjectsForBundle(namespace, bundleName string) ([]runtime.Object, error) {
+func (s *Multi) GetObjectsForBundle(namespace, bundleName string) ([]runtime.Object, error) {
 	var result []runtime.Object
 	indexKey := ByNamespaceAndBundleNameIndexKey(namespace, bundleName)
 	for gvk, inf := range s.GetInformers() {
@@ -389,7 +390,7 @@ func byNamespaceAndBundleNameIndex(obj interface{}) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get meta of object: %v", err)
 	}
-	ref := GetControllerOf(m)
+	ref := resources.GetControllerOf(m)
 	if ref != nil && ref.APIVersion == smith.BundleResourceGroupVersion && ref.Kind == smith.BundleResourceKind {
 		return []string{ByNamespaceAndBundleNameIndexKey(m.GetNamespace(), ref.Name)}, nil
 	}

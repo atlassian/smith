@@ -61,13 +61,13 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	// 1. Store
+	// 1. Multi store
 	var wgStore wait.Group
-	defer wgStore.Wait() // await rawStore termination
+	defer wgStore.Wait() // await multiStore termination
 	ctxStore, cancelStore := context.WithCancel(context.Background())
-	defer cancelStore() // signal rawStore to stop
-	rawStore := resources.NewStore(scheme.DeepCopy)
-	wgStore.StartWithContext(ctxStore, rawStore.Run)
+	defer cancelStore() // signal multiStore to stop
+	multiStore := store.NewMulti(scheme.DeepCopy)
+	wgStore.StartWithContext(ctxStore, multiStore.Run)
 
 	// 1.5. Informers
 	var wg wait.Group
@@ -76,10 +76,10 @@ func (a *App) Run(ctx context.Context) error {
 	defer cancel()
 
 	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
-	rawStore.AddInformer(smith.BundleGVK, bundleInf)
+	multiStore.AddInformer(smith.BundleGVK, bundleInf)
 
 	resourceInfs, tprInf := a.resourceInformers(clientset, scClient)
-	rawStore.AddInformer(tprGVK, tprInf)
+	multiStore.AddInformer(tprGVK, tprInf)
 	wg.StartWithChannel(ctx.Done(), tprInf.Run) // Must be after store.AddInformer()
 
 	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
@@ -93,11 +93,11 @@ func (a *App) Run(ctx context.Context) error {
 	if a.ServiceCatalogConfig != nil {
 		types = append(types, readychecker.ServiceCatalogKnownTypes)
 	}
-	rc := readychecker.New(&store.Tpr{Store: rawStore}, types...)
+	rc := readychecker.New(&store.Tpr{Store: multiStore}, types...)
 
 	// 3. Ensure ThirdPartyResource Bundle exists
 	err = retryUntilSuccessOrDone(ctx, func() error {
-		return resources.EnsureTprExists(ctx, clientset, rawStore, resources.BundleTpr())
+		return resources.EnsureTprExists(ctx, clientset, multiStore, resources.BundleTpr())
 	}, func(e error) bool {
 		// TODO be smarter about what is retried
 		log.Printf("Failed to create resource %s: %v", smith.BundleResourceName, e)
@@ -108,17 +108,17 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 4. Controller
-	bs, err := store.NewBundleStore(bundleInf, rawStore, scheme.DeepCopy)
+	bs, err := store.NewBundleStore(bundleInf, multiStore, scheme.DeepCopy)
 	if err != nil {
 		return err
 	}
 
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
-	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, rawStore, queue, a.Workers, a.ResyncPeriod, resourceInfs)
+	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, multiStore, queue, a.Workers, a.ResyncPeriod, resourceInfs)
 
-	// Add all to Store
+	// Add all to Multi store
 	for gvk, inf := range resourceInfs {
-		rawStore.AddInformer(gvk, inf)
+		multiStore.AddInformer(gvk, inf)
 		wg.StartWithChannel(ctx.Done(), inf.Run) // Must be after store.AddInformer()
 	}
 	wg.StartWithChannel(ctx.Done(), bundleInf.Run)

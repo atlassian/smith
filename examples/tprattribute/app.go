@@ -7,6 +7,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util/wait"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,22 +43,22 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	store := resources.NewStore(scheme.DeepCopy)
+	multiStore := store.NewMulti(scheme.DeepCopy)
 
 	var wgStore wait.Group
-	defer wgStore.Wait() // await store termination
+	defer wgStore.Wait() // await multiStore termination
 
 	ctxStore, cancelStore := context.WithCancel(context.Background())
-	defer cancelStore() // signal store to stop
-	wgStore.StartWithContext(ctxStore, store.Run)
+	defer cancelStore() // signal multiStore to stop
+	wgStore.StartWithContext(ctxStore, multiStore.Run)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	informerFactory := informers.NewSharedInformerFactory(clientset, ResyncPeriod)
 	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
-	store.AddInformer(ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
-	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
+	multiStore.AddInformer(ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
+	informerFactory.Start(ctx.Done()) // Must be after multiStore.AddInformer()
 
 	// 1. Ensure ThirdPartyResource Sleeper exists
 
@@ -67,7 +68,7 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for TPR Informer was cancelled")
 	}
 
-	if err = resources.EnsureTprExists(ctx, clientset, store, SleeperTpr()); err != nil {
+	if err = resources.EnsureTprExists(ctx, clientset, multiStore, SleeperTpr()); err != nil {
 		return err
 	}
 
