@@ -8,6 +8,7 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/util/wait"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -31,7 +32,7 @@ type BundleController struct {
 	bundleStore  BundleStore
 	smartClient  smith.SmartClient
 	rc           ReadyChecker
-	deepCopy     smith.DeepCopy
+	scheme       *runtime.Scheme
 	store        Store
 	// Bundle objects that need to be synced.
 	queue   workqueue.RateLimitingInterface
@@ -43,7 +44,7 @@ type BundleController struct {
 }
 
 func New(bundleInf, tprInf cache.SharedIndexInformer, bundleClient *rest.RESTClient, bundleStore BundleStore,
-	sc smith.SmartClient, rc ReadyChecker, deepCopy smith.DeepCopy, store Store, queue workqueue.RateLimitingInterface,
+	sc smith.SmartClient, rc ReadyChecker, scheme *runtime.Scheme, store Store, queue workqueue.RateLimitingInterface,
 	workers int, tprResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
 	c := &BundleController{
 		bundleInf:       bundleInf,
@@ -52,7 +53,7 @@ func New(bundleInf, tprInf cache.SharedIndexInformer, bundleClient *rest.RESTCli
 		bundleStore:     bundleStore,
 		smartClient:     sc,
 		rc:              rc,
-		deepCopy:        deepCopy,
+		scheme:          scheme,
 		store:           store,
 		queue:           queue,
 		workers:         workers,

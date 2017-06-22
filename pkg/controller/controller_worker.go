@@ -82,7 +82,7 @@ func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
 	}
 
 	// Deep-copy otherwise we are mutating our cache.
-	bundleObjCopy, err := c.deepCopy(bundleObj)
+	bundleObjCopy, err := c.scheme.DeepCopy(bundleObj)
 	if err != nil {
 		return false, err
 	}
@@ -103,8 +103,6 @@ func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
 // that a field "State" in the Status of the resource is set to "Ready". It may be customizable via
 // annotations with some defaults.
 func (c *BundleController) process(bundle *smith.Bundle) (isReady, conflictRet, retriableError bool, e error) {
-	log.Printf("[WORKER][%s/%s] Rebuilding bundle", bundle.Namespace, bundle.Name)
-
 	// Build resource map by name
 	resourceMap := make(map[smith.ResourceName]smith.Resource, len(bundle.Spec.Resources))
 	for _, res := range bundle.Spec.Resources {
@@ -181,7 +179,7 @@ func (c *BundleController) checkResource(bundle *smith.Bundle, res *smith.Resour
 // evalSpec evaluates the resource specification and returns the result.
 func (c *BundleController) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	// 0. Convert to Unstructured
-	spec, err := res.ToUnstructured(c.deepCopy)
+	spec, err := res.ToUnstructured(c.scheme.DeepCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +232,7 @@ func (c *BundleController) evalSpec(bundle *smith.Bundle, res *smith.Resource, r
 
 // createOrUpdate creates or updates a resources.
 // May return nil resource without any errors if an update/create conflict happened.
-func (c *BundleController) createOrUpdate(bundle *smith.Bundle, spec *unstructured.Unstructured) (resUpdated *unstructured.Unstructured, conflictRet, retriableError bool, e error) {
+func (c *BundleController) createOrUpdate(bundle *smith.Bundle, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, conflictRet, retriableRet bool, e error) {
 	// Prepare client
 	resClient, err := c.smartClient.ForGVK(spec.GroupVersionKind(), bundle.Namespace)
 	if err != nil {
@@ -254,7 +252,7 @@ func (c *BundleController) createOrUpdate(bundle *smith.Bundle, spec *unstructur
 	return c.createResource(bundle, resClient, spec)
 }
 
-func (c *BundleController) createResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured) (resUpdated *unstructured.Unstructured, conflictRet, retriableError bool, e error) {
+func (c *BundleController) createResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, conflictRet, retriableError bool, e error) {
 	log.Printf("[WORKER][%s/%s] Object %q not found, creating", bundle.Namespace, bundle.Name, spec.GetName())
 	response, err := resClient.Create(spec)
 	if err == nil {
@@ -270,41 +268,41 @@ func (c *BundleController) createResource(bundle *smith.Bundle, resClient *dynam
 	return nil, false, true, err
 }
 
-func (c *BundleController) updateResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured, obj runtime.Object) (resUpdated *unstructured.Unstructured, conflictRet, retriableError bool, e error) {
-	existingObj, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		existingObj = &unstructured.Unstructured{
-			Object: make(map[string]interface{}),
-		}
-		if err := converter.ToUnstructured(obj, &existingObj.Object); err != nil {
-			// Unexpected error
-			return nil, false, false, err
-		}
-	}
-
+// Mutates spec and actual.
+func (c *BundleController) updateResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, conflictRet, retriableError bool, e error) {
+	actualMeta := actual.(meta_v1.Object)
 	// Check that the object is not marked for deletion
-	if existingObj.GetDeletionTimestamp() != nil {
-		return nil, false, false, fmt.Errorf("object %v %q is marked for deletion", existingObj.GroupVersionKind(), existingObj.GetName())
+	if actualMeta.GetDeletionTimestamp() != nil {
+		return nil, false, false, fmt.Errorf("object %v %q is marked for deletion", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName())
 	}
 
 	// Check that this bundle owns the object
-	if !isOwner(existingObj, bundle) {
-		return nil, false, false, fmt.Errorf("object %v %q is not owned by the Bundle", existingObj.GroupVersionKind(), existingObj.GetName())
+	if !isOwner(actualMeta, bundle) {
+		return nil, false, false, fmt.Errorf("object %v %q is not owned by the Bundle", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName())
+	}
+
+	// Apply defaults to the spec
+	if err := c.applyDefaults(spec); err != nil {
+		return nil, false, false, fmt.Errorf("failed to apply defaults to object spec %v %q: %v", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName(), err)
+	}
+
+	actualUnstr, err := c.cloneAsUnstructured(actual)
+	if err != nil {
+		return nil, false, false, err
 	}
 
 	// Compare spec and existing resource
-	updated, err := updateResource(c.deepCopy, spec, existingObj)
+	updated, match, err := c.compareActualVsSpec(spec, actualUnstr)
 	if err != nil {
-		// Unexpected error
 		return nil, false, false, err
 	}
-	if updated == nil {
+	if match {
 		log.Printf("[WORKER][%s/%s] Object %q has correct spec", bundle.Namespace, bundle.Name, spec.GetName())
-		return existingObj, false, false, nil
+		return updated, false, false, nil
 	}
 
 	// Update if different
-	existingObj, err = resClient.Update(updated)
+	updated, err = resClient.Update(updated)
 	if err != nil {
 		if errors.IsConflict(err) {
 			log.Printf("[WORKER][%s/%s] Object %q update resulted in conflict, restarting loop", bundle.Namespace, bundle.Name, spec.GetName())
@@ -315,7 +313,7 @@ func (c *BundleController) updateResource(bundle *smith.Bundle, resClient *dynam
 		return nil, false, true, err
 	}
 	log.Printf("[WORKER][%s/%s] Object %q updated", bundle.Namespace, bundle.Name, spec.GetName())
-	return existingObj, false, false, nil
+	return updated, false, false, nil
 }
 
 func (c *BundleController) deleteRemovedResources(bundle *smith.Bundle) (retriableError bool, e error) {
@@ -489,21 +487,58 @@ func (c *BundleController) handleProcessResult(bundle *smith.Bundle, isReady, re
 	return retriable, err
 }
 
-// updateResource checks if actual resource satisfies the desired spec.
-// Returns non-nil object with updates applied or nil if actual matches desired.
-func updateResource(deepCopy smith.DeepCopy, spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	// TODO Handle deleted or to be deleted object. We need to wait for the object to be gone.
-
-	upd, err := deepCopy(actual)
+func (c *BundleController) applyDefaults(spec *unstructured.Unstructured) error {
+	gvk := spec.GroupVersionKind()
+	if !c.scheme.Recognizes(gvk) {
+		log.Printf("[WORKER] Unrecognized object type %v", gvk)
+		return nil
+	}
+	specTyped, err := c.scheme.New(gvk)
 	if err != nil {
+		return err
+	}
+	if err = converter.FromUnstructured(spec.Object, specTyped); err != nil {
+		return err
+	}
+	c.scheme.Default(specTyped)
+	spec.Object = make(map[string]interface{})
+	if err := converter.ToUnstructured(specTyped, &spec.Object); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *BundleController) cloneAsUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
+	if _, ok := obj.(*unstructured.Unstructured); ok {
+		clone, err := c.scheme.DeepCopy(obj)
+		if err != nil {
+			return nil, err
+		}
+		return clone.(*unstructured.Unstructured), nil
+	}
+	u := &unstructured.Unstructured{
+		Object: make(map[string]interface{}),
+	}
+	if err := converter.ToUnstructured(obj, &u.Object); err != nil {
 		return nil, err
+	}
+	return u, nil
+}
+
+// compareActualVsSpec checks if actual resource satisfies the desired spec.
+// If actual matches spec then actual is returned untouched otherwise an updated object is returned.
+// Mutates spec (reuses parts of it).
+func (c *BundleController) compareActualVsSpec(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, bool /*match*/, error) {
+	upd, err := c.scheme.DeepCopy(actual)
+	if err != nil {
+		return nil, false, err
 	}
 	updated := upd.(*unstructured.Unstructured)
 	delete(updated.Object, "status")
 
-	actClone, err := deepCopy(updated)
+	actClone, err := c.scheme.DeepCopy(updated)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	actualClone := actClone.(*unstructured.Unstructured)
 
@@ -544,66 +579,20 @@ func updateResource(deepCopy smith.DeepCopy, spec, actual *unstructured.Unstruct
 		case "kind", "apiVersion", "metadata":
 			continue
 		}
-		specValueClone, err := deepCopy(specValue)
-		if err != nil {
-			return nil, err
-		}
-		updated.Object[field] = processField(specValueClone, updated.Object[field])
+		updated.Object[field] = specValue // using the value directly - we've made a copy up the stack so it's ok
 	}
-
-	if !equality.Semantic.DeepEqual(updated, actualClone) {
-		fmt.Printf(
-			"Objects are different: %s\n",
-			diff.ObjectReflectDiff(updated, actualClone))
-		fmt.Printf("updated: %v\n", updated)
-		fmt.Printf("actualClone: %v\n", actualClone)
-		return updated, nil
+	if !equality.Semantic.DeepEqual(updated.Object, actualClone.Object) {
+		log.Printf("Objects are different: %s\nupdated: %v\nactualClone: %v",
+			diff.ObjectReflectDiff(updated.Object, actualClone.Object), updated.Object, actualClone.Object)
+		return updated, false, nil
 	}
-	return nil, nil
+	return actual, true, nil
 }
 
 func processAnnotations(spec, actual map[string]string) map[string]string {
 	for key, val := range spec {
 		actual[key] = val
 	}
-	return actual
-}
-
-func processField(spec, actual interface{}) interface{} {
-	specObj, specIsMap := spec.(map[string]interface{})
-	actualObj, actualIsMap := actual.(map[string]interface{})
-	if specIsMap != actualIsMap {
-		// TODO Error?
-		return spec
-	}
-	if !specIsMap {
-		specArray, specIsArray := spec.([]interface{})
-		actualArray, actualIsArray := actual.([]interface{})
-		if specIsArray != actualIsArray {
-			// TODO Error?
-			return spec
-		}
-		if !specIsArray {
-			return spec
-		}
-		return processArrayField(specArray, actualArray)
-	}
-	for field, specValue := range specObj {
-		// Check fields recursively
-		actualObj[field] = processField(specValue, actualObj[field])
-	}
-	// TODO mutate clone?
-	return actualObj
-}
-
-func processArrayField(spec, actual []interface{}) []interface{} {
-	for i, specVal := range spec {
-		if len(actual) <= i {
-			break
-		}
-		actual[i] = processField(specVal, actual[i])
-	}
-	// TODO mutate clone?
 	return actual
 }
 

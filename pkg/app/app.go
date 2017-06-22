@@ -114,7 +114,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
-	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme.DeepCopy, rawStore, queue, a.Workers, a.ResyncPeriod, resourceInfs)
+	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, rawStore, queue, a.Workers, a.ResyncPeriod, resourceInfs)
 
 	// Add all to Store
 	for gvk, inf := range resourceInfs {

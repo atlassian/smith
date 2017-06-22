@@ -24,8 +24,10 @@ import (
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
+	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -247,6 +249,20 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+
+	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
+	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
+	store.AddInformer(ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
+	go tprInf.Run(ctx.Done())
+
+	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
+	// in resources.EnsureTprExists().
+	if !cache.WaitForCacheSync(ctx.Done(), tprInf.HasSynced) {
+		t.Fatal("wait for TPR Informer was cancelled")
+	}
+
+	require.NoError(t, resources.EnsureTprExists(ctx, clientset, store, tprattribute.SleeperTpr()))
+	require.NoError(t, resources.EnsureTprExists(ctx, clientset, store, resources.BundleTpr()))
 
 	wg.Start(func() {
 		apl := app.App{
