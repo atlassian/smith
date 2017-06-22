@@ -571,7 +571,10 @@ func (c *BundleController) compareActualVsSpec(spec, actual *unstructured.Unstru
 	setOwnerReferences(updated, spec.GetOwnerReferences())
 	updated.SetFinalizers(spec.GetFinalizers()) // TODO Is this ok?
 
-	// 3. Everything else
+	// 3. Ignore fields managed by server
+	c.cleaner.Cleanup(updated)
+
+	// 4. Everything else
 	for field, specValue := range spec.Object {
 		switch field {
 		case "kind", "apiVersion", "metadata":
