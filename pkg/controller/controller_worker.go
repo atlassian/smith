@@ -509,6 +509,7 @@ func (c *BundleController) applyDefaults(spec *unstructured.Unstructured) error 
 }
 
 func (c *BundleController) cloneAsUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
+	// ------ TODO this block is a workaround for https://github.com/kubernetes/kubernetes/issues/47889
 	if _, ok := obj.(*unstructured.Unstructured); ok {
 		clone, err := c.scheme.DeepCopy(obj)
 		if err != nil {
@@ -516,6 +517,7 @@ func (c *BundleController) cloneAsUnstructured(obj runtime.Object) (*unstructure
 		}
 		return clone.(*unstructured.Unstructured), nil
 	}
+	// ------
 	u := &unstructured.Unstructured{
 		Object: make(map[string]interface{}),
 	}
