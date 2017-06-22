@@ -93,7 +93,7 @@ func (a *App) Run(ctx context.Context) error {
 	if a.ServiceCatalogConfig != nil {
 		types = append(types, readychecker.ServiceCatalogKnownTypes)
 	}
-	rc := readychecker.New(&tprStore{store: rawStore}, types...)
+	rc := readychecker.New(&store.Tpr{Store: rawStore}, types...)
 
 	// 3. Ensure ThirdPartyResource Bundle exists
 	err = retryUntilSuccessOrDone(ctx, func() error {
