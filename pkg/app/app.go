@@ -108,7 +108,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 4. Controller
-	bs, err := store.NewBundleStore(bundleInf, multiStore, scheme.DeepCopy)
+	bs, err := store.NewBundle(bundleInf, multiStore, scheme.DeepCopy)
 	if err != nil {
 		return err
 	}

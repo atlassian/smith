@@ -23,7 +23,7 @@ type BundleStore struct {
 	deepCopy      smith.DeepCopy
 }
 
-func NewBundleStore(bundleInf cache.SharedIndexInformer, store smith.ByNameStore, deepCopy smith.DeepCopy) (*BundleStore, error) {
+func NewBundle(bundleInf cache.SharedIndexInformer, store smith.ByNameStore, deepCopy smith.DeepCopy) (*BundleStore, error) {
 	err := bundleInf.AddIndexers(cache.Indexers{
 		byTprNameIndexName: byTprNameIndex,
 		byObjectIndexName:  byObjectIndex,
