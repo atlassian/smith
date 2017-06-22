@@ -25,10 +25,13 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 			desired := input2()
 			t.Run(fmt.Sprintf("%s actual, %s desired", kind1, kind2), func(t *testing.T) {
 				t.Parallel()
-				scheme := runtime.NewScheme()
-				updated, err := updateResource(scheme.DeepCopy, desired, actual)
+				cntrlr := BundleController{
+					scheme: runtime.NewScheme(),
+				}
+				updated, match, err := cntrlr.compareActualVsSpec(desired, actual)
 				require.NoError(t, err)
-				assert.Nil(t, updated)
+				assert.True(t, match)
+				assert.Equal(t, actual, updated)
 			})
 		}
 	}

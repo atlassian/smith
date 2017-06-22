@@ -67,21 +67,7 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for TPR Informer was cancelled")
 	}
 
-	tpr := &ext_v1b1.ThirdPartyResource{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name: SleeperResourceName,
-			Annotations: map[string]string{
-				smith.TprFieldPathAnnotation:  SleeperReadyStatePath,
-				smith.TprFieldValueAnnotation: string(SleeperReadyStateValue),
-			},
-		},
-		Description: "Sleeper TPR Informer example",
-		Versions: []ext_v1b1.APIVersion{
-			{Name: SleeperResourceVersion},
-		},
-	}
-	err = resources.EnsureTprExists(ctx, clientset, store, tpr)
-	if err != nil {
+	if err = resources.EnsureTprExists(ctx, clientset, store, SleeperTpr()); err != nil {
 		return err
 	}
 
