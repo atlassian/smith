@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/atlassian/smith/pkg/app"
+	"github.com/atlassian/smith/app"
 	"github.com/atlassian/smith/pkg/resources"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
