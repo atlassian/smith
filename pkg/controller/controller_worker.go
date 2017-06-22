@@ -24,10 +24,6 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-var (
-	converter = unstructured_conversion.NewConverter(false)
-)
-
 type objectRef struct {
 	schema.GroupVersionKind
 	Name string
@@ -497,12 +493,12 @@ func (c *BundleController) applyDefaults(spec *unstructured.Unstructured) error 
 	if err != nil {
 		return err
 	}
-	if err = converter.FromUnstructured(spec.Object, specTyped); err != nil {
+	if err = unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, specTyped); err != nil {
 		return err
 	}
 	c.scheme.Default(specTyped)
 	spec.Object = make(map[string]interface{})
-	if err := converter.ToUnstructured(specTyped, &spec.Object); err != nil {
+	if err := unstructured_conversion.DefaultConverter.ToUnstructured(specTyped, &spec.Object); err != nil {
 		return err
 	}
 	return nil
@@ -521,7 +517,7 @@ func (c *BundleController) cloneAsUnstructured(obj runtime.Object) (*unstructure
 	u := &unstructured.Unstructured{
 		Object: make(map[string]interface{}),
 	}
-	if err := converter.ToUnstructured(obj, &u.Object); err != nil {
+	if err := unstructured_conversion.DefaultConverter.ToUnstructured(obj, &u.Object); err != nil {
 		return nil, err
 	}
 	return u, nil

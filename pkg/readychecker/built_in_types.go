@@ -11,8 +11,6 @@ import (
 	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 )
 
-var converter = unstructured_conversion.NewConverter(false)
-
 var MainKnownTypes = map[schema.GroupKind]IsObjectReady{
 	{Group: api_v1.GroupName, Kind: "ConfigMap"}:        alwaysReady,
 	{Group: api_v1.GroupName, Kind: "Secret"}:           alwaysReady,
@@ -36,7 +34,7 @@ func alwaysReady(_ *unstructured.Unstructured) (isReady, retriableError bool, e 
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
 func isDeploymentExtReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	var deployment ext_v1b1.Deployment
-	if err := converter.FromUnstructured(obj.Object, &deployment); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &deployment); err != nil {
 		return false, false, err
 	}
 
@@ -53,7 +51,7 @@ func isDeploymentExtReady(obj *unstructured.Unstructured) (isReady, retriableErr
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
 func isDeploymentAppsReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	var deployment apps_v1b1.Deployment
-	if err := converter.FromUnstructured(obj.Object, &deployment); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &deployment); err != nil {
 		return false, false, err
 	}
 
@@ -68,7 +66,7 @@ func isDeploymentAppsReady(obj *unstructured.Unstructured) (isReady, retriableEr
 
 func isScBindingReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	var binding sc_v1a1.Binding
-	if err := converter.FromUnstructured(obj.Object, &binding); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &binding); err != nil {
 		return false, false, err
 	}
 	readyCond := getBindingCondition(&binding, sc_v1a1.BindingConditionReady)
@@ -77,7 +75,7 @@ func isScBindingReady(obj *unstructured.Unstructured) (isReady, retriableError b
 
 func isScInstanceReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	var instance sc_v1a1.Instance
-	if err := converter.FromUnstructured(obj.Object, &instance); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &instance); err != nil {
 		return false, false, err
 	}
 	readyCond := getInstanceCondition(&instance, sc_v1a1.InstanceConditionReady)
