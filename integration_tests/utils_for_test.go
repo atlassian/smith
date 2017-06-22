@@ -12,6 +12,7 @@ import (
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util/wait"
 
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -48,7 +49,7 @@ type itConfig struct {
 	clientset     *kubernetes.Clientset
 	sc            smith.SmartClient
 	bundleClient  *rest.RESTClient
-	store         *resources.Store
+	store         *store.Multi
 	toCleanup     []runtime.Object
 }
 
@@ -163,7 +164,7 @@ func isBundleError(obj runtime.Object) bool {
 	return cond != nil && cond.Status == smith.ConditionTrue
 }
 
-func isBundleReadyAndNewer(resourceVersions ...string) resources.AwaitCondition {
+func isBundleReadyAndNewer(resourceVersions ...string) store.AwaitCondition {
 	return func(obj runtime.Object) bool {
 		b := obj.(*smith.Bundle)
 		for _, rv := range resourceVersions {
@@ -212,12 +213,12 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	scheme, err := app.FullScheme(serviceCatalog)
 	require.NoError(t, err)
 
-	store := resources.NewStore(scheme.DeepCopy)
+	multiStore := store.NewMulti(scheme.DeepCopy)
 	var wgStore wait.Group
-	defer wgStore.Wait() // await store termination
+	defer wgStore.Wait() // await multiStore termination
 	ctxStore, cancelStore := context.WithCancel(context.Background())
-	defer cancelStore() // signal store to stop
-	wgStore.StartWithContext(ctxStore, store.Run)
+	defer cancelStore() // signal multiStore to stop
+	wgStore.StartWithContext(ctxStore, multiStore.Run)
 
 	err = bundleClient.Delete().
 		Namespace(useNamespace).
@@ -238,7 +239,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		clientset:    clientset,
 		sc:           sc,
 		bundleClient: bundleClient,
-		store:        store,
+		store:        multiStore,
 	}
 	defer cfg.cleanup()
 
@@ -250,7 +251,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
-	store.AddInformer(ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
+	multiStore.AddInformer(ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
 	go tprInf.Run(ctx.Done())
 
 	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
@@ -259,8 +260,8 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		t.Fatal("wait for TPR Informer was cancelled")
 	}
 
-	require.NoError(t, resources.EnsureTprExists(ctx, clientset, store, tprattribute.SleeperTpr()))
-	require.NoError(t, resources.EnsureTprExists(ctx, clientset, store, resources.BundleTpr()))
+	require.NoError(t, resources.EnsureTprExists(ctx, clientset, multiStore, tprattribute.SleeperTpr()))
+	require.NoError(t, resources.EnsureTprExists(ctx, clientset, multiStore, resources.BundleTpr()))
 
 	wg.Start(func() {
 		apl := app.App{
@@ -281,13 +282,13 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	}
 
 	bundleInf := bundleInformer(bundleClient, useNamespace)
-	store.AddInformer(smith.BundleGVK, bundleInf)
+	multiStore.AddInformer(smith.BundleGVK, bundleInf)
 	wg.StartWithChannel(ctx.Done(), bundleInf.Run)
 
 	test(t, ctx, cfg, args...)
 }
 
-func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle, resourceVersions ...string) *smith.Bundle {
+func assertBundle(t *testing.T, ctx context.Context, store *store.Multi, namespace string, bundle *smith.Bundle, resourceVersions ...string) *smith.Bundle {
 	obj, err := store.AwaitObjectCondition(ctx, smith.BundleGVK, namespace, bundle.Name, isBundleReadyAndNewer(resourceVersions...))
 	require.NoError(t, err)
 	bundleRes := obj.(*smith.Bundle)
@@ -312,7 +313,7 @@ func assertBundle(t *testing.T, ctx context.Context, store *resources.Store, nam
 	return bundleRes
 }
 
-func assertBundleTimeout(t *testing.T, ctx context.Context, store *resources.Store, namespace string, bundle *smith.Bundle, resourceVersion ...string) *smith.Bundle {
+func assertBundleTimeout(t *testing.T, ctx context.Context, store *store.Multi, namespace string, bundle *smith.Bundle, resourceVersion ...string) *smith.Bundle {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return assertBundle(t, ctxTimeout, store, namespace, bundle, resourceVersion...)

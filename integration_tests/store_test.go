@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith/pkg/client"
-	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util/wait"
 
 	"github.com/stretchr/testify/assert"
@@ -20,17 +20,17 @@ import (
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 )
 
-func TestStore(t *testing.T) {
+func TestMultiStore(t *testing.T) {
 	_, clientset, _ := testSetup(t)
 
-	store := resources.NewStore(client.BundleScheme().DeepCopy)
+	multiStore := store.NewMulti(client.BundleScheme().DeepCopy)
 
 	var wgStore wait.Group
-	defer wgStore.Wait() // await store termination
+	defer wgStore.Wait() // await multiStore termination
 
 	ctxStore, cancelStore := context.WithCancel(context.Background())
-	defer cancelStore() // signal store to stop
-	wgStore.StartWithContext(ctxStore, store.Run)
+	defer cancelStore() // signal multiStore to stop
+	wgStore.StartWithContext(ctxStore, multiStore.Run)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -39,14 +39,14 @@ func TestStore(t *testing.T) {
 
 	informerFactory := informers.NewSharedInformerFactory(clientset, 1*time.Minute)
 	configMapInf := informerFactory.Core().V1().ConfigMaps().Informer()
-	store.AddInformer(configMapGvk, configMapInf)
-	informerFactory.Start(ctx.Done()) // Must be after store.AddInformer()
+	multiStore.AddInformer(configMapGvk, configMapInf)
+	informerFactory.Start(ctx.Done()) // Must be after multiStore.AddInformer()
 
 	t.Run("timeout", func(t *testing.T) {
 		ctxTimeout, cancelTimeout1 := context.WithTimeout(ctx, 1*time.Second)
 		defer cancelTimeout1()
 
-		_, err := store.AwaitObject(ctxTimeout, configMapGvk, useNamespace, "i-do-not-exist-13123123123")
+		_, err := multiStore.AwaitObject(ctxTimeout, configMapGvk, useNamespace, "i-do-not-exist-13123123123")
 		assert.EqualError(t, err, context.DeadlineExceeded.Error())
 	})
 	t.Run("create", func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestStore(t *testing.T) {
 		var obj runtime.Object
 		var wg wait.Group
 		wg.Start(func() {
-			obj, err = store.AwaitObject(ctxTimeout, configMapGvk, useNamespace, mapName)
+			obj, err = multiStore.AwaitObject(ctxTimeout, configMapGvk, useNamespace, mapName)
 		})
 		time.Sleep(1 * time.Second)
 		cm, errCreate := clientset.CoreV1().ConfigMaps(useNamespace).Create(cm)
@@ -93,19 +93,19 @@ func TestStore(t *testing.T) {
 		defer cancelTimeout()
 		var wg wait.Group
 		wg.Start(func() {
-			_, err = store.AwaitObject(ctxTimeout, configMapGvk, useNamespace, mapName)
+			_, err = multiStore.AwaitObject(ctxTimeout, configMapGvk, useNamespace, mapName)
 		})
 		time.Sleep(1 * time.Second)
-		assert.True(t, store.RemoveInformer(configMapGvk))
+		assert.True(t, multiStore.RemoveInformer(configMapGvk))
 		wg.Wait()
-		require.Equal(t, resources.ErrInformerRemoved, err)
+		require.Equal(t, store.ErrInformerRemoved, err)
 	})
 	t.Run("missing informer", func(t *testing.T) {
 		mapName := "i-do-not-exist-234234"
 		ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 5*time.Second)
 		defer cancelTimeout()
 
-		_, err := store.AwaitObject(ctxTimeout, api_v1.SchemeGroupVersion.WithKind("Secret"), useNamespace, mapName)
+		_, err := multiStore.AwaitObject(ctxTimeout, api_v1.SchemeGroupVersion.WithKind("Secret"), useNamespace, mapName)
 		require.EqualError(t, err, "no informer for /v1, Kind=Secret is registered")
 	})
 }
