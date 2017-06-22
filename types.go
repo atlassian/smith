@@ -176,6 +176,12 @@ func (bs *BundleStatus) ShortString() string {
 			buf.WriteString(cond.Reason)
 			buf.WriteByte('"')
 		}
+		if cond.Message != "" {
+			buf.WriteByte(' ')
+			buf.WriteByte('"')
+			buf.WriteString(cond.Message)
+			buf.WriteByte('"')
+		}
 	}
 	buf.WriteByte(']')
 	return buf.String()
