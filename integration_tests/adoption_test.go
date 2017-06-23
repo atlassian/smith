@@ -9,8 +9,8 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/tprattribute"
-	"github.com/atlassian/smith/pkg/util/wait"
 
+	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -68,12 +68,11 @@ func TestAdoption(t *testing.T) {
 	setupApp(t, bundle, false, false, testAdoption, cm, sleeper)
 }
 
-func testAdoption(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
-	var wg wait.Group
-	defer wg.Wait()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	wg.Start(func() {
+func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...interface{}) {
+	stgr := stager.New()
+	defer stgr.Shutdown()
+	stage := stgr.NextStage()
+	stage.StartWithContext(func(ctx context.Context) {
 		apl := tprattribute.App{
 			RestConfig: cfg.config,
 		}
@@ -113,7 +112,7 @@ func testAdoption(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 	time.Sleep(1 * time.Second) // TODO this should be removed once race with tpr informer is fixed "no informer for tpr.atlassian.com/v1, Kind=Sleeper is registered"
 
 	// Bundle should be in Error=true state
-	obj, err := cfg.store.AwaitObjectCondition(ctx, smith.BundleGVK, cfg.namespace, cfg.bundle.Name, isBundleError)
+	obj, err := cfg.store.AwaitObjectCondition(ctxTest, smith.BundleGVK, cfg.namespace, cfg.bundle.Name, isBundleError)
 	require.NoError(t, err)
 	bundleActual = obj.(*smith.Bundle)
 
@@ -172,7 +171,7 @@ func testAdoption(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 	}
 
 	// Bundle should reach Ready=true state
-	assertBundle(t, ctx, cfg.store, cfg.namespace, cfg.bundle)
+	assertBundle(t, ctxTest, cfg.store, cfg.namespace, cfg.bundle)
 
 	// ConfigMap should have BlockOwnerDeletion updated
 	cmActual, err = cmClient.Get(cm.Name, meta_v1.GetOptions{})

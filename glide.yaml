@@ -7,8 +7,5 @@ import:
   version: 75b8dd260ef0469d96d578705a87cffd0e09dab8 # version used by service-catalog
 - package: github.com/kubernetes-incubator/service-catalog
   version: master
-testImports:
-- name: github.com/stretchr/testify
-  subpackages:
-  - assert
-  - require
+- package: github.com/ash2k/stager
+  version: master

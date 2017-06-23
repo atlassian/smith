@@ -13,8 +13,8 @@ import (
 	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/store"
-	"github.com/atlassian/smith/pkg/util/wait"
 
+	"github.com/ash2k/stager"
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -61,26 +61,22 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
+	stgr := stager.New()
+	defer stgr.Shutdown()
+
 	// 1. Multi store
-	var wgStore wait.Group
-	defer wgStore.Wait() // await multiStore termination
-	ctxStore, cancelStore := context.WithCancel(context.Background())
-	defer cancelStore() // signal multiStore to stop
+	stage := stgr.NextStage()
 	multiStore := store.NewMulti(scheme.DeepCopy)
-	wgStore.StartWithContext(ctxStore, multiStore.Run)
+	stage.StartWithContext(multiStore.Run)
 
 	// 1.5. Informers
-	var wg wait.Group
-	defer wg.Wait() // await termination
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
 	multiStore.AddInformer(smith.BundleGVK, bundleInf)
 
 	resourceInfs, tprInf := a.resourceInformers(clientset, scClient)
 	multiStore.AddInformer(tprGVK, tprInf)
-	wg.StartWithChannel(ctx.Done(), tprInf.Run) // Must be after store.AddInformer()
+	stage = stgr.NextStage()
+	stage.StartWithChannel(tprInf.Run) // Must be after store.AddInformer()
 
 	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
 	// in Ready Checker and in EnsureTprExists().
@@ -119,9 +115,9 @@ func (a *App) Run(ctx context.Context) error {
 	// Add all to Multi store
 	for gvk, inf := range resourceInfs {
 		multiStore.AddInformer(gvk, inf)
-		wg.StartWithChannel(ctx.Done(), inf.Run) // Must be after store.AddInformer()
+		stage.StartWithChannel(inf.Run) // Must be after store.AddInformer()
 	}
-	wg.StartWithChannel(ctx.Done(), bundleInf.Run)
+	stage.StartWithChannel(bundleInf.Run)
 
 	cntrlr.Run(ctx)
 	return ctx.Err()

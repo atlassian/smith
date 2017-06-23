@@ -9,8 +9,8 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/tprattribute"
-	"github.com/atlassian/smith/pkg/util/wait"
 
+	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,17 +50,15 @@ func TestTprAttribute(t *testing.T) {
 	setupApp(t, bundle, false, true, testTprAttribute, sleeper)
 }
 
-func testTprAttribute(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
-
+func testTprAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...interface{}) {
 	sleeper := args[0].(*tprattribute.Sleeper)
 	sClient, err := tprattribute.GetSleeperTprClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
-	var wg wait.Group
-	defer wg.Wait()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	wg.Start(func() {
+	stgr := stager.New()
+	defer stgr.Shutdown()
+	stage := stgr.NextStage()
+	stage.StartWithContext(func(ctx context.Context) {
 		apl := tprattribute.App{
 			RestConfig: cfg.config,
 		}
@@ -69,7 +67,7 @@ func testTprAttribute(t *testing.T, ctx context.Context, cfg *itConfig, args ...
 		}
 	})
 
-	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper.Spec.SleepFor+3)*time.Second)
+	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sleeper.Spec.SleepFor+3)*time.Second)
 	defer cancel()
 
 	assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, cfg.bundle, "")

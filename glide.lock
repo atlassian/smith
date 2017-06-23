@@ -1,6 +1,10 @@
-hash: 452775db7352002969d41a0310c6ca4f33885e767721451daea0122bf8302e20
-updated: 2017-06-18T22:28:56.777039464+10:00
+hash: 0692fa7cb18d68b7938d3ebf645c7947ef1180206b5faaf610841257d536dc2e
+updated: 2017-06-22T22:49:32.812513388+10:00
 imports:
+- name: github.com/ash2k/stager
+  version: 6e9c7b0eacd465286fac042bfb29a170aa8c2c3f
+  subpackages:
+  - wait
 - name: github.com/cenk/backoff
   version: 5d150e7eec023ce7a124856b37c68e54b4050ac7
 - name: github.com/davecgh/go-spew

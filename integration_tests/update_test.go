@@ -9,8 +9,8 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/tprattribute"
-	"github.com/atlassian/smith/pkg/util/wait"
 
+	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -140,12 +140,11 @@ func TestUpdate(t *testing.T) {
 	setupApp(t, bundle1, false, true, testUpdate, cm2, sleeper1, sleeper2, bundle2)
 }
 
-func testUpdate(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
-	var wg wait.Group
-	defer wg.Wait()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	wg.Start(func() {
+func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...interface{}) {
+	stgr := stager.New()
+	defer stgr.Shutdown()
+	stage := stgr.NextStage()
+	stage.StartWithContext(func(ctx context.Context) {
 		apl := tprattribute.App{
 			RestConfig: cfg.config,
 		}
@@ -163,7 +162,7 @@ func testUpdate(t *testing.T, ctx context.Context, cfg *itConfig, args ...interf
 	sClient, err := tprattribute.GetSleeperTprClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
-	ctxTimeout, cancel := context.WithTimeout(ctx, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
+	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
 	defer cancel()
 
 	bundleRes1 := assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, cfg.bundle, cfg.createdBundle.ResourceVersion)
@@ -218,7 +217,7 @@ func testUpdate(t *testing.T, ctx context.Context, cfg *itConfig, args ...interf
 		Do().
 		Into(res))
 
-	assertBundleTimeout(t, ctx, cfg.store, cfg.namespace, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
+	assertBundleTimeout(t, ctxTest, cfg.store, cfg.namespace, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
 
 	cfMap, err = cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	if err == nil {
