@@ -118,11 +118,12 @@ and following the same behaviour, semantics and code "style" as native Kubernete
 
 ## Features
 
-- Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `PodPreset`, `Ingress`
-- [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `Instance` and `Binding`
-- Dynamic TPR support via [special annotations](https://github.com/atlassian/smith/blob/master/docs/design/managing-resources.md#defined-annotations)
-- References between objects in the graph to pull parts of objects/fields from dependencies
-- Smith will delete objects which were removed from a Bundle when Bundle reconciliation is performed (e.g. on a Bundle update)
+- Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `PodPreset`, `Ingress`;
+- [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `Instance` and `Binding`.
+See [recording of the presentation](https://youtu.be/7fgPgtQh5Es) to SIG Service Catalog;
+- Dynamic TPR support via [special annotations](https://github.com/atlassian/smith/blob/master/docs/design/managing-resources.md#defined-annotations);
+- References between objects in the graph to pull parts of objects/fields from dependencies;
+- Smith will delete objects which were removed from a Bundle when Bundle reconciliation is performed (e.g. on a Bundle update).
 
 ## Missing features
 

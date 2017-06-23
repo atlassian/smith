@@ -1,5 +1,7 @@
 # Service Catalog example
 
+Recoding of the presentation to SIG Service Catalog: https://youtu.be/7fgPgtQh5Es
+
 ## Description
 
 Imagine that we want to deploy a service to Kubernetes, which consists of:
