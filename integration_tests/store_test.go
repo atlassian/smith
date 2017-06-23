@@ -9,8 +9,9 @@ import (
 
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/store"
-	"github.com/atlassian/smith/pkg/util/wait"
 
+	"github.com/ash2k/stager"
+	"github.com/ash2k/stager/wait"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,22 +26,21 @@ func TestMultiStore(t *testing.T) {
 
 	multiStore := store.NewMulti(client.BundleScheme().DeepCopy)
 
-	var wgStore wait.Group
-	defer wgStore.Wait() // await multiStore termination
-
-	ctxStore, cancelStore := context.WithCancel(context.Background())
-	defer cancelStore() // signal multiStore to stop
-	wgStore.StartWithContext(ctxStore, multiStore.Run)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	stgr := stager.New()
+	defer stgr.Shutdown()
+	stage := stgr.NextStage()
+	stage.StartWithContext(multiStore.Run)
 
 	configMapGvk := api_v1.SchemeGroupVersion.WithKind("ConfigMap")
 
 	informerFactory := informers.NewSharedInformerFactory(clientset, 1*time.Minute)
 	configMapInf := informerFactory.Core().V1().ConfigMaps().Informer()
 	multiStore.AddInformer(configMapGvk, configMapInf)
-	informerFactory.Start(ctx.Done()) // Must be after multiStore.AddInformer()
+	stage = stgr.NextStage()
+	stage.StartWithChannel(configMapInf.Run) // Must be after multiStore.AddInformer()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	t.Run("timeout", func(t *testing.T) {
 		ctxTimeout, cancelTimeout1 := context.WithTimeout(ctx, 1*time.Second)

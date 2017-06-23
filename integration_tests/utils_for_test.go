@@ -13,8 +13,8 @@ import (
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/store"
-	"github.com/atlassian/smith/pkg/util/wait"
 
+	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -214,23 +214,6 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	require.NoError(t, err)
 
 	multiStore := store.NewMulti(scheme.DeepCopy)
-	var wgStore wait.Group
-	defer wgStore.Wait() // await multiStore termination
-	ctxStore, cancelStore := context.WithCancel(context.Background())
-	defer cancelStore() // signal multiStore to stop
-	wgStore.StartWithContext(ctxStore, multiStore.Run)
-
-	err = bundleClient.Delete().
-		Namespace(useNamespace).
-		Resource(smith.BundleResourcePath).
-		Name(bundle.Name).
-		Do().
-		Error()
-	if err == nil {
-		t.Log("Bundle deleted")
-	} else if !api_errors.IsNotFound(err) {
-		require.NoError(t, err)
-	}
 	cfg := &itConfig{
 		t:            t,
 		namespace:    useNamespace,
@@ -243,16 +226,33 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	}
 	defer cfg.cleanup()
 
-	var wg wait.Group
-	defer wg.Wait()
+	stgr := stager.New()
+	defer stgr.Shutdown()
+
+	stage := stgr.NextStage()
+	stage.StartWithContext(multiStore.Run)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
+	err = bundleClient.Delete().
+		Context(ctx).
+		Namespace(useNamespace).
+		Resource(smith.BundleResourcePath).
+		Name(bundle.Name).
+		Do().
+		Error()
+	if err == nil {
+		t.Log("Bundle deleted")
+	} else if !api_errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
+
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
 	multiStore.AddInformer(ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
-	go tprInf.Run(ctx.Done())
+	stage = stgr.NextStage()
+	stage.StartWithChannel(tprInf.Run)
 
 	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
 	// in resources.EnsureTprExists().
@@ -263,7 +263,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	require.NoError(t, resources.EnsureTprExists(ctx, clientset, multiStore, tprattribute.SleeperTpr()))
 	require.NoError(t, resources.EnsureTprExists(ctx, clientset, multiStore, resources.BundleTpr()))
 
-	wg.Start(func() {
+	stage.StartWithContext(func(ctx context.Context) {
 		apl := app.App{
 			RestConfig:           config,
 			ServiceCatalogConfig: scConfig,
@@ -283,7 +283,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 
 	bundleInf := bundleInformer(bundleClient, useNamespace)
 	multiStore.AddInformer(smith.BundleGVK, bundleInf)
-	wg.StartWithChannel(ctx.Done(), bundleInf.Run)
+	stage.StartWithChannel(bundleInf.Run)
 
 	test(t, ctx, cfg, args...)
 }
