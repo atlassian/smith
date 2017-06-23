@@ -74,7 +74,7 @@ spec:
     dependsOn:
     - db1
     spec:
-      apiVersion: extensions/v1beta1
+      apiVersion: apps/v1beta1
       kind: Deployment
       metadata:
         name: app1
@@ -108,37 +108,45 @@ a DB then it means it was provisioned and set up as requested. State is often pa
 ### Event-driven and stateless
 Smith does not block while waiting for a resource to reach the READY state. Instead, when walking the dependency
 graph, if a resource is not in the READY state (still being created) it skips processing of that resource.
-Of course resources that don't have their dependencies READY are not processed either.
+Resources that don't have their dependencies READY are not processed.
 Resources that can be created concurrently are created concurrently.
 Full bundle re-processing is triggered by events about the watched resources.
-Smith is watching all supported resource types and inspects labels on events to find out which
-bundle should be re-processed because of the event. This scales better than watching
-individual resources and much better than polling individual resources.
+Smith is watching all supported resource types and reacts to events to determine which bundle should be re-processed.
+This scales better than watching individual resources and much better than polling individual resources.
+Smith controller is built according to [recommendations](https://github.com/kubernetes/community/blob/master/contributors/devel/controllers.md)
+and following the same behaviour, semantics and code "style" as native Kubernetes controllers as closely as possible.
 
 ## Features
 
 - Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `PodPreset`, `Ingress`
 - [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `Instance` and `Binding`
 - Dynamic TPR support via [special annotations](https://github.com/atlassian/smith/blob/master/docs/design/managing-resources.md#defined-annotations)
+- References between objects in the graph to pull parts of objects/fields from dependencies
+- Smith will delete objects which were removed from a Bundle when Bundle reconciliation is performed (e.g. on a Bundle update)
 
 ## Missing features
 
-See [milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0) and previous milestones.
+See [milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0).
 
 ## Notes
 
 ### On [App Controller](https://github.com/Mirantis/k8s-AppController)
 Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes/issues/29453) is a very similar workflow engine with a few differences.
 
-1. Graph of dependencies is defined explicitly.
-2. It uses polling and blocks while waiting for the resource to become READY.
-3. The goal of Smith is to manage instances of TPRs. App Controller cannot manage them as of this writing.
+* Graph of dependencies is defined explicitly.
+* It uses polling and blocks while waiting for the resource to become READY.
+* The goal of Smith is to manage instances of TPRs. App Controller cannot manage them as of this writing.
 
-It is not better or worse, just different set of design choices.
+### On [Helm](https://helm.sh/)
+Helm is a package manager for Kubernetes. Smith operates on a lower level, even though it can be used by a human,
+that is not the main usecase. Smith is built to be used as a foundation component with human-friendly tooling built
+on top of it. E.g. Helm could probably use Smith under the covers to manipulate Kubernetes API objects. Another
+usecase is a PaaS that delegates (some) object manipulations to Smith.
 
 ### Requirements
 
-* Please run on Kubernetes 1.4+ because earlier versions have some bugs that may prevent Smith from working properly;
+* Please run on recent enough Kubernetes version because earlier versions have some bugs that may prevent Smith from
+working properly. We test on 1.6+;
 * Go 1.7+ is required because [context package](https://golang.org/doc/go1.7#context) is used and it was added to
 standard library in this version;
 * Working Docker installation - build process uses dockerized Go to isolate from the host system;
