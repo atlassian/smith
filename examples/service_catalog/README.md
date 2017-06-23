@@ -1,6 +1,6 @@
 # Service Catalog example
 
-Recoding of the presentation to SIG Service Catalog: https://youtu.be/7fgPgtQh5Es
+Recoding of the presentation to Service Catalog SIG: https://youtu.be/7fgPgtQh5Es
 
 ## Description
 
