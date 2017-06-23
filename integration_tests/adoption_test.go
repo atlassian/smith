@@ -96,6 +96,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 	// Create orphaned Sleeper
 	sleeperActual := &tprattribute.Sleeper{}
 	err = sClient.Post().
+		Context(ctxTest).
 		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Body(sleeper).
@@ -106,7 +107,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 
 	// Create Bundle with same resources
 	bundleActual := &smith.Bundle{}
-	cfg.createObject(cfg.bundle, bundleActual, smith.BundleResourcePath, cfg.bundleClient)
+	cfg.createObject(ctxTest, cfg.bundle, bundleActual, smith.BundleResourcePath, cfg.bundleClient)
 	cfg.createdBundle = bundleActual
 
 	time.Sleep(1 * time.Second) // TODO this should be removed once race with tpr informer is fixed "no informer for tpr.atlassian.com/v1, Kind=Sleeper is registered"
@@ -150,6 +151,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 			},
 		})
 		err = sClient.Put().
+			Context(ctxTest).
 			Namespace(cfg.namespace).
 			Resource(tprattribute.SleeperResourcePath).
 			Name(sleeperActual.Name).
@@ -158,6 +160,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 			Into(sleeperActual)
 		if api_errors.IsConflict(err) {
 			err = sClient.Get().
+				Context(ctxTest).
 				Namespace(cfg.namespace).
 				Resource(tprattribute.SleeperResourcePath).
 				Name(sleeperActual.Name).
@@ -189,6 +192,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 
 	// Sleeper should have BlockOwnerDeletion updated
 	err = sClient.Get().
+		Context(ctxTest).
 		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Name(sleeperActual.Name).

@@ -74,6 +74,7 @@ func testTprAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args
 
 	var sleeperObj tprattribute.Sleeper
 	require.NoError(t, sClient.Get().
+		Context(ctxTest).
 		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Name(sleeper.Name).

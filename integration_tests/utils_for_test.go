@@ -115,12 +115,13 @@ func (cfg *itConfig) deleteObject(obj runtime.Object) {
 	}
 }
 
-func (cfg *itConfig) createObject(obj, res runtime.Object, resourcePath string, client *rest.RESTClient) {
+func (cfg *itConfig) createObject(ctxTest context.Context, obj, res runtime.Object, resourcePath string, client *rest.RESTClient) {
 	metaObj, err := meta.Accessor(obj)
 	require.NoError(cfg.t, err)
 
 	cfg.t.Logf("Creating a new object %s/%s of kind %s", cfg.namespace, metaObj.GetName(), obj.GetObjectKind().GroupVersionKind().Kind)
 	require.NoError(cfg.t, client.Post().
+		Context(ctxTest).
 		Namespace(cfg.namespace).
 		Resource(resourcePath).
 		Body(obj).
@@ -232,11 +233,11 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	stage := stgr.NextStage()
 	stage.StartWithContext(multiStore.Run)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctxTest, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	err = bundleClient.Delete().
-		Context(ctx).
+		Context(ctxTest).
 		Namespace(useNamespace).
 		Resource(smith.BundleResourcePath).
 		Name(bundle.Name).
@@ -256,12 +257,12 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 
 	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
 	// in resources.EnsureTprExists().
-	if !cache.WaitForCacheSync(ctx.Done(), tprInf.HasSynced) {
+	if !cache.WaitForCacheSync(ctxTest.Done(), tprInf.HasSynced) {
 		t.Fatal("wait for TPR Informer was cancelled")
 	}
 
-	require.NoError(t, resources.EnsureTprExists(ctx, clientset, multiStore, tprattribute.SleeperTpr()))
-	require.NoError(t, resources.EnsureTprExists(ctx, clientset, multiStore, resources.BundleTpr()))
+	require.NoError(t, resources.EnsureTprExists(ctxTest, clientset, multiStore, tprattribute.SleeperTpr()))
+	require.NoError(t, resources.EnsureTprExists(ctxTest, clientset, multiStore, resources.BundleTpr()))
 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := app.App{
@@ -277,7 +278,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	if createBundle {
 		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle TPR
 		res := &smith.Bundle{}
-		cfg.createObject(bundle, res, smith.BundleResourcePath, bundleClient)
+		cfg.createObject(ctxTest, bundle, res, smith.BundleResourcePath, bundleClient)
 		cfg.createdBundle = res
 	}
 
@@ -285,7 +286,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	multiStore.AddInformer(smith.BundleGVK, bundleInf)
 	stage.StartWithChannel(bundleInf.Run)
 
-	test(t, ctx, cfg, args...)
+	test(t, ctxTest, cfg, args...)
 }
 
 func assertBundle(t *testing.T, ctx context.Context, store *store.Multi, namespace string, bundle *smith.Bundle, resourceVersions ...string) *smith.Bundle {
