@@ -572,7 +572,13 @@ func (c *BundleController) compareActualVsSpec(spec, actual *unstructured.Unstru
 	updated.SetFinalizers(spec.GetFinalizers()) // TODO Is this ok?
 
 	// 3. Ignore fields managed by server
-	c.cleaner.Cleanup(updated)
+	//c.cleaner.Cleanup(updated)
+	log.Printf("Before: %v\n", &updated.Object)
+	updated, err = c.cleaner.Cleanup(updated)
+	if err != nil {
+		return nil, false, err
+	}
+	log.Printf("After: %v\n", &updated.Object)
 
 	// 4. Everything else
 	for field, specValue := range spec.Object {
@@ -583,6 +589,7 @@ func (c *BundleController) compareActualVsSpec(spec, actual *unstructured.Unstru
 		updated.Object[field] = specValue // using the value directly - we've made a copy up the stack so it's ok
 	}
 	if !equality.Semantic.DeepEqual(updated.Object, actualClone.Object) {
+		log.Printf("Updated: %v\n", &updated.Object)
 		log.Printf("Objects are different: %s\nupdated: %v\nactualClone: %v",
 			diff.ObjectReflectDiff(updated.Object, actualClone.Object), updated.Object, actualClone.Object)
 		return updated, false, nil

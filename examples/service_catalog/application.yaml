@@ -12,7 +12,6 @@ spec:
       metadata:
         name: instance1
       spec:
-        externalID: 786abffa-ed42-4c70-a06f-3836fe3d641c
         serviceClassName: user-provided-service
         planName: default
         parameters:

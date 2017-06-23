@@ -7,15 +7,15 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
 	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
-	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 var converter = unstructured_conversion.NewConverter(false)
 
 var MainKnownTypes = map[schema.GroupKind]Cleanup{
-	{Group: apps_v1b1.GroupName, Kind: "Deployment"}: deploymentAppsCleanup,
-	{Group: ext_v1b1.GroupName, Kind: "Deployment"}:  deploymentExtCleanup,
+	{Group: apps_v1b1.GroupName, Kind: "Deployment"}: deploymentCleanup,
+	{Group: api_v1.GroupName, Kind: "Service"}:       serviceCleanup,
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]Cleanup{
@@ -23,50 +23,67 @@ var ServiceCatalogKnownTypes = map[schema.GroupKind]Cleanup{
 	{Group: sc_v1a1.GroupName, Kind: "Instance"}: scInstanceCleanup,
 }
 
-func deploymentExtCleanup(obj *unstructured.Unstructured) (err error) {
-	var deployment ext_v1b1.Deployment
-	if err := converter.FromUnstructured(obj.Object, &deployment); err != nil {
-		return err
-	}
-
-	// TODO: implement cleanup
-	fmt.Print("deploymentExtCleanup\n")
-
-	return nil
-}
-
-func deploymentAppsCleanup(obj *unstructured.Unstructured) (err error) {
+func deploymentCleanup(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var deployment apps_v1b1.Deployment
 	if err := converter.FromUnstructured(obj.Object, &deployment); err != nil {
-		return err
+		return nil, err
 	}
 
 	// TODO: implement cleanup
-	fmt.Print("deploymentAppsCleanup\n")
+	fmt.Print("deploymentCleanup\n")
 
-	return nil
+	return obj, nil
 }
 
-func scBindingCleanup(obj *unstructured.Unstructured) (err error) {
+func serviceCleanup(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	var service api_v1.Service
+	if err := converter.FromUnstructured(obj.Object, &service); err != nil {
+		return nil, err
+	}
+
+	// TODO: implement cleanup
+	fmt.Print("serviceCleanup\n")
+	service.Spec.ClusterIP = "test"
+
+	updatedObj := &unstructured.Unstructured{
+		Object: make(map[string]interface{}),
+	}
+	converter.ToUnstructured(&service, &updatedObj.Object)
+	return updatedObj, nil
+}
+
+func scBindingCleanup(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var binding sc_v1a1.Binding
 	if err := converter.FromUnstructured(obj.Object, &binding); err != nil {
-		return err
+		return nil, err
 	}
 
 	fmt.Printf("scBindingCleanup: binding.Spec.ExternalID=%s\n", binding.Spec.ExternalID)
 	binding.Spec.ExternalID = ""
 
-	return nil
+	updatedObj := &unstructured.Unstructured{
+		Object: make(map[string]interface{}),
+	}
+	converter.ToUnstructured(&binding, &updatedObj.Object)
+	return updatedObj, nil
 }
 
-func scInstanceCleanup(obj *unstructured.Unstructured) (err error) {
+func scInstanceCleanup(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var instance sc_v1a1.Instance
 	if err := converter.FromUnstructured(obj.Object, &instance); err != nil {
-		return err
+		return nil, err
 	}
 
-	fmt.Printf("scBindingCleanup: binding.Spec.ExternalID=%s\n", instance.Spec.ExternalID)
-	instance.Spec.ExternalID = ""
+	fmt.Printf("scInstanceCleanup: binding.Spec.ExternalID=%s\n", instance.Spec.ExternalID)
+	//instance.ObjectMeta.SetFinalizers(nil)
+	instance.Spec.ExternalID = "test"
 
-	return nil
+	updatedObj := &unstructured.Unstructured{
+		Object: make(map[string]interface{}),
+	}
+	err := converter.ToUnstructured(&instance, &updatedObj.Object)
+	if err != nil {
+		return nil, err
+	}
+	return updatedObj, nil
 }
