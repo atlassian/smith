@@ -64,19 +64,19 @@ func (h *SleeperEventHandler) retryUpdate(sleeper *Sleeper, state SleeperState, 
 		sleeper.Status.State = state
 		sleeper.Status.Message = message
 		err := h.client.Put().
+			Context(h.ctx).
 			Namespace(sleeper.Namespace).
 			Resource(SleeperResourcePath).
 			Name(sleeper.Name).
-			Context(h.ctx).
 			Body(sleeper).
 			Do().
 			Into(sleeper)
 		if errors.IsConflict(err) {
 			err = h.client.Get().
+				Context(h.ctx).
 				Namespace(sleeper.Namespace).
 				Resource(SleeperResourcePath).
 				Name(sleeper.Name).
-				Context(h.ctx).
 				Do().
 				Into(sleeper)
 			if err != nil {

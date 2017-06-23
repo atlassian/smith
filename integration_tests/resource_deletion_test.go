@@ -95,6 +95,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	// Create orphaned Sleeper
 	sleeperActual := &tprattribute.Sleeper{}
 	err = sClient.Post().
+		Context(ctxTest).
 		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Body(sleeper).
@@ -105,7 +106,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 
 	// Create Bundle with same resources
 	bundleActual := &smith.Bundle{}
-	cfg.createObject(cfg.bundle, bundleActual, smith.BundleResourcePath, cfg.bundleClient)
+	cfg.createObject(ctxTest, cfg.bundle, bundleActual, smith.BundleResourcePath, cfg.bundleClient)
 	cfg.createdBundle = bundleActual
 
 	time.Sleep(1 * time.Second) // TODO this should be removed once race with tpr informer is fixed "no informer for tpr.atlassian.com/v1, Kind=Sleeper is registered"
@@ -142,6 +143,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	require.NoError(t, err)
 
 	err = sClient.Delete().
+		Context(ctxTest).
 		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Name(sleeperActual.Name).

@@ -170,6 +170,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	res := &smith.Bundle{}
 	bundle2.ResourceVersion = bundleRes1.ResourceVersion
 	require.NoError(t, cfg.bundleClient.Put().
+		Context(ctxTest).
 		Namespace(cfg.namespace).
 		Resource(smith.BundleResourcePath).
 		Name(bundle2.Name).
@@ -191,6 +192,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 
 	var sleeperObj tprattribute.Sleeper
 	err = sClient.Get().
+		Context(ctxTest).
 		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Name(sleeper2.Name).
@@ -210,6 +212,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	emptyBundle.Spec.Resources = []smith.Resource{}
 	emptyBundle.ResourceVersion = bundleRes2.ResourceVersion
 	require.NoError(t, cfg.bundleClient.Put().
+		Context(ctxTest).
 		Namespace(cfg.namespace).
 		Resource(smith.BundleResourcePath).
 		Name(emptyBundle.Name).
@@ -226,6 +229,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 		assert.True(t, api_errors.IsNotFound(err)) // Has been removed from api already
 	}
 	err = sClient.Get().
+		Context(ctxTest).
 		Namespace(cfg.namespace).
 		Resource(tprattribute.SleeperResourcePath).
 		Name(sleeper2.Name).
