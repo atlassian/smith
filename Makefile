@@ -95,17 +95,11 @@ minikube-sleeper-run: build-all-race
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	go run -race examples/tprattribute/main/*
 
-test-race: fmt
+test: fmt
 	go test -i -race $$(glide nv | grep -v integration_tests)
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	go test -race $$(glide nv | grep -v integration_tests)
-
-test: fmt
-	go test -i $$(glide nv | grep -v integration_tests)
-	KUBE_PATCH_CONVERSION_DETECTOR=true \
-	KUBE_CACHE_MUTATION_DETECTOR=true \
-	go test $$(glide nv | grep -v integration_tests)
 
 check: build-all
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor \

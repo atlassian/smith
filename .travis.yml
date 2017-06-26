@@ -19,5 +19,5 @@ install:
 
 script:
   - make build-all-race
-  - make test-race
+  - make test
   - make coveralls
