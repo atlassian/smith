@@ -40,7 +40,7 @@ type BundleController struct {
 	queue   workqueue.RateLimitingInterface
 	workers int
 	// Server fields cleanup
-	cleaner cleanup.ObjectCleaner
+	cleaner cleanup.SpecCleaner
 
 	// TPR
 	tprResyncPeriod time.Duration
@@ -49,7 +49,7 @@ type BundleController struct {
 
 func New(bundleInf, tprInf cache.SharedIndexInformer, bundleClient *rest.RESTClient, bundleStore BundleStore,
 	sc smith.SmartClient, rc ReadyChecker, scheme *runtime.Scheme, store Store, queue workqueue.RateLimitingInterface,
-	workers int, cleaner cleanup.ObjectCleaner, tprResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
+	workers int, cleaner cleanup.SpecCleaner, tprResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
 	c := &BundleController{
 		bundleInf:       bundleInf,
 		tprInf:          tprInf,

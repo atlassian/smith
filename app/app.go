@@ -93,7 +93,7 @@ func (a *App) Run(ctx context.Context) error {
 	rc := readychecker.New(&store.Tpr{store: multiStore}, readyTypes...)
 
 	// 3. Object cleanup
-	cleanupTypes := []map[schema.GroupKind]cleanup.Cleanup{cleanup.MainKnownTypes}
+	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{cleanup.MainKnownTypes}
 	if a.ServiceCatalogConfig != nil {
 		cleanupTypes = append(cleanupTypes, cleanup.ServiceCatalogKnownTypes)
 	}

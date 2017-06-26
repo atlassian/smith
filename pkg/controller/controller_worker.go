@@ -550,19 +550,26 @@ func (c *BundleController) compareActualVsSpec(spec, actual *unstructured.Unstru
 	setOwnerReferences(actualClone, actualClone.GetOwnerReferences())
 	actualClone.SetFinalizers(actualClone.GetFinalizers())
 
-	// Remove status to make sure ready checker will only detect readiness after resource controller has seen
-	// the object.
-	// Will be possible to implement it in a cleaner way once "status" is a separate sub-resource.
-	// See https://github.com/kubernetes/kubernetes/issues/38113
-	// Also ideally we don't want to clear the status at all but have a way to tell if controller has
-	// observed the update yet. Like Generation/ObservedGeneration for built-in controllers.
-	delete(spec.Object, "status")
-
 	// 1. TypeMeta
 	updated.SetKind(spec.GetKind())
 	updated.SetAPIVersion(spec.GetAPIVersion())
 
-	// 2. Some stuff from ObjectMeta
+	// 2. Copy data from the spec
+	for field, specValue := range spec.Object {
+		switch field {
+		case "kind", "apiVersion", "metadata", "status":
+			continue
+		}
+		updated.Object[field] = specValue // using the value directly - we've made a copy up the stack so it's ok
+	}
+
+	// 3. Ignore fields managed by server
+	updated, err = c.cleaner.Cleanup(updated, actualClone)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// 4. Some stuff from ObjectMeta
 	// TODO Ignores added annotations/labels. Should be configurable per-object and/or per-object kind?
 	updated.SetName(spec.GetName())
 	updated.SetLabels(spec.GetLabels())
@@ -571,25 +578,17 @@ func (c *BundleController) compareActualVsSpec(spec, actual *unstructured.Unstru
 	setOwnerReferences(updated, spec.GetOwnerReferences())
 	updated.SetFinalizers(spec.GetFinalizers()) // TODO Is this ok?
 
-	// 3. Ignore fields managed by server
-	//c.cleaner.Cleanup(updated)
-	log.Printf("Before: %v\n", &updated.Object)
-	updated, err = c.cleaner.Cleanup(updated)
-	if err != nil {
-		return nil, false, err
-	}
-	log.Printf("After: %v\n", &updated.Object)
+	// Remove status to make sure ready checker will only detect readiness after resource controller has seen
+	// the object.
+	// Will be possible to implement it in a cleaner way once "status" is a separate sub-resource.
+	// See https://github.com/kubernetes/kubernetes/issues/38113
+	// Also ideally we don't want to clear the status at all but have a way to tell if controller has
+	// observed the update yet. Like Generation/ObservedGeneration for built-in controllers.
+	delete(updated.Object, "status")
 
-	// 4. Everything else
-	for field, specValue := range spec.Object {
-		switch field {
-		case "kind", "apiVersion", "metadata":
-			continue
-		}
-		updated.Object[field] = specValue // using the value directly - we've made a copy up the stack so it's ok
-	}
 	if !equality.Semantic.DeepEqual(updated.Object, actualClone.Object) {
-		log.Printf("Updated: %v\n", &updated.Object)
+		//setOwnerReferences(updated, actualClone.GetOwnerReferences())
+
 		log.Printf("Objects are different: %s\nupdated: %v\nactualClone: %v",
 			diff.ObjectReflectDiff(updated.Object, actualClone.Object), updated.Object, actualClone.Object)
 		return updated, false, nil
