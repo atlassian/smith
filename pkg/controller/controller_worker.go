@@ -615,9 +615,8 @@ func mergeLabels(labels ...map[string]string) map[string]string {
 
 func isOwner(obj meta_v1.Object, bundle *smith.Bundle) bool {
 	ref := resources.GetControllerOf(obj)
+	// Theoretically Bundle may be represented by multiple API versions, hence we only check name and UID.
 	return ref != nil &&
-		ref.APIVersion == smith.BundleResourceGroupVersion &&
-		ref.Kind == smith.BundleResourceKind &&
 		ref.Name == bundle.Name &&
 		ref.UID == bundle.UID
 }
