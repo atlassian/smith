@@ -9,6 +9,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+type SpecCleaner interface {
+	Cleanup(spec, actual *unstructured.Unstructured) (updatedSpec *unstructured.Unstructured, err error)
+}
+
 type ReadyChecker interface {
 	IsReady(*unstructured.Unstructured) (isReady, retriableError bool, e error)
 }

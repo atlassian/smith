@@ -9,8 +9,6 @@ import (
 	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 )
 
-var converter = unstructured_conversion.NewConverter(false)
-
 var MainKnownTypes = map[schema.GroupKind]SpecCleanup{
 	{Group: apps_v1b1.GroupName, Kind: "Deployment"}: deploymentCleanup,
 	{Group: api_v1.GroupName, Kind: "Service"}:       serviceCleanup,
@@ -23,7 +21,7 @@ var ServiceCatalogKnownTypes = map[schema.GroupKind]SpecCleanup{
 
 func deploymentCleanup(obj *unstructured.Unstructured, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var deployment apps_v1b1.Deployment
-	if err := converter.FromUnstructured(obj.Object, &deployment); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &deployment); err != nil {
 		return nil, err
 	}
 
@@ -34,11 +32,11 @@ func deploymentCleanup(obj *unstructured.Unstructured, actual *unstructured.Unst
 
 func serviceCleanup(spec *unstructured.Unstructured, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var serviceSpec api_v1.Service
-	if err := converter.FromUnstructured(spec.Object, &serviceSpec); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &serviceSpec); err != nil {
 		return nil, err
 	}
 	var serviceActual api_v1.Service
-	if err := converter.FromUnstructured(actual.Object, &serviceActual); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &serviceActual); err != nil {
 		return nil, err
 	}
 
@@ -48,17 +46,19 @@ func serviceCleanup(spec *unstructured.Unstructured, actual *unstructured.Unstru
 	updatedObj := &unstructured.Unstructured{
 		Object: make(map[string]interface{}),
 	}
-	converter.ToUnstructured(&serviceSpec, &updatedObj.Object)
+	if err := unstructured_conversion.DefaultConverter.ToUnstructured(&serviceSpec, &updatedObj.Object); err != nil {
+		return nil, err
+	}
 	return updatedObj, nil
 }
 
 func scBindingCleanup(spec *unstructured.Unstructured, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var bindingSpec sc_v1a1.Binding
-	if err := converter.FromUnstructured(spec.Object, &bindingSpec); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &bindingSpec); err != nil {
 		return nil, err
 	}
 	var bindingActual sc_v1a1.Binding
-	if err := converter.FromUnstructured(actual.Object, &bindingActual); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &bindingActual); err != nil {
 		return nil, err
 	}
 
@@ -68,17 +68,19 @@ func scBindingCleanup(spec *unstructured.Unstructured, actual *unstructured.Unst
 	updatedObj := &unstructured.Unstructured{
 		Object: make(map[string]interface{}),
 	}
-	converter.ToUnstructured(&bindingSpec, &updatedObj.Object)
+	if err := unstructured_conversion.DefaultConverter.ToUnstructured(&bindingSpec, &updatedObj.Object); err != nil {
+		return nil, err
+	}
 	return updatedObj, nil
 }
 
 func scInstanceCleanup(spec *unstructured.Unstructured, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var instanceSpec sc_v1a1.Instance
-	if err := converter.FromUnstructured(spec.Object, &instanceSpec); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &instanceSpec); err != nil {
 		return nil, err
 	}
 	var instanceActual sc_v1a1.Instance
-	if err := converter.FromUnstructured(actual.Object, &instanceActual); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &instanceActual); err != nil {
 		return nil, err
 	}
 
@@ -87,8 +89,7 @@ func scInstanceCleanup(spec *unstructured.Unstructured, actual *unstructured.Uns
 	updatedObj := &unstructured.Unstructured{
 		Object: make(map[string]interface{}),
 	}
-	err := converter.ToUnstructured(&instanceSpec, &updatedObj.Object)
-	if err != nil {
+	if err := unstructured_conversion.DefaultConverter.ToUnstructured(&instanceSpec, &updatedObj.Object); err != nil {
 		return nil, err
 	}
 	return updatedObj, nil
