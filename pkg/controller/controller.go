@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/cleanup"
 
 	"github.com/ash2k/stager/wait"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,7 +38,7 @@ type BundleController struct {
 	queue   workqueue.RateLimitingInterface
 	workers int
 	// Server fields cleanup
-	cleaner cleanup.SpecCleaner
+	cleaner SpecCleaner
 
 	// TPR
 	tprResyncPeriod time.Duration
@@ -48,7 +47,7 @@ type BundleController struct {
 
 func New(bundleInf, tprInf cache.SharedIndexInformer, bundleClient *rest.RESTClient, bundleStore BundleStore,
 	sc smith.SmartClient, rc ReadyChecker, scheme *runtime.Scheme, store Store, queue workqueue.RateLimitingInterface,
-	workers int, cleaner cleanup.SpecCleaner, tprResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
+	workers int, cleaner SpecCleaner, tprResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
 	c := &BundleController{
 		bundleInf:       bundleInf,
 		tprInf:          tprInf,
