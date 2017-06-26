@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/atlassian/smith/examples/tprattribute"
-	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/client"
 
 	"k8s.io/client-go/rest"
 )
@@ -28,7 +28,7 @@ func run() error {
 }
 
 func runWithContext(ctx context.Context) error {
-	config, err := resources.ConfigFromEnv()
+	config, err := client.ConfigFromEnv()
 	if err != nil {
 		config, err = rest.InClusterConfig()
 		if err != nil {

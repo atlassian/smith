@@ -182,7 +182,7 @@ func isBundleReadyAndNewer(resourceVersions ...string) store.AwaitCondition {
 }
 
 func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *rest.RESTClient) {
-	config, err := resources.ConfigFromEnv()
+	config, err := client.ConfigFromEnv()
 	require.NoError(t, err)
 
 	clientset, err := kubernetes.NewForConfig(config)

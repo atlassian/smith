@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith/app"
-	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/client"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -46,7 +46,7 @@ func runWithContext(ctx context.Context) error {
 	fs.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
 	fs.Parse(os.Args[1:]) // nolint: gas
 
-	config, err := resources.ConfigFromEnv()
+	config, err := client.ConfigFromEnv()
 	if err != nil {
 		config, err = rest.InClusterConfig()
 		if err != nil {
