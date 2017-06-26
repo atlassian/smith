@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/atlassian/smith/pkg/cleanup"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -26,7 +27,8 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 			t.Run(fmt.Sprintf("%s actual, %s desired", kind1, kind2), func(t *testing.T) {
 				t.Parallel()
 				cntrlr := BundleController{
-					scheme: runtime.NewScheme(),
+					scheme:  runtime.NewScheme(),
+					cleaner: cleanup.New(),
 				}
 				updated, match, err := cntrlr.compareActualVsSpec(desired, actual)
 				require.NoError(t, err)
