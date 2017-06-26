@@ -7,7 +7,6 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/cleanup"
-	"github.com/atlassian/smith/pkg/util/wait"
 
 	"github.com/ash2k/stager/wait"
 	"k8s.io/apimachinery/pkg/runtime"

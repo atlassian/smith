@@ -14,8 +14,8 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/store"
 
-	"github.com/atlassian/smith/pkg/cleanup"
 	"github.com/ash2k/stager"
+	"github.com/atlassian/smith/pkg/cleanup"
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -90,7 +90,7 @@ func (a *App) Run(ctx context.Context) error {
 	if a.ServiceCatalogConfig != nil {
 		readyTypes = append(readyTypes, readychecker.ServiceCatalogKnownTypes)
 	}
-	rc := readychecker.New(&store.Tpr{store: multiStore}, readyTypes...)
+	rc := readychecker.New(&store.Tpr{Store: multiStore}, readyTypes...)
 
 	// 3. Object cleanup
 	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{cleanup.MainKnownTypes}
@@ -118,8 +118,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
-	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, multiStore, queue, a.Workers, a.ResyncPeriod, resourceInfs)
-	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, rawStore, queue, a.Workers, oc, a.ResyncPeriod, resourceInfs)
+	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, multiStore, queue, a.Workers, oc, a.ResyncPeriod, resourceInfs)
 
 	// Add all to Multi store
 	for gvk, inf := range resourceInfs {
