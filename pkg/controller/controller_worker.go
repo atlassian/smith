@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/controller/graph"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/util/graph"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
