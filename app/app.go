@@ -15,6 +15,7 @@ import (
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
+	"github.com/atlassian/smith/pkg/cleanup"
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -85,11 +86,18 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 2. Ready Checker
-	types := []map[schema.GroupKind]readychecker.IsObjectReady{readychecker.MainKnownTypes}
+	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{readychecker.MainKnownTypes}
 	if a.ServiceCatalogConfig != nil {
-		types = append(types, readychecker.ServiceCatalogKnownTypes)
+		readyTypes = append(readyTypes, readychecker.ServiceCatalogKnownTypes)
 	}
-	rc := readychecker.New(&store.Tpr{Store: multiStore}, types...)
+	rc := readychecker.New(&store.Tpr{Store: multiStore}, readyTypes...)
+
+	// 3. Object cleanup
+	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{cleanup.MainKnownTypes}
+	if a.ServiceCatalogConfig != nil {
+		cleanupTypes = append(cleanupTypes, cleanup.ServiceCatalogKnownTypes)
+	}
+	oc := cleanup.New(cleanupTypes...)
 
 	// 3. Ensure ThirdPartyResource Bundle exists
 	err = retryUntilSuccessOrDone(ctx, func() error {
@@ -110,7 +118,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
-	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, multiStore, queue, a.Workers, a.ResyncPeriod, resourceInfs)
+	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, multiStore, queue, a.Workers, oc, a.ResyncPeriod, resourceInfs)
 
 	// Add all to Multi store
 	for gvk, inf := range resourceInfs {
