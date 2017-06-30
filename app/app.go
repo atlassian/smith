@@ -21,6 +21,7 @@ import (
 	"github.com/ash2k/stager"
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -43,7 +44,7 @@ type App struct {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	// 0. Clients
+	// Clients
 	clientset, err := kubernetes.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
@@ -65,15 +66,16 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Stager will perform ordered, graceful shutdown
 	stgr := stager.New()
 	defer stgr.Shutdown()
 
-	// 1. Multi store
+	// Multi store
 	stage := stgr.NextStage()
 	multiStore := store.NewMulti(scheme.DeepCopy)
 	stage.StartWithContext(multiStore.Run)
 
-	// 1.5. Informers
+	// Informers
 	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
 	multiStore.AddInformer(smith.BundleGVK, bundleInf)
 
@@ -88,21 +90,7 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for TPR Informer was cancelled")
 	}
 
-	// 2. Ready Checker
-	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
-	if a.ServiceCatalogConfig != nil {
-		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
-	}
-	rc := readychecker.New(&store.Tpr{Store: multiStore}, readyTypes...)
-
-	// 3. Object cleanup
-	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}
-	if a.ServiceCatalogConfig != nil {
-		cleanupTypes = append(cleanupTypes, clean_types.ServiceCatalogKnownTypes)
-	}
-	oc := cleanup.New(cleanupTypes...)
-
-	// 3. Ensure ThirdPartyResource Bundle exists
+	// Ensure ThirdPartyResource Bundle exists
 	err = retryUntilSuccessOrDone(ctx, func() error {
 		return resources.EnsureTprExists(ctx, clientset, multiStore, resources.BundleTpr())
 	}, func(e error) bool {
@@ -114,27 +102,49 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	// 4. Controller
+	// Controller
 	bs, err := store.NewBundle(bundleInf, multiStore, scheme.DeepCopy)
 	if err != nil {
 		return err
 	}
-	specCheck := &speccheck.SpecCheck{
-		Scheme:  scheme,
-		Cleaner: oc,
-	}
-	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
-	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, multiStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs)
+	cntrlr := a.controller(bundleInf, tprInf, bundleClient, bs, sc, scheme, multiStore, resourceInfs)
 
-	// Add all to Multi store
+	// Add all informers to Multi store and start them
 	for gvk, inf := range resourceInfs {
 		multiStore.AddInformer(gvk, inf)
-		stage.StartWithChannel(inf.Run) // Must be after store.AddInformer()
+		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
 	}
 	stage.StartWithChannel(bundleInf.Run)
 
 	cntrlr.Run(ctx)
 	return ctx.Err()
+}
+
+func (a *App) controller(bundleInf, tprInf cache.SharedIndexInformer, bundleClient *rest.RESTClient, bundleStore controller.BundleStore,
+	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *controller.BundleController {
+
+	// Ready Checker
+	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
+	if a.ServiceCatalogConfig != nil {
+		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
+	}
+	rc := readychecker.New(&store.Tpr{Store: cStore}, readyTypes...)
+
+	// Object cleanup
+	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}
+	if a.ServiceCatalogConfig != nil {
+		cleanupTypes = append(cleanupTypes, clean_types.ServiceCatalogKnownTypes)
+	}
+	oc := cleanup.New(cleanupTypes...)
+
+	// Spec check
+	specCheck := &speccheck.SpecCheck{
+		Scheme:  scheme,
+		Cleaner: oc,
+	}
+	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
+
+	return controller.New(bundleInf, tprInf, bundleClient, bundleStore, sc, rc, scheme, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs)
 }
 
 func (a *App) resourceInformers(mainClient kubernetes.Interface, scClient scClientset.Interface) (map[schema.GroupVersionKind]cache.SharedIndexInformer, cache.SharedIndexInformer) {
