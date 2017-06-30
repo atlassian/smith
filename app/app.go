@@ -8,10 +8,12 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/cleanup"
+	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/readychecker"
+	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/store"
 
@@ -86,16 +88,16 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 2. Ready Checker
-	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{readychecker.MainKnownTypes}
+	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
 	if a.ServiceCatalogConfig != nil {
-		readyTypes = append(readyTypes, readychecker.ServiceCatalogKnownTypes)
+		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
 	}
 	rc := readychecker.New(&store.Tpr{Store: multiStore}, readyTypes...)
 
 	// 3. Object cleanup
-	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{cleanup.MainKnownTypes}
+	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}
 	if a.ServiceCatalogConfig != nil {
-		cleanupTypes = append(cleanupTypes, cleanup.ServiceCatalogKnownTypes)
+		cleanupTypes = append(cleanupTypes, clean_types.ServiceCatalogKnownTypes)
 	}
 	oc := cleanup.New(cleanupTypes...)
 

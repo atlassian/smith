@@ -1,6 +1,8 @@
-package cleanup
+package types
 
 import (
+	"github.com/atlassian/smith/pkg/cleanup"
+
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
@@ -9,28 +11,28 @@ import (
 	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 )
 
-var MainKnownTypes = map[schema.GroupKind]SpecCleanup{
+var MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
 	{Group: apps_v1b1.GroupName, Kind: "Deployment"}: deploymentCleanup,
 	{Group: api_v1.GroupName, Kind: "Service"}:       serviceCleanup,
 }
 
-var ServiceCatalogKnownTypes = map[schema.GroupKind]SpecCleanup{
+var ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
 	{Group: sc_v1a1.GroupName, Kind: "Binding"}:  scBindingCleanup,
 	{Group: sc_v1a1.GroupName, Kind: "Instance"}: scInstanceCleanup,
 }
 
-func deploymentCleanup(obj *unstructured.Unstructured, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func deploymentCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var deployment apps_v1b1.Deployment
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &deployment); err != nil {
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &deployment); err != nil {
 		return nil, err
 	}
 
 	// TODO: implement cleanup
 
-	return obj, nil
+	return spec, nil
 }
 
-func serviceCleanup(spec *unstructured.Unstructured, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func serviceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var serviceSpec api_v1.Service
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &serviceSpec); err != nil {
 		return nil, err
@@ -52,7 +54,7 @@ func serviceCleanup(spec *unstructured.Unstructured, actual *unstructured.Unstru
 	return updatedObj, nil
 }
 
-func scBindingCleanup(spec *unstructured.Unstructured, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func scBindingCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var bindingSpec sc_v1a1.Binding
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &bindingSpec); err != nil {
 		return nil, err
@@ -74,7 +76,7 @@ func scBindingCleanup(spec *unstructured.Unstructured, actual *unstructured.Unst
 	return updatedObj, nil
 }
 
-func scInstanceCleanup(spec *unstructured.Unstructured, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func scInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	var instanceSpec sc_v1a1.Instance
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &instanceSpec); err != nil {
 		return nil, err
