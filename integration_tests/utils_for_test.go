@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/app"
+	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/tprattribute"
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/client/smart"
