@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/cleanup"
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
@@ -15,7 +16,6 @@ import (
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
-	"github.com/atlassian/smith/pkg/cleanup"
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
