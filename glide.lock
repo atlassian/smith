@@ -1,5 +1,5 @@
-hash: 0692fa7cb18d68b7938d3ebf645c7947ef1180206b5faaf610841257d536dc2e
-updated: 2017-06-26T14:22:55.551432599+10:00
+hash: 71002a5f703b439005a98757679498f9b07de6950fbe3dbfe33ea66be9ef6b1d
+updated: 2017-06-30T14:14:06.465181461+10:00
 imports:
 - name: github.com/ash2k/stager
   version: 6e9c7b0eacd465286fac042bfb29a170aa8c2c3f
@@ -8,7 +8,7 @@ imports:
 - name: github.com/cenk/backoff
   version: 5d150e7eec023ce7a124856b37c68e54b4050ac7
 - name: github.com/davecgh/go-spew
-  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
   subpackages:
   - spew
 - name: github.com/docker/distribution
@@ -43,7 +43,7 @@ imports:
 - name: github.com/juju/ratelimit
   version: 77ed1c8a01217656d2080ad51981f6e99adaa177
 - name: github.com/kubernetes-incubator/service-catalog
-  version: 9ed6812383d2658fe23d665bb3ff7b068795c499
+  version: 79d5206eba585721fd22aff53cb265ccf05855b0
   subpackages:
   - pkg/apis/servicecatalog
   - pkg/apis/servicecatalog/v1alpha1
@@ -56,6 +56,10 @@ imports:
   - buffer
   - jlexer
   - jwriter
+- name: github.com/pmezard/go-difflib
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
+  subpackages:
+  - difflib
 - name: github.com/PuerkitoBio/purell
   version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
 - name: github.com/PuerkitoBio/urlesc
@@ -64,6 +68,11 @@ imports:
   version: 5bf94b69c6b68ee1b541973bb8e1144db23a194b
 - name: github.com/spf13/pflag
   version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
+- name: github.com/stretchr/testify
+  version: f6abca593680b2315d2075e0f5e2a9751e3f431a
+  subpackages:
+  - assert
+  - require
 - name: github.com/ugorji/go
   version: ded73eae5db7e7a0ef6f55aace87a2873c5d2b74
   subpackages:
@@ -260,13 +269,4 @@ imports:
   - util/integer
   - util/jsonpath
   - util/workqueue
-testImports:
-- name: github.com/pmezard/go-difflib
-  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
-  subpackages:
-  - difflib
-- name: github.com/stretchr/testify
-  version: e3a8ff8ce36581f87a15341206f205b1da467059
-  subpackages:
-  - assert
-  - require
+testImports: []

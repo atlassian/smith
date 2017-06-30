@@ -10,17 +10,14 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util/graph"
 
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -277,18 +274,8 @@ func (c *BundleController) updateResource(bundle *smith.Bundle, resClient *dynam
 		return nil, false, false, fmt.Errorf("object %v %q is not owned by the Bundle", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName())
 	}
 
-	// Apply defaults to the spec
-	if err := c.applyDefaults(spec); err != nil {
-		return nil, false, false, fmt.Errorf("failed to apply defaults to object spec %v %q: %v", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName(), err)
-	}
-
-	actualUnstr, err := c.cloneAsUnstructured(actual)
-	if err != nil {
-		return nil, false, false, err
-	}
-
 	// Compare spec and existing resource
-	updated, match, err := c.compareActualVsSpec(spec, actualUnstr)
+	updated, match, err := c.specCheck.CompareActualVsSpec(spec, actual)
 	if err != nil {
 		return nil, false, false, err
 	}
@@ -481,126 +468,6 @@ func (c *BundleController) handleProcessResult(bundle *smith.Bundle, isReady, re
 		}
 	}
 	return retriable, err
-}
-
-func (c *BundleController) applyDefaults(spec *unstructured.Unstructured) error {
-	gvk := spec.GroupVersionKind()
-	if !c.scheme.Recognizes(gvk) {
-		log.Printf("[WORKER] Unrecognized object type %v", gvk)
-		return nil
-	}
-	specTyped, err := c.scheme.New(gvk)
-	if err != nil {
-		return err
-	}
-	if err = unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, specTyped); err != nil {
-		return err
-	}
-	c.scheme.Default(specTyped)
-	spec.Object = make(map[string]interface{})
-	if err := unstructured_conversion.DefaultConverter.ToUnstructured(specTyped, &spec.Object); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *BundleController) cloneAsUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
-	// ------ TODO this block is a workaround for https://github.com/kubernetes/kubernetes/issues/47889
-	if _, ok := obj.(*unstructured.Unstructured); ok {
-		clone, err := c.scheme.DeepCopy(obj)
-		if err != nil {
-			return nil, err
-		}
-		return clone.(*unstructured.Unstructured), nil
-	}
-	// ------
-	u := &unstructured.Unstructured{
-		Object: make(map[string]interface{}),
-	}
-	if err := unstructured_conversion.DefaultConverter.ToUnstructured(obj, &u.Object); err != nil {
-		return nil, err
-	}
-	return u, nil
-}
-
-// compareActualVsSpec checks if actual resource satisfies the desired spec.
-// If actual matches spec then actual is returned untouched otherwise an updated object is returned.
-// Mutates spec (reuses parts of it).
-func (c *BundleController) compareActualVsSpec(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, bool /*match*/, error) {
-	upd, err := c.scheme.DeepCopy(actual)
-	if err != nil {
-		return nil, false, err
-	}
-	updated := upd.(*unstructured.Unstructured)
-	delete(updated.Object, "status")
-
-	actClone, err := c.scheme.DeepCopy(updated)
-	if err != nil {
-		return nil, false, err
-	}
-	actualClone := actClone.(*unstructured.Unstructured)
-
-	// This is to ensure those fields actually exist in underlying map whether they are nil or empty slices/map
-	actualClone.SetKind(spec.GetKind())             // Objects from type-specific informers don't have kind/api version
-	actualClone.SetAPIVersion(spec.GetAPIVersion()) // Objects from type-specific informers don't have kind/api version
-	actualClone.SetName(actualClone.GetName())
-	actualClone.SetLabels(actualClone.GetLabels())
-	actualClone.SetAnnotations(actualClone.GetAnnotations())
-	//actualClone.SetOwnerReferences(actualClone.GetOwnerReferences())
-	setOwnerReferences(actualClone, actualClone.GetOwnerReferences())
-	actualClone.SetFinalizers(actualClone.GetFinalizers())
-
-	// 1. TypeMeta
-	updated.SetKind(spec.GetKind())
-	updated.SetAPIVersion(spec.GetAPIVersion())
-
-	// 2. Copy data from the spec
-	for field, specValue := range spec.Object {
-		switch field {
-		case "kind", "apiVersion", "metadata", "status":
-			continue
-		}
-		updated.Object[field] = specValue // using the value directly - we've made a copy up the stack so it's ok
-	}
-
-	// 3. Ignore fields managed by server
-	updated, err = c.cleaner.Cleanup(updated, actualClone)
-	if err != nil {
-		return nil, false, err
-	}
-
-	// 4. Some stuff from ObjectMeta
-	// TODO Ignores added annotations/labels. Should be configurable per-object and/or per-object kind?
-	updated.SetName(spec.GetName())
-	updated.SetLabels(spec.GetLabels())
-	updated.SetAnnotations(processAnnotations(spec.GetAnnotations(), updated.GetAnnotations()))
-	//updated.SetOwnerReferences(spec.GetOwnerReferences()) // TODO Is this ok? Check that there is only one controller and it is THIS bundle
-	setOwnerReferences(updated, spec.GetOwnerReferences())
-	updated.SetFinalizers(spec.GetFinalizers()) // TODO Is this ok?
-
-	// Remove status to make sure ready checker will only detect readiness after resource controller has seen
-	// the object.
-	// Will be possible to implement it in a cleaner way once "status" is a separate sub-resource.
-	// See https://github.com/kubernetes/kubernetes/issues/38113
-	// Also ideally we don't want to clear the status at all but have a way to tell if controller has
-	// observed the update yet. Like Generation/ObservedGeneration for built-in controllers.
-	delete(updated.Object, "status")
-
-	if !equality.Semantic.DeepEqual(updated.Object, actualClone.Object) {
-		//setOwnerReferences(updated, actualClone.GetOwnerReferences())
-
-		log.Printf("Objects are different: %s\nupdated: %v\nactualClone: %v",
-			diff.ObjectReflectDiff(updated.Object, actualClone.Object), updated.Object, actualClone.Object)
-		return updated, false, nil
-	}
-	return actual, true, nil
-}
-
-func processAnnotations(spec, actual map[string]string) map[string]string {
-	for key, val := range spec {
-		actual[key] = val
-	}
-	return actual
 }
 
 func mergeLabels(labels ...map[string]string) map[string]string {

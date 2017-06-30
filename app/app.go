@@ -15,6 +15,7 @@ import (
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
@@ -118,9 +119,12 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
+	specCheck := &speccheck.SpecCheck{
+		Scheme:  scheme,
+		Cleaner: oc,
+	}
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
-	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, multiStore, queue, a.Workers, oc, a.ResyncPeriod, resourceInfs)
+	cntrlr := controller.New(bundleInf, tprInf, bundleClient, bs, sc, rc, scheme, multiStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs)
 
 	// Add all to Multi store
 	for gvk, inf := range resourceInfs {
