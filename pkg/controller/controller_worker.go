@@ -60,10 +60,15 @@ func (c *BundleController) handleErr(retriable bool, err error, key interface{})
 }
 
 func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
+	var conflict bool
 	startTime := time.Now()
 	log.Printf("[WORKER][%s] Started syncing Bundle", key)
 	defer func() {
-		log.Printf("[WORKER][%s] Synced Bundle in %v", key, time.Now().Sub(startTime))
+		msg := ""
+		if conflict {
+			msg = " (conflict)"
+		}
+		log.Printf("[WORKER][%s] Synced Bundle in %v%s", key, time.Now().Sub(startTime), msg)
 	}()
 	bundleObj, exists, err := c.bundleInf.GetIndexer().GetByKey(key)
 	if err != nil {
@@ -80,7 +85,8 @@ func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
 		return false, err
 	}
 	bundle := bundleObjCopy.(*smith.Bundle)
-	isReady, conflict, retriable, err := c.process(bundle)
+	var isReady, retriable bool
+	isReady, conflict, retriable, err = c.process(bundle)
 	if conflict {
 		return false, nil
 	}
@@ -374,7 +380,6 @@ func (c *BundleController) deleteRemovedResources(bundle *smith.Bundle) (retriab
 }
 
 func (c *BundleController) setBundleStatus(bundle *smith.Bundle) error {
-	log.Printf("[WORKER][%s/%s] Setting bundle status to %s", bundle.Namespace, bundle.Name, bundle.Status.ShortString())
 	err := c.bundleClient.Put().
 		Namespace(bundle.Namespace).
 		Resource(smith.BundleResourcePath).
@@ -391,8 +396,9 @@ func (c *BundleController) setBundleStatus(bundle *smith.Bundle) error {
 			// It is safe to ignore this conflict because we will reiterate because of the update event.
 			return nil
 		}
-		return fmt.Errorf("failed to set bundle %s/%s status to %v: %v", bundle.Namespace, bundle.Name, bundle.Status, err)
+		return fmt.Errorf("failed to set bundle %s/%s status to %v: %v", bundle.Namespace, bundle.Name, bundle.Status.ShortString(), err)
 	}
+	log.Printf("[WORKER][%s/%s] Set bundle status to %s", bundle.Namespace, bundle.Name, bundle.Status.ShortString())
 	return nil
 }
 

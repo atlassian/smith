@@ -22,6 +22,9 @@ const (
 	//
 	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
 	maxRetries = 15
+	// Work queue deduplicates scheduled keys. This is the period it waits for duplicate keys before letting the work
+	// to be dequeued.
+	workDeduplicationPeriod = 50 * time.Millisecond
 )
 
 type BundleController struct {
@@ -112,5 +115,5 @@ func (c *BundleController) enqueue(bundle *smith.Bundle) {
 }
 
 func (c *BundleController) enqueueKey(key string) {
-	c.queue.Add(key)
+	c.queue.AddAfter(key, workDeduplicationPeriod)
 }
