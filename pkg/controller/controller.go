@@ -34,11 +34,10 @@ type BundleController struct {
 	rc           ReadyChecker
 	scheme       *runtime.Scheme
 	store        Store
+	specCheck    SpecCheck
 	// Bundle objects that need to be synced.
 	queue   workqueue.RateLimitingInterface
 	workers int
-	// Server fields cleanup
-	cleaner SpecCleaner
 
 	// TPR
 	tprResyncPeriod time.Duration
@@ -46,8 +45,8 @@ type BundleController struct {
 }
 
 func New(bundleInf, tprInf cache.SharedIndexInformer, bundleClient *rest.RESTClient, bundleStore BundleStore,
-	sc smith.SmartClient, rc ReadyChecker, scheme *runtime.Scheme, store Store, queue workqueue.RateLimitingInterface,
-	workers int, cleaner SpecCleaner, tprResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
+	sc smith.SmartClient, rc ReadyChecker, scheme *runtime.Scheme, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
+	workers int, tprResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
 	c := &BundleController{
 		bundleInf:       bundleInf,
 		tprInf:          tprInf,
@@ -57,9 +56,9 @@ func New(bundleInf, tprInf cache.SharedIndexInformer, bundleClient *rest.RESTCli
 		rc:              rc,
 		scheme:          scheme,
 		store:           store,
+		specCheck:       specCheck,
 		queue:           queue,
 		workers:         workers,
-		cleaner:         cleaner,
 		tprResyncPeriod: tprResyncPeriod,
 	}
 	bundleInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
