@@ -233,7 +233,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	stage := stgr.NextStage()
 	stage.StartWithContext(multiStore.Run)
 
-	ctxTest, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctxTest, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 
 	err = bundleClient.Delete().

@@ -1,7 +1,6 @@
 package tprattribute
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/atlassian/smith/pkg/resources"
@@ -10,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 var _ runtime.Object = &SleeperList{}

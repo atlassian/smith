@@ -1,13 +1,13 @@
 package resources
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/atlassian/smith"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 func TestGetJsonPathStringBundle(t *testing.T) {
