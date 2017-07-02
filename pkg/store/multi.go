@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -147,11 +145,7 @@ func (s *Multi) handleAwaitRequest(ar *awaitRequest) {
 }
 
 func (s *Multi) handleEvent(gvk schema.GroupVersionKind, obj runtime.Object) {
-	metaObj, err := meta.Accessor(obj)
-	if err != nil {
-		log.Printf("Failed to get meta from %T: %v", obj, err)
-		return
-	}
+	metaObj := obj.(meta_v1.Object)
 	name := types.NamespacedName{Namespace: metaObj.GetNamespace(), Name: metaObj.GetName()}
 	m := s.gvk2request[gvk]
 	n := m[name]
@@ -386,10 +380,7 @@ func byNamespaceAndBundleNameIndex(obj interface{}) ([]string, error) {
 	if key, ok := obj.(cache.ExplicitKey); ok {
 		return []string{string(key)}, nil
 	}
-	m, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get meta of object: %v", err)
-	}
+	m := obj.(meta_v1.Object)
 	ref := resources.GetControllerOf(m)
 	if ref != nil && ref.APIVersion == smith.BundleResourceGroupVersion && ref.Kind == smith.BundleResourceKind {
 		return []string{ByNamespaceAndBundleNameIndexKey(m.GetNamespace(), ref.Name)}, nil
@@ -406,10 +397,7 @@ func byNamespaceAndNameIndex(obj interface{}) ([]string, error) {
 	if key, ok := obj.(cache.ExplicitKey); ok {
 		return []string{string(key)}, nil
 	}
-	m, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get meta of object: %v", err)
-	}
+	m := obj.(meta_v1.Object)
 	return []string{ByNamespaceAndNameIndexKey(m.GetNamespace(), m.GetName())}, nil
 }
 

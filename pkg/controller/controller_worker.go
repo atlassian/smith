@@ -12,7 +12,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -312,10 +311,7 @@ func (c *BundleController) deleteRemovedResources(bundle *smith.Bundle) (retriab
 	}
 	existingObjs := make(map[objectRef]types.UID, len(objs))
 	for _, obj := range objs {
-		m, err := meta.Accessor(obj)
-		if err != nil {
-			return false, fmt.Errorf("failed to get meta of object: %v", err)
-		}
+		m := obj.(meta_v1.Object)
 		if m.GetDeletionTimestamp() != nil {
 			// Object is marked for deletion already
 			continue
@@ -333,10 +329,7 @@ func (c *BundleController) deleteRemovedResources(bundle *smith.Bundle) (retriab
 		existingObjs[ref] = m.GetUID()
 	}
 	for _, res := range bundle.Spec.Resources {
-		m, err := meta.Accessor(res.Spec)
-		if err != nil {
-			return false, fmt.Errorf("failed to get meta of object: %v", err)
-		}
+		m := res.Spec.(meta_v1.Object)
 		ref := objectRef{
 			GroupVersionKind: res.Spec.GetObjectKind().GroupVersionKind(),
 			Name:             m.GetName(),

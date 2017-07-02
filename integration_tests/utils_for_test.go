@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
@@ -81,10 +80,7 @@ func (cfg *itConfig) cleanupBundle(bundle *smith.Bundle) {
 }
 
 func (cfg *itConfig) deleteObject(obj runtime.Object) {
-	m, err := meta.Accessor(obj)
-	if !assert.NoError(cfg.t, err) {
-		return
-	}
+	m := obj.(meta_v1.Object)
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	if gvk.Empty() {
 		switch obj.(type) {
@@ -116,8 +112,7 @@ func (cfg *itConfig) deleteObject(obj runtime.Object) {
 }
 
 func (cfg *itConfig) createObject(ctxTest context.Context, obj, res runtime.Object, resourcePath string, client *rest.RESTClient) {
-	metaObj, err := meta.Accessor(obj)
-	require.NoError(cfg.t, err)
+	metaObj := obj.(meta_v1.Object)
 
 	cfg.t.Logf("Creating a new object %s/%s of kind %s", cfg.namespace, metaObj.GetName(), obj.GetObjectKind().GroupVersionKind().Kind)
 	require.NoError(cfg.t, client.Post().

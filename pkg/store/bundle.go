@@ -7,7 +7,7 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
-	"k8s.io/apimachinery/pkg/api/meta"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
@@ -93,10 +93,7 @@ func byObjectIndex(obj interface{}) ([]string, error) {
 	bundle := obj.(*smith.Bundle)
 	result := make([]string, 0, len(bundle.Spec.Resources))
 	for _, resource := range bundle.Spec.Resources {
-		m, err := meta.Accessor(resource.Spec)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get meta of object: %v", err)
-		}
+		m := resource.Spec.(meta_v1.Object)
 		result = append(result, byObjectIndexKey(resource.Spec.GetObjectKind().GroupVersionKind().GroupKind(), bundle.Namespace, m.GetName()))
 	}
 	return result, nil
