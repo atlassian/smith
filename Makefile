@@ -73,7 +73,7 @@ minikube-run: build-all-race
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go run -race cmd/smith/*
+	go run -race cmd/smith/*.go
 
 minikube-run-sc: build-all-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
@@ -83,7 +83,7 @@ minikube-run-sc: build-all-race
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go run -race cmd/smith/* -service-catalog-url="http://$$(minikube ip):30080"
+	go run -race cmd/smith/*.go -service-catalog-url="http://$$(minikube ip):30080"
 
 minikube-sleeper-run: build-all-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
@@ -93,7 +93,7 @@ minikube-sleeper-run: build-all-race
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go run -race examples/tprattribute/main/*
+	go run -race examples/tprattribute/main/*.go
 
 test: fmt
 	go test -i -race $$(glide nv | grep -v integration_tests)
