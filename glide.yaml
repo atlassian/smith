@@ -2,7 +2,6 @@ package: github.com/atlassian/smith
 import:
 - package: k8s.io/client-go
   version: 76153773eaa3a268131d3d993290a194a1370585 # version used by service-catalog
-- package: github.com/cenk/backoff
 - package: k8s.io/apimachinery
   version: 75b8dd260ef0469d96d578705a87cffd0e09dab8 # version used by service-catalog
 - package: github.com/kubernetes-incubator/service-catalog

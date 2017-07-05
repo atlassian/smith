@@ -1,12 +1,10 @@
-hash: 71002a5f703b439005a98757679498f9b07de6950fbe3dbfe33ea66be9ef6b1d
-updated: 2017-06-30T14:14:06.465181461+10:00
+hash: b2b942e5214920f9c0f4e8988f08b51bcdc109e9c20c3198c8889070a2b9891f
+updated: 2017-07-05T13:40:47.736596922+10:00
 imports:
 - name: github.com/ash2k/stager
   version: 6e9c7b0eacd465286fac042bfb29a170aa8c2c3f
   subpackages:
   - wait
-- name: github.com/cenk/backoff
-  version: 5d150e7eec023ce7a124856b37c68e54b4050ac7
 - name: github.com/davecgh/go-spew
   version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
   subpackages:
@@ -43,7 +41,7 @@ imports:
 - name: github.com/juju/ratelimit
   version: 77ed1c8a01217656d2080ad51981f6e99adaa177
 - name: github.com/kubernetes-incubator/service-catalog
-  version: 79d5206eba585721fd22aff53cb265ccf05855b0
+  version: cc179bcb4ce43de29c56ee6a70d7bef83b88e048
   subpackages:
   - pkg/apis/servicecatalog
   - pkg/apis/servicecatalog/v1alpha1
@@ -80,7 +78,6 @@ imports:
 - name: golang.org/x/net
   version: e90d6d0afc4c315a0d87a568ae68577cc15149a0
   subpackages:
-  - context
   - http2
   - http2/hpack
   - idna

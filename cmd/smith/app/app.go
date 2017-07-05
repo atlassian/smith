@@ -23,6 +23,7 @@ import (
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
@@ -32,6 +33,15 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+)
+
+var (
+	tprCreationBackoff = wait.Backoff{
+		Duration: 1 * time.Second,
+		Factor:   1.2,
+		Jitter:   0.1,
+		Steps:    7,
+	}
 )
 
 type App struct {
@@ -91,12 +101,16 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// Ensure ThirdPartyResource Bundle exists
-	err = retryUntilSuccessOrDone(ctx, func() error {
-		return resources.EnsureTprExists(ctx, clientset, multiStore, resources.BundleTpr())
-	}, func(e error) bool {
-		// TODO be smarter about what is retried
-		log.Printf("Failed to create resource %s: %v", smith.BundleResourceName, e)
-		return false
+	err = wait.ExponentialBackoff(tprCreationBackoff, func() (bool /*done*/, error) {
+		if err := resources.EnsureTprExists(ctx, clientset, multiStore, resources.BundleTpr()); err != nil {
+			// TODO be smarter about what is retried
+			if err == context.Canceled || err == context.DeadlineExceeded {
+				return true, err
+			}
+			log.Printf("Failed to create TPR %s: %v", smith.BundleResourceName, err)
+			return false, nil
+		}
+		return true, nil
 	})
 	if err != nil {
 		return err
