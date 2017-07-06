@@ -23,7 +23,9 @@ func TopologicalSort(bundle *smith.Bundle) (*SortedData, error) {
 
 	for _, res := range bundle.Spec.Resources {
 		for _, d := range res.DependsOn {
-			graph.addEdge(res.Name, d)
+			if err := graph.addEdge(res.Name, d); err != nil {
+				return nil, err
+			}
 		}
 	}
 
