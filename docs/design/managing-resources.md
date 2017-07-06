@@ -50,7 +50,7 @@ spec:
         name: sleeper2
       spec:
         sleepFor: 4
-        wakeupMessage: "$(sleeper1#status.message)"
+        wakeupMessage: "{{sleeper1#status.message}}"
   - name: sleeper3
     dependsOn:
     - sleeper2
@@ -59,7 +59,7 @@ spec:
       kind: Sleeper
       metadata:
         name: sleeper3
-      spec: "$((sleeper2#spec))"
+      spec: "{{{sleeper2#spec}}}"
 ```
 
 ## Defined annotations
