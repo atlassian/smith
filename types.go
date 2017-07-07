@@ -2,6 +2,8 @@ package smith
 
 import (
 	"bytes"
+	"fmt"
+	"reflect"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -233,4 +235,22 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 	r.DependsOn = res.DependsOn
 	r.Spec = &res.Spec
 	return nil
+}
+
+// IntoTyped tries to convert resource spec into a typed object passed as obj.
+// It supports objects of the same type and Unstructured.
+// Note that it does not perform a deep copy in case of typed API object.
+func (r *Resource) IntoTyped(obj runtime.Object) error {
+	objT := reflect.TypeOf(r.Spec)
+	if objT == reflect.TypeOf(obj) && objT.Kind() == reflect.Ptr {
+		objV := reflect.ValueOf(obj)
+		specV := reflect.ValueOf(r.Spec)
+
+		objV.Elem().Set(specV.Elem()) // types are the same, dereference and assign value
+		return nil
+	}
+	if specUnstr, ok := r.Spec.(*unstructured.Unstructured); ok {
+		return unstructured_conversion.DefaultConverter.FromUnstructured(specUnstr.Object, obj)
+	}
+	return fmt.Errorf("cannot convert %T into typed object %T", r.Spec, obj)
 }
