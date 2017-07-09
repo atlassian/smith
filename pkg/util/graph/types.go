@@ -2,37 +2,47 @@ package graph
 
 import (
 	"fmt"
-
-	"github.com/atlassian/smith"
 )
 
-// Graph is a graph representation of resource dependencies
-type Graph struct {
-	// Vertices is a map from resource name to resource vertex
-	Vertices map[smith.ResourceName]Vertex
+// V is name of the vertex.
+type V interface{}
 
-	// Vertices in order of appearance (for deterministic order after sort)
-	orderedVertices []smith.ResourceName
+// D is data attached to the vertex.
+type D interface{}
+
+// Vertex is a resource representation in a dependency graph.
+type Vertex struct {
+	EdgesSet map[V]struct{}
+	Data     D
 }
 
-// Vertex is a resource representation in a dependency graph
-type Vertex map[smith.ResourceName]struct{}
+// Graph is a graph representation of resource dependencies.
+type Graph struct {
+	// Vertices is a map from resource name to resource vertex.
+	Vertices map[V]Vertex
 
-func newGraph(size int) *Graph {
+	// Vertices in order of appearance (for deterministic order after sort).
+	orderedVertices []V
+}
+
+func NewGraph(size int) *Graph {
 	return &Graph{
-		Vertices:        make(map[smith.ResourceName]Vertex, size),
-		orderedVertices: make([]smith.ResourceName, 0, size),
+		Vertices:        make(map[V]Vertex, size),
+		orderedVertices: make([]V, 0, size),
 	}
 }
 
-func (g *Graph) addVertex(name smith.ResourceName) {
-	if !g.containsVertex(name) {
-		g.Vertices[name] = make(Vertex)
+func (g *Graph) AddVertex(name V, data D) {
+	if !g.ContainsVertex(name) {
+		g.Vertices[name] = Vertex{
+			EdgesSet: make(map[V]struct{}),
+			Data:     data,
+		}
 		g.orderedVertices = append(g.orderedVertices, name)
 	}
 }
 
-func (g *Graph) addEdge(from, to smith.ResourceName) error {
+func (g *Graph) AddEdge(from, to V) error {
 	f, ok := g.Vertices[from]
 	if !ok {
 		return fmt.Errorf("vertex %q not found", from)
@@ -46,19 +56,19 @@ func (g *Graph) addEdge(from, to smith.ResourceName) error {
 	return nil
 }
 
-func (g *Graph) containsVertex(name smith.ResourceName) bool {
+func (g *Graph) ContainsVertex(name V) bool {
 	_, ok := g.Vertices[name]
 	return ok
 }
 
-func (v Vertex) addEdge(name smith.ResourceName) {
-	v[name] = struct{}{}
+func (v Vertex) addEdge(name V) {
+	v.EdgesSet[name] = struct{}{}
 }
 
-// Edges returns a list of resources current resource depends on
-func (v Vertex) Edges() []smith.ResourceName {
-	keys := make([]smith.ResourceName, 0, len(v))
-	for k := range v {
+// Edges returns a list of resources current resource depends on.
+func (v Vertex) Edges() []V {
+	keys := make([]V, 0, len(v.EdgesSet))
+	for k := range v.EdgesSet {
 		keys = append(keys, k)
 	}
 	return keys
