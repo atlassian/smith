@@ -88,6 +88,13 @@ func TestSortCycleError3(t *testing.T) {
 	assertCycleDetection(t, g)
 }
 
+func TestSortMissingVertexError(t *testing.T) {
+	t.Parallel()
+	g := initGraph()
+
+	require.Error(t, g.AddEdge("a", "x"), "vertex \"x\" not found")
+}
+
 func initGraph() *Graph {
 	g := NewGraph(4)
 	g.AddVertex("a", 1)
