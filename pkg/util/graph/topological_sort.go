@@ -2,49 +2,9 @@ package graph
 
 import (
 	"fmt"
-	"log"
-
-	"github.com/atlassian/smith"
 )
 
-// SortedData is a container for dependency graph and topological sort result
-type SortedData struct {
-	Graph          *Graph
-	SortedVertices []smith.ResourceName
-}
-
-// TopologicalSort builds resource dependency graph and topologically sorts it
-func TopologicalSort(bundle *smith.Bundle) (*SortedData, error) {
-	graph := newGraph(len(bundle.Spec.Resources))
-
-	for _, res := range bundle.Spec.Resources {
-		graph.addVertex(res.Name)
-	}
-
-	for _, res := range bundle.Spec.Resources {
-		for _, d := range res.DependsOn {
-			if err := graph.addEdge(res.Name, d); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	sorted, err := graph.topologicalSort()
-	if err != nil {
-		return nil, err
-	}
-
-	graphData := SortedData{
-		Graph:          graph,
-		SortedVertices: sorted,
-	}
-
-	log.Printf("Sorted graph: %v", sorted)
-
-	return &graphData, nil
-}
-
-func (g *Graph) topologicalSort() ([]smith.ResourceName, error) {
+func (g *Graph) TopologicalSort() ([]V, error) {
 	results := newOrderedSet()
 	for _, name := range g.orderedVertices {
 		err := g.visit(name, results, nil)
@@ -56,7 +16,7 @@ func (g *Graph) topologicalSort() ([]smith.ResourceName, error) {
 	return results.items, nil
 }
 
-func (g *Graph) visit(name smith.ResourceName, results *orderedset, visited *orderedset) error {
+func (g *Graph) visit(name V, results *orderedset, visited *orderedset) error {
 	if visited == nil {
 		visited = newOrderedSet()
 	}
@@ -81,26 +41,27 @@ func (g *Graph) visit(name smith.ResourceName, results *orderedset, visited *ord
 }
 
 type orderedset struct {
-	indexes map[smith.ResourceName]int
-	items   []smith.ResourceName
+	indexes map[V]int
+	items   []V
 	length  int
 }
 
 func newOrderedSet() *orderedset {
 	return &orderedset{
-		indexes: make(map[smith.ResourceName]int),
+		indexes: make(map[V]int),
 		length:  0,
 	}
 }
 
-func (s *orderedset) add(item smith.ResourceName) bool {
+func (s *orderedset) add(item V) bool {
 	_, ok := s.indexes[item]
-	if !ok {
-		s.indexes[item] = s.length
-		s.items = append(s.items, item)
-		s.length++
+	if ok {
+		return false
 	}
-	return !ok
+	s.indexes[item] = s.length
+	s.items = append(s.items, item)
+	s.length++
+	return true
 }
 
 func (s *orderedset) clone() *orderedset {
@@ -111,7 +72,7 @@ func (s *orderedset) clone() *orderedset {
 	return clone
 }
 
-func (s *orderedset) index(item smith.ResourceName) int {
+func (s *orderedset) index(item V) int {
 	index, ok := s.indexes[item]
 	if ok {
 		return index

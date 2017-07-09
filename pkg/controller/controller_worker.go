@@ -111,7 +111,7 @@ func (c *BundleController) process(bundle *smith.Bundle) (isReady, conflictRet, 
 	}
 
 	// Build the graph and topologically sort it
-	graphData, sortErr := graph.TopologicalSort(bundle)
+	g, sorted, sortErr := sortBundle(bundle)
 	if sortErr != nil {
 		return false, false, false, sortErr
 	}
@@ -121,10 +121,10 @@ func (c *BundleController) process(bundle *smith.Bundle) (isReady, conflictRet, 
 
 	// Visit vertices in sorted order
 nextVertex:
-	for _, v := range graphData.SortedVertices {
+	for _, v := range sorted {
 		// Check if all resource dependencies are ready (so we can start processing this one)
-		for _, dependency := range graphData.Graph.Vertices[v].Edges() {
-			if _, ok := readyResources[dependency]; !ok {
+		for _, dependency := range g.Vertices[v].Edges() {
+			if _, ok := readyResources[dependency.(smith.ResourceName)]; !ok {
 				allReady = false
 				log.Printf("[WORKER][%s/%s] Dependency %q is required by resource %q but it's not ready", bundle.Namespace, bundle.Name, dependency, v)
 				continue nextVertex // Move to the next resource
@@ -132,14 +132,14 @@ nextVertex:
 		}
 		// Process the resource
 		log.Printf("[WORKER][%s/%s] Checking resource %q", bundle.Namespace, bundle.Name, v)
-		res := resourceMap[v]
+		res := resourceMap[v.(smith.ResourceName)]
 		readyResource, conflict, retriable, err := c.checkResource(bundle, &res, readyResources)
 		if err != nil || conflict {
 			return false, conflict, retriable, err
 		}
 		log.Printf("[WORKER][%s/%s] Resource %q, ready: %t", bundle.Namespace, bundle.Name, v, readyResource != nil)
 		if readyResource != nil {
-			readyResources[v] = readyResource
+			readyResources[v.(smith.ResourceName)] = readyResource
 		} else {
 			allReady = false
 		}
@@ -485,6 +485,29 @@ func isOwner(obj meta_v1.Object, bundle *smith.Bundle) bool {
 	return ref != nil &&
 		ref.Name == bundle.Name &&
 		ref.UID == bundle.UID
+}
+
+func sortBundle(bundle *smith.Bundle) (*graph.Graph, []graph.V, error) {
+	g := graph.NewGraph(len(bundle.Spec.Resources))
+
+	for _, res := range bundle.Spec.Resources {
+		g.AddVertex(graph.V(res.Name), nil)
+	}
+
+	for _, res := range bundle.Spec.Resources {
+		for _, d := range res.DependsOn {
+			if err := g.AddEdge(res.Name, d); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+
+	sorted, err := g.TopologicalSort()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return g, sorted, nil
 }
 
 // TODO remove the workaround below when https://github.com/kubernetes-incubator/service-catalog/pull/944 is merged
