@@ -45,6 +45,19 @@ func serviceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unst
 	serviceSpec.Spec.ClusterIP = serviceActual.Spec.ClusterIP
 	serviceSpec.Status = serviceActual.Status
 
+	if len(serviceActual.Spec.Ports) == len(serviceSpec.Spec.Ports) {
+		for i, port := range serviceSpec.Spec.Ports {
+			if port.NodePort == 0 {
+				actualPort := serviceActual.Spec.Ports[i]
+				port.NodePort = actualPort.NodePort
+				if port == actualPort { // NodePort field is the only difference, other fields are the same
+					// Copy port from actual if port is not specified in spec
+					serviceSpec.Spec.Ports[i].NodePort = actualPort.NodePort
+				}
+			}
+		}
+	}
+
 	updatedObj := &unstructured.Unstructured{
 		Object: make(map[string]interface{}),
 	}
