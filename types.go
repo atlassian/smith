@@ -240,6 +240,7 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 // IntoTyped tries to convert resource spec into a typed object passed as obj.
 // It supports objects of the same type and Unstructured.
 // Note that it does not perform a deep copy in case of typed API object.
+// Note that this method may fail if references are used where a non-string value is expected.
 func (r *Resource) IntoTyped(obj runtime.Object) error {
 	objT := reflect.TypeOf(r.Spec)
 	if objT == reflect.TypeOf(obj) && objT.Kind() == reflect.Ptr {
