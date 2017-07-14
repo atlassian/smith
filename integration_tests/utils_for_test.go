@@ -45,7 +45,7 @@ type itConfig struct {
 	bundle        *smith.Bundle
 	createdBundle *smith.Bundle
 	config        *rest.Config
-	clientset     *kubernetes.Clientset
+	clientset     kubernetes.Interface
 	sc            smith.SmartClient
 	bundleClient  rest.Interface
 	store         *store.Multi
