@@ -13,7 +13,7 @@ import (
 
 type SleeperEventHandler struct {
 	ctx      context.Context
-	client   *rest.RESTClient
+	client   rest.Interface
 	deepCopy smith.DeepCopy
 }
 

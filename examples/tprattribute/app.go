@@ -77,7 +77,7 @@ func (a *App) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func sleeperInformer(ctx context.Context, sClient *rest.RESTClient, deepCopy smith.DeepCopy) cache.SharedInformer {
+func sleeperInformer(ctx context.Context, sClient rest.Interface, deepCopy smith.DeepCopy) cache.SharedInformer {
 	sleeperInf := cache.NewSharedInformer(
 		cache.NewListWatchFromClient(sClient, SleeperResourcePath, meta_v1.NamespaceAll, fields.Everything()),
 		&Sleeper{}, 0)

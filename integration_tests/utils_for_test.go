@@ -47,7 +47,7 @@ type itConfig struct {
 	config        *rest.Config
 	clientset     *kubernetes.Clientset
 	sc            smith.SmartClient
-	bundleClient  *rest.RESTClient
+	bundleClient  rest.Interface
 	store         *store.Multi
 	toCleanup     []runtime.Object
 }
@@ -111,7 +111,7 @@ func (cfg *itConfig) deleteObject(obj runtime.Object) {
 	}
 }
 
-func (cfg *itConfig) createObject(ctxTest context.Context, obj, res runtime.Object, resourcePath string, client *rest.RESTClient) {
+func (cfg *itConfig) createObject(ctxTest context.Context, obj, res runtime.Object, resourcePath string, client rest.Interface) {
 	metaObj := obj.(meta_v1.Object)
 
 	cfg.t.Logf("Creating a new object %s/%s of kind %s", cfg.namespace, metaObj.GetName(), obj.GetObjectKind().GroupVersionKind().Kind)

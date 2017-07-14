@@ -134,7 +134,7 @@ func (a *App) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (a *App) controller(bundleInf, tprInf cache.SharedIndexInformer, bundleClient *rest.RESTClient, bundleStore controller.BundleStore,
+func (a *App) controller(bundleInf, tprInf cache.SharedIndexInformer, bundleClient rest.Interface, bundleStore controller.BundleStore,
 	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *controller.BundleController {
 
 	// Ready Checker

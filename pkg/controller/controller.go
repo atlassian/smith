@@ -31,7 +31,7 @@ type BundleController struct {
 	wg           wait.Group
 	bundleInf    cache.SharedIndexInformer
 	tprInf       cache.SharedIndexInformer
-	bundleClient *rest.RESTClient
+	bundleClient rest.Interface
 	bundleStore  BundleStore
 	smartClient  smith.SmartClient
 	rc           ReadyChecker
@@ -47,7 +47,7 @@ type BundleController struct {
 	tprHandler      cache.ResourceEventHandler
 }
 
-func New(bundleInf, tprInf cache.SharedIndexInformer, bundleClient *rest.RESTClient, bundleStore BundleStore,
+func New(bundleInf, tprInf cache.SharedIndexInformer, bundleClient rest.Interface, bundleStore BundleStore,
 	sc smith.SmartClient, rc ReadyChecker, scheme *runtime.Scheme, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
 	workers int, tprResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
 	c := &BundleController{
