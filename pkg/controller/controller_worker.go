@@ -399,58 +399,23 @@ func (c *BundleController) handleProcessResult(bundle *smith.Bundle, isReady, re
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		return false, err
 	}
-	var inProgressCond, readyCond, errorCond smith.BundleCondition
+	inProgressCond := smith.BundleCondition{Type: smith.BundleInProgress, Status: smith.ConditionFalse}
+	readyCond := smith.BundleCondition{Type: smith.BundleReady, Status: smith.ConditionFalse}
+	errorCond := smith.BundleCondition{Type: smith.BundleError, Status: smith.ConditionFalse}
 	if err == nil {
-		errorCond = smith.BundleCondition{
-			Type:   smith.BundleError,
-			Status: smith.ConditionFalse,
-		}
 		if isReady {
-			inProgressCond = smith.BundleCondition{
-				Type:   smith.BundleInProgress,
-				Status: smith.ConditionFalse,
-			}
-			readyCond = smith.BundleCondition{
-				Type:   smith.BundleReady,
-				Status: smith.ConditionTrue,
-			}
+			readyCond.Status = smith.ConditionTrue
 		} else {
-			inProgressCond = smith.BundleCondition{
-				Type:   smith.BundleInProgress,
-				Status: smith.ConditionTrue,
-			}
-			readyCond = smith.BundleCondition{
-				Type:   smith.BundleReady,
-				Status: smith.ConditionFalse,
-			}
+			inProgressCond.Status = smith.ConditionTrue
 		}
 	} else {
-		readyCond = smith.BundleCondition{
-			Type:   smith.BundleReady,
-			Status: smith.ConditionFalse,
-		}
+		errorCond.Status = smith.ConditionTrue
+		errorCond.Message = err.Error()
 		if retriable {
-			errorCond = smith.BundleCondition{
-				Type:    smith.BundleError,
-				Status:  smith.ConditionTrue,
-				Reason:  "RetriableError",
-				Message: err.Error(),
-			}
-			inProgressCond = smith.BundleCondition{
-				Type:   smith.BundleInProgress,
-				Status: smith.ConditionTrue,
-			}
+			errorCond.Reason = smith.BundleReasonRetriableError
+			inProgressCond.Status = smith.ConditionTrue
 		} else {
-			errorCond = smith.BundleCondition{
-				Type:    smith.BundleError,
-				Status:  smith.ConditionTrue,
-				Reason:  "TerminalError",
-				Message: err.Error(),
-			}
-			inProgressCond = smith.BundleCondition{
-				Type:   smith.BundleInProgress,
-				Status: smith.ConditionFalse,
-			}
+			errorCond.Reason = smith.BundleReasonTerminalError
 		}
 	}
 

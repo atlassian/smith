@@ -22,6 +22,11 @@ const (
 	BundleError      BundleConditionType = "Error"
 )
 
+const (
+	BundleReasonTerminalError  = "TerminalError"
+	BundleReasonRetriableError = "RetriableError"
+)
+
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition.
