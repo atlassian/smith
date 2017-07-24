@@ -145,7 +145,7 @@ that is not the main usecase. Smith is built to be used as a foundation componen
 on top of it. E.g. Helm could probably use Smith under the covers to manipulate Kubernetes API objects. Another
 usecase is a PaaS that delegates (some) object manipulations to Smith.
 
-### Requirements
+## Requirements
 
 * Please run on recent enough Kubernetes version because earlier versions have some bugs that may prevent Smith from
 working properly. We test on 1.6+;
@@ -154,7 +154,7 @@ standard library in this version;
 * Working Docker installation - build process uses dockerized Go to isolate from the host system;
 * List of project dependencies and their versions can be found in `glide.yaml` and `glide.lock` files.
 
-### Building
+## Building
 
 * To install dependencies run
 ```bash
@@ -180,7 +180,7 @@ make docker
 # or make docker-race to build a binary with -race
 ```
 
-### Contributing
+## Contributing
 
 Pull requests, issues and comments welcome. For pull requests:
 
@@ -203,6 +203,6 @@ those contributing as an individual.
 * [CLA for corporate contributors](https://na2.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=e1c17c66-ca4d-4aab-a953-2c231af4a20b)
 * [CLA for individuals](https://na2.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=3f94fbdc-2fbe-46ac-b14c-5d152700ae5d)
 
-# License
+## License
 
 Copyright (c) 2016-2017 Atlassian and others. Apache 2.0 licensed, see LICENSE file.
