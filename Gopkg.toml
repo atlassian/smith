@@ -1,0 +1,39 @@
+
+# Gopkg.toml example
+#
+# Refer to https://github.com/golang/dep/blob/master/docs/Gopkg.toml.md
+# for detailed Gopkg.toml documentation.
+#
+# required = ["github.com/user/thing/cmd/thing"]
+# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
+#
+# [[constraint]]
+#   name = "github.com/user/project"
+#   version = "1.0.0"
+#
+# [[constraint]]
+#   name = "github.com/user/project2"
+#   branch = "dev"
+#   source = "github.com/myfork/project2"
+#
+# [[override]]
+#  name = "github.com/x/y"
+#  version = "2.4.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/kubernetes-incubator/service-catalog"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/stretchr/testify"
+
+# Transitive dependencies used by Service Catalog. Not resolved properly, have to override :(
+
+[[override]]
+  name = "k8s.io/apimachinery"
+  revision = "abe34e4f5b4413c282a83011892cbeea5b32223b"
+
+[[override]]
+  name = "k8s.io/client-go"
+  revision = "e356aa2e77ab4a5914c216c12ba14cce25a25ab0"
