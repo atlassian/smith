@@ -19,10 +19,11 @@ setup: setup-ci
 	go get -u golang.org/x/tools/cmd/goimports
 
 setup-ci:
+	go get -u github.com/golang/dep/cmd/dep
 	go get -u github.com/Masterminds/glide
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
-	glide install --strip-vendor
+	dep ensure
 
 build: fmt
 	go build -i -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
