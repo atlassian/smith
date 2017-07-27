@@ -5,6 +5,10 @@ language: go
 services:
   - docker
 
+cache:
+  directories:
+    - $GOPATH/pkg/dep
+
 go:
   - 1.8.3
 
