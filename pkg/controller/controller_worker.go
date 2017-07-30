@@ -94,11 +94,11 @@ func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
 
 // Parse bundle, build resource graph, traverse graph, assert each resource exists.
 // For each resource ensure its dependencies (if any) are in READY state before creating it.
-// If at least one dependency is not READY, exit loop. Rebuild will/should be called once the dependency
+// If at least one dependency is not READY - skip the resource. Rebuild will/should be called once the dependency
 // updates it's state (noticed via watching).
 
-// READY state might mean something different for each resource type. For ThirdPartyResources it may mean
-// that a field "State" in the Status of the resource is set to "Ready". It may be customizable via
+// READY state might mean something different for each resource type. For a Custom Resource it may mean
+// that a field "State" in the Status of the resource is set to "Ready". It is customizable via
 // annotations with some defaults.
 func (c *BundleController) process(bundle *smith.Bundle) (isReady, conflictRet, retriableError bool, e error) {
 	// Build resource map by name
@@ -375,7 +375,7 @@ func (c *BundleController) deleteRemovedResources(bundle *smith.Bundle) (retriab
 func (c *BundleController) setBundleStatus(bundle *smith.Bundle) error {
 	err := c.bundleClient.Put().
 		Namespace(bundle.Namespace).
-		Resource(smith.BundleResourcePath).
+		Resource(smith.BundleResourcePlural).
 		Name(bundle.Name).
 		Body(bundle).
 		Do().

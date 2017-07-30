@@ -43,17 +43,19 @@ const (
 	SmithDomain        = "smith.atlassian.com"
 	SmithResourceGroup = SmithDomain
 
-	BundleResourcePath         = "bundles"
-	BundleResourceName         = "bundle." + SmithDomain
-	BundleResourceVersion      = "v1"
-	BundleResourceKind         = "Bundle"
+	BundleResourceSingular = "bundle"
+	BundleResourcePlural   = "bundles"
+	BundleResourceVersion  = "v1"
+	BundleResourceKind     = "Bundle"
+
 	BundleResourceGroupVersion = SmithResourceGroup + "/" + BundleResourceVersion
 
-	BundleNameLabel = BundleResourceName + "/BundleName"
+	BundleResourceName = BundleResourcePlural + "." + SmithDomain
+	BundleNameLabel    = BundleResourceName + "/BundleName"
 
 	// See docs/design/managing-resources.md
-	TprFieldPathAnnotation  = SmithDomain + "/TprReadyWhenFieldPath"
-	TprFieldValueAnnotation = SmithDomain + "/TprReadyWhenFieldValue"
+	CrFieldPathAnnotation  = SmithDomain + "/CrReadyWhenFieldPath"
+	CrFieldValueAnnotation = SmithDomain + "/CrReadyWhenFieldValue"
 )
 
 var GV = schema.GroupVersion{

@@ -84,7 +84,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	sleeper := args[1].(*tprattribute.Sleeper)
 
 	cmClient := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace)
-	sClient, err := tprattribute.GetSleeperTprClient(cfg.config, sleeperScheme())
+	sClient, err := tprattribute.GetSleeperClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
 	// Create orphaned ConfigMap
@@ -97,7 +97,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	err = sClient.Post().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePath).
+		Resource(tprattribute.SleeperResourcePlural).
 		Body(sleeper).
 		Do().
 		Into(sleeperActual)
@@ -106,7 +106,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 
 	// Create Bundle with same resources
 	bundleActual := &smith.Bundle{}
-	cfg.createObject(ctxTest, cfg.bundle, bundleActual, smith.BundleResourcePath, cfg.bundleClient)
+	cfg.createObject(ctxTest, cfg.bundle, bundleActual, smith.BundleResourcePlural, cfg.bundleClient)
 	cfg.createdBundle = bundleActual
 
 	time.Sleep(1 * time.Second) // TODO this should be removed once race with tpr informer is fixed "no informer for tpr.atlassian.com/v1, Kind=Sleeper is registered"
@@ -145,7 +145,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	err = sClient.Delete().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePath).
+		Resource(tprattribute.SleeperResourcePlural).
 		Name(sleeperActual.Name).
 		Body(&meta_v1.DeleteOptions{
 			Preconditions: &meta_v1.Preconditions{
@@ -166,7 +166,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	// Sleeper should have BlockOwnerDeletion updated
 	err = sClient.Get().
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePath).
+		Resource(tprattribute.SleeperResourcePlural).
 		Name(sleeperActual.Name).
 		Do().
 		Into(sleeperActual)

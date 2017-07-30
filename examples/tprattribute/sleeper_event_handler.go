@@ -66,7 +66,7 @@ func (h *SleeperEventHandler) retryUpdate(sleeper *Sleeper, state SleeperState, 
 		err := h.client.Put().
 			Context(h.ctx).
 			Namespace(sleeper.Namespace).
-			Resource(SleeperResourcePath).
+			Resource(SleeperResourcePlural).
 			Name(sleeper.Name).
 			Body(sleeper).
 			Do().
@@ -75,7 +75,7 @@ func (h *SleeperEventHandler) retryUpdate(sleeper *Sleeper, state SleeperState, 
 			err = h.client.Get().
 				Context(h.ctx).
 				Namespace(sleeper.Namespace).
-				Resource(SleeperResourcePath).
+				Resource(SleeperResourcePlural).
 				Name(sleeper.Name).
 				Do().
 				Into(sleeper)

@@ -34,18 +34,12 @@ func BundleClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTClient, e
 	config.ContentType = runtime.ContentTypeJSON
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)}
 
-	client, err := rest.RESTClientFor(&config)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
+	return rest.RESTClientFor(&config)
 }
 
 func BundleInformer(bundleClient cache.Getter, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, namespace, fields.Everything()),
+		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePlural, namespace, fields.Everything()),
 		&smith.Bundle{},
 		resyncPeriod,
 		cache.Indexers{})

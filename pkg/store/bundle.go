@@ -5,16 +5,16 @@ import (
 	"strings"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/resources"
 
+	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
 
 const (
-	byTprNameIndexName = "TprNameIndex"
-	byObjectIndexName  = "ByObjectIndex"
+	byCrdGroupKindIndexName = "ByCrdGroupKind"
+	byObjectIndexName       = "ByObject"
 )
 
 type BundleStore struct {
@@ -25,8 +25,8 @@ type BundleStore struct {
 
 func NewBundle(bundleInf cache.SharedIndexInformer, store smith.ByNameStore, deepCopy smith.DeepCopy) (*BundleStore, error) {
 	err := bundleInf.AddIndexers(cache.Indexers{
-		byTprNameIndexName: byTprNameIndex,
-		byObjectIndexName:  byObjectIndex,
+		byCrdGroupKindIndexName: byCrdGroupKindIndex,
+		byObjectIndexName:       byObjectIndex,
 	})
 	if err != nil {
 		return nil, err
@@ -48,9 +48,9 @@ func (s *BundleStore) Get(namespace, bundleName string) (*smith.Bundle, error) {
 	return bundle.(*smith.Bundle), nil
 }
 
-// GetBundles returns bundles where a resource declared via TPR with specified name is used.
-func (s *BundleStore) GetBundles(tprName string) ([]*smith.Bundle, error) {
-	return s.getBundles(byTprNameIndexName, tprName)
+// GetBundlesByCrd returns Bundles which have a resource defined by CRD.
+func (s *BundleStore) GetBundlesByCrd(crd *apiext_v1b1.CustomResourceDefinition) ([]*smith.Bundle, error) {
+	return s.getBundles(byCrdGroupKindIndexName, byCrdGroupKindIndexKey(crd.Spec.Group, crd.Spec.Names.Kind))
 }
 
 // GetBundlesByObject returns bundles where a resource with specified GVK, namespace and name is defined.
@@ -74,19 +74,23 @@ func (s *BundleStore) getBundles(indexName, indexKey string) ([]*smith.Bundle, e
 	return result, nil
 }
 
-func byTprNameIndex(obj interface{}) ([]string, error) {
+func byCrdGroupKindIndex(obj interface{}) ([]string, error) {
 	bundle := obj.(*smith.Bundle)
 	var result []string
 	for _, resource := range bundle.Spec.Resources {
 		gvk := resource.Spec.GetObjectKind().GroupVersionKind()
-		if !strings.ContainsRune(gvk.Group, '.') {
-			// TPR names are of form <kind>.<domain>.<tld> so there should be at least
+		if strings.IndexByte(gvk.Group, '.') == -1 {
+			// CRD names are of form <plural>.<domain>.<tld> so there should be at least
 			// one dot between domain and tld
 			continue
 		}
-		result = append(result, resources.GroupKindToTprName(gvk.GroupKind()))
+		result = append(result, byCrdGroupKindIndexKey(gvk.Group, gvk.Kind))
 	}
 	return result, nil
+}
+
+func byCrdGroupKindIndexKey(group, kind string) string {
+	return group + "/" + kind
 }
 
 func byObjectIndex(obj interface{}) ([]string, error) {

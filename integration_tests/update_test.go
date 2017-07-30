@@ -159,7 +159,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	bundle2 := args[3].(*smith.Bundle)
 
 	cmClient := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace)
-	sClient, err := tprattribute.GetSleeperTprClient(cfg.config, sleeperScheme())
+	sClient, err := tprattribute.GetSleeperClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
 	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
@@ -172,7 +172,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	require.NoError(t, cfg.bundleClient.Put().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(smith.BundleResourcePath).
+		Resource(smith.BundleResourcePlural).
 		Name(bundle2.Name).
 		Body(bundle2).
 		Do().
@@ -194,7 +194,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	err = sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePath).
+		Resource(tprattribute.SleeperResourcePlural).
 		Name(sleeper2.Name).
 		Do().
 		Into(&sleeperObj)
@@ -214,7 +214,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	require.NoError(t, cfg.bundleClient.Put().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(smith.BundleResourcePath).
+		Resource(smith.BundleResourcePlural).
 		Name(emptyBundle.Name).
 		Body(&emptyBundle).
 		Do().
@@ -231,7 +231,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	err = sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePath).
+		Resource(tprattribute.SleeperResourcePlural).
 		Name(sleeper2.Name).
 		Do().
 		Into(&sleeperObj)

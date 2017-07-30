@@ -7,27 +7,27 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
+	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 // IsObjectReady checks if an object is Ready.
 // Each function is responsible for handling different versions of objects itself.
 type IsObjectReady func(*unstructured.Unstructured) (isReady, retriableError bool, e error)
 
-// TprStore gets a TPR definition for a Group and Kind of the resource (TPR instance).
-// Returns nil if TPR definition was not found.
-type TprStore interface {
-	Get(resource schema.GroupKind) (*ext_v1b1.ThirdPartyResource, error)
+// CrdStore gets a CRD definition for a Group and Kind of the resource (CRD instance).
+// Returns nil if CRD definition was not found.
+type CrdStore interface {
+	Get(resource schema.GroupKind) (*apiext_v1b1.CustomResourceDefinition, error)
 }
 
 type ReadyChecker struct {
-	Store      TprStore
+	Store      CrdStore
 	KnownTypes map[schema.GroupKind]IsObjectReady
 }
 
-func New(store TprStore, kts ...map[schema.GroupKind]IsObjectReady) *ReadyChecker {
+func New(store CrdStore, kts ...map[schema.GroupKind]IsObjectReady) *ReadyChecker {
 	kt := make(map[schema.GroupKind]IsObjectReady)
 	for _, knownTypes := range kts {
 		for knownGK, f := range knownTypes {
@@ -56,31 +56,31 @@ func (rc *ReadyChecker) IsReady(obj *unstructured.Unstructured) (isReady, retria
 		return isObjectReady(obj)
 	}
 
-	// 2. Check if it is a TPR with path/value annotation
+	// 2. Check if it is a CRD with path/value annotation
 	ready, retriable, err := rc.checkPathValue(gk, obj)
 	if err != nil || ready {
 		return ready, retriable, err
 	}
 
-	// 3. Check if it is a TPR with Kind/GroupVersion annotation
+	// 3. Check if it is a CRD with Kind/GroupVersion annotation
 	return rc.checkForInstance(gk, obj)
 }
 
 func (rc *ReadyChecker) checkForInstance(gk schema.GroupKind, obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
-	// TODO Check if it is a TPR with Kind/GroupVersion annotation
+	// TODO Check if it is a CRD with Kind/GroupVersion annotation
 	return false, false, nil
 }
 
 func (rc *ReadyChecker) checkPathValue(gk schema.GroupKind, obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
-	tpr, err := rc.Store.Get(gk)
+	crd, err := rc.Store.Get(gk)
 	if err != nil {
 		return false, true, err
 	}
-	if tpr == nil {
+	if crd == nil {
 		return false, false, nil
 	}
-	path := tpr.Annotations[smith.TprFieldPathAnnotation]
-	value := tpr.Annotations[smith.TprFieldValueAnnotation]
+	path := crd.Annotations[smith.CrFieldPathAnnotation]
+	value := crd.Annotations[smith.CrFieldValueAnnotation]
 	if len(path) == 0 || len(value) == 0 {
 		return false, false, nil
 	}

@@ -52,7 +52,7 @@ func TestTprAttribute(t *testing.T) {
 
 func testTprAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...interface{}) {
 	sleeper := args[0].(*tprattribute.Sleeper)
-	sClient, err := tprattribute.GetSleeperTprClient(cfg.config, sleeperScheme())
+	sClient, err := tprattribute.GetSleeperClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
 	stgr := stager.New()
@@ -76,7 +76,7 @@ func testTprAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args
 	require.NoError(t, sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePath).
+		Resource(tprattribute.SleeperResourcePlural).
 		Name(sleeper.Name).
 		Do().
 		Into(&sleeperObj))

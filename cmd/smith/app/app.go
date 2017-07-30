@@ -21,10 +21,11 @@ import (
 	"github.com/ash2k/stager"
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -36,7 +37,7 @@ import (
 )
 
 var (
-	tprCreationBackoff = wait.Backoff{
+	crdCreationBackoff = wait.Backoff{
 		Duration: 1 * time.Second,
 		Factor:   1.2,
 		Jitter:   0.1,
@@ -70,6 +71,10 @@ func (a *App) Run(ctx context.Context) error {
 			return err
 		}
 	}
+	crdClient, err := crdClientset.NewForConfig(a.RestConfig)
+	if err != nil {
+		return err
+	}
 	sc := smart.NewClient(a.RestConfig, a.ServiceCatalogConfig, clientset, scClient)
 	scheme, err := FullScheme(a.ServiceCatalogConfig != nil)
 	if err != nil {
@@ -89,25 +94,30 @@ func (a *App) Run(ctx context.Context) error {
 	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
 	multiStore.AddInformer(smith.BundleGVK, bundleInf)
 
-	resourceInfs, tprInf := a.resourceInformers(clientset, scClient)
-	multiStore.AddInformer(tprGVK, tprInf)
+	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, a.ResyncPeriod)
+	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
+	crdStore, err := store.NewCrd(crdInf, scheme.DeepCopy)
+	if err != nil {
+		return err
+	}
+	multiStore.AddInformer(crdGVK, crdInf)
 	stage = stgr.NextStage()
-	stage.StartWithChannel(tprInf.Run) // Must be after store.AddInformer()
+	stage.StartWithChannel(crdInf.Run) // Must be after store.AddInformer()
 
-	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
-	// in Ready Checker and in EnsureTprExists().
-	if !cache.WaitForCacheSync(ctx.Done(), tprInf.HasSynced) {
-		return errors.New("wait for TPR Informer was cancelled")
+	// We must wait for crdInf to populate its cache to avoid reading from an empty cache
+	// in Ready Checker and in EnsureCrdExists().
+	if !cache.WaitForCacheSync(ctx.Done(), crdInf.HasSynced) {
+		return errors.New("wait for CRD Informer was cancelled")
 	}
 
-	// Ensure ThirdPartyResource Bundle exists
-	err = wait.ExponentialBackoff(tprCreationBackoff, func() (bool /*done*/, error) {
-		if err := resources.EnsureTprExists(ctx, clientset, multiStore, resources.BundleTpr()); err != nil {
+	// Ensure CRD Bundle exists
+	err = wait.ExponentialBackoff(crdCreationBackoff, func() (bool /*done*/, error) {
+		if err := resources.EnsureCrdExists(ctx, scheme, crdClient, multiStore, resources.BundleCrd()); err != nil {
 			// TODO be smarter about what is retried
 			if err == context.Canceled || err == context.DeadlineExceeded {
 				return true, err
 			}
-			log.Printf("Failed to create TPR %s: %v", smith.BundleResourceName, err)
+			log.Printf("Failed to create CRD %s: %v", smith.BundleResourceName, err)
 			return false, nil
 		}
 		return true, nil
@@ -121,7 +131,8 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	cntrlr := a.controller(bundleInf, tprInf, bundleClient, bs, sc, scheme, multiStore, resourceInfs)
+	resourceInfs := a.resourceInformers(clientset, scClient)
+	cntrlr := a.controller(bundleInf, crdInf, bundleClient, bs, crdStore, sc, scheme, multiStore, resourceInfs)
 
 	// Add all informers to Multi store and start them
 	for gvk, inf := range resourceInfs {
@@ -134,7 +145,7 @@ func (a *App) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (a *App) controller(bundleInf, tprInf cache.SharedIndexInformer, bundleClient rest.Interface, bundleStore controller.BundleStore,
+func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClient rest.Interface, bundleStore controller.BundleStore, crdStore readychecker.CrdStore,
 	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *controller.BundleController {
 
 	// Ready Checker
@@ -142,7 +153,7 @@ func (a *App) controller(bundleInf, tprInf cache.SharedIndexInformer, bundleClie
 	if a.ServiceCatalogConfig != nil {
 		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
 	}
-	rc := readychecker.New(&store.Tpr{Store: cStore}, readyTypes...)
+	rc := readychecker.New(crdStore, readyTypes...)
 
 	// Object cleanup
 	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}
@@ -158,12 +169,10 @@ func (a *App) controller(bundleInf, tprInf cache.SharedIndexInformer, bundleClie
 	}
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
 
-	return controller.New(bundleInf, tprInf, bundleClient, bundleStore, sc, rc, scheme, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs)
+	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, scheme, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs)
 }
 
-func (a *App) resourceInformers(mainClient kubernetes.Interface, scClient scClientset.Interface) (map[schema.GroupVersionKind]cache.SharedIndexInformer, cache.SharedIndexInformer) {
-	mainSif := informers.NewSharedInformerFactory(mainClient, a.ResyncPeriod)
-
+func (a *App) resourceInformers(mainClient kubernetes.Interface, scClient scClientset.Interface) map[schema.GroupVersionKind]cache.SharedIndexInformer {
 	// Core API types
 	infs := map[schema.GroupVersionKind]cache.SharedIndexInformer{
 		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):     a.ingressInformer(mainClient),
@@ -182,7 +191,5 @@ func (a *App) resourceInformers(mainClient kubernetes.Interface, scClient scClie
 		infs[sc_v1a1.SchemeGroupVersion.WithKind("Instance")] = a.instanceInformer(scClient)
 	}
 
-	tprInf := mainSif.Extensions().V1beta1().ThirdPartyResources().Informer()
-
-	return infs, tprInf
+	return infs
 }

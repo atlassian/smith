@@ -137,7 +137,7 @@
   branch = "master"
   name = "github.com/kubernetes-incubator/service-catalog"
   packages = ["pkg/apis/servicecatalog","pkg/apis/servicecatalog/v1alpha1","pkg/client/clientset_generated/clientset","pkg/client/clientset_generated/clientset/scheme","pkg/client/clientset_generated/clientset/typed/servicecatalog/v1alpha1"]
-  revision = "ee57bfbb51057de82dedd4503059f5e318ecec2c"
+  revision = "d15554aa340e0b305897f2c5292ce1fb3a9d64fd"
 
 [[projects]]
   branch = "master"
@@ -212,6 +212,11 @@
   revision = "25c4ec802a7d637f88d584ab26798e94ad14c13b"
 
 [[projects]]
+  name = "k8s.io/apiextensions-apiserver"
+  packages = ["pkg/apis/apiextensions","pkg/apis/apiextensions/v1beta1","pkg/client/clientset/clientset","pkg/client/clientset/clientset/scheme","pkg/client/clientset/clientset/typed/apiextensions/v1beta1"]
+  revision = "be41f5093e2b05c7a0befe35b04b715eb325ab43"
+
+[[projects]]
   name = "k8s.io/apimachinery"
   packages = ["pkg/api/equality","pkg/api/errors","pkg/api/meta","pkg/api/resource","pkg/apimachinery","pkg/apimachinery/announced","pkg/apimachinery/registered","pkg/apis/meta/v1","pkg/apis/meta/v1/unstructured","pkg/apis/meta/v1alpha1","pkg/conversion","pkg/conversion/queryparams","pkg/conversion/unstructured","pkg/fields","pkg/labels","pkg/openapi","pkg/runtime","pkg/runtime/schema","pkg/runtime/serializer","pkg/runtime/serializer/json","pkg/runtime/serializer/protobuf","pkg/runtime/serializer/recognizer","pkg/runtime/serializer/streaming","pkg/runtime/serializer/versioning","pkg/selection","pkg/types","pkg/util/cache","pkg/util/clock","pkg/util/diff","pkg/util/errors","pkg/util/framer","pkg/util/intstr","pkg/util/json","pkg/util/net","pkg/util/rand","pkg/util/runtime","pkg/util/sets","pkg/util/validation","pkg/util/validation/field","pkg/util/wait","pkg/util/yaml","pkg/version","pkg/watch","third_party/forked/golang/reflect"]
   revision = "abe34e4f5b4413c282a83011892cbeea5b32223b"
@@ -224,6 +229,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9ba7c125b0c80b288db039600201282906aa7190965df825ec3bc8e390997a42"
+  inputs-digest = "81dba1aee43970fd0837349efe57a04a04f299482fd5e44fedf455a9575a6c9a"
   solver-name = "gps-cdcl"
   solver-version = 1
