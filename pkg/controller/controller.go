@@ -44,7 +44,7 @@ type BundleController struct {
 
 	// CRD
 	crdResyncPeriod time.Duration
-	crdHandler      cache.ResourceEventHandler
+	resourceHandler cache.ResourceEventHandler
 }
 
 func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient rest.Interface, bundleStore BundleStore,
@@ -69,13 +69,13 @@ func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient rest.Interfac
 		UpdateFunc: c.onBundleUpdate,
 		DeleteFunc: c.onBundleDelete,
 	})
-	c.crdHandler = cache.ResourceEventHandlerFuncs{
+	c.resourceHandler = cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onResourceAdd,
 		UpdateFunc: c.onResourceUpdate,
 		DeleteFunc: c.onResourceDelete,
 	}
 	for _, resourceInf := range resourceInfs {
-		resourceInf.AddEventHandler(c.crdHandler)
+		resourceInf.AddEventHandler(c.resourceHandler)
 	}
 	return c
 }
