@@ -18,7 +18,7 @@ instead of the placeholder. In this case it can be of any type including objects
 The `fieldName` could be specified in JsonPath format (with `$.` prefix added by default), for example:
 `{{dependency1#status.conditions[?(@.type=="Ready")].status}}`
 
-```
+```yaml
 apiVersion: smith.atlassian.com/v1
 kind: Bundle
 metadata:
@@ -70,7 +70,7 @@ located by `<FieldPath>`, that equals `<Value>`. The `<FieldPath>` value must be
 
 Example of a CRD `T`:
 
-```
+```yaml
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -89,7 +89,7 @@ spec:
 
 Example of a CR `Tinst`:
 
-```
+```yaml
 apiVersion: smith.atlassian.com/v1
 kind: CloudFormation
 metadata:
@@ -110,7 +110,7 @@ Kind=`<Kind>` `K` exists in the same namespace and that resource has an
 
 Example of a CRD `T`:
 
-```
+```yaml
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -129,7 +129,7 @@ spec:
 
 Example of a CR `Tinst`:
 
-```
+```yaml
 apiVersion: smith.atlassian.com/v1
 kind: ResourceClaim
 metadata:
@@ -139,7 +139,7 @@ metadata:
 
 CR `Tinst` will be considered `READY` when the following object `K` is created:
 
-```
+```yaml
 apiVersion: smith.atlassian.com/v1
 kind: ResourceBinding
 metadata:
@@ -177,7 +177,7 @@ whoever constructs the Bundle object with that CR to use those fields or not.
 
 Example of a CRD `T`:
 
-```
+```yaml
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -199,7 +199,7 @@ spec:
 
 Example of a CR `Tinst`:
 
-```
+```yaml
 apiVersion: smith.atlassian.com/v1
 kind: ResourceClaim
 metadata:
@@ -215,7 +215,7 @@ spec:
 
 Object `K`:
 
-```
+```yaml
 apiVersion: smith.atlassian.com/v1
 kind: ResourceBinding
 metadata:
@@ -234,7 +234,7 @@ status:
 
 Object `O`:
 
-```
+```yaml
 apiVersion: v1
 kind: Secret
 metadata:
