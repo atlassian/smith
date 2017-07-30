@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/atlassian/smith/examples/tprattribute"
+	"github.com/atlassian/smith/examples/sleeper"
 	"github.com/atlassian/smith/pkg/client"
 
 	"k8s.io/client-go/rest"
@@ -41,7 +41,7 @@ func runWithContext(ctx context.Context) error {
 }
 
 func runWithConfig(ctx context.Context, config *rest.Config) error {
-	a := tprattribute.App{
+	a := sleeper.App{
 		RestConfig: config,
 	}
 	return a.Run(ctx)

@@ -8,7 +8,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/cmd/smith/app"
-	"github.com/atlassian/smith/examples/tprattribute"
+	"github.com/atlassian/smith/examples/sleeper"
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
@@ -91,8 +91,8 @@ func (cfg *itConfig) deleteObject(obj runtime.Object) {
 			gvk = api_v1.SchemeGroupVersion.WithKind("Secret")
 		case *smith.Bundle:
 			gvk = smith.BundleGVK
-		case *tprattribute.Sleeper:
-			gvk = tprattribute.SleeperGVK
+		case *sleeper.Sleeper:
+			gvk = sleeper.SleeperGVK
 		default:
 			assert.Fail(cfg.t, "Unhandled object kind", "%T", obj)
 			return
@@ -137,7 +137,7 @@ func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.Bun
 func sleeperScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
-	tprattribute.AddToScheme(scheme)
+	sleeper.AddToScheme(scheme)
 	return scheme
 }
 
@@ -260,7 +260,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		t.Fatal("wait for CRD Informer was cancelled")
 	}
 
-	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, multiStore, tprattribute.SleeperCrd()))
+	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, multiStore, sleeper.SleeperCrd()))
 	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, multiStore, resources.BundleCrd()))
 
 	stage.StartWithContext(func(ctx context.Context) {

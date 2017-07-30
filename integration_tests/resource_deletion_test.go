@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/examples/tprattribute"
+	"github.com/atlassian/smith/examples/sleeper"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
@@ -30,15 +30,15 @@ func TestResourceDeletion(t *testing.T) {
 			"a": "b",
 		},
 	}
-	sleeper := &tprattribute.Sleeper{
+	sl := &sleeper.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       tprattribute.SleeperResourceKind,
-			APIVersion: tprattribute.SleeperResourceGroupVersion,
+			Kind:       sleeper.SleeperResourceKind,
+			APIVersion: sleeper.SleeperResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "sleeper2",
 		},
-		Spec: tprattribute.SleeperSpec{
+		Spec: sleeper.SleeperSpec{
 			SleepFor:      1, // seconds,
 			WakeupMessage: "Hello there!",
 		},
@@ -58,13 +58,13 @@ func TestResourceDeletion(t *testing.T) {
 					Spec: cm,
 				},
 				{
-					Name: smith.ResourceName(sleeper.Name),
-					Spec: sleeper,
+					Name: smith.ResourceName(sl.Name),
+					Spec: sl,
 				},
 			},
 		},
 	}
-	setupApp(t, bundle, false, false, testResourceDeletion, cm, sleeper)
+	setupApp(t, bundle, false, false, testResourceDeletion, cm, sl)
 }
 
 func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...interface{}) {
@@ -72,7 +72,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	defer stgr.Shutdown()
 	stage := stgr.NextStage()
 	stage.StartWithContext(func(ctx context.Context) {
-		apl := tprattribute.App{
+		apl := sleeper.App{
 			RestConfig: cfg.config,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
@@ -81,10 +81,10 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	})
 
 	cm := args[0].(*api_v1.ConfigMap)
-	sleeper := args[1].(*tprattribute.Sleeper)
+	sl := args[1].(*sleeper.Sleeper)
 
 	cmClient := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace)
-	sClient, err := tprattribute.GetSleeperClient(cfg.config, sleeperScheme())
+	sClient, err := sleeper.GetSleeperClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
 	// Create orphaned ConfigMap
@@ -93,12 +93,12 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	cfg.cleanupLater(cmActual)
 
 	// Create orphaned Sleeper
-	sleeperActual := &tprattribute.Sleeper{}
+	sleeperActual := &sleeper.Sleeper{}
 	err = sClient.Post().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePlural).
-		Body(sleeper).
+		Resource(sleeper.SleeperResourcePlural).
+		Body(sl).
 		Do().
 		Into(sleeperActual)
 	require.NoError(t, err)
@@ -145,7 +145,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	err = sClient.Delete().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePlural).
+		Resource(sleeper.SleeperResourcePlural).
 		Name(sleeperActual.Name).
 		Body(&meta_v1.DeleteOptions{
 			Preconditions: &meta_v1.Preconditions{
@@ -166,7 +166,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	// Sleeper should have BlockOwnerDeletion updated
 	err = sClient.Get().
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePlural).
+		Resource(sleeper.SleeperResourcePlural).
 		Name(sleeperActual.Name).
 		Do().
 		Into(sleeperActual)

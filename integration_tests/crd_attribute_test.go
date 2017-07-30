@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/examples/tprattribute"
+	"github.com/atlassian/smith/examples/sleeper"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
@@ -16,16 +16,16 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestTprAttribute(t *testing.T) {
-	sleeper := &tprattribute.Sleeper{
+func TestCrdAttribute(t *testing.T) {
+	sl := &sleeper.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       tprattribute.SleeperResourceKind,
-			APIVersion: tprattribute.SleeperResourceGroupVersion,
+			Kind:       sleeper.SleeperResourceKind,
+			APIVersion: sleeper.SleeperResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "sleeper1",
 		},
-		Spec: tprattribute.SleeperSpec{
+		Spec: sleeper.SleeperSpec{
 			SleepFor:      1, // seconds,
 			WakeupMessage: "Hello, Infravators!",
 		},
@@ -41,25 +41,25 @@ func TestTprAttribute(t *testing.T) {
 		Spec: smith.BundleSpec{
 			Resources: []smith.Resource{
 				{
-					Name: smith.ResourceName(sleeper.Name),
-					Spec: sleeper,
+					Name: smith.ResourceName(sl.Name),
+					Spec: sl,
 				},
 			},
 		},
 	}
-	setupApp(t, bundle, false, true, testTprAttribute, sleeper)
+	setupApp(t, bundle, false, true, testCrdAttribute, sl)
 }
 
-func testTprAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...interface{}) {
-	sleeper := args[0].(*tprattribute.Sleeper)
-	sClient, err := tprattribute.GetSleeperClient(cfg.config, sleeperScheme())
+func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...interface{}) {
+	sl := args[0].(*sleeper.Sleeper)
+	sClient, err := sleeper.GetSleeperClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
 	stgr := stager.New()
 	defer stgr.Shutdown()
 	stage := stgr.NextStage()
 	stage.StartWithContext(func(ctx context.Context) {
-		apl := tprattribute.App{
+		apl := sleeper.App{
 			RestConfig: cfg.config,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
@@ -67,22 +67,22 @@ func testTprAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args
 		}
 	})
 
-	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sleeper.Spec.SleepFor+3)*time.Second)
+	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sl.Spec.SleepFor+3)*time.Second)
 	defer cancel()
 
 	assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, cfg.bundle, "")
 
-	var sleeperObj tprattribute.Sleeper
+	var sleeperObj sleeper.Sleeper
 	require.NoError(t, sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePlural).
-		Name(sleeper.Name).
+		Resource(sleeper.SleeperResourcePlural).
+		Name(sl.Name).
 		Do().
 		Into(&sleeperObj))
 
 	assert.Equal(t, map[string]string{
 		smith.BundleNameLabel: cfg.bundle.Name,
 	}, sleeperObj.Labels)
-	assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
+	assert.Equal(t, sleeper.Awake, sleeperObj.Status.State)
 }

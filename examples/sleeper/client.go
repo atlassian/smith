@@ -1,4 +1,4 @@
-package tprattribute
+package sleeper
 
 import (
 	"github.com/atlassian/smith"

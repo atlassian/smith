@@ -94,7 +94,7 @@ minikube-sleeper-run: build-all-race
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go run -race examples/tprattribute/main/*.go
+	go run -race examples/sleeper/main/*.go
 
 test: fmt
 	go test -i -race $$(glide nv | grep -v integration_tests)

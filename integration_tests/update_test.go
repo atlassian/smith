@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/examples/tprattribute"
+	"github.com/atlassian/smith/examples/sleeper"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
@@ -51,10 +51,10 @@ func TestUpdate(t *testing.T) {
 			"x": "y",
 		},
 	}
-	sleeper1 := &tprattribute.Sleeper{
+	sleeper1 := &sleeper.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       tprattribute.SleeperResourceKind,
-			APIVersion: tprattribute.SleeperResourceGroupVersion,
+			Kind:       sleeper.SleeperResourceKind,
+			APIVersion: sleeper.SleeperResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "sleeper2",
@@ -62,15 +62,15 @@ func TestUpdate(t *testing.T) {
 				"labelx": "labelxValue",
 			},
 		},
-		Spec: tprattribute.SleeperSpec{
+		Spec: sleeper.SleeperSpec{
 			SleepFor:      2, // seconds,
 			WakeupMessage: "Hello there!",
 		},
 	}
-	sleeper2 := &tprattribute.Sleeper{
+	sleeper2 := &sleeper.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       tprattribute.SleeperResourceKind,
-			APIVersion: tprattribute.SleeperResourceGroupVersion,
+			Kind:       sleeper.SleeperResourceKind,
+			APIVersion: sleeper.SleeperResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: sleeper1.Name,
@@ -80,7 +80,7 @@ func TestUpdate(t *testing.T) {
 				smith.BundleNameLabel: "configLabel123",
 			},
 		},
-		Spec: tprattribute.SleeperSpec{
+		Spec: sleeper.SleeperSpec{
 			SleepFor:      1, // seconds,
 			WakeupMessage: "Hello, martians!",
 		},
@@ -145,7 +145,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	defer stgr.Shutdown()
 	stage := stgr.NextStage()
 	stage.StartWithContext(func(ctx context.Context) {
-		apl := tprattribute.App{
+		apl := sleeper.App{
 			RestConfig: cfg.config,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
@@ -154,12 +154,12 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	})
 
 	cm2 := args[0].(*api_v1.ConfigMap)
-	sleeper1 := args[1].(*tprattribute.Sleeper)
-	sleeper2 := args[2].(*tprattribute.Sleeper)
+	sleeper1 := args[1].(*sleeper.Sleeper)
+	sleeper2 := args[2].(*sleeper.Sleeper)
 	bundle2 := args[3].(*smith.Bundle)
 
 	cmClient := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace)
-	sClient, err := tprattribute.GetSleeperClient(cfg.config, sleeperScheme())
+	sClient, err := sleeper.GetSleeperClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
 	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
@@ -190,11 +190,11 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	}, cfMap.Labels)
 	assert.Equal(t, cm2.Data, cfMap.Data)
 
-	var sleeperObj tprattribute.Sleeper
+	var sleeperObj sleeper.Sleeper
 	err = sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePlural).
+		Resource(sleeper.SleeperResourcePlural).
 		Name(sleeper2.Name).
 		Do().
 		Into(&sleeperObj)
@@ -205,7 +205,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 		"overlappingLabel":    "overlappingConfigValue",
 		smith.BundleNameLabel: cfg.bundle.Name,
 	}, sleeperObj.Labels)
-	assert.Equal(t, tprattribute.Awake, sleeperObj.Status.State)
+	assert.Equal(t, sleeper.Awake, sleeperObj.Status.State)
 	assert.Equal(t, sleeper2.Spec, sleeperObj.Spec)
 
 	emptyBundle := *cfg.bundle
@@ -231,7 +231,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	err = sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePlural).
+		Resource(sleeper.SleeperResourcePlural).
 		Name(sleeper2.Name).
 		Do().
 		Into(&sleeperObj)
