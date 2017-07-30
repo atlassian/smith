@@ -28,6 +28,10 @@
   branch = "master"
   name = "github.com/stretchr/testify"
 
+[[constraint]]
+  name = "k8s.io/apiextensions-apiserver"
+  revision = "be41f5093e2b05c7a0befe35b04b715eb325ab43" # just before refactor to move to k8s.io/api/
+
 # Transitive dependencies used by Service Catalog. Not resolved properly, have to override :(
 
 [[override]]

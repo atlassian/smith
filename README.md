@@ -17,16 +17,16 @@ It may or may not fulfil the requirements of https://github.com/kubernetes/kuber
 ## The idea
 
 What if we build a service that allows us to manage Kubernetes' built-in resources and other
-[Third Party Resources](https://github.com/kubernetes/kubernetes/blob/master/docs/design/extending-api.md)
-(TPR) in a generic way? Similar to how AWS CloudFormation (or Google Deployment Manager) allows us to manage any
+[Custom Resources](https://kubernetes.io/docs/concepts/api-extension/custom-resources/) (CRs) in a generic way?
+Similar to how AWS CloudFormation (or Google Deployment Manager) allows us to manage any
 AWS/GCE and custom resource. Then we could expose all the resources we need
 to integrate as Third Party Resources and manage them declaratively. This is an open architecture
-with Kubernetes as its core. Other microservices can create/update/watch TPRs to co-ordinate their work/lifecycle.
+with Kubernetes as its core. Other microservices can create/update/watch CRs to co-ordinate their work/lifecycle.
 
 ## Implementation
 
 A group of resources is defined using a Bundle (just like a Stack for AWS CloudFormation).
-The Bundle itself is also a Kubernetes TPR.
+The Bundle itself is also a Kubernetes CR.
 Smith watches for new instances of a Bundle (and events to existing ones), picks them up and processes them.
 
 Processing involves parsing the bundle, building a dependency graph (which is implicitly defined in the bundle),
@@ -34,24 +34,32 @@ walking the graph, and creating/updating necessary resources. Each created/refer
 an label pointing at the origin Bundle.
 
 ### Example bundle
-TPR definitions:
+CR definitions:
 ```yaml
-apiVersion: extensions/v1beta1
-kind: ThirdPartyResource
-description: "Resource bundle definition"
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
 metadata:
-  name: bundle.smith.atlassian.com
-versions:
-  - name: v1
+  name: bundles.smith.atlassian.com
+spec:
+  group: smith.atlassian.com
+  version: v1
+  names:
+    kind: Bundle
+    plural: bundles
+    singular: bundle
 ```
 ```yaml
-apiVersion: extensions/v1beta1
-kind: ThirdPartyResource
-description: "Postgresql resource definition"
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
 metadata:
-  name: postgresql-resource.smith-sql.atlassian.com # must use another group due to https://github.com/kubernetes/kubernetes/issues/23831
-versions:
-  - name: v1
+  name: postgresql-resources.smith.atlassian.com
+spec:
+  group: smith.atlassian.com
+  version: v1
+  names:
+    kind: PostgresqlResource
+    plural: postgresqlresources
+    singular: postgresqlresource
 ```
 Bundle:
 ```yaml
@@ -64,7 +72,7 @@ spec:
   resources:
   - name: db1
     spec:
-      apiVersion: smith-sql.atlassian.com/v1
+      apiVersion: smith.atlassian.com/v1
       kind: PostgresqlResource
       metadata:
         name: db1
@@ -122,7 +130,7 @@ and following the same behaviour, semantics and code "style" as native Kubernete
 - [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `Instance` and `Binding`.
 See [an example](https://github.com/atlassian/smith/tree/master/examples/service_catalog) and
 [recording of the presentation](https://youtu.be/7fgPgtQh5Es) to [Service Catalog SIG](https://github.com/kubernetes/community/tree/master/sig-service-catalog);
-- Dynamic TPR support via [special annotations](https://github.com/atlassian/smith/blob/master/docs/design/managing-resources.md#defined-annotations);
+- Dynamic Custom Resources support via [special annotations](https://github.com/atlassian/smith/blob/master/docs/design/managing-resources.md#defined-annotations);
 - References between objects in the graph to pull parts of objects/fields from dependencies;
 - Smith will delete objects which were removed from a Bundle when Bundle reconciliation is performed (e.g. on a Bundle update).
 
@@ -137,7 +145,7 @@ Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes
 
 * Graph of dependencies is defined explicitly.
 * It uses polling and blocks while waiting for the resource to become READY.
-* The goal of Smith is to manage instances of TPRs. App Controller cannot manage them as of this writing.
+* The goal of Smith is to manage instances of CRs. App Controller cannot manage them as of this writing.
 
 ### On [Helm](https://helm.sh/)
 Helm is a package manager for Kubernetes. Smith operates on a lower level, even though it can be used by a human,

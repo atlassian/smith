@@ -30,7 +30,7 @@ const (
 type BundleController struct {
 	wg           wait.Group
 	bundleInf    cache.SharedIndexInformer
-	tprInf       cache.SharedIndexInformer
+	crdInf       cache.SharedIndexInformer
 	bundleClient rest.Interface
 	bundleStore  BundleStore
 	smartClient  smith.SmartClient
@@ -42,17 +42,17 @@ type BundleController struct {
 	queue   workqueue.RateLimitingInterface
 	workers int
 
-	// TPR
-	tprResyncPeriod time.Duration
-	tprHandler      cache.ResourceEventHandler
+	// CRD
+	crdResyncPeriod time.Duration
+	crdHandler      cache.ResourceEventHandler
 }
 
-func New(bundleInf, tprInf cache.SharedIndexInformer, bundleClient rest.Interface, bundleStore BundleStore,
+func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient rest.Interface, bundleStore BundleStore,
 	sc smith.SmartClient, rc ReadyChecker, scheme *runtime.Scheme, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
-	workers int, tprResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
+	workers int, crdResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
 	c := &BundleController{
 		bundleInf:       bundleInf,
-		tprInf:          tprInf,
+		crdInf:          crdInf,
 		bundleClient:    bundleClient,
 		bundleStore:     bundleStore,
 		smartClient:     sc,
@@ -62,20 +62,20 @@ func New(bundleInf, tprInf cache.SharedIndexInformer, bundleClient rest.Interfac
 		specCheck:       specCheck,
 		queue:           queue,
 		workers:         workers,
-		tprResyncPeriod: tprResyncPeriod,
+		crdResyncPeriod: crdResyncPeriod,
 	}
 	bundleInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onBundleAdd,
 		UpdateFunc: c.onBundleUpdate,
 		DeleteFunc: c.onBundleDelete,
 	})
-	c.tprHandler = cache.ResourceEventHandlerFuncs{
+	c.crdHandler = cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onResourceAdd,
 		UpdateFunc: c.onResourceUpdate,
 		DeleteFunc: c.onResourceDelete,
 	}
 	for _, resourceInf := range resourceInfs {
-		resourceInf.AddEventHandler(c.tprHandler)
+		resourceInf.AddEventHandler(c.crdHandler)
 	}
 	return c
 }
@@ -88,10 +88,10 @@ func (c *BundleController) Run(ctx context.Context) {
 	log.Print("Starting Bundle controller")
 	defer log.Print("Shutting down Bundle controller")
 
-	c.tprInf.AddEventHandler(&tprEventHandler{
+	c.crdInf.AddEventHandler(&crdEventHandler{
 		ctx:              ctx,
 		BundleController: c,
-		watchers:         make(map[string]map[string]watchState),
+		watchers:         make(map[string]watchState),
 	})
 
 	if !cache.WaitForCacheSync(ctx.Done(), c.bundleInf.HasSynced) {

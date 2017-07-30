@@ -3,15 +3,15 @@ package tprattribute
 import (
 	"github.com/atlassian/smith"
 
+	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 )
 
-func GetSleeperTprClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTClient, error) {
+func GetSleeperClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTClient, error) {
 	groupVersion := schema.GroupVersion{
 		Group:   SleeperResourceGroup,
 		Version: SleeperResourceVersion,
@@ -23,27 +23,26 @@ func GetSleeperTprClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTCl
 	config.ContentType = runtime.ContentTypeJSON
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)}
 
-	client, err := rest.RESTClientFor(&config)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
+	return rest.RESTClientFor(&config)
 }
 
-func SleeperTpr() *ext_v1b1.ThirdPartyResource {
-	return &ext_v1b1.ThirdPartyResource{
+func SleeperCrd() *apiext_v1b1.CustomResourceDefinition {
+	return &apiext_v1b1.CustomResourceDefinition{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: SleeperResourceName,
 			Annotations: map[string]string{
-				smith.TprFieldPathAnnotation:  SleeperReadyStatePath,
-				smith.TprFieldValueAnnotation: string(SleeperReadyStateValue),
+				smith.CrFieldPathAnnotation:  SleeperReadyStatePath,
+				smith.CrFieldValueAnnotation: string(SleeperReadyStateValue),
 			},
 		},
-		Description: "Sleeper TPR example",
-		Versions: []ext_v1b1.APIVersion{
-			{Name: SleeperResourceVersion},
+		Spec: apiext_v1b1.CustomResourceDefinitionSpec{
+			Group:   SleeperResourceGroup,
+			Version: SleeperResourceVersion,
+			Names: apiext_v1b1.CustomResourceDefinitionNames{
+				Plural:   SleeperResourcePlural,
+				Singular: SleeperResourceSingular,
+				Kind:     SleeperResourceKind,
+			},
 		},
 	}
 }

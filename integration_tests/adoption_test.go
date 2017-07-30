@@ -85,7 +85,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 	sleeper := args[1].(*tprattribute.Sleeper)
 
 	cmClient := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace)
-	sClient, err := tprattribute.GetSleeperTprClient(cfg.config, sleeperScheme())
+	sClient, err := tprattribute.GetSleeperClient(cfg.config, sleeperScheme())
 	require.NoError(t, err)
 
 	// Create orphaned ConfigMap
@@ -98,7 +98,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 	err = sClient.Post().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePath).
+		Resource(tprattribute.SleeperResourcePlural).
 		Body(sleeper).
 		Do().
 		Into(sleeperActual)
@@ -107,7 +107,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 
 	// Create Bundle with same resources
 	bundleActual := &smith.Bundle{}
-	cfg.createObject(ctxTest, cfg.bundle, bundleActual, smith.BundleResourcePath, cfg.bundleClient)
+	cfg.createObject(ctxTest, cfg.bundle, bundleActual, smith.BundleResourcePlural, cfg.bundleClient)
 	cfg.createdBundle = bundleActual
 
 	time.Sleep(1 * time.Second) // TODO this should be removed once race with tpr informer is fixed "no informer for tpr.atlassian.com/v1, Kind=Sleeper is registered"
@@ -153,7 +153,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 		err = sClient.Put().
 			Context(ctxTest).
 			Namespace(cfg.namespace).
-			Resource(tprattribute.SleeperResourcePath).
+			Resource(tprattribute.SleeperResourcePlural).
 			Name(sleeperActual.Name).
 			Body(sleeperActual).
 			Do().
@@ -162,7 +162,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 			err = sClient.Get().
 				Context(ctxTest).
 				Namespace(cfg.namespace).
-				Resource(tprattribute.SleeperResourcePath).
+				Resource(tprattribute.SleeperResourcePlural).
 				Name(sleeperActual.Name).
 				Do().
 				Into(sleeperActual)
@@ -194,7 +194,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 	err = sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(tprattribute.SleeperResourcePath).
+		Resource(tprattribute.SleeperResourcePlural).
 		Name(sleeperActual.Name).
 		Do().
 		Into(sleeperActual)

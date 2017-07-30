@@ -10,13 +10,13 @@ import (
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
+	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
-	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -30,15 +30,18 @@ type App struct {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	clientset, err := kubernetes.NewForConfig(a.RestConfig)
-	if err != nil {
-		return err
-	}
-
 	scheme := runtime.NewScheme()
 	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
 	AddToScheme(scheme)
-	sClient, err := GetSleeperTprClient(a.RestConfig, scheme)
+	if err := apiext_v1b1.SchemeBuilder.AddToScheme(scheme); err != nil {
+		return err
+	}
+
+	sClient, err := GetSleeperClient(a.RestConfig, scheme)
+	if err != nil {
+		return err
+	}
+	crdClient, err := crdClientset.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -50,21 +53,22 @@ func (a *App) Run(ctx context.Context) error {
 	multiStore := store.NewMulti(scheme.DeepCopy)
 	stage.StartWithContext(multiStore.Run)
 
-	informerFactory := informers.NewSharedInformerFactory(clientset, ResyncPeriod)
-	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
-	multiStore.AddInformer(ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
+	// TODO replace with upstream function https://github.com/kubernetes/kubernetes/issues/45939
+	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, ResyncPeriod)
+	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
+	multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
 	stage = stgr.NextStage()
-	stage.StartWithChannel(tprInf.Run) // Must be after multiStore.AddInformer()
+	stage.StartWithChannel(crdInf.Run) // Must be after multiStore.AddInformer()
 
-	// 1. Ensure ThirdPartyResource Sleeper exists
+	// 1. Ensure CRD Sleeper exists
 
-	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
-	// in resources.EnsureTprExists().
-	if !cache.WaitForCacheSync(ctx.Done(), tprInf.HasSynced) {
-		return errors.New("wait for TPR Informer was cancelled")
+	// We must wait for crdInf to populate its cache to avoid reading from an empty cache
+	// in resources.EnsureCrdExists().
+	if !cache.WaitForCacheSync(ctx.Done(), crdInf.HasSynced) {
+		return errors.New("wait for CRD informer was cancelled")
 	}
 
-	if err = resources.EnsureTprExists(ctx, clientset, multiStore, SleeperTpr()); err != nil {
+	if err = resources.EnsureCrdExists(ctx, scheme, crdClient, multiStore, SleeperCrd()); err != nil {
 		return err
 	}
 
@@ -79,8 +83,8 @@ func (a *App) Run(ctx context.Context) error {
 
 func sleeperInformer(ctx context.Context, sClient rest.Interface, deepCopy smith.DeepCopy) cache.SharedInformer {
 	sleeperInf := cache.NewSharedInformer(
-		cache.NewListWatchFromClient(sClient, SleeperResourcePath, meta_v1.NamespaceAll, fields.Everything()),
-		&Sleeper{}, 0)
+		cache.NewListWatchFromClient(sClient, SleeperResourcePlural, meta_v1.NamespaceAll, fields.Everything()),
+		&Sleeper{}, ResyncPeriod)
 
 	seh := &SleeperEventHandler{
 		ctx:      ctx,

@@ -18,16 +18,17 @@ import (
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
-	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -142,7 +143,7 @@ func sleeperScheme() *runtime.Scheme {
 
 func bundleInformer(bundleClient cache.Getter, namespace string) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePath, namespace, fields.Everything()),
+		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePlural, namespace, fields.Everything()),
 		&smith.Bundle{},
 		0,
 		cache.Indexers{})
@@ -234,7 +235,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	err = bundleClient.Delete().
 		Context(ctxTest).
 		Namespace(useNamespace).
-		Resource(smith.BundleResourcePath).
+		Resource(smith.BundleResourcePlural).
 		Name(bundle.Name).
 		Do().
 		Error()
@@ -244,20 +245,23 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		require.NoError(t, err)
 	}
 
-	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
-	tprInf := informerFactory.Extensions().V1beta1().ThirdPartyResources().Informer()
-	multiStore.AddInformer(ext_v1b1.SchemeGroupVersion.WithKind("ThirdPartyResource"), tprInf)
-	stage = stgr.NextStage()
-	stage.StartWithChannel(tprInf.Run)
+	crdClient, err := crdClientset.NewForConfig(config)
+	require.NoError(t, err)
 
-	// We must wait for tprInf to populate its cache to avoid reading from an empty cache
-	// in resources.EnsureTprExists().
-	if !cache.WaitForCacheSync(ctxTest.Done(), tprInf.HasSynced) {
-		t.Fatal("wait for TPR Informer was cancelled")
+	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, 0)
+	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
+	multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
+	stage = stgr.NextStage()
+	stage.StartWithChannel(crdInf.Run)
+
+	// We must wait for crdInf to populate its cache to avoid reading from an empty cache
+	// in resources.EnsureCrdExists().
+	if !cache.WaitForCacheSync(ctxTest.Done(), crdInf.HasSynced) {
+		t.Fatal("wait for CRD Informer was cancelled")
 	}
 
-	require.NoError(t, resources.EnsureTprExists(ctxTest, clientset, multiStore, tprattribute.SleeperTpr()))
-	require.NoError(t, resources.EnsureTprExists(ctxTest, clientset, multiStore, resources.BundleTpr()))
+	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, multiStore, tprattribute.SleeperCrd()))
+	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, multiStore, resources.BundleCrd()))
 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := app.App{
@@ -271,9 +275,9 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	})
 
 	if createBundle {
-		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle TPR
+		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle CRD
 		res := &smith.Bundle{}
-		cfg.createObject(ctxTest, bundle, res, smith.BundleResourcePath, bundleClient)
+		cfg.createObject(ctxTest, bundle, res, smith.BundleResourcePlural, bundleClient)
 		cfg.createdBundle = res
 	}
 

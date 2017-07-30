@@ -1,6 +1,7 @@
 # Managing resources
 
-This file describes the way Smith manages instances of Third Party Resources (TPR) and other resources.
+This file describes the way Smith manages
+[Custom Resources](https://kubernetes.io/docs/concepts/api-extension/custom-resources/) (CRs) and other resources.
 
 ## Field references
 
@@ -14,11 +15,8 @@ of the placeholder. In this case value must be a string, boolean or number.
 Syntax `"{{{dependency1#fieldName}}}"` means that value of `fieldName` will be injected without quotes
 instead of the placeholder. In this case it can be of any type including objects.
 
-The `fieldName` could be specified in JsonPath format (with `$.` prefix added by default), for example: `{{dependency1#status.conditions[?(@.type=="Ready")].status}}`
-
-This syntax is selected to be as close to
-[Templates proposal](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/templates.md)
-as possible so that it can be used in the future to implement substitution.
+The `fieldName` could be specified in JsonPath format (with `$.` prefix added by default), for example:
+`{{dependency1#status.conditions[?(@.type=="Ready")].status}}`
 
 ```
 apiVersion: smith.atlassian.com/v1
@@ -29,7 +27,7 @@ spec:
   resources:
   - name: sleeper1
     spec:
-      apiVersion: tpr.atlassian.com/v1
+      apiVersion: crd.atlassian.com/v1
       kind: Sleeper
       metadata:
         name: sleeper1
@@ -44,7 +42,7 @@ spec:
     dependsOn:
     - sleeper1
     spec:
-      apiVersion: tpr.atlassian.com/v1
+      apiVersion: crd.atlassian.com/v1
       kind: Sleeper
       metadata:
         name: sleeper2
@@ -55,7 +53,7 @@ spec:
     dependsOn:
     - sleeper2
     spec:
-      apiVersion: tpr.atlassian.com/v1
+      apiVersion: crd.atlassian.com/v1
       kind: Sleeper
       metadata:
         name: sleeper3
@@ -64,28 +62,32 @@ spec:
 
 ## Defined annotations
 
-### smith.a.c/TprReadyWhenFieldPath=`<FieldPath>`, smith.a.c/TprReadyWhenFieldValue=`<Value>`
+### smith.a.c/CrdReadyWhenFieldPath=`<FieldPath>`, smith.a.c/CrdReadyWhenFieldValue=`<Value>`
 
-Applied to a TPR `T` to indicate that an instance of it `Tinst` is considered `READY` when it has a field,
-located by `<FieldPath>`, that equals `<Value>`. The `<FieldPath>` value must be specified in [JsonPath](http://goessner.net/articles/JsonPath/) format.
+Applied to a CRD `T` to indicate that an instance of it `Tinst` is considered `READY` when it has a field,
+located by `<FieldPath>`, that equals `<Value>`. The `<FieldPath>` value must be specified in
+[JsonPath](http://goessner.net/articles/JsonPath/) format.
 
-Example of a TPR `T`:
+Example of a CRD `T`:
 
 ```
-apiVersion: extensions/v1beta1
-description: Smith example AWS CloudFormation stack
-kind: ThirdPartyResource
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
 metadata:
-  name: cloud-formation.smith.atlassian.com
+  name: cloud-formations.smith.atlassian.com
   annotations:
-    smith.atlassian.com/TprReadyWhenFieldPath: {$.status.state}
-    smith.atlassian.com/TprReadyWhenFieldValue: Ready
-versions:
-- name: v1
-
+    smith.atlassian.com/CrReadyWhenFieldPath: "{{$.status.state}}"
+    smith.atlassian.com/CrReadyWhenFieldValue: Ready
+spec:
+  group: smith.atlassian.com
+  version: v1
+  names:
+    kind: CloudFormation
+    plural: cloudformations
+    singular: cloudformation
 ```
 
-Example of a TPR instance `Tinst`:
+Example of a CR `Tinst`:
 
 ```
 apiVersion: smith.atlassian.com/v1
@@ -100,29 +102,32 @@ status:
 
 ## Defined but not implemented
 
-### smith.a.c/TprReadyWhenExistsKind=`<Kind>`, smith.a.c/TprReadyWhenExistsVersion=`<GroupVersion>`
+### smith.a.c/CrReadyWhenExistsKind=`<Kind>`, smith.a.c/CrReadyWhenExistsVersion=`<GroupVersion>`
 
-Applied to a TPR `T` to indicate that an instance of it `Tinst` is considered `READY` when a resource of
+Applied to a CRD `T` to indicate that an instance of it `Tinst` is considered `READY` when a resource of
 Kind=`<Kind>` `K` exists in the same namespace and that resource has an
 [Owner Reference](https://kubernetes.io/docs/api-reference/v1.5/#ownerreference-v1) pointing to `Tinst`.
 
-Example of a TPR `T`:
+Example of a CRD `T`:
 
 ```
-apiVersion: extensions/v1beta1
-description: Smith example Resource Claim
-kind: ThirdPartyResource
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
 metadata:
-  name: resource-claim.smith.atlassian.com
+  name: resource-claims.smith.atlassian.com
   annotations:
-    smith.atlassian.com/TprReadyWhenExistsKind: ResourceBinding
-    smith.atlassian.com/TprReadyWhenExistsVersion: smith.atlassian.com/v1
-versions:
-- name: v1
-
+    smith.atlassian.com/CrReadyWhenExistsKind: ResourceBinding
+    smith.atlassian.com/CrReadyWhenExistsVersion: smith.atlassian.com/v1
+spec:
+  group: smith.atlassian.com
+  version: v1
+  names:
+    kind: ResourceClaim
+    plural: resourceclaims
+    singular: resourceclaim
 ```
 
-Example of a TPR instance `Tinst`:
+Example of a CR `Tinst`:
 
 ```
 apiVersion: smith.atlassian.com/v1
@@ -132,7 +137,7 @@ metadata:
   uid: 038b49a6-e746-11e6-baf3-ee8d75af8f6e
 ```
 
-TPR instance `Tinst` will be considered `READY` when the following object `K` is created:
+CR `Tinst` will be considered `READY` when the following object `K` is created:
 
 ```
 apiVersion: smith.atlassian.com/v1
@@ -146,50 +151,53 @@ metadata:
     uid: 038b49a6-e746-11e6-baf3-ee8d75af8f6e
 ```
 
-### smith.a.c/TprOutputNameModeField=`<NameModeField>`, smith.a.c/TprOutputNameSetterField=`<OutputNameSetterField>`, smith.a.c/TprOutputNameField=`<OutputNameField>`
+### smith.a.c/CrOutputNameModeField=`<NameModeField>`, smith.a.c/CrOutputNameSetterField=`<OutputNameSetterField>`, smith.a.c/CrOutputNameField=`<OutputNameField>`
 
-These two annotations work together with `smith.a.c/TprReadyWhenExistsKind` and `smith.a.c/TprReadyWhenExistsVersion`.
+These two annotations work together with `smith.a.c/CrReadyWhenExistsKind` and `smith.a.c/CrReadyWhenExistsVersion`.
 Please refer to their definition for definitions of `Tinst` and `K`.
 
-`smith.a.c/TprOutputNameModeField` can be applied to a TPR `T` to configure the way name of the output object `O`
+`smith.a.c/CrOutputNameModeField` can be applied to a CRD `T` to configure the way name of the output object `O`
 is constructed. Object `O` is a [Secret](https://kubernetes.io/docs/user-guide/secrets/) or a
 [ConfigMap](https://kubernetes.io/docs/user-guide/configmap/) which holds parameters that may be injected into
 object(s) `D` depending on `Tinst`. Object `O` is created/updated before `K` is created/updated.
 
-The following values of `smith.a.c/TprOutputNameModeField` are defined:
+The following values of `smith.a.c/CrOutputNameModeField` are defined:
 - `Random` - `O`'s name is randomly generated on each `O` update.
 - `ContentsHash` - `O`'s name is a deterministic hash function of `O`'s contents. `O`'s name changes if, and only if, it's contents change.
 - `Fixed` - `O`'s name is provided via a field `<OutputNameSetterField>` on `Tinst`. Name of that field is defined by
-`smith.a.c/TprOutputNameSetterField` set on `T`.
+`smith.a.c/CrOutputNameSetterField` set on `T`.
 
 Each time `O`'s name changes a new `O` object is created, all dependent objects will have references updated and the old object will be deleted.
 
-Smith does not use `smith.a.c/TprOutputNameModeField` and `smith.a.c/TprOutputNameSetterField` annotations directly,
-they are defined here for completeness only. It is the job of a TPR controller to honor/support them and it is up to
-whoever constructs the Bundle object with that TPR to use those fields or not.
+Smith does not use `smith.a.c/CrOutputNameModeField` and `smith.a.c/CrOutputNameSetterField` annotations directly,
+they are defined here for completeness only. It is the job of a CR controller to honor/support them and it is up to
+whoever constructs the Bundle object with that CR to use those fields or not.
 
-`smith.a.c/TprOutputNameField` is the name of a field on `K` that contains the actual name of `O` that has been created.
+`smith.a.c/CrOutputNameField` is the name of a field on `K` that contains the actual name of `O` that has been created.
 
-Example of a TPR `T`:
+Example of a CRD `T`:
 
 ```
-apiVersion: extensions/v1beta1
-description: Smith example Resource Claim
-kind: ThirdPartyResource
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
 metadata:
-  name: resource-claim.smith.atlassian.com
+  name: resource-claims.smith.atlassian.com
   annotations:
-    smith.atlassian.com/TprReadyWhenExistsKind: ResourceBinding
-    smith.atlassian.com/TprReadyWhenExistsVersion: smith.atlassian.com/v1
-    smith.atlassian.com/TprOutputNameModeField: spec.secretNameMode
-    smith.atlassian.com/TprOutputNameSetterField: spec.secretName
-    smith.atlassian.com/TprOutputNameField: status.secretName
-versions:
-- name: v1
-
+    smith.atlassian.com/CrReadyWhenExistsKind: ResourceBinding
+    smith.atlassian.com/CrReadyWhenExistsVersion: smith.atlassian.com/v1
+    smith.atlassian.com/CrOutputNameModeField: spec.secretNameMode
+    smith.atlassian.com/CrOutputNameSetterField: spec.secretName
+    smith.atlassian.com/CrOutputNameField: status.secretName
+spec:
+  group: smith.atlassian.com
+  version: v1
+  names:
+    kind: ResourceClaim
+    plural: resourceclaims
+    singular: resourceclaim
 ```
 
-Example of a TPR instance `Tinst`:
+Example of a CR `Tinst`:
 
 ```
 apiVersion: smith.atlassian.com/v1

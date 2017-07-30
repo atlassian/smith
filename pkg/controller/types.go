@@ -3,6 +3,7 @@ package controller
 import (
 	"github.com/atlassian/smith"
 
+	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,8 +26,10 @@ type Store interface {
 }
 
 type BundleStore interface {
-	// Get is a function that does a lookup of Bundle based on its namespace and name.
+	// Get returns Bundle based on its namespace and name.
 	Get(namespace, bundleName string) (*smith.Bundle, error)
-	GetBundles(tprName string) ([]*smith.Bundle, error)
+	// GetBundlesByCrd returns Bundles which have a resource defined by CRD.
+	GetBundlesByCrd(*apiext_v1b1.CustomResourceDefinition) ([]*smith.Bundle, error)
+	// GetBundlesByObject returns Bundles which have a resource of a particular group/kind with a name in a namespace.
 	GetBundlesByObject(gk schema.GroupKind, namespace, name string) ([]*smith.Bundle, error)
 }

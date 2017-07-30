@@ -7,14 +7,17 @@ import (
 )
 
 const (
-	TprDomain            = "tpr.atlassian.com"
-	SleeperResourceGroup = TprDomain
+	CrdDomain            = "crd.atlassian.com"
+	SleeperResourceGroup = CrdDomain
 
-	SleeperResourcePath         = "sleepers"
-	SleeperResourceName         = "sleeper." + TprDomain
-	SleeperResourceVersion      = "v1"
-	SleeperResourceKind         = "Sleeper"
+	SleeperResourceSingular = "sleeper"
+	SleeperResourcePlural   = "sleepers"
+	SleeperResourceVersion  = "v1"
+	SleeperResourceKind     = "Sleeper"
+
 	SleeperResourceGroupVersion = SleeperResourceGroup + "/" + SleeperResourceVersion
+
+	SleeperResourceName = SleeperResourcePlural + "." + CrdDomain
 
 	SleeperReadyStatePath  = "{$.status.state}"
 	SleeperReadyStateValue = Awake

@@ -6,7 +6,7 @@ spec:
   resources:
   - name: sleeper1
     spec:
-      apiVersion: tpr.atlassian.com/v1
+      apiVersion: crd.atlassian.com/v1
       kind: Sleeper
       metadata:
         name: sleeper1
@@ -17,7 +17,7 @@ spec:
     dependsOn:
     - sleeper1
     spec:
-      apiVersion: tpr.atlassian.com/v1
+      apiVersion: crd.atlassian.com/v1
       kind: Sleeper
       metadata:
         name: sleeper2
@@ -28,7 +28,7 @@ spec:
     dependsOn:
     - sleeper2
     spec:
-      apiVersion: tpr.atlassian.com/v1
+      apiVersion: crd.atlassian.com/v1
       kind: Sleeper
       metadata:
         name: sleeper3
