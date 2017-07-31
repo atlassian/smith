@@ -53,6 +53,8 @@ func EnsureCrdExists(ctx context.Context, scheme *runtime.Scheme, clientset crdC
 			o.Spec = crd.Spec
 			o.Annotations = crd.Annotations
 			o.Labels = crd.Labels
+			// TODO this is only necessary because there is no support for generation/observedGeneration at the moment
+			o.Status = apiext_v1b1.CustomResourceDefinitionStatus{}
 			_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Update(o) // This is a CAS
 			if err == nil {
 				log.Printf("CustomResourceDefinition %s updated, waiting for it to become established", crd.Name)
@@ -87,6 +89,7 @@ func WaitForCrdToBecomeEstablished(ctx context.Context, store smith.ByNameStore,
 		if err != nil || !exists {
 			return false, err
 		}
+		// TODO check generation/observedGeneration when supported
 		established := false
 		for _, cond := range obj.(*apiext_v1b1.CustomResourceDefinition).Status.Conditions {
 			switch cond.Type {
