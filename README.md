@@ -140,6 +140,11 @@ See [milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0).
 
 ## Notes
 
+### Presentations
+Smith has been presented to:
+- SIG Service Catalog - see information, screencast and recording [here](examples/service_catalog).
+- SIG Apps - see [recoding of the meeting](https://youtu.be/Eak9EN1PVds?t=875).  
+
 ### On [App Controller](https://github.com/Mirantis/k8s-AppController)
 Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes/issues/29453) is a very similar workflow engine with a few differences.
 
