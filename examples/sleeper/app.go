@@ -53,7 +53,6 @@ func (a *App) Run(ctx context.Context) error {
 	multiStore := store.NewMulti(scheme.DeepCopy)
 	stage.StartWithContext(multiStore.Run)
 
-	// TODO replace with upstream function https://github.com/kubernetes/kubernetes/issues/45939
 	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, ResyncPeriod)
 	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
 	multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
@@ -68,7 +67,8 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for CRD informer was cancelled")
 	}
 
-	if err = resources.EnsureCrdExists(ctx, scheme, crdClient, multiStore, SleeperCrd()); err != nil {
+	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
+	if err = resources.EnsureCrdExists(ctx, scheme, crdClient, crdLister, SleeperCrd()); err != nil {
 		return err
 	}
 
