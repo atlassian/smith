@@ -76,7 +76,7 @@ kind: CustomResourceDefinition
 metadata:
   name: cloud-formations.smith.atlassian.com
   annotations:
-    smith.atlassian.com/CrReadyWhenFieldPath: "{{$.status.state}}"
+    smith.atlassian.com/CrReadyWhenFieldPath: "{$.status.state}"
     smith.atlassian.com/CrReadyWhenFieldValue: Ready
 spec:
   group: smith.atlassian.com
