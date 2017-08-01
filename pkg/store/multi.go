@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	ByNamespaceAndNameIndex       = "NamespaceNameIndex"
 	ByNamespaceAndBundleNameIndex = "NamespaceBundleNameIndex"
 )
 
@@ -192,7 +191,6 @@ func (s *Multi) handleAddInformer(ctx context.Context, gvk schema.GroupVersionKi
 		panic(fmt.Errorf("Informer for %v is already registered", gvk))
 	}
 	err := informer.AddIndexers(cache.Indexers{
-		ByNamespaceAndNameIndex:       byNamespaceAndNameIndex,
 		ByNamespaceAndBundleNameIndex: byNamespaceAndBundleNameIndex,
 	})
 	if err != nil {
@@ -309,26 +307,18 @@ func (s *Multi) Get(gvk schema.GroupVersionKind, namespace, name string) (obj ru
 	return s.getFromIndexer(informer.GetIndexer(), gvk, namespace, name)
 }
 
-func (s *Multi) getFromIndexer(indexer cache.Indexer, gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, e error) {
-	objs, err := indexer.ByIndex(ByNamespaceAndNameIndex, ByNamespaceAndNameIndexKey(namespace, name))
+func (s *Multi) getFromIndexer(indexer cache.Indexer, gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, bool /*exists */, error) {
+	obj, exists, err := indexer.GetByKey(ByNamespaceAndNameIndexKey(namespace, name))
+	if err != nil || !exists {
+		return nil, exists, err
+	}
+	objCopy, err := s.deepCopy(obj)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("failed to deep copy %T: %v", obj, err)
 	}
-	switch len(objs) {
-	case 0:
-		return nil, false, nil
-	case 1:
-		obj, err := s.deepCopy(objs[0])
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to deep copy %T: %v", objs[0], err)
-		}
-		ro := obj.(runtime.Object)
-		ro.GetObjectKind().SetGroupVersionKind(gvk) // Objects from type-specific informers don't have GVK set
-		return ro, true, nil
-	default:
-		// Must never happen
-		panic(fmt.Errorf("multiple objects by namespace/name key for %v: %s", gvk, objs))
-	}
+	ro := objCopy.(runtime.Object)
+	ro.GetObjectKind().SetGroupVersionKind(gvk) // Objects from type-specific informers don't have GVK set
+	return ro, true, nil
 }
 
 func (s *Multi) GetObjectsForBundle(namespace, bundleName string) ([]runtime.Object, error) {
@@ -390,15 +380,6 @@ func byNamespaceAndBundleNameIndex(obj interface{}) ([]string, error) {
 
 func ByNamespaceAndBundleNameIndexKey(namespace, bundleName string) string {
 	return namespace + "|" + bundleName // Different separator to avoid clashes with ByNamespaceAndNameIndexKey
-}
-
-// byNamespaceAndNameIndex is a slightly modified cache.byNamespaceAndNameIndex().
-func byNamespaceAndNameIndex(obj interface{}) ([]string, error) {
-	if key, ok := obj.(cache.ExplicitKey); ok {
-		return []string{string(key)}, nil
-	}
-	m := obj.(meta_v1.Object)
-	return []string{ByNamespaceAndNameIndexKey(m.GetNamespace(), m.GetName())}, nil
 }
 
 func ByNamespaceAndNameIndexKey(namespace, name string) string {
