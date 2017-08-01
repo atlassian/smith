@@ -260,8 +260,9 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		t.Fatal("wait for CRD Informer was cancelled")
 	}
 
-	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, multiStore, sleeper.SleeperCrd()))
-	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, multiStore, resources.BundleCrd()))
+	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
+	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, crdLister, sleeper.SleeperCrd()))
+	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, crdLister, resources.BundleCrd()))
 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := app.App{
