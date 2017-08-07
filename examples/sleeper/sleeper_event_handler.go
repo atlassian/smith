@@ -7,7 +7,7 @@ import (
 
 	"github.com/atlassian/smith"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
 )
 
@@ -71,7 +71,7 @@ func (h *SleeperEventHandler) retryUpdate(sleeper *Sleeper, state SleeperState, 
 			Body(sleeper).
 			Do().
 			Into(sleeper)
-		if errors.IsConflict(err) {
+		if api_errors.IsConflict(err) {
 			err = h.client.Get().
 				Context(h.ctx).
 				Namespace(sleeper.Namespace).

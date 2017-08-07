@@ -10,7 +10,6 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util/graph"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -257,7 +256,7 @@ func (c *BundleController) createResource(bundle *smith.Bundle, resClient *dynam
 		log.Printf("[WORKER][%s/%s] Object %q created", bundle.Namespace, bundle.Name, spec.GetName())
 		return response, false, false, nil
 	}
-	if errors.IsAlreadyExists(err) {
+	if api_errors.IsAlreadyExists(err) {
 		log.Printf("[WORKER][%s/%s] Object %q found, but not in Store yet", bundle.Namespace, bundle.Name, spec.GetName())
 		// We let the next rebuild() iteration, triggered by someone else creating the resource, to finish the work.
 		return nil, true, false, nil
@@ -292,7 +291,7 @@ func (c *BundleController) updateResource(bundle *smith.Bundle, resClient *dynam
 	// Update if different
 	updated, err = resClient.Update(updated)
 	if err != nil {
-		if errors.IsConflict(err) {
+		if api_errors.IsConflict(err) {
 			log.Printf("[WORKER][%s/%s] Object %q update resulted in conflict, restarting loop", bundle.Namespace, bundle.Name, spec.GetName())
 			// We let the next rebuild() iteration, triggered by someone else updating the resource, to finish the work.
 			return nil, true, false, nil
