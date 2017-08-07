@@ -10,6 +10,7 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util/graph"
 
+	"github.com/pkg/errors"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -84,8 +85,9 @@ func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
 	}
 	bundle := bundleObjCopy.(*smith.Bundle)
 	var isReady, retriable bool
-	isReady, conflict, retriable, err = c.process(bundle)
-	if conflict {
+	isReady, retriable, err = c.process(bundle)
+	if err != nil && api_errors.IsConflict(errors.Cause(err)) {
+		conflict = true
 		return false, nil
 	}
 	return c.handleProcessResult(bundle, isReady, retriable, err)
@@ -99,12 +101,12 @@ func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
 // READY state might mean something different for each resource type. For a Custom Resource it may mean
 // that a field "State" in the Status of the resource is set to "Ready". It is customizable via
 // annotations with some defaults.
-func (c *BundleController) process(bundle *smith.Bundle) (isReady, conflictRet, retriableError bool, e error) {
+func (c *BundleController) process(bundle *smith.Bundle) (isReady, retriableError bool, e error) {
 	// Build resource map by name
 	resourceMap := make(map[smith.ResourceName]smith.Resource, len(bundle.Spec.Resources))
 	for _, res := range bundle.Spec.Resources {
 		if _, exist := resourceMap[res.Name]; exist {
-			return false, false, false, fmt.Errorf("bundle contains two resources with the same name %q", res.Name)
+			return false, false, errors.New(fmt.Sprintf("bundle contains two resources with the same name %q", res.Name))
 		}
 		resourceMap[res.Name] = res
 	}
@@ -112,7 +114,7 @@ func (c *BundleController) process(bundle *smith.Bundle) (isReady, conflictRet, 
 	// Build the graph and topologically sort it
 	g, sorted, sortErr := sortBundle(bundle)
 	if sortErr != nil {
-		return false, false, false, sortErr
+		return false, false, sortErr
 	}
 
 	readyResources := make(map[smith.ResourceName]*unstructured.Unstructured, len(bundle.Spec.Resources))
@@ -132,9 +134,9 @@ nextVertex:
 		// Process the resource
 		log.Printf("[WORKER][%s/%s] Checking resource %q", bundle.Namespace, bundle.Name, v)
 		res := resourceMap[v.(smith.ResourceName)]
-		readyResource, conflict, retriable, err := c.checkResource(bundle, &res, readyResources)
-		if err != nil || conflict {
-			return false, conflict, retriable, err
+		readyResource, retriable, err := c.checkResource(bundle, &res, readyResources)
+		if err != nil {
+			return false, retriable, err
 		}
 		log.Printf("[WORKER][%s/%s] Resource %q, ready: %t", bundle.Namespace, bundle.Name, v, readyResource != nil)
 		if readyResource != nil {
@@ -146,31 +148,31 @@ nextVertex:
 	// Delete objects which were removed from the bundle
 	retriable, err := c.deleteRemovedResources(bundle)
 	if err != nil {
-		return false, false, retriable, err
+		return false, retriable, err
 	}
 
-	return allReady, false, false, nil
+	return allReady, false, nil
 }
 
-func (c *BundleController) checkResource(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) (readyResource *unstructured.Unstructured, conflictRet, retriableError bool, e error) {
+func (c *BundleController) checkResource(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) (readyResource *unstructured.Unstructured, retriableError bool, e error) {
 	// 1. Eval spec
 	spec, err := c.evalSpec(bundle, res, readyResources)
 	if err != nil {
-		return nil, false, false, err
+		return nil, false, err
 	}
 
 	// 2. Create or update resource
-	resUpdated, conflict, retriable, err := c.createOrUpdate(bundle, spec)
-	if err != nil || conflict {
-		return nil, conflict, retriable, err
+	resUpdated, retriable, err := c.createOrUpdate(bundle, spec)
+	if err != nil {
+		return nil, retriable, err
 	}
 
 	// 3. Check if resource is ready
 	ready, retriable, err := c.rc.IsReady(resUpdated)
 	if err != nil || !ready {
-		return nil, false, retriable, err
+		return nil, retriable, err
 	}
-	return resUpdated, false, false, nil
+	return resUpdated, false, nil
 }
 
 // evalSpec evaluates the resource specification and returns the result.
@@ -228,12 +230,11 @@ func (c *BundleController) evalSpec(bundle *smith.Bundle, res *smith.Resource, r
 }
 
 // createOrUpdate creates or updates a resources.
-// May return nil resource without any errors if an update/create conflict happened.
-func (c *BundleController) createOrUpdate(bundle *smith.Bundle, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, conflictRet, retriableRet bool, e error) {
+func (c *BundleController) createOrUpdate(bundle *smith.Bundle, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableRet bool, e error) {
 	// Prepare client
 	resClient, err := c.smartClient.ForGVK(spec.GroupVersionKind(), bundle.Namespace)
 	if err != nil {
-		return nil, false, false, err
+		return nil, false, err
 	}
 	gvk := spec.GetObjectKind().GroupVersionKind()
 
@@ -241,7 +242,7 @@ func (c *BundleController) createOrUpdate(bundle *smith.Bundle, spec *unstructur
 	obj, exists, err := c.store.Get(gvk, bundle.Namespace, spec.GetName())
 	if err != nil {
 		// Unexpected error
-		return nil, false, false, err
+		return nil, false, err
 	}
 	if exists {
 		return c.updateResource(bundle, resClient, spec, obj)
@@ -249,58 +250,58 @@ func (c *BundleController) createOrUpdate(bundle *smith.Bundle, spec *unstructur
 	return c.createResource(bundle, resClient, spec)
 }
 
-func (c *BundleController) createResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, conflictRet, retriableError bool, e error) {
+func (c *BundleController) createResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
 	log.Printf("[WORKER][%s/%s] Object %q not found, creating", bundle.Namespace, bundle.Name, spec.GetName())
 	response, err := resClient.Create(spec)
 	if err == nil {
 		log.Printf("[WORKER][%s/%s] Object %q created", bundle.Namespace, bundle.Name, spec.GetName())
-		return response, false, false, nil
+		return response, false, nil
 	}
 	if api_errors.IsAlreadyExists(err) {
-		log.Printf("[WORKER][%s/%s] Object %q found, but not in Store yet", bundle.Namespace, bundle.Name, spec.GetName())
-		// We let the next rebuild() iteration, triggered by someone else creating the resource, to finish the work.
-		return nil, true, false, nil
+		// We let the next processKey() iteration, triggered by someone else creating the resource, to finish the work.
+		gvk := spec.GroupVersionKind()
+		err = api_errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, spec.GetName(), err)
+		return nil, false, errors.Wrapf(err, "object %q found, but not in Store yet (will re-process)", spec.GetName())
 	}
 	// Unexpected error, will retry
-	return nil, false, true, err
+	return nil, true, err
 }
 
 // Mutates spec and actual.
-func (c *BundleController) updateResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, conflictRet, retriableError bool, e error) {
+func (c *BundleController) updateResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
 	actualMeta := actual.(meta_v1.Object)
 	// Check that the object is not marked for deletion
 	if actualMeta.GetDeletionTimestamp() != nil {
-		return nil, false, false, fmt.Errorf("object %v %q is marked for deletion", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName())
+		return nil, false, fmt.Errorf("object %v %q is marked for deletion", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName())
 	}
 
 	// Check that this bundle owns the object
 	if !isOwner(actualMeta, bundle) {
-		return nil, false, false, fmt.Errorf("object %v %q is not owned by the Bundle", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName())
+		return nil, false, fmt.Errorf("object %v %q is not owned by the Bundle", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName())
 	}
 
 	// Compare spec and existing resource
 	updated, match, err := c.specCheck.CompareActualVsSpec(spec, actual)
 	if err != nil {
-		return nil, false, false, err
+		return nil, false, err
 	}
 	if match {
 		log.Printf("[WORKER][%s/%s] Object %q has correct spec", bundle.Namespace, bundle.Name, spec.GetName())
-		return updated, false, false, nil
+		return updated, false, nil
 	}
 
 	// Update if different
 	updated, err = resClient.Update(updated)
 	if err != nil {
 		if api_errors.IsConflict(err) {
-			log.Printf("[WORKER][%s/%s] Object %q update resulted in conflict, restarting loop", bundle.Namespace, bundle.Name, spec.GetName())
-			// We let the next rebuild() iteration, triggered by someone else updating the resource, to finish the work.
-			return nil, true, false, nil
+			// We let the next processKey() iteration, triggered by someone else updating the resource, to finish the work.
+			return nil, false, errors.Wrapf(err, "object %q update resulted in conflict (will re-process)", bundle.Namespace, bundle.Name, spec.GetName())
 		}
 		// Unexpected error, will retry
-		return nil, false, true, err
+		return nil, true, err
 	}
 	log.Printf("[WORKER][%s/%s] Object %q updated", bundle.Namespace, bundle.Name, spec.GetName())
-	return updated, false, false, nil
+	return updated, false, nil
 }
 
 func (c *BundleController) deleteRemovedResources(bundle *smith.Bundle) (retriableError bool, e error) {
