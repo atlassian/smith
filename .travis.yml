@@ -1,9 +1,5 @@
-sudo: required
-
+dist: trusty
 language: go
-
-services:
-  - docker
 
 cache:
   directories:
@@ -22,6 +18,6 @@ install:
   - make setup-ci
 
 script:
-  - make build-all-race
-  - make test
+  - make build-all-race-ci
+  - make test-ci
   - make coveralls

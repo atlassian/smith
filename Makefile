@@ -33,11 +33,13 @@ build-race: fmt
 
 build-all: fmt
 	go install $$(glide nv | grep -v integration_tests)
-	go test -i -tags=integration,integration_sc $$(glide nv)
+	go test -i -tags='integration integration_sc' $$(glide nv)
 
-build-all-race: fmt
+build-all-race: fmt build-all-race-ci
+
+build-all-race-ci:
 	go install -race $$(glide nv | grep -v integration_tests)
-	go test -i -race -tags=integration,integration_sc $$(glide nv)
+	go test -i -race -tags='integration integration_sc' $$(glide nv)
 
 fmt:
 	gofmt -w=true -s $$(find . -type f -name '*.go' -not -path "./vendor/*")
@@ -96,7 +98,9 @@ minikube-sleeper-run: build-all-race
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	go run -race examples/sleeper/main/*.go
 
-test: fmt
+test: fmt test-ci
+
+test-ci:
 	go test -i -race $$(glide nv | grep -v integration_tests)
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
