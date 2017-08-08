@@ -58,6 +58,9 @@ func runWithContext(ctx context.Context) error {
 	if *scUrl != "" {
 		scConfig := *config // shallow copy
 		scConfig.Host = *scUrl
+		scConfig.TLSClientConfig = rest.TLSClientConfig{
+			Insecure: true,
+		}
 		a.ServiceCatalogConfig = &scConfig
 	}
 
