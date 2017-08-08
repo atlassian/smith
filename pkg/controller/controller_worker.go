@@ -223,8 +223,7 @@ func (c *BundleController) evalSpec(bundle *smith.Bundle, res *smith.Resource, r
 			BlockOwnerDeletion: &trueRef,
 		})
 	}
-	//spec.SetOwnerReferences(refs)
-	setOwnerReferences(spec, refs)
+	spec.SetOwnerReferences(refs)
 
 	return spec, nil
 }
@@ -473,49 +472,4 @@ func sortBundle(bundle *smith.Bundle) (*graph.Graph, []graph.V, error) {
 	}
 
 	return g, sorted, nil
-}
-
-// TODO remove the workaround below when https://github.com/kubernetes-incubator/service-catalog/pull/944 is merged
-// and dependencies are updated.
-
-func setNestedField(obj map[string]interface{}, value interface{}, fields ...string) {
-	m := obj
-	if len(fields) > 1 {
-		for _, field := range fields[0 : len(fields)-1] {
-			if _, ok := m[field].(map[string]interface{}); !ok {
-				m[field] = make(map[string]interface{})
-			}
-			m = m[field].(map[string]interface{})
-		}
-	}
-	m[fields[len(fields)-1]] = value
-}
-
-func setOwnerReference(src meta_v1.OwnerReference) map[string]interface{} {
-	ret := make(map[string]interface{})
-	setNestedField(ret, src.Kind, "kind")
-	setNestedField(ret, src.Name, "name")
-	setNestedField(ret, src.APIVersion, "apiVersion")
-	setNestedField(ret, string(src.UID), "uid")
-	// json.Unmarshal() extracts boolean json fields as bool, not as *bool and hence extractOwnerReference()
-	// expects bool or a missing field, not *bool. So if pointer is nil, fields are omitted from the ret object.
-	// If pointer is non-nil, they are set to the referenced value.
-	if src.Controller != nil {
-		setNestedField(ret, *src.Controller, "controller")
-	}
-	if src.BlockOwnerDeletion != nil {
-		setNestedField(ret, *src.BlockOwnerDeletion, "blockOwnerDeletion")
-	}
-	return ret
-}
-
-func setOwnerReferences(u *unstructured.Unstructured, references []meta_v1.OwnerReference) {
-	var newReferences = make([]map[string]interface{}, 0, len(references))
-	for i := 0; i < len(references); i++ {
-		newReferences = append(newReferences, setOwnerReference(references[i]))
-	}
-	if u.Object == nil {
-		u.Object = make(map[string]interface{})
-	}
-	setNestedField(u.Object, newReferences, "metadata", "ownerReferences")
 }
