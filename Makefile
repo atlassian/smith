@@ -65,7 +65,7 @@ minikube-test-sc: fmt
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	SERVICE_CATALOG_URL="http://$$(minikube ip):30080" \
+	SERVICE_CATALOG_URL="https://$$(minikube ip):30443" \
 	go test -tags=integration_sc -race -v ./integration_tests
 
 minikube-run: build-all-race
@@ -86,7 +86,7 @@ minikube-run-sc: build-all-race
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go run -race cmd/smith/*.go -service-catalog-url="http://$$(minikube ip):30080"
+	go run -race cmd/smith/*.go -service-catalog-url="https://$$(minikube ip):30443"
 
 minikube-sleeper-run: build-all-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
