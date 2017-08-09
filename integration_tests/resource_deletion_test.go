@@ -112,9 +112,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	time.Sleep(1 * time.Second) // TODO this should be removed once race with tpr informer is fixed "no informer for tpr.atlassian.com/v1, Kind=Sleeper is registered"
 
 	// Bundle should be in Error=true state
-	obj, err := cfg.store.AwaitObjectCondition(ctxTest, smith.BundleGVK, cfg.namespace, cfg.bundle.Name, isBundleError)
-	require.NoError(t, err)
-	bundleActual = obj.(*smith.Bundle)
+	bundleActual = cfg.awaitBundleCondition(isBundleStatusCond(smith.BundleError, smith.ConditionTrue))
 
 	assertCondition(t, bundleActual, smith.BundleReady, smith.ConditionFalse)
 	assertCondition(t, bundleActual, smith.BundleInProgress, smith.ConditionFalse)
@@ -157,7 +155,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 	require.NoError(t, err)
 
 	// Bundle should reach Ready=true state
-	assertBundle(t, ctxTest, cfg.store, cfg.namespace, cfg.bundle)
+	cfg.assertBundle(ctxTest, cfg.bundle)
 
 	// ConfigMap should exist by now
 	cmActual, err = cmClient.Get(cm.Name, meta_v1.GetOptions{})

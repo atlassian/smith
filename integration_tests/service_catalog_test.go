@@ -68,5 +68,5 @@ func TestServiceCatalog(t *testing.T) {
 }
 
 func testServiceCatalog(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
-	assertBundleTimeout(t, ctx, cfg.store, cfg.namespace, cfg.bundle, "")
+	cfg.assertBundleTimeout(ctx, cfg.bundle, "")
 }

@@ -2,6 +2,7 @@ package integration_tests
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ import (
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
@@ -126,6 +128,13 @@ func (cfg *itConfig) createObject(ctxTest context.Context, obj, res runtime.Obje
 	cfg.cleanupLater(res)
 }
 
+func (cfg *itConfig) awaitBundleCondition(conditions ...watch.ConditionFunc) *smith.Bundle {
+	lw := cache.NewListWatchFromClient(cfg.bundleClient, smith.BundleResourcePlural, cfg.namespace, fields.Everything())
+	event, err := cache.ListWatchUntil(10*time.Second, lw, conditions...)
+	require.NoError(cfg.t, err)
+	return event.Object.(*smith.Bundle)
+}
+
 func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) *smith.BundleCondition {
 	_, condition := bundle.GetCondition(conditionType)
 	if assert.NotNil(t, condition) {
@@ -149,31 +158,31 @@ func bundleInformer(bundleClient cache.Getter, namespace string) cache.SharedInd
 		cache.Indexers{})
 }
 
-func isBundleReady(obj runtime.Object) bool {
-	b := obj.(*smith.Bundle)
-	_, cond := b.GetCondition(smith.BundleReady)
-	return cond != nil && cond.Status == smith.ConditionTrue
+func isBundleStatusCond(cType smith.BundleConditionType, status smith.ConditionStatus) watch.ConditionFunc {
+	return func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Added, watch.Modified:
+			b := event.Object.(*smith.Bundle)
+			_, cond := b.GetCondition(cType)
+			return cond != nil && cond.Status == status, nil
+		default:
+			return false, fmt.Errorf("unexpected event type %q: %v", event.Type, event.Object)
+		}
+	}
 }
 
-func isBundleError(obj runtime.Object) bool {
-	b := obj.(*smith.Bundle)
-	_, cond := b.GetCondition(smith.BundleError)
-	return cond != nil && cond.Status == smith.ConditionTrue
-}
-
-func isBundleReadyAndNewer(resourceVersions ...string) store.AwaitCondition {
-	return func(obj runtime.Object) bool {
-		b := obj.(*smith.Bundle)
+func isBundleNewerCond(resourceVersions ...string) watch.ConditionFunc {
+	return func(event watch.Event) (bool, error) {
+		b := event.Object.(*smith.Bundle)
 		for _, rv := range resourceVersions {
 			if b.ResourceVersion == rv {
 				// TODO Should be using Generation here once it is available
 				// https://github.com/kubernetes/kubernetes/issues/7328
 				// https://github.com/kubernetes/features/issues/95
-				return false
+				return false, nil
 			}
 		}
-		_, cond := b.GetCondition(smith.BundleReady)
-		return cond != nil && cond.Status == smith.ConditionTrue
+		return true, nil
 	}
 }
 
@@ -289,35 +298,33 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	test(t, ctxTest, cfg, args...)
 }
 
-func assertBundle(t *testing.T, ctx context.Context, store *store.Multi, namespace string, bundle *smith.Bundle, resourceVersions ...string) *smith.Bundle {
-	obj, err := store.AwaitObjectCondition(ctx, smith.BundleGVK, namespace, bundle.Name, isBundleReadyAndNewer(resourceVersions...))
-	require.NoError(t, err)
-	bundleRes := obj.(*smith.Bundle)
+func (cfg *itConfig) assertBundle(ctx context.Context, bundle *smith.Bundle, resourceVersions ...string) *smith.Bundle {
+	bundleRes := cfg.awaitBundleCondition(isBundleNewerCond(resourceVersions...), isBundleStatusCond(smith.BundleReady, smith.ConditionTrue))
 
-	assertCondition(t, bundleRes, smith.BundleReady, smith.ConditionTrue)
-	assertCondition(t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
-	assertCondition(t, bundleRes, smith.BundleError, smith.ConditionFalse)
-	if assert.Len(t, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
+	assertCondition(cfg.t, bundleRes, smith.BundleReady, smith.ConditionTrue)
+	assertCondition(cfg.t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
+	assertCondition(cfg.t, bundleRes, smith.BundleError, smith.ConditionFalse)
+	if assert.Len(cfg.t, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
 		for i, res := range bundle.Spec.Resources {
 			spec, err := res.ToUnstructured(noCopy)
-			if !assert.NoError(t, err) {
+			if !assert.NoError(cfg.t, err) {
 				continue
 			}
 			actual, err := bundleRes.Spec.Resources[i].ToUnstructured(noCopy)
-			if !assert.NoError(t, err) {
+			if !assert.NoError(cfg.t, err) {
 				continue
 			}
-			assert.Equal(t, spec, actual, "%#v", bundleRes)
+			assert.Equal(cfg.t, spec, actual, "%#v", bundleRes)
 		}
 	}
 
 	return bundleRes
 }
 
-func assertBundleTimeout(t *testing.T, ctx context.Context, store *store.Multi, namespace string, bundle *smith.Bundle, resourceVersion ...string) *smith.Bundle {
+func (cfg *itConfig) assertBundleTimeout(ctx context.Context, bundle *smith.Bundle, resourceVersion ...string) *smith.Bundle {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	return assertBundle(t, ctxTimeout, store, namespace, bundle, resourceVersion...)
+	return cfg.assertBundle(ctxTimeout, bundle, resourceVersion...)
 }
 
 // noCopy is a noop implementation of DeepCopy.
