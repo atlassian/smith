@@ -70,7 +70,7 @@ func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args
 	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sl.Spec.SleepFor+3)*time.Second)
 	defer cancel()
 
-	assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, cfg.bundle, "")
+	cfg.assertBundle(ctxTimeout, cfg.bundle, "")
 
 	var sleeperObj sleeper.Sleeper
 	require.NoError(t, sClient.Get().

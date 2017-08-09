@@ -165,7 +165,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
 	defer cancel()
 
-	bundleRes1 := assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, cfg.bundle, cfg.createdBundle.ResourceVersion)
+	bundleRes1 := cfg.assertBundle(ctxTimeout, cfg.bundle, cfg.createdBundle.ResourceVersion)
 
 	res := &smith.Bundle{}
 	bundle2.ResourceVersion = bundleRes1.ResourceVersion
@@ -178,7 +178,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 		Do().
 		Into(res))
 
-	bundleRes2 := assertBundle(t, ctxTimeout, cfg.store, cfg.namespace, bundle2, bundle2.ResourceVersion, res.ResourceVersion)
+	bundleRes2 := cfg.assertBundle(ctxTimeout, bundle2, bundle2.ResourceVersion, res.ResourceVersion)
 
 	cfMap, err := cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	require.NoError(t, err)
@@ -220,7 +220,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 		Do().
 		Into(res))
 
-	assertBundleTimeout(t, ctxTest, cfg.store, cfg.namespace, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
+	cfg.assertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
 
 	cfMap, err = cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	if err == nil {
