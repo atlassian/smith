@@ -107,6 +107,21 @@ func WaitForCrdToBecomeEstablished(ctx context.Context, crdLister apiext_lst_v1b
 	}, ctx.Done())
 }
 
+// IsCrdConditionTrue indicates if the condition is present and strictly true
+func IsCrdConditionTrue(crd *apiext_v1b1.CustomResourceDefinition, conditionType apiext_v1b1.CustomResourceDefinitionConditionType) bool {
+	return IsCrdConditionPresentAndEqual(crd, conditionType, apiext_v1b1.ConditionTrue)
+}
+
+// IsCrdConditionPresentAndEqual indicates if the condition is present and equal to the arg
+func IsCrdConditionPresentAndEqual(crd *apiext_v1b1.CustomResourceDefinition, conditionType apiext_v1b1.CustomResourceDefinitionConditionType, status apiext_v1b1.ConditionStatus) bool {
+	for _, condition := range crd.Status.Conditions {
+		if condition.Type == conditionType {
+			return condition.Status == status
+		}
+	}
+	return false
+}
+
 func IsEqualCrd(a, b *apiext_v1b1.CustomResourceDefinition, scheme *runtime.Scheme) bool {
 	aCopy := *a
 	bCopy := *b

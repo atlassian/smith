@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/resources"
 
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,19 +30,16 @@ type crdEventHandler struct {
 
 func (h *crdEventHandler) OnAdd(obj interface{}) {
 	crd := obj.(*apiext_v1b1.CustomResourceDefinition)
-	if crd.Name == smith.BundleResourceName {
-		return
+	if h.ensureWatch(crd) {
+		h.rebuildBundles(crd, "added")
 	}
-	h.watch(crd)
-	h.rebuildBundles(crd, "added")
 }
 
 func (h *crdEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	newCrd := newObj.(*apiext_v1b1.CustomResourceDefinition)
-	if newCrd.Name == smith.BundleResourceName {
-		return
+	if h.ensureWatch(newCrd) {
+		h.rebuildBundles(newCrd, "updated")
 	}
-	h.rebuildBundles(newCrd, "updated")
 }
 
 func (h *crdEventHandler) OnDelete(obj interface{}) {
@@ -62,7 +60,21 @@ func (h *crdEventHandler) OnDelete(obj interface{}) {
 	h.rebuildBundles(crd, "deleted")
 }
 
-func (h *crdEventHandler) watch(crd *apiext_v1b1.CustomResourceDefinition) {
+func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition) bool {
+	if crd.Name == smith.BundleResourceName {
+		return false
+	}
+	if _, ok := h.watchers[crd.Name]; ok {
+		return true
+	}
+	if !resources.IsCrdConditionTrue(crd, apiext_v1b1.Established) {
+		log.Printf("[CRDEH] Not adding a watch for CRD %s because it hasn't been established", crd.Name)
+		return false
+	}
+	if !resources.IsCrdConditionTrue(crd, apiext_v1b1.NamesAccepted) {
+		log.Printf("[CRDEH] Not adding a watch for CRD %s because it's names haven't been accepted", crd.Name)
+		return false
+	}
 	gvk := schema.GroupVersionKind{
 		Group:   crd.Spec.Group,
 		Version: crd.Spec.Version,
@@ -72,7 +84,7 @@ func (h *crdEventHandler) watch(crd *apiext_v1b1.CustomResourceDefinition) {
 	res, err := h.smartClient.ForGVK(gvk, meta_v1.NamespaceNone)
 	if err != nil {
 		log.Printf("[CRDEH] Failed to setup informer for CRD %s of version %s: %v", crd.Name, crd.Spec.Version, err)
-		return
+		return false
 	}
 	crdInf := cache.NewSharedIndexInformer(&cache.ListWatch{
 		ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
@@ -87,6 +99,7 @@ func (h *crdEventHandler) watch(crd *apiext_v1b1.CustomResourceDefinition) {
 	h.watchers[crd.Name] = watchState{cancel: cancel}
 	h.store.AddInformer(gvk, crdInf)
 	h.wg.StartWithChannel(ctx.Done(), crdInf.Run)
+	return true
 }
 
 func (h *crdEventHandler) unwatch(crd *apiext_v1b1.CustomResourceDefinition) {
