@@ -28,6 +28,9 @@ type crdEventHandler struct {
 	watchers map[string]watchState // CRD name -> state
 }
 
+// OnAdd handles just added CRDs and CRDs that existed before CRD informer was started.
+// Any CRDs that are not established and/or haven't had their names accepted are ignored.
+// This is necessary to wait until a CRD has been processed by the CRD controller. Also see OnUpdate.
 func (h *crdEventHandler) OnAdd(obj interface{}) {
 	crd := obj.(*apiext_v1b1.CustomResourceDefinition)
 	if h.ensureWatch(crd) {
@@ -35,6 +38,13 @@ func (h *crdEventHandler) OnAdd(obj interface{}) {
 	}
 }
 
+// OnUpdate handles updates for CRDs.
+// If
+// - there is no watch and
+// - a CRD is established and
+// - it had its names accepted
+// then a watch is established. This is necessary to wait until a CRD has been processed by the CRD controller and
+// to pick up fixes for invalid/conflicting CRDs.
 func (h *crdEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	newCrd := newObj.(*apiext_v1b1.CustomResourceDefinition)
 	if h.ensureWatch(newCrd) {
@@ -72,7 +82,7 @@ func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition)
 		return false
 	}
 	if !resources.IsCrdConditionTrue(crd, apiext_v1b1.NamesAccepted) {
-		log.Printf("[CRDEH] Not adding a watch for CRD %s because it's names haven't been accepted", crd.Name)
+		log.Printf("[CRDEH] Not adding a watch for CRD %s because its names haven't been accepted", crd.Name)
 		return false
 	}
 	gvk := schema.GroupVersionKind{
