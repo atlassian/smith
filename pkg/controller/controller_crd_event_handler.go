@@ -80,10 +80,10 @@ func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition)
 		Version: crd.Spec.Version,
 		Kind:    crd.Spec.Names.Kind,
 	}
-	log.Printf("[CRDEH] Configuring watch for CRD %s version %s", crd.Name, crd.Spec.Version)
+	log.Printf("[CRDEH] Configuring watch for CRD %s", crd.Name)
 	res, err := h.smartClient.ForGVK(gvk, meta_v1.NamespaceNone)
 	if err != nil {
-		log.Printf("[CRDEH] Failed to setup informer for CRD %s of version %s: %v", crd.Name, crd.Spec.Version, err)
+		log.Printf("[CRDEH] Failed to setup informer for CRD %s: %v", crd.Name, err)
 		return false
 	}
 	crdInf := cache.NewSharedIndexInformer(&cache.ListWatch{
@@ -108,7 +108,7 @@ func (h *crdEventHandler) unwatch(crd *apiext_v1b1.CustomResourceDefinition) {
 		// Nothing to do. This can happen if there was an error adding a watch
 		return
 	}
-	log.Printf("[CRDEH] Removing watch for CRD %s version %s", crd.Name, crd.Spec.Version)
+	log.Printf("[CRDEH] Removing watch for CRD %s", crd.Name)
 	crdWatch.cancel()
 	delete(h.watchers, crd.Name)
 	gvk := schema.GroupVersionKind{
