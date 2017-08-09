@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"log"
-	"sync"
 
 	"github.com/atlassian/smith"
 
@@ -25,7 +24,6 @@ type watchState struct {
 type crdEventHandler struct {
 	ctx context.Context
 	*BundleController
-	mx       sync.Mutex            // protects the map
 	watchers map[string]watchState // CRD name -> state
 }
 
@@ -34,11 +32,7 @@ func (h *crdEventHandler) OnAdd(obj interface{}) {
 	if crd.Name == smith.BundleResourceName {
 		return
 	}
-	func() {
-		h.mx.Lock()
-		defer h.mx.Unlock()
-		h.watch(crd)
-	}()
+	h.watch(crd)
 	h.rebuildBundles(crd, "added")
 }
 
@@ -64,11 +58,7 @@ func (h *crdEventHandler) OnDelete(obj interface{}) {
 			return
 		}
 	}
-	func() {
-		h.mx.Lock()
-		defer h.mx.Unlock()
-		h.unwatch(crd)
-	}()
+	h.unwatch(crd)
 	h.rebuildBundles(crd, "deleted")
 }
 
