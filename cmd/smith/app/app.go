@@ -86,9 +86,7 @@ func (a *App) Run(ctx context.Context) error {
 	defer stgr.Shutdown()
 
 	// Multi store
-	stage := stgr.NextStage()
 	multiStore := store.NewMulti(scheme.DeepCopy)
-	stage.StartWithContext(multiStore.Run)
 
 	// Informers
 	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
@@ -101,7 +99,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 	multiStore.AddInformer(crdGVK, crdInf)
-	stage = stgr.NextStage()
+	stage := stgr.NextStage()
 	stage.StartWithChannel(crdInf.Run) // Must be after store.AddInformer()
 
 	// We must wait for crdInf to populate its cache to avoid reading from an empty cache

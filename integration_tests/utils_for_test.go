@@ -235,9 +235,6 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	stgr := stager.New()
 	defer stgr.Shutdown()
 
-	stage := stgr.NextStage()
-	stage.StartWithContext(multiStore.Run)
-
 	ctxTest, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 
@@ -260,7 +257,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, 0)
 	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
 	multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
-	stage = stgr.NextStage()
+	stage := stgr.NextStage()
 	stage.StartWithChannel(crdInf.Run)
 
 	// We must wait for crdInf to populate its cache to avoid reading from an empty cache
