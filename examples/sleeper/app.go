@@ -66,7 +66,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
-	if err = resources.EnsureCrdExists(ctx, scheme, crdClient, crdLister, SleeperCrd()); err != nil {
+	if err = resources.EnsureCrdExistsAndIsEstablished(ctx, scheme, crdClient, crdLister, SleeperCrd()); err != nil {
 		return err
 	}
 

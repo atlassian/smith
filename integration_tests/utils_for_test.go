@@ -256,14 +256,14 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	stage.StartWithChannel(crdInf.Run)
 
 	// We must wait for crdInf to populate its cache to avoid reading from an empty cache
-	// in resources.EnsureCrdExists().
+	// in resources.EnsureCrdExistsAndIsEstablished().
 	if !cache.WaitForCacheSync(ctxTest.Done(), crdInf.HasSynced) {
 		t.Fatal("wait for CRD Informer was cancelled")
 	}
 
 	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
-	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, crdLister, sleeper.SleeperCrd()))
-	require.NoError(t, resources.EnsureCrdExists(ctxTest, scheme, crdClient, crdLister, resources.BundleCrd()))
+	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, scheme, crdClient, crdLister, sleeper.SleeperCrd()))
+	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, scheme, crdClient, crdLister, resources.BundleCrd()))
 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := app.App{

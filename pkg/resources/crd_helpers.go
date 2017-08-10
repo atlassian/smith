@@ -35,6 +35,15 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 	}
 }
 
+func EnsureCrdExistsAndIsEstablished(ctx context.Context, scheme *runtime.Scheme, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+	err := EnsureCrdExists(ctx, scheme, clientset, crdLister, crd)
+	if err != nil {
+		return err
+	}
+	log.Printf("Waiting for CustomResourceDefinition %s it to become established", crd.Name)
+	return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
+}
+
 func EnsureCrdExists(ctx context.Context, scheme *runtime.Scheme, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
 	for {
 		obj, err := crdLister.Get(crd.Name)
@@ -46,8 +55,8 @@ func EnsureCrdExists(ctx context.Context, scheme *runtime.Scheme, clientset crdC
 			log.Printf("Creating CustomResourceDefinition %s", crd.Name)
 			_, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 			if err == nil {
-				log.Printf("CustomResourceDefinition %s created, waiting for it to become established", crd.Name)
-				return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
+				log.Printf("CustomResourceDefinition %s created", crd.Name)
+				return nil
 			}
 			if !api_errors.IsAlreadyExists(err) {
 				return fmt.Errorf("failed to create %s CustomResourceDefinition: %v", crd.Name, err)
@@ -55,7 +64,7 @@ func EnsureCrdExists(ctx context.Context, scheme *runtime.Scheme, clientset crdC
 			log.Printf("CustomResourceDefinition %s was created concurrently", crd.Name)
 		} else {
 			if IsEqualCrd(crd, obj, scheme) {
-				return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
+				return nil
 			}
 			log.Printf("Updating CustomResourceDefinition %s", crd.Name)
 			obj.Spec = crd.Spec
@@ -65,8 +74,8 @@ func EnsureCrdExists(ctx context.Context, scheme *runtime.Scheme, clientset crdC
 			obj.Status = apiext_v1b1.CustomResourceDefinitionStatus{}
 			_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Update(obj) // This is a CAS
 			if err == nil {
-				log.Printf("CustomResourceDefinition %s updated, waiting for it to become established", crd.Name)
-				return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
+				log.Printf("CustomResourceDefinition %s updated", crd.Name)
+				return nil
 			}
 			if !api_errors.IsConflict(err) {
 				return fmt.Errorf("failed to update CustomResourceDefinition %s: %v", crd.Name, err)

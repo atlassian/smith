@@ -111,7 +111,7 @@ func (a *App) Run(ctx context.Context) error {
 	// Ensure CRD Bundle exists
 	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
 	err = wait.ExponentialBackoff(crdCreationBackoff, func() (bool /*done*/, error) {
-		if err := resources.EnsureCrdExists(ctx, scheme, crdClient, crdLister, resources.BundleCrd()); err != nil {
+		if err := resources.EnsureCrdExistsAndIsEstablished(ctx, scheme, crdClient, crdLister, resources.BundleCrd()); err != nil {
 			// TODO be smarter about what is retried
 			if err == context.Canceled || err == context.DeadlineExceeded {
 				return true, err
