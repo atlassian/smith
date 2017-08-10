@@ -13,13 +13,11 @@ import (
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
-	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -51,7 +49,6 @@ type itConfig struct {
 	clientset     kubernetes.Interface
 	sc            smith.SmartClient
 	bundleClient  rest.Interface
-	store         *store.Multi
 	toCleanup     []runtime.Object
 }
 
@@ -76,6 +73,7 @@ func (cfg *itConfig) cleanup() {
 		cfg.cleanupBundle(bundle)
 	}
 }
+
 func (cfg *itConfig) cleanupBundle(bundle *smith.Bundle) {
 	for _, resource := range bundle.Spec.Resources {
 		cfg.deleteObject(resource.Spec)
@@ -219,7 +217,6 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	scheme, err := app.FullScheme(serviceCatalog)
 	require.NoError(t, err)
 
-	multiStore := store.NewMulti(scheme.DeepCopy)
 	cfg := &itConfig{
 		t:            t,
 		namespace:    useNamespace,
@@ -228,7 +225,6 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		clientset:    clientset,
 		sc:           sc,
 		bundleClient: bundleClient,
-		store:        multiStore,
 	}
 	defer cfg.cleanup()
 
@@ -256,7 +252,6 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 
 	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, 0)
 	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
-	multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
 	stage := stgr.NextStage()
 	stage.StartWithChannel(crdInf.Run)
 
@@ -287,10 +282,6 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 		cfg.createObject(ctxTest, bundle, res, smith.BundleResourcePlural, bundleClient)
 		cfg.createdBundle = res
 	}
-
-	bundleInf := bundleInformer(bundleClient, useNamespace)
-	multiStore.AddInformer(smith.BundleGVK, bundleInf)
-	stage.StartWithChannel(bundleInf.Run)
 
 	test(t, ctxTest, cfg, args...)
 }
