@@ -17,12 +17,12 @@ MAIN_PKG := github.com/atlassian/smith/cmd/smith
 
 setup: setup-ci
 	go get -u golang.org/x/tools/cmd/goimports
+	go get -u github.com/alecthomas/gometalinter
+	gometalinter --install
 
 setup-ci:
 	go get -u github.com/golang/dep/cmd/dep
 	go get -u github.com/Masterminds/glide
-	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install
 	dep ensure
 
 build: fmt
