@@ -49,14 +49,12 @@ func (a *App) Run(ctx context.Context) error {
 	stgr := stager.New()
 	defer stgr.Shutdown()
 
-	stage := stgr.NextStage()
 	multiStore := store.NewMulti(scheme.DeepCopy)
-	stage.StartWithContext(multiStore.Run)
 
 	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, ResyncPeriod)
 	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
 	multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
-	stage = stgr.NextStage()
+	stage := stgr.NextStage()
 	stage.StartWithChannel(crdInf.Run) // Must be after multiStore.AddInformer()
 
 	// 1. Ensure CRD Sleeper exists
