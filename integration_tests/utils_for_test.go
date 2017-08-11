@@ -148,14 +148,6 @@ func sleeperScheme() *runtime.Scheme {
 	return scheme
 }
 
-func bundleInformer(bundleClient cache.Getter, namespace string) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePlural, namespace, fields.Everything()),
-		&smith.Bundle{},
-		0,
-		cache.Indexers{})
-}
-
 func isBundleStatusCond(cType smith.BundleConditionType, status smith.ConditionStatus) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		switch event.Type {
