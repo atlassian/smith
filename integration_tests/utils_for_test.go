@@ -148,8 +148,12 @@ func sleeperScheme() *runtime.Scheme {
 	return scheme
 }
 
-func isBundleStatusCond(cType smith.BundleConditionType, status smith.ConditionStatus) watch.ConditionFunc {
+func isBundleStatusCond(namespace, name string, cType smith.BundleConditionType, status smith.ConditionStatus) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
+		metaObj := event.Object.(meta_v1.Object)
+		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
+			return false, nil
+		}
 		switch event.Type {
 		case watch.Added, watch.Modified:
 			b := event.Object.(*smith.Bundle)
@@ -161,8 +165,12 @@ func isBundleStatusCond(cType smith.BundleConditionType, status smith.ConditionS
 	}
 }
 
-func isBundleNewerCond(resourceVersions ...string) watch.ConditionFunc {
+func isBundleNewerCond(namespace, name string, resourceVersions ...string) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
+		metaObj := event.Object.(meta_v1.Object)
+		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
+			return false, nil
+		}
 		b := event.Object.(*smith.Bundle)
 		for _, rv := range resourceVersions {
 			if b.ResourceVersion == rv {
@@ -279,7 +287,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 }
 
 func (cfg *itConfig) assertBundle(ctx context.Context, bundle *smith.Bundle, resourceVersions ...string) *smith.Bundle {
-	bundleRes := cfg.awaitBundleCondition(isBundleNewerCond(resourceVersions...), isBundleStatusCond(smith.BundleReady, smith.ConditionTrue))
+	bundleRes := cfg.awaitBundleCondition(isBundleNewerCond(cfg.namespace, bundle.Name, resourceVersions...), isBundleStatusCond(cfg.namespace, cfg.bundle.Name, smith.BundleReady, smith.ConditionTrue))
 
 	assertCondition(cfg.t, bundleRes, smith.BundleReady, smith.ConditionTrue)
 	assertCondition(cfg.t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
