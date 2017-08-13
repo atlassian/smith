@@ -3,7 +3,7 @@ package controller
 import (
 	"testing"
 
-	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util/graph"
 
 	"github.com/stretchr/testify/assert"
@@ -12,23 +12,23 @@ import (
 
 func TestBundleSort(t *testing.T) {
 	t.Parallel()
-	bundle := smith.Bundle{
-		Spec: smith.BundleSpec{
-			Resources: []smith.Resource{
+	bundle := smith_v1.Bundle{
+		Spec: smith_v1.BundleSpec{
+			Resources: []smith_v1.Resource{
 				{
 					Name:      "a",
-					DependsOn: []smith.ResourceName{"c"},
+					DependsOn: []smith_v1.ResourceName{"c"},
 				},
 				{
 					Name: "b",
 				},
 				{
 					Name:      "c",
-					DependsOn: []smith.ResourceName{"b"},
+					DependsOn: []smith_v1.ResourceName{"b"},
 				},
 				{
 					Name:      "d",
-					DependsOn: []smith.ResourceName{"e"},
+					DependsOn: []smith_v1.ResourceName{"e"},
 				},
 				{
 					Name: "e",
@@ -39,28 +39,28 @@ func TestBundleSort(t *testing.T) {
 	_, sorted, err := sortBundle(&bundle)
 	require.NoError(t, err)
 
-	assert.EqualValues(t, []graph.V{smith.ResourceName("b"), smith.ResourceName("c"), smith.ResourceName("a"), smith.ResourceName("e"), smith.ResourceName("d")}, sorted)
+	assert.EqualValues(t, []graph.V{smith_v1.ResourceName("b"), smith_v1.ResourceName("c"), smith_v1.ResourceName("a"), smith_v1.ResourceName("e"), smith_v1.ResourceName("d")}, sorted)
 }
 
 func TestBundleSortMissingDependency(t *testing.T) {
 	t.Parallel()
-	bundle := smith.Bundle{
-		Spec: smith.BundleSpec{
-			Resources: []smith.Resource{
+	bundle := smith_v1.Bundle{
+		Spec: smith_v1.BundleSpec{
+			Resources: []smith_v1.Resource{
 				{
 					Name:      "a",
-					DependsOn: []smith.ResourceName{"x"},
+					DependsOn: []smith_v1.ResourceName{"x"},
 				},
 				{
 					Name: "b",
 				},
 				{
 					Name:      "c",
-					DependsOn: []smith.ResourceName{"b"},
+					DependsOn: []smith_v1.ResourceName{"b"},
 				},
 				{
 					Name:      "d",
-					DependsOn: []smith.ResourceName{"e"},
+					DependsOn: []smith_v1.ResourceName{"e"},
 				},
 				{
 					Name: "e",

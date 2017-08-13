@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util"
 
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -21,15 +21,15 @@ import (
 func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 	return &apiext_v1b1.CustomResourceDefinition{
 		ObjectMeta: meta_v1.ObjectMeta{
-			Name: smith.BundleResourceName,
+			Name: smith_v1.BundleResourceName,
 		},
 		Spec: apiext_v1b1.CustomResourceDefinitionSpec{
-			Group:   smith.SmithResourceGroup,
-			Version: smith.BundleResourceVersion,
+			Group:   smith_v1.GroupName,
+			Version: smith_v1.BundleResourceVersion,
 			Names: apiext_v1b1.CustomResourceDefinitionNames{
-				Plural:   smith.BundleResourcePlural,
-				Singular: smith.BundleResourceSingular,
-				Kind:     smith.BundleResourceKind,
+				Plural:   smith_v1.BundleResourcePlural,
+				Singular: smith_v1.BundleResourceSingular,
+				Kind:     smith_v1.BundleResourceKind,
 			},
 		},
 	}

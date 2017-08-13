@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util/graph"
 
@@ -83,7 +84,7 @@ func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
 	if err != nil {
 		return false, err
 	}
-	bundle := bundleObjCopy.(*smith.Bundle)
+	bundle := bundleObjCopy.(*smith_v1.Bundle)
 	var isReady, retriable bool
 	isReady, retriable, err = c.process(bundle)
 	if err != nil && api_errors.IsConflict(errors.Cause(err)) {
@@ -101,9 +102,9 @@ func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
 // READY state might mean something different for each resource type. For a Custom Resource it may mean
 // that a field "State" in the Status of the resource is set to "Ready". It is customizable via
 // annotations with some defaults.
-func (c *BundleController) process(bundle *smith.Bundle) (isReady, retriableError bool, e error) {
+func (c *BundleController) process(bundle *smith_v1.Bundle) (isReady, retriableError bool, e error) {
 	// Build resource map by name
-	resourceMap := make(map[smith.ResourceName]smith.Resource, len(bundle.Spec.Resources))
+	resourceMap := make(map[smith_v1.ResourceName]smith_v1.Resource, len(bundle.Spec.Resources))
 	for _, res := range bundle.Spec.Resources {
 		if _, exist := resourceMap[res.Name]; exist {
 			return false, false, errors.New(fmt.Sprintf("bundle contains two resources with the same name %q", res.Name))
@@ -117,7 +118,7 @@ func (c *BundleController) process(bundle *smith.Bundle) (isReady, retriableErro
 		return false, false, sortErr
 	}
 
-	readyResources := make(map[smith.ResourceName]*unstructured.Unstructured, len(bundle.Spec.Resources))
+	readyResources := make(map[smith_v1.ResourceName]*unstructured.Unstructured, len(bundle.Spec.Resources))
 	allReady := true
 
 	// Visit vertices in sorted order
@@ -125,7 +126,7 @@ nextVertex:
 	for _, v := range sorted {
 		// Check if all resource dependencies are ready (so we can start processing this one)
 		for _, dependency := range g.Vertices[v].Edges() {
-			if _, ok := readyResources[dependency.(smith.ResourceName)]; !ok {
+			if _, ok := readyResources[dependency.(smith_v1.ResourceName)]; !ok {
 				allReady = false
 				log.Printf("[WORKER][%s/%s] Dependency %q is required by resource %q but it's not ready", bundle.Namespace, bundle.Name, dependency, v)
 				continue nextVertex // Move to the next resource
@@ -133,14 +134,14 @@ nextVertex:
 		}
 		// Process the resource
 		log.Printf("[WORKER][%s/%s] Checking resource %q", bundle.Namespace, bundle.Name, v)
-		res := resourceMap[v.(smith.ResourceName)]
+		res := resourceMap[v.(smith_v1.ResourceName)]
 		readyResource, retriable, err := c.checkResource(bundle, &res, readyResources)
 		if err != nil {
 			return false, retriable, err
 		}
 		log.Printf("[WORKER][%s/%s] Resource %q, ready: %t", bundle.Namespace, bundle.Name, v, readyResource != nil)
 		if readyResource != nil {
-			readyResources[v.(smith.ResourceName)] = readyResource
+			readyResources[v.(smith_v1.ResourceName)] = readyResource
 		} else {
 			allReady = false
 		}
@@ -154,7 +155,7 @@ nextVertex:
 	return allReady, false, nil
 }
 
-func (c *BundleController) checkResource(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) (readyResource *unstructured.Unstructured, retriableError bool, e error) {
+func (c *BundleController) checkResource(bundle *smith_v1.Bundle, res *smith_v1.Resource, readyResources map[smith_v1.ResourceName]*unstructured.Unstructured) (readyResource *unstructured.Unstructured, retriableError bool, e error) {
 	// 1. Eval spec
 	spec, err := c.evalSpec(bundle, res, readyResources)
 	if err != nil {
@@ -176,7 +177,7 @@ func (c *BundleController) checkResource(bundle *smith.Bundle, res *smith.Resour
 }
 
 // evalSpec evaluates the resource specification and returns the result.
-func (c *BundleController) evalSpec(bundle *smith.Bundle, res *smith.Resource, readyResources map[smith.ResourceName]*unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (c *BundleController) evalSpec(bundle *smith_v1.Bundle, res *smith_v1.Resource, readyResources map[smith_v1.ResourceName]*unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	// 0. Convert to Unstructured
 	spec, err := res.ToUnstructured(c.scheme.DeepCopy)
 	if err != nil {
@@ -206,8 +207,8 @@ func (c *BundleController) evalSpec(bundle *smith.Bundle, res *smith.Resource, r
 	}
 	// Hardcode APIVersion/Kind because of https://github.com/kubernetes/client-go/issues/60
 	refs = append(refs, meta_v1.OwnerReference{
-		APIVersion:         smith.BundleResourceGroupVersion,
-		Kind:               smith.BundleResourceKind,
+		APIVersion:         smith_v1.BundleResourceGroupVersion,
+		Kind:               smith_v1.BundleResourceKind,
 		Name:               bundle.Name,
 		UID:                bundle.UID,
 		Controller:         &trueRef,
@@ -229,7 +230,7 @@ func (c *BundleController) evalSpec(bundle *smith.Bundle, res *smith.Resource, r
 }
 
 // createOrUpdate creates or updates a resources.
-func (c *BundleController) createOrUpdate(bundle *smith.Bundle, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableRet bool, e error) {
+func (c *BundleController) createOrUpdate(bundle *smith_v1.Bundle, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableRet bool, e error) {
 	// Prepare client
 	resClient, err := c.smartClient.ForGVK(spec.GroupVersionKind(), bundle.Namespace)
 	if err != nil {
@@ -249,7 +250,7 @@ func (c *BundleController) createOrUpdate(bundle *smith.Bundle, spec *unstructur
 	return c.createResource(bundle, resClient, spec)
 }
 
-func (c *BundleController) createResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
+func (c *BundleController) createResource(bundle *smith_v1.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
 	log.Printf("[WORKER][%s/%s] Object %q not found, creating", bundle.Namespace, bundle.Name, spec.GetName())
 	response, err := resClient.Create(spec)
 	if err == nil {
@@ -267,7 +268,7 @@ func (c *BundleController) createResource(bundle *smith.Bundle, resClient *dynam
 }
 
 // Mutates spec and actual.
-func (c *BundleController) updateResource(bundle *smith.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
+func (c *BundleController) updateResource(bundle *smith_v1.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
 	actualMeta := actual.(meta_v1.Object)
 	// Check that the object is not marked for deletion
 	if actualMeta.GetDeletionTimestamp() != nil {
@@ -303,7 +304,7 @@ func (c *BundleController) updateResource(bundle *smith.Bundle, resClient *dynam
 	return updated, false, nil
 }
 
-func (c *BundleController) deleteRemovedResources(bundle *smith.Bundle) (retriableError bool, e error) {
+func (c *BundleController) deleteRemovedResources(bundle *smith_v1.Bundle) (retriableError bool, e error) {
 	objs, err := c.store.GetObjectsForBundle(bundle.Namespace, bundle.Name)
 	if err != nil {
 		return false, err
@@ -371,10 +372,10 @@ func (c *BundleController) deleteRemovedResources(bundle *smith.Bundle) (retriab
 	return retriable, firstErr
 }
 
-func (c *BundleController) setBundleStatus(bundle *smith.Bundle) error {
+func (c *BundleController) setBundleStatus(bundle *smith_v1.Bundle) error {
 	err := c.bundleClient.Put().
 		Namespace(bundle.Namespace).
-		Resource(smith.BundleResourcePlural).
+		Resource(smith_v1.BundleResourcePlural).
 		Name(bundle.Name).
 		Body(bundle).
 		Do().
@@ -394,27 +395,27 @@ func (c *BundleController) setBundleStatus(bundle *smith.Bundle) error {
 	return nil
 }
 
-func (c *BundleController) handleProcessResult(bundle *smith.Bundle, isReady, retriable bool, err error) (retriableRet bool, errRet error) {
+func (c *BundleController) handleProcessResult(bundle *smith_v1.Bundle, isReady, retriable bool, err error) (retriableRet bool, errRet error) {
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		return false, err
 	}
-	inProgressCond := smith.BundleCondition{Type: smith.BundleInProgress, Status: smith.ConditionFalse}
-	readyCond := smith.BundleCondition{Type: smith.BundleReady, Status: smith.ConditionFalse}
-	errorCond := smith.BundleCondition{Type: smith.BundleError, Status: smith.ConditionFalse}
+	inProgressCond := smith_v1.BundleCondition{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionFalse}
+	readyCond := smith_v1.BundleCondition{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse}
+	errorCond := smith_v1.BundleCondition{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse}
 	if err == nil {
 		if isReady {
-			readyCond.Status = smith.ConditionTrue
+			readyCond.Status = smith_v1.ConditionTrue
 		} else {
-			inProgressCond.Status = smith.ConditionTrue
+			inProgressCond.Status = smith_v1.ConditionTrue
 		}
 	} else {
-		errorCond.Status = smith.ConditionTrue
+		errorCond.Status = smith_v1.ConditionTrue
 		errorCond.Message = err.Error()
 		if retriable {
-			errorCond.Reason = smith.BundleReasonRetriableError
-			inProgressCond.Status = smith.ConditionTrue
+			errorCond.Reason = smith_v1.BundleReasonRetriableError
+			inProgressCond.Status = smith_v1.ConditionTrue
 		} else {
-			errorCond.Reason = smith.BundleReasonTerminalError
+			errorCond.Reason = smith_v1.BundleReasonTerminalError
 		}
 	}
 
@@ -443,7 +444,7 @@ func mergeLabels(labels ...map[string]string) map[string]string {
 	return result
 }
 
-func isOwner(obj meta_v1.Object, bundle *smith.Bundle) bool {
+func isOwner(obj meta_v1.Object, bundle *smith_v1.Bundle) bool {
 	ref := resources.GetControllerOf(obj)
 	// Theoretically Bundle may be represented by multiple API versions, hence we only check name and UID.
 	return ref != nil &&
@@ -451,7 +452,7 @@ func isOwner(obj meta_v1.Object, bundle *smith.Bundle) bool {
 		ref.UID == bundle.UID
 }
 
-func sortBundle(bundle *smith.Bundle) (*graph.Graph, []graph.V, error) {
+func sortBundle(bundle *smith_v1.Bundle) (*graph.Graph, []graph.V, error) {
 	g := graph.NewGraph(len(bundle.Spec.Resources))
 
 	for _, res := range bundle.Spec.Resources {

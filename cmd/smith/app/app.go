@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/cleanup"
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
 	"github.com/atlassian/smith/pkg/client"
@@ -60,7 +61,11 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	bundleClient, err := client.BundleClient(a.RestConfig, client.BundleScheme())
+	bundleScheme, err := client.BundleScheme()
+	if err != nil {
+		return err
+	}
+	bundleClient, err := client.BundleClient(a.RestConfig, bundleScheme)
 	if err != nil {
 		return err
 	}
@@ -90,7 +95,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Informers
 	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
-	multiStore.AddInformer(smith.BundleGVK, bundleInf)
+	multiStore.AddInformer(smith_v1.BundleGVK, bundleInf)
 
 	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, a.ResyncPeriod)
 	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
@@ -116,7 +121,7 @@ func (a *App) Run(ctx context.Context) error {
 			if err == context.Canceled || err == context.DeadlineExceeded {
 				return true, err
 			}
-			log.Printf("Failed to create CRD %s: %v", smith.BundleResourceName, err)
+			log.Printf("Failed to create CRD %s: %v", smith_v1.BundleResourceName, err)
 			return false, nil
 		}
 		return true, nil

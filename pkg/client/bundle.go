@@ -3,7 +3,7 @@ package client
 import (
 	"time"
 
-	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -15,17 +15,19 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func BundleScheme() *runtime.Scheme {
+func BundleScheme() (*runtime.Scheme, error) {
 	scheme := runtime.NewScheme()
-	smith.AddToScheme(scheme)
+	if err := smith_v1.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
 	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
-	return scheme
+	return scheme, nil
 }
 
 func BundleClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTClient, error) {
 	groupVersion := schema.GroupVersion{
-		Group:   smith.SmithResourceGroup,
-		Version: smith.BundleResourceVersion,
+		Group:   smith_v1.GroupName,
+		Version: smith_v1.BundleResourceVersion,
 	}
 
 	config := *cfg
@@ -39,8 +41,8 @@ func BundleClient(cfg *rest.Config, scheme *runtime.Scheme) (*rest.RESTClient, e
 
 func BundleInformer(bundleClient cache.Getter, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		cache.NewListWatchFromClient(bundleClient, smith.BundleResourcePlural, namespace, fields.Everything()),
-		&smith.Bundle{},
+		cache.NewListWatchFromClient(bundleClient, smith_v1.BundleResourcePlural, namespace, fields.Everything()),
+		&smith_v1.Bundle{},
 		resyncPeriod,
 		cache.Indexers{})
 }

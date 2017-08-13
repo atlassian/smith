@@ -2,6 +2,7 @@ package controller
 
 import (
 	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -27,9 +28,9 @@ type Store interface {
 
 type BundleStore interface {
 	// Get returns Bundle based on its namespace and name.
-	Get(namespace, bundleName string) (*smith.Bundle, error)
+	Get(namespace, bundleName string) (*smith_v1.Bundle, error)
 	// GetBundlesByCrd returns Bundles which have a resource defined by CRD.
-	GetBundlesByCrd(*apiext_v1b1.CustomResourceDefinition) ([]*smith.Bundle, error)
+	GetBundlesByCrd(*apiext_v1b1.CustomResourceDefinition) ([]*smith_v1.Bundle, error)
 	// GetBundlesByObject returns Bundles which have a resource of a particular group/kind with a name in a namespace.
-	GetBundlesByObject(gk schema.GroupKind, namespace, name string) ([]*smith.Bundle, error)
+	GetBundlesByObject(gk schema.GroupKind, namespace, name string) ([]*smith_v1.Bundle, error)
 }

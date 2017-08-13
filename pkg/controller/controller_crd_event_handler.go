@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -71,7 +71,7 @@ func (h *crdEventHandler) OnDelete(obj interface{}) {
 }
 
 func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition) bool {
-	if crd.Name == smith.BundleResourceName {
+	if crd.Name == smith_v1.BundleResourceName {
 		return false
 	}
 	if _, ok := h.watchers[crd.Name]; ok {

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/sleeper"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
@@ -44,22 +44,22 @@ func TestAdoption(t *testing.T) {
 			WakeupMessage: "Hello there!",
 		},
 	}
-	bundle := &smith.Bundle{
+	bundle := &smith_v1.Bundle{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       smith.BundleResourceKind,
-			APIVersion: smith.BundleResourceGroupVersion,
+			Kind:       smith_v1.BundleResourceKind,
+			APIVersion: smith_v1.BundleResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle",
 		},
-		Spec: smith.BundleSpec{
-			Resources: []smith.Resource{
+		Spec: smith_v1.BundleSpec{
+			Resources: []smith_v1.Resource{
 				{
-					Name: smith.ResourceName(cm.Name),
+					Name: smith_v1.ResourceName(cm.Name),
 					Spec: cm,
 				},
 				{
-					Name: smith.ResourceName(sleeper.Name),
+					Name: smith_v1.ResourceName(sleeper.Name),
 					Spec: sleeper,
 				},
 			},
@@ -106,18 +106,18 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 	cfg.cleanupLater(sleeperActual)
 
 	// Create Bundle with same resources
-	bundleActual := &smith.Bundle{}
-	cfg.createObject(ctxTest, cfg.bundle, bundleActual, smith.BundleResourcePlural, cfg.bundleClient)
+	bundleActual := &smith_v1.Bundle{}
+	cfg.createObject(ctxTest, cfg.bundle, bundleActual, smith_v1.BundleResourcePlural, cfg.bundleClient)
 	cfg.createdBundle = bundleActual
 
 	time.Sleep(1 * time.Second) // TODO this should be removed once race with tpr informer is fixed "no informer for tpr.atlassian.com/v1, Kind=Sleeper is registered"
 
 	// Bundle should be in Error=true state
-	bundleActual = cfg.awaitBundleCondition(isBundleStatusCond(cfg.namespace, cfg.bundle.Name, smith.BundleError, smith.ConditionTrue))
+	bundleActual = cfg.awaitBundleCondition(isBundleStatusCond(cfg.namespace, cfg.bundle.Name, smith_v1.BundleError, smith_v1.ConditionTrue))
 
-	assertCondition(t, bundleActual, smith.BundleReady, smith.ConditionFalse)
-	assertCondition(t, bundleActual, smith.BundleInProgress, smith.ConditionFalse)
-	cond := assertCondition(t, bundleActual, smith.BundleError, smith.ConditionTrue)
+	assertCondition(t, bundleActual, smith_v1.BundleReady, smith_v1.ConditionFalse)
+	assertCondition(t, bundleActual, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+	cond := assertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
 	if cond != nil {
 		assert.Equal(t, "TerminalError", cond.Reason)
 		assert.Equal(t, "object /v1, Kind=ConfigMap \"cm\" is not owned by the Bundle", cond.Message)
@@ -127,8 +127,8 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 	trueVar := true
 	cmActual.OwnerReferences = []meta_v1.OwnerReference{
 		{
-			APIVersion: smith.BundleResourceGroupVersion,
-			Kind:       smith.BundleResourceKind,
+			APIVersion: smith_v1.BundleResourceGroupVersion,
+			Kind:       smith_v1.BundleResourceKind,
 			Name:       bundleActual.Name,
 			UID:        bundleActual.UID,
 			Controller: &trueVar,
@@ -141,8 +141,8 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 	for { // Retry loop to handle conflicts with Sleeper controller
 		sleeperActual.SetOwnerReferences([]meta_v1.OwnerReference{
 			{
-				APIVersion: smith.BundleResourceGroupVersion,
-				Kind:       smith.BundleResourceKind,
+				APIVersion: smith_v1.BundleResourceGroupVersion,
+				Kind:       smith_v1.BundleResourceKind,
 				Name:       bundleActual.Name,
 				UID:        bundleActual.UID,
 				Controller: &trueVar,
@@ -179,8 +179,8 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 	require.NoError(t, err)
 	assert.Equal(t, []meta_v1.OwnerReference{
 		{
-			APIVersion:         smith.BundleResourceGroupVersion,
-			Kind:               smith.BundleResourceKind,
+			APIVersion:         smith_v1.BundleResourceGroupVersion,
+			Kind:               smith_v1.BundleResourceKind,
 			Name:               bundleActual.Name,
 			UID:                bundleActual.UID,
 			Controller:         &trueVar,
@@ -199,8 +199,8 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...
 	require.NoError(t, err)
 	assert.Equal(t, []meta_v1.OwnerReference{
 		{
-			APIVersion:         smith.BundleResourceGroupVersion,
-			Kind:               smith.BundleResourceKind,
+			APIVersion:         smith_v1.BundleResourceGroupVersion,
+			Kind:               smith_v1.BundleResourceKind,
 			Name:               bundleActual.Name,
 			UID:                bundleActual.UID,
 			Controller:         &trueVar,

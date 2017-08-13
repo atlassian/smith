@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,23 +42,23 @@ func TestServiceCatalog(t *testing.T) {
 			SecretName: "secret1",
 		},
 	}
-	bundle := &smith.Bundle{
+	bundle := &smith_v1.Bundle{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       smith.BundleResourceKind,
-			APIVersion: smith.BundleResourceGroupVersion,
+			Kind:       smith_v1.BundleResourceKind,
+			APIVersion: smith_v1.BundleResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle-cs",
 		},
-		Spec: smith.BundleSpec{
-			Resources: []smith.Resource{
+		Spec: smith_v1.BundleSpec{
+			Resources: []smith_v1.Resource{
 				{
-					Name: smith.ResourceName(instance.Name),
+					Name: smith_v1.ResourceName(instance.Name),
 					Spec: instance,
 				},
 				{
-					Name:      smith.ResourceName(binding.Name),
-					DependsOn: []smith.ResourceName{smith.ResourceName(instance.Name)},
+					Name:      smith_v1.ResourceName(binding.Name),
+					DependsOn: []smith_v1.ResourceName{smith_v1.ResourceName(instance.Name)},
 					Spec:      binding,
 				},
 			},

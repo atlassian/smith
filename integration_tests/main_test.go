@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,10 +45,10 @@ func TestWorkflow(t *testing.T) {
 			"a": "b",
 		},
 	}
-	bundle := &smith.Bundle{
+	bundle := &smith_v1.Bundle{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       smith.BundleResourceKind,
-			APIVersion: smith.BundleResourceGroupVersion,
+			Kind:       smith_v1.BundleResourceKind,
+			APIVersion: smith_v1.BundleResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle1",
@@ -57,11 +58,11 @@ func TestWorkflow(t *testing.T) {
 				smith.BundleNameLabel: "bundleLabel123",
 			},
 		},
-		Spec: smith.BundleSpec{
-			Resources: []smith.Resource{
+		Spec: smith_v1.BundleSpec{
+			Resources: []smith_v1.Resource{
 				{
 					Name:      "config1res",
-					DependsOn: []smith.ResourceName{"secret2res"},
+					DependsOn: []smith_v1.ResourceName{"secret2res"},
 					Spec:      c1,
 				},
 				{
@@ -91,8 +92,8 @@ func testWorkflow(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 	trueRef := true
 	assert.Equal(t, []meta_v1.OwnerReference{
 		{
-			APIVersion:         smith.BundleResourceGroupVersion,
-			Kind:               smith.BundleResourceKind,
+			APIVersion:         smith_v1.BundleResourceGroupVersion,
+			Kind:               smith_v1.BundleResourceKind,
 			Name:               bundleRes.Name,
 			UID:                bundleRes.UID,
 			Controller:         &trueRef,
@@ -108,8 +109,8 @@ func testWorkflow(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 	}, cfMap.GetOwnerReferences())
 	assert.Equal(t, []meta_v1.OwnerReference{
 		{
-			APIVersion:         smith.BundleResourceGroupVersion,
-			Kind:               smith.BundleResourceKind,
+			APIVersion:         smith_v1.BundleResourceGroupVersion,
+			Kind:               smith_v1.BundleResourceKind,
 			Name:               bundleRes.Name,
 			UID:                bundleRes.UID,
 			Controller:         &trueRef,

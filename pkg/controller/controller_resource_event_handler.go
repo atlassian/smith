@@ -3,7 +3,7 @@ package controller
 import (
 	"log"
 
-	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,7 +64,7 @@ func (c *BundleController) rebuildByName(namespace, bundleName, addUpdateDelete 
 	// TODO print GVK
 	log.Printf("[REH][%s/%s] Rebuilding bundle because object %s was %s",
 		namespace, bundleName, obj.(meta_v1.Object).GetName(), addUpdateDelete)
-	c.enqueue(&smith.Bundle{
+	c.enqueue(&smith_v1.Bundle{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      bundleName,
 			Namespace: namespace,
@@ -76,7 +76,7 @@ func getBundleNameAndNamespace(obj interface{}) (string, string) {
 	var bundleName string
 	meta := obj.(meta_v1.Object)
 	ref := resources.GetControllerOf(meta)
-	if ref != nil && ref.APIVersion == smith.BundleResourceGroupVersion && ref.Kind == smith.BundleResourceKind {
+	if ref != nil && ref.APIVersion == smith_v1.BundleResourceGroupVersion && ref.Kind == smith_v1.BundleResourceKind {
 		bundleName = ref.Name
 	}
 	return bundleName, meta.GetNamespace()
