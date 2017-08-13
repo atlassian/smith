@@ -10,6 +10,7 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/client"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
@@ -43,8 +44,8 @@ type testFunc func(*testing.T, context.Context, *itConfig, ...interface{})
 type itConfig struct {
 	t             *testing.T
 	namespace     string
-	bundle        *smith.Bundle
-	createdBundle *smith.Bundle
+	bundle        *smith_v1.Bundle
+	createdBundle *smith_v1.Bundle
 	config        *rest.Config
 	clientset     kubernetes.Interface
 	sc            smith.SmartClient
@@ -59,13 +60,13 @@ func (cfg *itConfig) cleanupLater(obj ...runtime.Object) {
 func (cfg *itConfig) cleanup() {
 	for _, obj := range cfg.toCleanup {
 		cfg.deleteObject(obj)
-		bundle, ok := obj.(*smith.Bundle)
+		bundle, ok := obj.(*smith_v1.Bundle)
 		if !ok {
 			u, ok := obj.(*unstructured.Unstructured)
-			if !ok || u.GetKind() != smith.BundleResourceKind || u.GetAPIVersion() != smith.BundleResourceGroupVersion {
+			if !ok || u.GetKind() != smith_v1.BundleResourceKind || u.GetAPIVersion() != smith_v1.BundleResourceGroupVersion {
 				continue
 			}
-			bundle = new(smith.Bundle)
+			bundle = new(smith_v1.Bundle)
 			if !assert.NoError(cfg.t, unstructured_conversion.DefaultConverter.FromUnstructured(u.Object, bundle)) {
 				continue
 			}
@@ -74,7 +75,7 @@ func (cfg *itConfig) cleanup() {
 	}
 }
 
-func (cfg *itConfig) cleanupBundle(bundle *smith.Bundle) {
+func (cfg *itConfig) cleanupBundle(bundle *smith_v1.Bundle) {
 	for _, resource := range bundle.Spec.Resources {
 		cfg.deleteObject(resource.Spec)
 	}
@@ -89,8 +90,8 @@ func (cfg *itConfig) deleteObject(obj runtime.Object) {
 			gvk = api_v1.SchemeGroupVersion.WithKind("ConfigMap")
 		case *api_v1.Secret:
 			gvk = api_v1.SchemeGroupVersion.WithKind("Secret")
-		case *smith.Bundle:
-			gvk = smith.BundleGVK
+		case *smith_v1.Bundle:
+			gvk = smith_v1.BundleGVK
 		case *sleeper.Sleeper:
 			gvk = sleeper.SleeperGVK
 		default:
@@ -126,14 +127,14 @@ func (cfg *itConfig) createObject(ctxTest context.Context, obj, res runtime.Obje
 	cfg.cleanupLater(res)
 }
 
-func (cfg *itConfig) awaitBundleCondition(conditions ...watch.ConditionFunc) *smith.Bundle {
-	lw := cache.NewListWatchFromClient(cfg.bundleClient, smith.BundleResourcePlural, cfg.namespace, fields.Everything())
+func (cfg *itConfig) awaitBundleCondition(conditions ...watch.ConditionFunc) *smith_v1.Bundle {
+	lw := cache.NewListWatchFromClient(cfg.bundleClient, smith_v1.BundleResourcePlural, cfg.namespace, fields.Everything())
 	event, err := cache.ListWatchUntil(10*time.Second, lw, conditions...)
 	require.NoError(cfg.t, err)
-	return event.Object.(*smith.Bundle)
+	return event.Object.(*smith_v1.Bundle)
 }
 
-func assertCondition(t *testing.T, bundle *smith.Bundle, conditionType smith.BundleConditionType, status smith.ConditionStatus) *smith.BundleCondition {
+func assertCondition(t *testing.T, bundle *smith_v1.Bundle, conditionType smith_v1.BundleConditionType, status smith_v1.ConditionStatus) *smith_v1.BundleCondition {
 	_, condition := bundle.GetCondition(conditionType)
 	if assert.NotNil(t, condition) {
 		assert.Equal(t, status, condition.Status)
@@ -148,7 +149,7 @@ func sleeperScheme() *runtime.Scheme {
 	return scheme
 }
 
-func isBundleStatusCond(namespace, name string, cType smith.BundleConditionType, status smith.ConditionStatus) watch.ConditionFunc {
+func isBundleStatusCond(namespace, name string, cType smith_v1.BundleConditionType, status smith_v1.ConditionStatus) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		metaObj := event.Object.(meta_v1.Object)
 		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
@@ -156,7 +157,7 @@ func isBundleStatusCond(namespace, name string, cType smith.BundleConditionType,
 		}
 		switch event.Type {
 		case watch.Added, watch.Modified:
-			b := event.Object.(*smith.Bundle)
+			b := event.Object.(*smith_v1.Bundle)
 			_, cond := b.GetCondition(cType)
 			return cond != nil && cond.Status == status, nil
 		default:
@@ -171,7 +172,7 @@ func isBundleNewerCond(namespace, name string, resourceVersions ...string) watch
 		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
 			return false, nil
 		}
-		b := event.Object.(*smith.Bundle)
+		b := event.Object.(*smith_v1.Bundle)
 		for _, rv := range resourceVersions {
 			if b.ResourceVersion == rv {
 				// TODO Should be using Generation here once it is available
@@ -191,14 +192,15 @@ func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *rest.RESTCli
 	clientset, err := kubernetes.NewForConfig(config)
 	require.NoError(t, err)
 
-	scheme := client.BundleScheme()
-	bundleClient, err := client.BundleClient(config, scheme)
+	bundleScheme, err := client.BundleScheme()
+	require.NoError(t, err)
+	bundleClient, err := client.BundleClient(config, bundleScheme)
 	require.NoError(t, err)
 
 	return config, clientset, bundleClient
 }
 
-func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle bool, test testFunc, args ...interface{}) {
+func setupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundle bool, test testFunc, args ...interface{}) {
 	config, clientset, bundleClient := testSetup(t)
 	var scConfig *rest.Config
 	var scClient scClientset.Interface
@@ -237,7 +239,7 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 	err = bundleClient.Delete().
 		Context(ctxTest).
 		Namespace(useNamespace).
-		Resource(smith.BundleResourcePlural).
+		Resource(smith_v1.BundleResourcePlural).
 		Name(bundle.Name).
 		Do().
 		Error()
@@ -278,20 +280,20 @@ func setupApp(t *testing.T, bundle *smith.Bundle, serviceCatalog, createBundle b
 
 	if createBundle {
 		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle CRD
-		res := &smith.Bundle{}
-		cfg.createObject(ctxTest, bundle, res, smith.BundleResourcePlural, bundleClient)
+		res := &smith_v1.Bundle{}
+		cfg.createObject(ctxTest, bundle, res, smith_v1.BundleResourcePlural, bundleClient)
 		cfg.createdBundle = res
 	}
 
 	test(t, ctxTest, cfg, args...)
 }
 
-func (cfg *itConfig) assertBundle(ctx context.Context, bundle *smith.Bundle, resourceVersions ...string) *smith.Bundle {
-	bundleRes := cfg.awaitBundleCondition(isBundleNewerCond(cfg.namespace, bundle.Name, resourceVersions...), isBundleStatusCond(cfg.namespace, cfg.bundle.Name, smith.BundleReady, smith.ConditionTrue))
+func (cfg *itConfig) assertBundle(ctx context.Context, bundle *smith_v1.Bundle, resourceVersions ...string) *smith_v1.Bundle {
+	bundleRes := cfg.awaitBundleCondition(isBundleNewerCond(cfg.namespace, bundle.Name, resourceVersions...), isBundleStatusCond(cfg.namespace, cfg.bundle.Name, smith_v1.BundleReady, smith_v1.ConditionTrue))
 
-	assertCondition(cfg.t, bundleRes, smith.BundleReady, smith.ConditionTrue)
-	assertCondition(cfg.t, bundleRes, smith.BundleInProgress, smith.ConditionFalse)
-	assertCondition(cfg.t, bundleRes, smith.BundleError, smith.ConditionFalse)
+	assertCondition(cfg.t, bundleRes, smith_v1.BundleReady, smith_v1.ConditionTrue)
+	assertCondition(cfg.t, bundleRes, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+	assertCondition(cfg.t, bundleRes, smith_v1.BundleError, smith_v1.ConditionFalse)
 	if assert.Len(cfg.t, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
 		for i, res := range bundle.Spec.Resources {
 			spec, err := res.ToUnstructured(noCopy)
@@ -309,7 +311,7 @@ func (cfg *itConfig) assertBundle(ctx context.Context, bundle *smith.Bundle, res
 	return bundleRes
 }
 
-func (cfg *itConfig) assertBundleTimeout(ctx context.Context, bundle *smith.Bundle, resourceVersion ...string) *smith.Bundle {
+func (cfg *itConfig) assertBundleTimeout(ctx context.Context, bundle *smith_v1.Bundle, resourceVersion ...string) *smith_v1.Bundle {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return cfg.assertBundle(ctxTimeout, bundle, resourceVersion...)

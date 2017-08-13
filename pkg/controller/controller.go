@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"github.com/ash2k/stager/wait"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -105,7 +106,7 @@ func (c *BundleController) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (c *BundleController) enqueue(bundle *smith.Bundle) {
+func (c *BundleController) enqueue(bundle *smith_v1.Bundle) {
 	key, err := cache.MetaNamespaceKeyFunc(bundle)
 	if err != nil {
 		log.Printf("Couldn't get key for Bundle %+v: %v", bundle, err)

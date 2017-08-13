@@ -9,6 +9,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/sleeper"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
@@ -85,10 +86,10 @@ func TestUpdate(t *testing.T) {
 			WakeupMessage: "Hello, martians!",
 		},
 	}
-	bundle1 := &smith.Bundle{
+	bundle1 := &smith_v1.Bundle{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       smith.BundleResourceKind,
-			APIVersion: smith.BundleResourceGroupVersion,
+			Kind:       smith_v1.BundleResourceKind,
+			APIVersion: smith_v1.BundleResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle1",
@@ -98,23 +99,23 @@ func TestUpdate(t *testing.T) {
 				smith.BundleNameLabel: "bundleLabel1",
 			},
 		},
-		Spec: smith.BundleSpec{
-			Resources: []smith.Resource{
+		Spec: smith_v1.BundleSpec{
+			Resources: []smith_v1.Resource{
 				{
-					Name: smith.ResourceName(cm1.Name),
+					Name: smith_v1.ResourceName(cm1.Name),
 					Spec: cm1,
 				},
 				{
-					Name: smith.ResourceName(sleeper1.Name),
+					Name: smith_v1.ResourceName(sleeper1.Name),
 					Spec: sleeper1,
 				},
 			},
 		},
 	}
-	bundle2 := &smith.Bundle{
+	bundle2 := &smith_v1.Bundle{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       smith.BundleResourceKind,
-			APIVersion: smith.BundleResourceGroupVersion,
+			Kind:       smith_v1.BundleResourceKind,
+			APIVersion: smith_v1.BundleResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle1",
@@ -124,14 +125,14 @@ func TestUpdate(t *testing.T) {
 				smith.BundleNameLabel: "bundleLabel2",
 			},
 		},
-		Spec: smith.BundleSpec{
-			Resources: []smith.Resource{
+		Spec: smith_v1.BundleSpec{
+			Resources: []smith_v1.Resource{
 				{
-					Name: smith.ResourceName(cm2.Name),
+					Name: smith_v1.ResourceName(cm2.Name),
 					Spec: cm2,
 				},
 				{
-					Name: smith.ResourceName(sleeper2.Name),
+					Name: smith_v1.ResourceName(sleeper2.Name),
 					Spec: sleeper2,
 				},
 			},
@@ -156,7 +157,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	cm2 := args[0].(*api_v1.ConfigMap)
 	sleeper1 := args[1].(*sleeper.Sleeper)
 	sleeper2 := args[2].(*sleeper.Sleeper)
-	bundle2 := args[3].(*smith.Bundle)
+	bundle2 := args[3].(*smith_v1.Bundle)
 
 	cmClient := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace)
 	sClient, err := sleeper.GetSleeperClient(cfg.config, sleeperScheme())
@@ -167,12 +168,12 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 
 	bundleRes1 := cfg.assertBundle(ctxTimeout, cfg.bundle, cfg.createdBundle.ResourceVersion)
 
-	res := &smith.Bundle{}
+	res := &smith_v1.Bundle{}
 	bundle2.ResourceVersion = bundleRes1.ResourceVersion
 	require.NoError(t, cfg.bundleClient.Put().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(smith.BundleResourcePlural).
+		Resource(smith_v1.BundleResourcePlural).
 		Name(bundle2.Name).
 		Body(bundle2).
 		Do().
@@ -209,12 +210,12 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	assert.Equal(t, sleeper2.Spec, sleeperObj.Spec)
 
 	emptyBundle := *cfg.bundle
-	emptyBundle.Spec.Resources = []smith.Resource{}
+	emptyBundle.Spec.Resources = []smith_v1.Resource{}
 	emptyBundle.ResourceVersion = bundleRes2.ResourceVersion
 	require.NoError(t, cfg.bundleClient.Put().
 		Context(ctxTest).
 		Namespace(cfg.namespace).
-		Resource(smith.BundleResourcePlural).
+		Resource(smith_v1.BundleResourcePlural).
 		Name(emptyBundle.Name).
 		Body(&emptyBundle).
 		Do().

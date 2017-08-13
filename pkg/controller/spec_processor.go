@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -25,13 +25,13 @@ var (
 )
 
 type SpecProcessor struct {
-	selfName         smith.ResourceName
-	readyResources   map[smith.ResourceName]*unstructured.Unstructured
-	allowedResources map[smith.ResourceName]struct{}
+	selfName         smith_v1.ResourceName
+	readyResources   map[smith_v1.ResourceName]*unstructured.Unstructured
+	allowedResources map[smith_v1.ResourceName]struct{}
 }
 
-func NewSpec(selfName smith.ResourceName, readyResources map[smith.ResourceName]*unstructured.Unstructured, allowedResources []smith.ResourceName) *SpecProcessor {
-	ar := make(map[smith.ResourceName]struct{}, len(allowedResources))
+func NewSpec(selfName smith_v1.ResourceName, readyResources map[smith_v1.ResourceName]*unstructured.Unstructured, allowedResources []smith_v1.ResourceName) *SpecProcessor {
+	ar := make(map[smith_v1.ResourceName]struct{}, len(allowedResources))
 	for _, allowedResource := range allowedResources {
 		ar[allowedResource] = struct{}{}
 	}
@@ -113,7 +113,7 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	if len(parts) < 2 {
 		return nil, fmt.Errorf("cannot include whole object: %s", selector)
 	}
-	objName := smith.ResourceName(parts[0])
+	objName := smith_v1.ResourceName(parts[0])
 	if objName == sp.selfName {
 		return nil, fmt.Errorf("self references are not allowed: %s", selector)
 	}

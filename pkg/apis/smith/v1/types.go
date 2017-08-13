@@ -1,15 +1,16 @@
-package smith
+package v1
 
 import (
 	"bytes"
 	"fmt"
 	"reflect"
 
+	"github.com/atlassian/smith"
+
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
@@ -40,38 +41,17 @@ const (
 )
 
 const (
-	SmithDomain        = "smith.atlassian.com"
-	SmithResourceGroup = SmithDomain
-
 	BundleResourceSingular = "bundle"
 	BundleResourcePlural   = "bundles"
 	BundleResourceVersion  = "v1"
 	BundleResourceKind     = "Bundle"
 
-	BundleResourceGroupVersion = SmithResourceGroup + "/" + BundleResourceVersion
+	BundleResourceGroupVersion = GroupName + "/" + BundleResourceVersion
 
-	BundleResourceName = BundleResourcePlural + "." + SmithDomain
-	BundleNameLabel    = BundleResourceName + "/BundleName"
-
-	// See docs/design/managing-resources.md
-	CrFieldPathAnnotation  = SmithDomain + "/CrReadyWhenFieldPath"
-	CrFieldValueAnnotation = SmithDomain + "/CrReadyWhenFieldValue"
+	BundleResourceName = BundleResourcePlural + "." + GroupName
 )
 
-var GV = schema.GroupVersion{
-	Group:   SmithResourceGroup,
-	Version: BundleResourceVersion,
-}
-
-var BundleGVK = GV.WithKind(BundleResourceKind)
-
-func AddToScheme(scheme *runtime.Scheme) {
-	scheme.AddKnownTypes(GV,
-		&Bundle{},
-		&BundleList{},
-	)
-	meta_v1.AddToGroupVersion(scheme, GV)
-}
+var BundleGVK = SchemeGroupVersion.WithKind(BundleResourceKind)
 
 type BundleList struct {
 	meta_v1.TypeMeta `json:",inline"`
@@ -209,7 +189,7 @@ type Resource struct {
 
 // ToUnstructured returns Spec field as an Unstructured object.
 // It makes a copy if it is an Unstructured already.
-func (r *Resource) ToUnstructured(copy DeepCopy) (*unstructured.Unstructured, error) {
+func (r *Resource) ToUnstructured(copy smith.DeepCopy) (*unstructured.Unstructured, error) {
 	if _, ok := r.Spec.(*unstructured.Unstructured); ok {
 		uCopy, err := copy(r.Spec)
 		if err != nil {

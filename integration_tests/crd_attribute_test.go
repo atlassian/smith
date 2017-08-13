@@ -9,6 +9,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/sleeper"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
@@ -30,18 +31,18 @@ func TestCrdAttribute(t *testing.T) {
 			WakeupMessage: "Hello, Infravators!",
 		},
 	}
-	bundle := &smith.Bundle{
+	bundle := &smith_v1.Bundle{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       smith.BundleResourceKind,
-			APIVersion: smith.BundleResourceGroupVersion,
+			Kind:       smith_v1.BundleResourceKind,
+			APIVersion: smith_v1.BundleResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle-attribute",
 		},
-		Spec: smith.BundleSpec{
-			Resources: []smith.Resource{
+		Spec: smith_v1.BundleSpec{
+			Resources: []smith_v1.Resource{
 				{
-					Name: smith.ResourceName(sl.Name),
+					Name: smith_v1.ResourceName(sl.Name),
 					Spec: sl,
 				},
 			},

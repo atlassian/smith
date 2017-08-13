@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +16,7 @@ func TestSpecProcessor(t *testing.T) {
 	sp := SpecProcessor{
 		selfName:       "abc",
 		readyResources: readyResources(),
-		allowedResources: map[smith.ResourceName]struct{}{
+		allowedResources: map[smith_v1.ResourceName]struct{}{
 			"res1": {},
 		},
 	}
@@ -202,7 +202,7 @@ func TestSpecProcessorErrors(t *testing.T) {
 			sp := SpecProcessor{
 				selfName:       "self1",
 				readyResources: readyResources(),
-				allowedResources: map[smith.ResourceName]struct{}{
+				allowedResources: map[smith_v1.ResourceName]struct{}{
 					"res1": {},
 				},
 			}
@@ -211,8 +211,8 @@ func TestSpecProcessorErrors(t *testing.T) {
 	}
 }
 
-func readyResources() map[smith.ResourceName]*unstructured.Unstructured {
-	return map[smith.ResourceName]*unstructured.Unstructured{
+func readyResources() map[smith_v1.ResourceName]*unstructured.Unstructured {
+	return map[smith_v1.ResourceName]*unstructured.Unstructured{
 		"res1": {
 			Object: map[string]interface{}{
 				"a": map[string]interface{}{

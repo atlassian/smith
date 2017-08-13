@@ -3,26 +3,26 @@ package controller
 import (
 	"log"
 
-	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"k8s.io/client-go/tools/cache"
 )
 
 func (c *BundleController) onBundleAdd(obj interface{}) {
-	bundle := obj.(*smith.Bundle)
+	bundle := obj.(*smith_v1.Bundle)
 	log.Printf("[%s/%s] Rebuilding bundle because it was added", bundle.Namespace, bundle.Name)
 	c.enqueue(bundle)
 
 }
 
 func (c *BundleController) onBundleUpdate(oldObj, newObj interface{}) {
-	bundle := newObj.(*smith.Bundle)
+	bundle := newObj.(*smith_v1.Bundle)
 	log.Printf("[%s/%s] Rebuilding bundle because it was updated", bundle.Namespace, bundle.Name)
 	c.enqueue(bundle)
 }
 
 func (c *BundleController) onBundleDelete(obj interface{}) {
-	bundle, ok := obj.(*smith.Bundle)
+	bundle, ok := obj.(*smith_v1.Bundle)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
