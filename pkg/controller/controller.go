@@ -7,11 +7,11 @@ import (
 
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 
 	"github.com/ash2k/stager/wait"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -32,7 +32,7 @@ type BundleController struct {
 	wg           wait.Group
 	bundleInf    cache.SharedIndexInformer
 	crdInf       cache.SharedIndexInformer
-	bundleClient rest.Interface
+	bundleClient smithClient_v1.BundlesGetter
 	bundleStore  BundleStore
 	smartClient  smith.SmartClient
 	rc           ReadyChecker
@@ -48,7 +48,7 @@ type BundleController struct {
 	resourceHandler cache.ResourceEventHandler
 }
 
-func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient rest.Interface, bundleStore BundleStore,
+func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore BundleStore,
 	sc smith.SmartClient, rc ReadyChecker, scheme *runtime.Scheme, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
 	workers int, crdResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
 	c := &BundleController{

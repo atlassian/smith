@@ -12,6 +12,7 @@ import (
 	"github.com/atlassian/smith/examples/sleeper"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/client"
+	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
 
@@ -49,7 +50,7 @@ type itConfig struct {
 	config        *rest.Config
 	clientset     kubernetes.Interface
 	sc            smith.SmartClient
-	bundleClient  rest.Interface
+	bundleClient  smithClientset.Interface
 	toCleanup     []runtime.Object
 }
 
@@ -128,7 +129,7 @@ func (cfg *itConfig) createObject(ctxTest context.Context, obj, res runtime.Obje
 }
 
 func (cfg *itConfig) awaitBundleCondition(conditions ...watch.ConditionFunc) *smith_v1.Bundle {
-	lw := cache.NewListWatchFromClient(cfg.bundleClient, smith_v1.BundleResourcePlural, cfg.namespace, fields.Everything())
+	lw := cache.NewListWatchFromClient(cfg.bundleClient.SmithV1().RESTClient(), smith_v1.BundleResourcePlural, cfg.namespace, fields.Everything())
 	event, err := cache.ListWatchUntil(10*time.Second, lw, conditions...)
 	require.NoError(cfg.t, err)
 	return event.Object.(*smith_v1.Bundle)
@@ -185,16 +186,14 @@ func isBundleNewerCond(namespace, name string, resourceVersions ...string) watch
 	}
 }
 
-func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *rest.RESTClient) {
+func testSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClientset.Clientset) {
 	config, err := client.ConfigFromEnv()
 	require.NoError(t, err)
 
 	clientset, err := kubernetes.NewForConfig(config)
 	require.NoError(t, err)
 
-	bundleScheme, err := client.BundleScheme()
-	require.NoError(t, err)
-	bundleClient, err := client.BundleClient(config, bundleScheme)
+	bundleClient, err := smithClientset.NewForConfig(config)
 	require.NoError(t, err)
 
 	return config, clientset, bundleClient
@@ -236,13 +235,7 @@ func setupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	ctxTest, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 
-	err = bundleClient.Delete().
-		Context(ctxTest).
-		Namespace(useNamespace).
-		Resource(smith_v1.BundleResourcePlural).
-		Name(bundle.Name).
-		Do().
-		Error()
+	err = bundleClient.SmithV1().Bundles(useNamespace).Delete(bundle.Name, nil)
 	if err == nil {
 		t.Log("Bundle deleted")
 	} else if !api_errors.IsNotFound(err) {
@@ -281,7 +274,7 @@ func setupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	if createBundle {
 		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle CRD
 		res := &smith_v1.Bundle{}
-		cfg.createObject(ctxTest, bundle, res, smith_v1.BundleResourcePlural, bundleClient)
+		cfg.createObject(ctxTest, bundle, res, smith_v1.BundleResourcePlural, bundleClient.SmithV1().RESTClient())
 		cfg.createdBundle = res
 	}
 

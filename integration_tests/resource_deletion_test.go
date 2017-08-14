@@ -106,7 +106,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *itConfig, 
 
 	// Create Bundle with same resources
 	bundleActual := &smith_v1.Bundle{}
-	cfg.createObject(ctxTest, cfg.bundle, bundleActual, smith_v1.BundleResourcePlural, cfg.bundleClient)
+	cfg.createObject(ctxTest, cfg.bundle, bundleActual, smith_v1.BundleResourcePlural, cfg.bundleClient.SmithV1().RESTClient())
 	cfg.createdBundle = bundleActual
 
 	time.Sleep(1 * time.Second) // TODO this should be removed once race with tpr informer is fixed "no informer for tpr.atlassian.com/v1, Kind=Sleeper is registered"
