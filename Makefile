@@ -32,18 +32,33 @@ build-race: fmt
 	go build -i -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
 build-all: fmt
-	go install $$(glide nv | grep -v integration_tests)
-	go test -i -tags='integration integration_sc' $$(glide nv)
+	go install $$(glide nv | grep -v integration_tests | grep -v ./build/)
+	go test -i -tags='integration integration_sc' $$(glide nv | grep -v ./build/)
 
 build-all-race: fmt build-all-race-ci
 
 build-all-race-ci:
-	go install -race $$(glide nv | grep -v integration_tests)
-	go test -i -race -tags='integration integration_sc' $$(glide nv)
+	go install -race $$(glide nv | grep -v integration_tests | grep -v ./build/)
+	go test -i -race -tags='integration integration_sc' $$(glide nv | grep -v ./build/)
 
 fmt:
-	gofmt -w=true -s $$(find . -type f -name '*.go' -not -path "./vendor/*")
-	goimports -w=true -d $$(find . -type f -name '*.go' -not -path "./vendor/*")
+	gofmt -w=true -s $$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*")
+	goimports -w=true -d $$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*")
+
+generate: generate-client
+	# Make sure you have k8s.io/kubernetes cloned into build/go/src/k8s.io/kubernetes
+	# at revision ebb8d6e0fadfc95f3d64ccecc36c8ed2ac9224ef
+	# TODO automate this. We'll use k8s.io/kube-gen instead once we are on 1.8 and that repo is published
+
+generate-client:
+	GOPATH=$(PWD)/build/go go build -i -o build/bin/client-gen k8s.io/kubernetes/cmd/libs/go2idl/client-gen
+	# Generate the versioned clientset (pkg/client/clientset_generated/clientset)
+	build/bin/client-gen \
+	--input-base "github.com/atlassian/smith/pkg/apis/" \
+	--input "smith/v1" \
+	--clientset-path "github.com/atlassian/smith/pkg/client/clientset_generated/" \
+	--clientset-name "clientset" \
+	--go-header-file "build/boilerplate.go.txt"
 
 minikube-test: fmt
 	go test -i -tags=integration -race -v ./integration_tests
@@ -101,10 +116,10 @@ minikube-sleeper-run: build-all-race
 test: fmt test-ci
 
 test-ci:
-	go test -i -race $$(glide nv | grep -v integration_tests)
+	go test -i -race $$(glide nv | grep -v integration_tests | grep -v ./build/)
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	go test -race $$(glide nv | grep -v integration_tests)
+	go test -race $$(glide nv | grep -v integration_tests | grep -v ./build/)
 
 check: build-all
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor \

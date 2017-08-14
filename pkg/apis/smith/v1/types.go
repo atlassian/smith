@@ -62,6 +62,9 @@ type BundleList struct {
 	Items []Bundle `json:"items"`
 }
 
+// +genclient=true
+// +genclientstatus=false
+
 // Bundle describes a resources bundle.
 type Bundle struct {
 	meta_v1.TypeMeta `json:",inline"`
