@@ -373,13 +373,7 @@ func (c *BundleController) deleteRemovedResources(bundle *smith_v1.Bundle) (retr
 }
 
 func (c *BundleController) setBundleStatus(bundle *smith_v1.Bundle) error {
-	err := c.bundleClient.Put().
-		Namespace(bundle.Namespace).
-		Resource(smith_v1.BundleResourcePlural).
-		Name(bundle.Name).
-		Body(bundle).
-		Do().
-		Into(bundle)
+	bundleUpdated, err := c.bundleClient.Bundles(bundle.Namespace).Update(bundle)
 	if err != nil {
 		if api_errors.IsConflict(err) {
 			// Something updated the bundle concurrently.
@@ -391,7 +385,7 @@ func (c *BundleController) setBundleStatus(bundle *smith_v1.Bundle) error {
 		}
 		return fmt.Errorf("failed to set bundle %s/%s status to %v: %v", bundle.Namespace, bundle.Name, bundle.Status.ShortString(), err)
 	}
-	log.Printf("[WORKER][%s/%s] Set bundle status to %s", bundle.Namespace, bundle.Name, bundle.Status.ShortString())
+	log.Printf("[WORKER][%s/%s] Set bundle status to %s", bundle.Namespace, bundle.Name, bundleUpdated.Status.ShortString())
 	return nil
 }
 

@@ -170,14 +170,8 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 
 	res := &smith_v1.Bundle{}
 	bundle2.ResourceVersion = bundleRes1.ResourceVersion
-	require.NoError(t, cfg.bundleClient.Put().
-		Context(ctxTest).
-		Namespace(cfg.namespace).
-		Resource(smith_v1.BundleResourcePlural).
-		Name(bundle2.Name).
-		Body(bundle2).
-		Do().
-		Into(res))
+	res, err = cfg.bundleClient.SmithV1().Bundles(cfg.namespace).Update(bundle2)
+	require.NoError(t, err)
 
 	bundleRes2 := cfg.assertBundle(ctxTimeout, bundle2, bundle2.ResourceVersion, res.ResourceVersion)
 
@@ -212,14 +206,8 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	emptyBundle := *cfg.bundle
 	emptyBundle.Spec.Resources = []smith_v1.Resource{}
 	emptyBundle.ResourceVersion = bundleRes2.ResourceVersion
-	require.NoError(t, cfg.bundleClient.Put().
-		Context(ctxTest).
-		Namespace(cfg.namespace).
-		Resource(smith_v1.BundleResourcePlural).
-		Name(emptyBundle.Name).
-		Body(&emptyBundle).
-		Do().
-		Into(res))
+	res, err = cfg.bundleClient.SmithV1().Bundles(cfg.namespace).Update(&emptyBundle)
+	require.NoError(t, err)
 
 	cfg.assertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
 

@@ -11,6 +11,8 @@ import (
 	"github.com/atlassian/smith/pkg/cleanup"
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
 	"github.com/atlassian/smith/pkg/client"
+	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
+	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/readychecker"
@@ -61,11 +63,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	bundleScheme, err := client.BundleScheme()
-	if err != nil {
-		return err
-	}
-	bundleClient, err := client.BundleClient(a.RestConfig, bundleScheme)
+	bundleClient, err := smithClientset.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -94,7 +92,7 @@ func (a *App) Run(ctx context.Context) error {
 	multiStore := store.NewMulti(scheme.DeepCopy)
 
 	// Informers
-	bundleInf := client.BundleInformer(bundleClient, a.Namespace, a.ResyncPeriod)
+	bundleInf := client.BundleInformer(bundleClient.SmithV1().RESTClient(), a.Namespace, a.ResyncPeriod)
 	multiStore.AddInformer(smith_v1.BundleGVK, bundleInf)
 
 	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, a.ResyncPeriod)
@@ -149,7 +147,7 @@ func (a *App) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClient rest.Interface, bundleStore controller.BundleStore, crdStore readychecker.CrdStore,
+func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore controller.BundleStore, crdStore readychecker.CrdStore,
 	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *controller.BundleController {
 
 	// Ready Checker
