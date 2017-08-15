@@ -14,6 +14,7 @@ GOVERSION := 1.8
 GP := /gopath
 GOPATH ?= "$$HOME/go"
 MAIN_PKG := github.com/atlassian/smith/cmd/smith
+ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*" -not -path './pkg/client/clientset_generated/*' -not -name 'zz_generated.*')
 
 setup: setup-ci
 	go get -u golang.org/x/tools/cmd/goimports
@@ -42,10 +43,10 @@ build-all-race-ci:
 	go test -i -race -tags='integration integration_sc' $$(glide nv | grep -v ./build/)
 
 fmt:
-	gofmt -w=true -s $$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*")
-	goimports -w=true -d $$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*")
+	gofmt -w=true -s $(ALL_GO_FILES)
+	goimports -w=true -d $(ALL_GO_FILES)
 
-generate: generate-client
+generate: generate-client generate-deepcopy
 	# Make sure you have k8s.io/kubernetes cloned into build/go/src/k8s.io/kubernetes
 	# at revision ebb8d6e0fadfc95f3d64ccecc36c8ed2ac9224ef
 	# TODO automate this. We'll use k8s.io/kube-gen instead once we are on 1.8 and that repo is published
@@ -59,6 +60,16 @@ generate-client:
 	--clientset-path "github.com/atlassian/smith/pkg/client/clientset_generated/" \
 	--clientset-name "clientset" \
 	--go-header-file "build/boilerplate.go.txt"
+
+generate-deepcopy:
+	GOPATH=$(PWD)/build/go go build -i -o build/bin/deepcopy-gen k8s.io/kubernetes/cmd/libs/go2idl/deepcopy-gen
+	# Generate deep copies
+	build/bin/deepcopy-gen \
+	--v 1 --logtostderr \
+	--go-header-file "build/boilerplate.go.txt" \
+	--input-dirs "github.com/atlassian/smith/pkg/apis/smith/v1" \
+	--bounding-dirs "github.com/atlassian/smith" \
+	--output-file-base zz_generated.deepcopy
 
 minikube-test: fmt
 	go test -i -tags=integration -race -v ./integration_tests
