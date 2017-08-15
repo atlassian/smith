@@ -92,7 +92,7 @@ func (a *App) Run(ctx context.Context) error {
 	multiStore := store.NewMulti(scheme.DeepCopy)
 
 	// Informers
-	bundleInf := client.BundleInformer(bundleClient.SmithV1().RESTClient(), a.Namespace, a.ResyncPeriod)
+	bundleInf := client.BundleInformer(bundleClient.SmithV1(), a.Namespace, a.ResyncPeriod)
 	multiStore.AddInformer(smith_v1.BundleGVK, bundleInf)
 
 	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, a.ResyncPeriod)
