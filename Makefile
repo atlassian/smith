@@ -15,6 +15,7 @@ GP := /gopath
 GOPATH ?= "$$HOME/go"
 MAIN_PKG := github.com/atlassian/smith/cmd/smith
 ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*" -not -path './pkg/client/clientset_generated/*' -not -name 'zz_generated.*')
+ALL_SOURCE_DIRS=$$(glide nv | grep -v ./integration_tests/ | grep -v ./build/)
 
 setup: setup-ci
 	go get -u golang.org/x/tools/cmd/goimports
@@ -33,13 +34,13 @@ build-race: fmt
 	go build -i -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
 build-all: fmt
-	go install $$(glide nv | grep -v integration_tests | grep -v ./build/)
+	go install $(ALL_SOURCE_DIRS)
 	go test -i -tags='integration integration_sc' $$(glide nv | grep -v ./build/)
 
 build-all-race: fmt build-all-race-ci
 
 build-all-race-ci:
-	go install -race $$(glide nv | grep -v integration_tests | grep -v ./build/)
+	go install -race $(ALL_SOURCE_DIRS)
 	go test -i -race -tags='integration integration_sc' $$(glide nv | grep -v ./build/)
 
 fmt:
@@ -127,10 +128,10 @@ minikube-sleeper-run: build-all-race
 test: fmt test-ci
 
 test-ci:
-	go test -i -race $$(glide nv | grep -v integration_tests | grep -v ./build/)
+	go test -i -race $(ALL_SOURCE_DIRS)
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	go test -race $$(glide nv | grep -v integration_tests | grep -v ./build/)
+	go test -race $(ALL_SOURCE_DIRS)
 
 check: build-all
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor \
