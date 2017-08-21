@@ -15,7 +15,7 @@ GP := /gopath
 GOPATH ?= "$$HOME/go"
 MAIN_PKG := github.com/atlassian/smith/cmd/smith
 ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*" -not -path './pkg/client/clientset_generated/*' -not -name 'zz_generated.*')
-ALL_SOURCE_DIRS=$$(glide nv | grep -v ./integration_tests/ | grep -v ./build/)
+ALL_SOURCE_DIRS=./cmd/... ./examples/... ./pkg/... .
 
 setup: setup-ci
 	go get -u golang.org/x/tools/cmd/goimports
@@ -24,7 +24,6 @@ setup: setup-ci
 
 setup-ci:
 	go get -u github.com/golang/dep/cmd/dep
-	go get -u github.com/Masterminds/glide
 	dep ensure
 
 build: fmt
@@ -35,13 +34,13 @@ build-race: fmt
 
 build-all: fmt
 	go install $(ALL_SOURCE_DIRS)
-	go test -i -tags='integration integration_sc' $$(glide nv | grep -v ./build/)
+	go test -i -tags='integration integration_sc' $(ALL_SOURCE_DIRS)
 
 build-all-race: fmt build-all-race-ci
 
 build-all-race-ci:
 	go install -race $(ALL_SOURCE_DIRS)
-	go test -i -race -tags='integration integration_sc' $$(glide nv | grep -v ./build/)
+	go test -i -race -tags='integration integration_sc' $(ALL_SOURCE_DIRS)
 
 fmt:
 	gofmt -w=true -s $(ALL_GO_FILES)
