@@ -6,7 +6,7 @@ cache:
     - $GOPATH/pkg/dep
 
 go:
-  - 1.8.3
+  - 1.9
 
 os:
   - linux
