@@ -1,11 +1,10 @@
-// +build integration_sc
-
-package integration_tests
+package sc
 
 import (
 	"context"
 	"testing"
 
+	"github.com/atlassian/smith/it"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
@@ -64,9 +63,9 @@ func TestServiceCatalog(t *testing.T) {
 			},
 		},
 	}
-	setupApp(t, bundle, true, true, testServiceCatalog)
+	it.SetupApp(t, bundle, true, true, testServiceCatalog)
 }
 
-func testServiceCatalog(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
-	cfg.assertBundleTimeout(ctx, cfg.bundle, "")
+func testServiceCatalog(t *testing.T, ctx context.Context, cfg *it.ItConfig, args ...interface{}) {
+	cfg.AssertBundleTimeout(ctx, cfg.Bundle, "")
 }

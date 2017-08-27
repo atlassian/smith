@@ -1,6 +1,4 @@
-// +build integration
-
-package integration_tests
+package it
 
 import (
 	"context"
@@ -48,12 +46,12 @@ func TestCrdAttribute(t *testing.T) {
 			},
 		},
 	}
-	setupApp(t, bundle, false, true, testCrdAttribute, sl)
+	SetupApp(t, bundle, false, true, testCrdAttribute, sl)
 }
 
-func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...interface{}) {
+func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...interface{}) {
 	sl := args[0].(*sleeper.Sleeper)
-	sClient, err := sleeper.GetSleeperClient(cfg.config, sleeperScheme())
+	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
 	require.NoError(t, err)
 
 	stgr := stager.New()
@@ -61,7 +59,7 @@ func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args
 	stage := stgr.NextStage()
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := sleeper.App{
-			RestConfig: cfg.config,
+			RestConfig: cfg.Config,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
@@ -71,19 +69,19 @@ func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *itConfig, args
 	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sl.Spec.SleepFor+3)*time.Second)
 	defer cancel()
 
-	cfg.assertBundle(ctxTimeout, cfg.bundle, "")
+	cfg.AssertBundle(ctxTimeout, cfg.Bundle, "")
 
 	var sleeperObj sleeper.Sleeper
 	require.NoError(t, sClient.Get().
 		Context(ctxTest).
-		Namespace(cfg.namespace).
+		Namespace(cfg.Namespace).
 		Resource(sleeper.SleeperResourcePlural).
 		Name(sl.Name).
 		Do().
 		Into(&sleeperObj))
 
 	assert.Equal(t, map[string]string{
-		smith.BundleNameLabel: cfg.bundle.Name,
+		smith.BundleNameLabel: cfg.Bundle.Name,
 	}, sleeperObj.Labels)
 	assert.Equal(t, sleeper.Awake, sleeperObj.Status.State)
 }

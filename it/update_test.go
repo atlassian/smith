@@ -1,6 +1,4 @@
-// +build integration
-
-package integration_tests
+package it
 
 import (
 	"context"
@@ -138,16 +136,16 @@ func TestUpdate(t *testing.T) {
 			},
 		},
 	}
-	setupApp(t, bundle1, false, true, testUpdate, cm2, sleeper1, sleeper2, bundle2)
+	SetupApp(t, bundle1, false, true, testUpdate, cm2, sleeper1, sleeper2, bundle2)
 }
 
-func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...interface{}) {
+func testUpdate(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...interface{}) {
 	stgr := stager.New()
 	defer stgr.Shutdown()
 	stage := stgr.NextStage()
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := sleeper.App{
-			RestConfig: cfg.config,
+			RestConfig: cfg.Config,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
@@ -159,21 +157,21 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	sleeper2 := args[2].(*sleeper.Sleeper)
 	bundle2 := args[3].(*smith_v1.Bundle)
 
-	cmClient := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace)
-	sClient, err := sleeper.GetSleeperClient(cfg.config, sleeperScheme())
+	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
+	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
 	require.NoError(t, err)
 
 	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
 	defer cancel()
 
-	bundleRes1 := cfg.assertBundle(ctxTimeout, cfg.bundle, cfg.createdBundle.ResourceVersion)
+	bundleRes1 := cfg.AssertBundle(ctxTimeout, cfg.Bundle, cfg.CreatedBundle.ResourceVersion)
 
 	res := &smith_v1.Bundle{}
 	bundle2.ResourceVersion = bundleRes1.ResourceVersion
-	res, err = cfg.bundleClient.SmithV1().Bundles(cfg.namespace).Update(bundle2)
+	res, err = cfg.BundleClient.SmithV1().Bundles(cfg.Namespace).Update(bundle2)
 	require.NoError(t, err)
 
-	bundleRes2 := cfg.assertBundle(ctxTimeout, bundle2, bundle2.ResourceVersion, res.ResourceVersion)
+	bundleRes2 := cfg.AssertBundle(ctxTimeout, bundle2, bundle2.ResourceVersion, res.ResourceVersion)
 
 	cfMap, err := cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	require.NoError(t, err)
@@ -181,14 +179,14 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 		"configLabel":         "configValue",
 		"bundleLabel":         "bundleValue2",
 		"overlappingLabel":    "overlappingConfigValue",
-		smith.BundleNameLabel: cfg.bundle.Name,
+		smith.BundleNameLabel: cfg.Bundle.Name,
 	}, cfMap.Labels)
 	assert.Equal(t, cm2.Data, cfMap.Data)
 
 	var sleeperObj sleeper.Sleeper
 	err = sClient.Get().
 		Context(ctxTest).
-		Namespace(cfg.namespace).
+		Namespace(cfg.Namespace).
 		Resource(sleeper.SleeperResourcePlural).
 		Name(sleeper2.Name).
 		Do().
@@ -198,18 +196,18 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 		"configLabel":         "configValue",
 		"bundleLabel":         "bundleValue2",
 		"overlappingLabel":    "overlappingConfigValue",
-		smith.BundleNameLabel: cfg.bundle.Name,
+		smith.BundleNameLabel: cfg.Bundle.Name,
 	}, sleeperObj.Labels)
 	assert.Equal(t, sleeper.Awake, sleeperObj.Status.State)
 	assert.Equal(t, sleeper2.Spec, sleeperObj.Spec)
 
-	emptyBundle := *cfg.bundle
+	emptyBundle := *cfg.Bundle
 	emptyBundle.Spec.Resources = []smith_v1.Resource{}
 	emptyBundle.ResourceVersion = bundleRes2.ResourceVersion
-	res, err = cfg.bundleClient.SmithV1().Bundles(cfg.namespace).Update(&emptyBundle)
+	res, err = cfg.BundleClient.SmithV1().Bundles(cfg.Namespace).Update(&emptyBundle)
 	require.NoError(t, err)
 
-	cfg.assertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
+	cfg.AssertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
 
 	cfMap, err = cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	if err == nil {
@@ -219,7 +217,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *itConfig, args ...in
 	}
 	err = sClient.Get().
 		Context(ctxTest).
-		Namespace(cfg.namespace).
+		Namespace(cfg.Namespace).
 		Resource(sleeper.SleeperResourcePlural).
 		Name(sleeper2.Name).
 		Do().

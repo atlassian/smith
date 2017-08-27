@@ -34,13 +34,13 @@ build-race: fmt
 
 build-all: fmt
 	go install $(ALL_SOURCE_DIRS)
-	go test -i -tags='integration integration_sc' $(ALL_SOURCE_DIRS)
+	go test -i $(ALL_SOURCE_DIRS)
 
 build-all-race: fmt build-all-race-ci
 
 build-all-race-ci:
 	go install -race $(ALL_SOURCE_DIRS)
-	go test -i -race -tags='integration integration_sc' $(ALL_SOURCE_DIRS)
+	go test -i -race $(ALL_SOURCE_DIRS)
 
 fmt:
 	gofmt -w=true -s $(ALL_GO_FILES)
@@ -72,7 +72,7 @@ generate-deepcopy:
 	--output-file-base zz_generated.deepcopy
 
 minikube-test: fmt
-	go test -i -tags=integration -race -v ./integration_tests
+	go test -i -race -v ./it
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -80,10 +80,10 @@ minikube-test: fmt
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go test -tags=integration -race -v ./integration_tests
+	go test -race -v ./it
 
 minikube-test-sc: fmt
-	go test -i -tags=integration_sc -race -v ./integration_tests
+	go test -i -race -v ./it/sc
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -92,7 +92,7 @@ minikube-test-sc: fmt
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	SERVICE_CATALOG_URL="https://$$(minikube ip):30443" \
-	go test -tags=integration_sc -race -v ./integration_tests
+	go test -race -v ./it/sc
 
 minikube-run: build-all-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \

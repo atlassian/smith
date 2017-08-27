@@ -1,6 +1,4 @@
-// +build integration
-
-package integration_tests
+package it
 
 import (
 	"context"
@@ -72,13 +70,13 @@ func TestWorkflow(t *testing.T) {
 			},
 		},
 	}
-	setupApp(t, bundle, false, true, testWorkflow)
+	SetupApp(t, bundle, false, true, testWorkflow)
 }
 
-func testWorkflow(t *testing.T, ctx context.Context, cfg *itConfig, args ...interface{}) {
-	bundleRes := cfg.assertBundleTimeout(ctx, cfg.bundle, cfg.createdBundle.ResourceVersion)
+func testWorkflow(t *testing.T, ctx context.Context, cfg *ItConfig, args ...interface{}) {
+	bundleRes := cfg.AssertBundleTimeout(ctx, cfg.Bundle, cfg.CreatedBundle.ResourceVersion)
 
-	cfMap, err := cfg.clientset.CoreV1().ConfigMaps(cfg.namespace).Get("config1", meta_v1.GetOptions{})
+	cfMap, err := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace).Get("config1", meta_v1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
 		"configLabel":         "configValue",
@@ -87,7 +85,7 @@ func testWorkflow(t *testing.T, ctx context.Context, cfg *itConfig, args ...inte
 		smith.BundleNameLabel: bundleRes.Name,
 	}, cfMap.GetLabels())
 
-	secret, err := cfg.clientset.CoreV1().Secrets(cfg.namespace).Get("secret1", meta_v1.GetOptions{})
+	secret, err := cfg.Clientset.CoreV1().Secrets(cfg.Namespace).Get("secret1", meta_v1.GetOptions{})
 	require.NoError(t, err)
 	trueRef := true
 	assert.Equal(t, []meta_v1.OwnerReference{
