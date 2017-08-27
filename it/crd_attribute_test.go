@@ -16,6 +16,7 @@ import (
 )
 
 func TestCrdAttribute(t *testing.T) {
+	t.Parallel()
 	sl := &sleeper.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       sleeper.SleeperResourceKind,
@@ -60,6 +61,7 @@ func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *ItConfig, args
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := sleeper.App{
 			RestConfig: cfg.Config,
+			Namespace:  cfg.Namespace,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)

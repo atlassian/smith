@@ -16,6 +16,7 @@ import (
 )
 
 func TestResourceDeletion(t *testing.T) {
+	t.Parallel()
 	cm := &api_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
@@ -72,6 +73,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *ItConfig, 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := sleeper.App{
 			RestConfig: cfg.Config,
+			Namespace:  cfg.Namespace,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
@@ -88,7 +90,6 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *ItConfig, 
 	// Create orphaned ConfigMap
 	cmActual, err := cmClient.Create(cm)
 	require.NoError(t, err)
-	cfg.CleanupLater(cmActual)
 
 	// Create orphaned Sleeper
 	sleeperActual := &sleeper.Sleeper{}
@@ -100,7 +101,6 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *ItConfig, 
 		Do().
 		Into(sleeperActual)
 	require.NoError(t, err)
-	cfg.CleanupLater(sleeperActual)
 
 	// Create Bundle with same resources
 	bundleActual := &smith_v1.Bundle{}

@@ -27,6 +27,7 @@ const (
 
 type App struct {
 	RestConfig *rest.Config
+	Namespace  string
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -71,17 +72,16 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 2. Create an Informer for Sleeper objects
-	sleeperInformer := sleeperInformer(ctx, sClient, scheme.DeepCopy)
-	stage.StartWithChannel(sleeperInformer.Run)
+	sleeperInformer := a.sleeperInformer(ctx, sClient, scheme.DeepCopy)
 
-	// 3. Wait for a signal to stop
-	<-ctx.Done()
+	// 3. Run until a signal to stop
+	sleeperInformer.Run(ctx.Done())
 	return ctx.Err()
 }
 
-func sleeperInformer(ctx context.Context, sClient rest.Interface, deepCopy smith.DeepCopy) cache.SharedInformer {
+func (a *App) sleeperInformer(ctx context.Context, sClient rest.Interface, deepCopy smith.DeepCopy) cache.SharedInformer {
 	sleeperInf := cache.NewSharedInformer(
-		cache.NewListWatchFromClient(sClient, SleeperResourcePlural, meta_v1.NamespaceAll, fields.Everything()),
+		cache.NewListWatchFromClient(sClient, SleeperResourcePlural, a.Namespace, fields.Everything()),
 		&Sleeper{}, ResyncPeriod)
 
 	seh := &SleeperEventHandler{
