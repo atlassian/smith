@@ -14,7 +14,7 @@ ERROR=""
 # Test each package and append coverage profile info to coverage.out
 for pkg in `find . -depth -name \*.go |
     grep -ve '^./vendor/' |
-    grep -v integration_tests |
+    grep -ve '^./it/' |
     sed -e 's/^\.\/\(\(.*\)\/\)\{0,1\}[^/]*$/github.com\/atlassian\/smith\/\2/' |
     sort -u`
 do
