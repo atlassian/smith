@@ -17,6 +17,7 @@ import (
 )
 
 func TestAdoption(t *testing.T) {
+	t.Parallel()
 	cm := &api_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
@@ -73,6 +74,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := sleeper.App{
 			RestConfig: cfg.Config,
+			Namespace:  cfg.Namespace,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
@@ -89,7 +91,6 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...
 	// Create orphaned ConfigMap
 	cmActual, err := cmClient.Create(cm)
 	require.NoError(t, err)
-	cfg.CleanupLater(cmActual)
 
 	// Create orphaned Sleeper
 	sleeperActual := &sleeper.Sleeper{}
@@ -101,7 +102,6 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...
 		Do().
 		Into(sleeperActual)
 	require.NoError(t, err)
-	cfg.CleanupLater(sleeperActual)
 
 	// Create Bundle with same resources
 	bundleActual := &smith_v1.Bundle{}

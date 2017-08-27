@@ -3,6 +3,7 @@ package it
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -22,10 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
-	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -36,7 +34,6 @@ import (
 )
 
 const (
-	useNamespace              = meta_v1.NamespaceDefault
 	serviceCatalogUrlEnvParam = "SERVICE_CATALOG_URL"
 )
 
@@ -51,67 +48,6 @@ type ItConfig struct {
 	Clientset     kubernetes.Interface
 	Sc            smith.SmartClient
 	BundleClient  smithClientset.Interface
-	toCleanup     []runtime.Object
-}
-
-func (cfg *ItConfig) CleanupLater(obj ...runtime.Object) {
-	cfg.toCleanup = append(cfg.toCleanup, obj...)
-}
-
-func (cfg *ItConfig) Cleanup() {
-	for _, obj := range cfg.toCleanup {
-		cfg.DeleteObject(obj)
-		bundle, ok := obj.(*smith_v1.Bundle)
-		if !ok {
-			u, ok := obj.(*unstructured.Unstructured)
-			if !ok || u.GetKind() != smith_v1.BundleResourceKind || u.GetAPIVersion() != smith_v1.BundleResourceGroupVersion {
-				continue
-			}
-			bundle = new(smith_v1.Bundle)
-			if !assert.NoError(cfg.T, unstructured_conversion.DefaultConverter.FromUnstructured(u.Object, bundle)) {
-				continue
-			}
-		}
-		cfg.CleanupBundle(bundle)
-	}
-}
-
-func (cfg *ItConfig) CleanupBundle(bundle *smith_v1.Bundle) {
-	for _, resource := range bundle.Spec.Resources {
-		cfg.DeleteObject(resource.Spec)
-	}
-}
-
-func (cfg *ItConfig) DeleteObject(obj runtime.Object) {
-	m := obj.(meta_v1.Object)
-	gvk := obj.GetObjectKind().GroupVersionKind()
-	if gvk.Empty() {
-		switch obj.(type) {
-		case *api_v1.ConfigMap:
-			gvk = api_v1.SchemeGroupVersion.WithKind("ConfigMap")
-		case *api_v1.Secret:
-			gvk = api_v1.SchemeGroupVersion.WithKind("Secret")
-		case *smith_v1.Bundle:
-			gvk = smith_v1.BundleGVK
-		case *sleeper.Sleeper:
-			gvk = sleeper.SleeperGVK
-		default:
-			assert.Fail(cfg.T, "Unhandled object kind", "%T", obj)
-			return
-		}
-	}
-	cfg.T.Logf("Deleting object %q", m.GetName())
-	objClient, err := cfg.Sc.ForGVK(gvk, cfg.Namespace)
-	if !assert.NoError(cfg.T, err) {
-		return
-	}
-	//policy := meta_v1.DeletePropagationForeground
-	err = objClient.Delete(m.GetName(), &meta_v1.DeleteOptions{
-	//PropagationPolicy: &policy,
-	})
-	if !api_errors.IsNotFound(err) {
-		assert.NoError(cfg.T, err)
-	}
 }
 
 func (cfg *ItConfig) CreateObject(ctxTest context.Context, obj, res runtime.Object, resourcePath string, client rest.Interface) {
@@ -125,7 +61,6 @@ func (cfg *ItConfig) CreateObject(ctxTest context.Context, obj, res runtime.Obje
 		Body(obj).
 		Do().
 		Into(res))
-	cfg.CleanupLater(res)
 }
 
 func (cfg *ItConfig) AwaitBundleCondition(conditions ...watch.ConditionFunc) *smith_v1.Bundle {
@@ -220,27 +155,32 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	cfg := &ItConfig{
 		T:            t,
-		Namespace:    useNamespace,
+		Namespace:    fmt.Sprintf("smith-it-%d", rand.Uint32()),
 		Bundle:       bundle,
 		Config:       config,
 		Clientset:    clientset,
 		Sc:           sc,
 		BundleClient: bundleClient,
 	}
-	defer cfg.Cleanup()
+
+	t.Logf("Creating namespace %q", cfg.Namespace)
+	_, err = clientset.Namespaces().Create(&api_v1.Namespace{
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: cfg.Namespace,
+		},
+	})
+	require.NoError(t, err)
+
+	defer func() {
+		t.Logf("Deleting namespace %q", cfg.Namespace)
+		assert.NoError(t, clientset.Namespaces().Delete(cfg.Namespace, nil))
+	}()
 
 	stgr := stager.New()
 	defer stgr.Shutdown()
 
 	ctxTest, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
-
-	err = bundleClient.SmithV1().Bundles(useNamespace).Delete(bundle.Name, nil)
-	if err == nil {
-		t.Log("Bundle deleted")
-	} else if !api_errors.IsNotFound(err) {
-		require.NoError(t, err)
-	}
 
 	crdClient, err := crdClientset.NewForConfig(config)
 	require.NoError(t, err)

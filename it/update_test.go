@@ -18,6 +18,7 @@ import (
 )
 
 func TestUpdate(t *testing.T) {
+	t.Parallel()
 	cm1 := &api_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
@@ -146,6 +147,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...in
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := sleeper.App{
 			RestConfig: cfg.Config,
+			Namespace:  cfg.Namespace,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
