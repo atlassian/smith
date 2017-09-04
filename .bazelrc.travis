@@ -1,0 +1,7 @@
+build --verbose_failures
+build --workspace_status_command build/print-workspace-status.sh
+build --curses=no
+build --show_timestamps
+
+test --test_output=all
+test --features=race

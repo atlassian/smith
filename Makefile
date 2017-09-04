@@ -1,46 +1,26 @@
-VERSION_VAR := main.Version
-GIT_VAR := main.GitCommit
-BUILD_DATE_VAR := main.BuildDate
-REPO_VERSION := "0.0"
-#REPO_VERSION = $$(git describe --abbrev=0 --tags)
-BUILD_DATE := $$(date +%Y-%m-%d-%H:%M)
-GIT_HASH := $$(git rev-parse --short HEAD)
-GOBUILD_VERSION_ARGS := -ldflags "-s -X $(VERSION_VAR)=$(REPO_VERSION) -X $(GIT_VAR)=$(GIT_HASH) -X $(BUILD_DATE_VAR)=$(BUILD_DATE)"
-BINARY_NAME := smith
-IMAGE_NAME := atlassianlabs/smith
-ARCH ?= darwin
 METALINTER_CONCURRENCY ?= 4
-GOVERSION := 1.8
-GP := /gopath
-GOPATH ?= "$$HOME/go"
-MAIN_PKG := github.com/atlassian/smith/cmd/smith
 ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*" -not -path './pkg/client/clientset_generated/*' -not -name 'zz_generated.*')
-ALL_SOURCE_DIRS=./cmd/... ./examples/... ./pkg/... .
 
-setup: setup-ci
+setup: setup-ci update-bazel
 	go get -u golang.org/x/tools/cmd/goimports
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
 
 setup-ci:
-	go get -u github.com/golang/dep/cmd/dep
 	dep ensure
+	# workaround https://github.com/kubernetes/kubernetes/issues/50975
+	cp fixed_BUILD_for_sets.bazel vendor/k8s.io/apimachinery/pkg/util/sets/BUILD
 
-build: fmt
-	go build -i -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
+update-bazel:
+	bazel $(BAZEL_CI_OPTS) run //:gazelle
 
-build-race: fmt
-	go build -i -race -o build/bin/$(ARCH)/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
+build: fmt update-bazel build-ci
 
-build-all: fmt
-	go install $(ALL_SOURCE_DIRS)
-	go test -i $(ALL_SOURCE_DIRS)
+build-race: fmt update-bazel
+	bazel $(BAZEL_CI_OPTS) build //cmd/smith:smith-race
 
-build-all-race: fmt build-all-race-ci
-
-build-all-race-ci:
-	go install -race $(ALL_SOURCE_DIRS)
-	go test -i -race $(ALL_SOURCE_DIRS)
+build-ci:
+	bazel $(BAZEL_CI_OPTS) build //cmd/smith
 
 fmt:
 	gofmt -w=true -s $(ALL_GO_FILES)
@@ -71,8 +51,30 @@ generate-deepcopy:
 	--bounding-dirs "github.com/atlassian/smith" \
 	--output-file-base zz_generated.deepcopy
 
-minikube-test: fmt
-	go test -i -race -v ./it
+minikube-test: fmt update-bazel
+	bazel $(BAZEL_CI_OPTS) test \
+		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
+		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
+		--test_env=KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
+		--test_env=KUBERNETES_SERVICE_PORT=8443 \
+		--test_env=KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
+		--test_env=KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
+		--test_env=KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
+		//it:go_default_test
+
+minikube-test-sc: fmt update-bazel
+	bazel $(BAZEL_CI_OPTS) test \
+		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
+		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
+		--test_env=KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
+		--test_env=KUBERNETES_SERVICE_PORT=8443 \
+		--test_env=KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
+		--test_env=KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
+		--test_env=KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
+		--test_env=SERVICE_CATALOG_URL="http://$$(minikube ip):30080" \
+		//it/sc:go_default_test
+
+minikube-run: fmt update-bazel
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -80,10 +82,9 @@ minikube-test: fmt
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go test -race -v ./it
+	bazel run //cmd/smith:smith-race
 
-minikube-test-sc: fmt
-	go test -i -race -v ./it/sc
+minikube-run-sc: fmt update-bazel
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -91,10 +92,9 @@ minikube-test-sc: fmt
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	SERVICE_CATALOG_URL="https://$$(minikube ip):30443" \
-	go test -race -v ./it/sc
+	bazel run //cmd/smith:smith-race -- -service-catalog-url="https://$$(minikube ip):30443"
 
-minikube-run: build-all-race
+minikube-sleeper-run: fmt update-bazel
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -102,90 +102,37 @@ minikube-run: build-all-race
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go run -race cmd/smith/*.go
+	bazel run //examples/sleeper/main:main-race
 
-minikube-run-sc: build-all-race
-	KUBE_PATCH_CONVERSION_DETECTOR=true \
-	KUBE_CACHE_MUTATION_DETECTOR=true \
-	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
-	KUBERNETES_SERVICE_PORT=8443 \
-	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
-	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
-	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go run -race cmd/smith/*.go -service-catalog-url="https://$$(minikube ip):30443"
+test: fmt update-bazel test-ci
 
-minikube-sleeper-run: build-all-race
-	KUBE_PATCH_CONVERSION_DETECTOR=true \
-	KUBE_CACHE_MUTATION_DETECTOR=true \
-	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
-	KUBERNETES_SERVICE_PORT=8443 \
-	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
-	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
-	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	go run -race examples/sleeper/main/*.go
-
-test: fmt test-ci
+verify:
+	# TODO verify BUILD.bazel files are up to date
 
 test-ci:
-	go test -i -race $(ALL_SOURCE_DIRS)
-	KUBE_PATCH_CONVERSION_DETECTOR=true \
-	KUBE_CACHE_MUTATION_DETECTOR=true \
-	go test -race $(ALL_SOURCE_DIRS)
+	# TODO: why does it build binaries and docker in cmd?
+	bazel $(BAZEL_CI_OPTS) test \
+		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
+		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
+		-- ... -cmd/... -vendor/...
 
-check: build-all
+check:
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor \
 		--linter='errcheck:errcheck:-ignore=net:Close' --cyclo-over=20 \
 		--disable=interfacer --disable=golint --dupl-threshold=200
 
-check-all: build-all
+check-all:
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor --cyclo-over=20 \
 		--dupl-threshold=65
 
-coveralls:
-	./cover.sh
-	goveralls -coverprofile=coverage.out -service=travis-ci
-
-# Compile a static binary. Cannot be used with -race
 docker:
-	docker pull golang:$(GOVERSION)
-	docker run \
-		--rm \
-		-v "$(GOPATH)":"$(GP)" \
-		-w "$(GP)/src/github.com/atlassian/smith" \
-		-e GOPATH="$(GP)" \
-		-e CGO_ENABLED=0 \
-		golang:$(GOVERSION) \
-		go build -o build/bin/linux/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) -installsuffix cgo $(MAIN_PKG)
-	docker build --pull -t $(IMAGE_NAME):$(GIT_HASH) build
+	bazel $(BAZEL_CI_OPTS) build --cpu=k8 //cmd/smith:docker
 
-# Compile a binary with -race. Needs to be run on a glibc-based system.
-docker-race:
-	docker pull golang:$(GOVERSION)
-	docker run \
-		--rm \
-		-v "$(GOPATH)":"$(GP)" \
-		-w "$(GP)/src/github.com/atlassian/smith" \
-		-e GOPATH="$(GP)" \
-		golang:$(GOVERSION) \
-		go build -race -o build/bin/linux/$(BINARY_NAME) $(GOBUILD_VERSION_ARGS) -installsuffix cgo $(MAIN_PKG)
-	docker build --pull -t $(IMAGE_NAME):$(GIT_HASH)-race -f build/Dockerfile-glibc build
+# Export docker image into local Docker
+docker-export:
+	bazel run --cpu=k8 //cmd/smith:docker
 
-release-hash: docker
-	docker push $(IMAGE_NAME):$(GIT_HASH)
-
-release-normal: release-hash
-#	docker tag $(IMAGE_NAME):$(GIT_HASH) $(IMAGE_NAME):latest
-#	docker push $(IMAGE_NAME):latest
-	docker tag $(IMAGE_NAME):$(GIT_HASH) $(IMAGE_NAME):$(REPO_VERSION)
-	docker push $(IMAGE_NAME):$(REPO_VERSION)
-
-release-hash-race: docker-race
-	docker push $(IMAGE_NAME):$(GIT_HASH)-race
-
-release-race: docker-race
-	docker tag $(IMAGE_NAME):$(GIT_HASH)-race $(IMAGE_NAME):$(REPO_VERSION)-race
-	docker push $(IMAGE_NAME):$(REPO_VERSION)-race
-
-release: release-normal release-race
+release:
+	bazel $(BAZEL_CI_OPTS) run --cpu=k8 //cmd/smith:push-docker
 
 .PHONY: build

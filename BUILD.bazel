@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "gazelle", "go_library", "go_prefix")
+
+go_prefix("github.com/atlassian/smith")
+
+gazelle(
+    name = "gazelle",
+    external = "vendored",
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "api.go",
+        "interfaces.go",
+    ],
+    importpath = "github.com/atlassian/smith",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/client-go/dynamic:go_default_library",
+    ],
+)

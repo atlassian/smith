@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["built_in.go"],
+    importpath = "github.com/atlassian/smith/pkg/cleanup/types",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/cleanup:go_default_library",
+        "//vendor/github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion/unstructured:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/apis/apps/v1beta1:go_default_library",
+    ],
+)
