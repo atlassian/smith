@@ -3,3 +3,8 @@
 /build/go/
 /.idea/
 /.vscode/
+/bazel-bin
+/bazel-genfiles
+/bazel-out
+/bazel-smith
+/bazel-testlogs

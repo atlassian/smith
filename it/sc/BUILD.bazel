@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "go_default_test",
+    timeout = "short",
+    srcs = ["service_catalog_test.go"],
+    importpath = "github.com/atlassian/smith/it/sc",
+    tags = [
+        "external",
+        "manual",
+    ],
+    deps = [
+        "//it:go_default_library",
+        "//pkg/apis/smith/v1:go_default_library",
+        "//vendor/github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/client-go/pkg/api/v1:go_default_library",
+    ],
+)

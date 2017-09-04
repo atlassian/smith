@@ -1,0 +1,48 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_push")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "main.go",
+        "version.go",
+    ],
+    importpath = "github.com/atlassian/smith/cmd/smith",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//cmd/smith/app:go_default_library",
+        "//pkg/client:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "smith",
+    importpath = "github.com/atlassian/smith/cmd/smith",
+    library = ":go_default_library",
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "smith-race",
+    gc_linkopts = ["-race"],
+    library = ":go_default_library",
+    visibility = ["//visibility:public"],
+)
+
+docker_build(
+    name = "docker",
+    base = "@official_busybox//image",
+    cmd = ["/smith"],
+    files = [":smith"],
+)
+
+docker_push(
+    name = "push-docker",
+    image = ":docker",
+    registry = "index.docker.io",
+    repository = "atlassianlabs/smith",
+    stamp = True,
+    tag = "{STABLE_BUILD_GIT_TAG}-{STABLE_BUILD_GIT_COMMIT}",
+)
