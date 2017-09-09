@@ -6,7 +6,7 @@
 [![GitHub tag](https://img.shields.io/github/tag/atlassian/smith.svg?maxAge=86400)](https://github.com/atlassian/smith)
 [![Docker Pulls](https://img.shields.io/docker/pulls/atlassianlabs/smith.svg)](https://hub.docker.com/r/atlassianlabs/smith/)
 [![Docker Stars](https://img.shields.io/docker/stars/atlassianlabs/smith.svg)](https://hub.docker.com/r/atlassianlabs/smith/)
-[![ImageLayers Size](https://imagelayers.io/badge/atlassianlabs/smith:latest.svg)](https://imagelayers.io/?images=atlassianlabs/smith:latest)
+[![MicroBadger Layers Size](https://images.microbadger.com/badges/image/atlassianlabs/smith.svg)](https://microbadger.com/images/atlassianlabs/smith)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atlassian/smith)](https://goreportcard.com/report/github.com/atlassian/smith)
 [![license](https://img.shields.io/github/license/atlassian/smith.svg)](https://github.com/atlassian/smith/blob/master/LICENSE)
 
@@ -169,9 +169,11 @@ standard library in this version;
 
 ## Building
 
+* [`dep`](https://github.com/golang/dep) is used for package management. Please [install it](https://github.com/golang/dep#setup).
+* [`Bazel`](https://www.bazel.build/) is used as the build tool. Please [install it](https://docs.bazel.build/versions/master/install.html).
 * To install dependencies run
 ```bash
-make setup-ci
+make setup
 ```
 * To run integration tests with [minikube](https://github.com/kubernetes/minikube) run
 ```bash
@@ -190,7 +192,6 @@ make minikube-run
 * To build the docker image run
 ```bash
 make docker
-# or make docker-race to build a binary with -race
 ```
 
 ## Contributing
