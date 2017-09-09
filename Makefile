@@ -12,15 +12,15 @@ setup-ci:
 	cp fixed_BUILD_for_sets.bazel vendor/k8s.io/apimachinery/pkg/util/sets/BUILD
 
 update-bazel:
-	bazel $(BAZEL_CI_OPTS) run //:gazelle
+	bazel run //:gazelle
 
 build: fmt update-bazel build-ci
 
 build-race: fmt update-bazel
-	bazel $(BAZEL_CI_OPTS) build //cmd/smith:smith-race
+	bazel build //cmd/smith:smith-race
 
 build-ci:
-	bazel $(BAZEL_CI_OPTS) build //cmd/smith
+	bazel build //cmd/smith
 
 fmt:
 	gofmt -w=true -s $(ALL_GO_FILES)
@@ -52,7 +52,7 @@ generate-deepcopy:
 	--output-file-base zz_generated.deepcopy
 
 minikube-test: fmt update-bazel
-	bazel $(BAZEL_CI_OPTS) test \
+	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
 		--test_env=KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -63,7 +63,7 @@ minikube-test: fmt update-bazel
 		//it:go_default_test
 
 minikube-test-sc: fmt update-bazel
-	bazel $(BAZEL_CI_OPTS) test \
+	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
 		--test_env=KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -111,7 +111,7 @@ verify:
 
 test-ci:
 	# TODO: why does it build binaries and docker in cmd?
-	bazel $(BAZEL_CI_OPTS) test \
+	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
 		-- ... -cmd/... -vendor/...
@@ -126,13 +126,13 @@ check-all:
 		--dupl-threshold=65
 
 docker:
-	bazel $(BAZEL_CI_OPTS) build --cpu=k8 //cmd/smith:docker
+	bazel build --cpu=k8 //cmd/smith:docker
 
 # Export docker image into local Docker
 docker-export:
 	bazel run --cpu=k8 //cmd/smith:docker
 
 release:
-	bazel $(BAZEL_CI_OPTS) run --cpu=k8 //cmd/smith:push-docker
+	bazel run --cpu=k8 //cmd/smith:push-docker
 
 .PHONY: build
