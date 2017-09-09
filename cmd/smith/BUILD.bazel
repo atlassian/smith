@@ -27,6 +27,7 @@ go_binary(
 go_binary(
     name = "smith-race",
     gc_linkopts = ["-race"],
+    importpath = "github.com/atlassian/smith/cmd/smith",
     library = ":go_default_library",
     visibility = ["//visibility:public"],
 )
