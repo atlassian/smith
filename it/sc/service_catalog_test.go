@@ -13,29 +13,29 @@ import (
 )
 
 func TestServiceCatalog(t *testing.T) {
-	instance := &sc_v1a1.Instance{
+	instance := &sc_v1a1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       "Instance",
+			Kind:       "ServiceInstance",
 			APIVersion: sc_v1a1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "instance1",
 		},
-		Spec: sc_v1a1.InstanceSpec{
+		Spec: sc_v1a1.ServiceInstanceSpec{
 			ServiceClassName: "user-provided-service",
 			PlanName:         "default",
 		},
 	}
-	binding := &sc_v1a1.Binding{
+	binding := &sc_v1a1.ServiceInstanceCredential{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       "Binding",
+			Kind:       "ServiceInstanceCredential",
 			APIVersion: sc_v1a1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "binding1",
 		},
-		Spec: sc_v1a1.BindingSpec{
-			InstanceRef: api_v1.LocalObjectReference{
+		Spec: sc_v1a1.ServiceInstanceCredentialSpec{
+			ServiceInstanceRef: api_v1.LocalObjectReference{
 				Name: instance.Name,
 			},
 			SecretName: "secret1",

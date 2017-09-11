@@ -11,13 +11,13 @@
   branch = "master"
   name = "github.com/PuerkitoBio/urlesc"
   packages = ["."]
-  revision = "bbf7a2afc14f93e1e0a5c06df524fbd75e5031e5"
+  revision = "de5bf2ad457846296e2031421a34e2568e304e35"
 
 [[projects]]
   name = "github.com/asaskevich/govalidator"
   packages = ["."]
-  revision = "4918b99a7cb949bb295f3c7bbaf24b577d806e35"
-  version = "v6"
+  revision = "73945b6115bfbbcc57d89b7316e28109364124e1"
+  version = "v7"
 
 [[projects]]
   branch = "master"
@@ -40,8 +40,8 @@
 [[projects]]
   name = "github.com/emicklei/go-restful"
   packages = [".","log"]
-  revision = "cf834cf8da5b681af81bde6fa32304e6ce8eec71"
-  version = "2.2.0"
+  revision = "68c9750c36bb8cb433f1b88c807b4b30df4acc40"
+  version = "v2.2.1"
 
 [[projects]]
   name = "github.com/emicklei/go-restful-swagger12"
@@ -59,7 +59,7 @@
   branch = "master"
   name = "github.com/go-openapi/analysis"
   packages = ["."]
-  revision = "0473cb67199f68b8b7d90e641afd9e79ad36b851"
+  revision = "8ed83f2ea9f00f945516462951a288eaa68bf0d6"
 
 [[projects]]
   branch = "master"
@@ -89,13 +89,13 @@
   branch = "master"
   name = "github.com/go-openapi/spec"
   packages = ["."]
-  revision = "9cf697d99bf904e29363382a2e8c23dde5c8d377"
+  revision = "3faa0055dbbf2110abc1f3b4e3adbb22721e96e7"
 
 [[projects]]
   branch = "master"
   name = "github.com/go-openapi/strfmt"
   packages = ["."]
-  revision = "93a31ef21ac23f317792fff78f9539219dd74619"
+  revision = "610b6cacdcde6852f4de68998bd20ce1dac85b22"
 
 [[projects]]
   branch = "master"
@@ -137,13 +137,13 @@
   branch = "master"
   name = "github.com/kubernetes-incubator/service-catalog"
   packages = ["pkg/apis/servicecatalog","pkg/apis/servicecatalog/v1alpha1","pkg/client/clientset_generated/clientset","pkg/client/clientset_generated/clientset/scheme","pkg/client/clientset_generated/clientset/typed/servicecatalog/v1alpha1"]
-  revision = "d15554aa340e0b305897f2c5292ce1fb3a9d64fd"
+  revision = "68b775ff194dba8eb7ec8467c4f4d659d82d4b8f"
 
 [[projects]]
   branch = "master"
   name = "github.com/mailru/easyjson"
   packages = ["buffer","jlexer","jwriter"]
-  revision = "2f5df55504ebc322e4d52d34df6a1f5b503bf26d"
+  revision = "2a92e673c9a6302dd05c3a691ae1f24aef46457d"
 
 [[projects]]
   branch = "master"
@@ -179,25 +179,25 @@
   branch = "master"
   name = "github.com/stretchr/testify"
   packages = ["assert","require"]
-  revision = "05e8a0eda380579888eb53c394909df027f06991"
+  revision = "890a5c3458b43e6104ff5da8dfa139d013d77544"
 
 [[projects]]
   branch = "master"
   name = "github.com/ugorji/go"
   packages = ["codec"]
-  revision = "5efa3251c7f7d05e5d9704a69a984ec9f1386a40"
+  revision = "8c0409fcbb70099c748d71f714529204975f6c3f"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["http2","http2/hpack","idna","lex/httplex"]
-  revision = "f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f"
+  revision = "66aacef3dd8a676686c7ae3716979581e8b03c47"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["internal/gen","internal/triegen","internal/ucd","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable","width"]
-  revision = "836efe42bb4aa16aaa17b9c155d8813d336ed720"
+  revision = "bd91bbf73e9a4a801adbfb97133c992678533126"
 
 [[projects]]
   name = "gopkg.in/inf.v0"
@@ -215,7 +215,7 @@
   branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "25c4ec802a7d637f88d584ab26798e94ad14c13b"
+  revision = "eb3733d160e74a9c7e442f435eb3bea458e1d19f"
 
 [[projects]]
   name = "k8s.io/apiextensions-apiserver"
@@ -229,12 +229,12 @@
 
 [[projects]]
   name = "k8s.io/client-go"
-  packages = ["discovery","dynamic","informers","informers/admissionregistration","informers/admissionregistration/v1alpha1","informers/apps","informers/apps/v1beta1","informers/autoscaling","informers/autoscaling/v1","informers/autoscaling/v2alpha1","informers/batch","informers/batch/v1","informers/batch/v2alpha1","informers/certificates","informers/certificates/v1beta1","informers/core","informers/core/v1","informers/extensions","informers/extensions/v1beta1","informers/internalinterfaces","informers/networking","informers/networking/v1","informers/policy","informers/policy/v1beta1","informers/rbac","informers/rbac/v1alpha1","informers/rbac/v1beta1","informers/settings","informers/settings/v1alpha1","informers/storage","informers/storage/v1","informers/storage/v1beta1","kubernetes","kubernetes/scheme","kubernetes/typed/admissionregistration/v1alpha1","kubernetes/typed/apps/v1beta1","kubernetes/typed/authentication/v1","kubernetes/typed/authentication/v1beta1","kubernetes/typed/authorization/v1","kubernetes/typed/authorization/v1beta1","kubernetes/typed/autoscaling/v1","kubernetes/typed/autoscaling/v2alpha1","kubernetes/typed/batch/v1","kubernetes/typed/batch/v2alpha1","kubernetes/typed/certificates/v1beta1","kubernetes/typed/core/v1","kubernetes/typed/extensions/v1beta1","kubernetes/typed/networking/v1","kubernetes/typed/policy/v1beta1","kubernetes/typed/rbac/v1alpha1","kubernetes/typed/rbac/v1beta1","kubernetes/typed/settings/v1alpha1","kubernetes/typed/storage/v1","kubernetes/typed/storage/v1beta1","listers/admissionregistration/v1alpha1","listers/apps/v1beta1","listers/autoscaling/v1","listers/autoscaling/v2alpha1","listers/batch/v1","listers/batch/v2alpha1","listers/certificates/v1beta1","listers/core/v1","listers/extensions/v1beta1","listers/networking/v1","listers/policy/v1beta1","listers/rbac/v1alpha1","listers/rbac/v1beta1","listers/settings/v1alpha1","listers/storage/v1","listers/storage/v1beta1","pkg/api","pkg/api/v1","pkg/api/v1/ref","pkg/apis/admissionregistration","pkg/apis/admissionregistration/v1alpha1","pkg/apis/apps","pkg/apis/apps/v1beta1","pkg/apis/authentication","pkg/apis/authentication/v1","pkg/apis/authentication/v1beta1","pkg/apis/authorization","pkg/apis/authorization/v1","pkg/apis/authorization/v1beta1","pkg/apis/autoscaling","pkg/apis/autoscaling/v1","pkg/apis/autoscaling/v2alpha1","pkg/apis/batch","pkg/apis/batch/v1","pkg/apis/batch/v2alpha1","pkg/apis/certificates","pkg/apis/certificates/v1beta1","pkg/apis/extensions","pkg/apis/extensions/v1beta1","pkg/apis/networking","pkg/apis/networking/v1","pkg/apis/policy","pkg/apis/policy/v1beta1","pkg/apis/rbac","pkg/apis/rbac/v1alpha1","pkg/apis/rbac/v1beta1","pkg/apis/settings","pkg/apis/settings/v1alpha1","pkg/apis/storage","pkg/apis/storage/v1","pkg/apis/storage/v1beta1","pkg/util","pkg/util/parsers","pkg/version","rest","rest/watch","third_party/forked/golang/template","tools/cache","tools/clientcmd/api","tools/metrics","transport","util/cert","util/flowcontrol","util/integer","util/jsonpath","util/workqueue"]
+  packages = ["discovery","discovery/fake","dynamic","kubernetes","kubernetes/scheme","kubernetes/typed/admissionregistration/v1alpha1","kubernetes/typed/apps/v1beta1","kubernetes/typed/authentication/v1","kubernetes/typed/authentication/v1beta1","kubernetes/typed/authorization/v1","kubernetes/typed/authorization/v1beta1","kubernetes/typed/autoscaling/v1","kubernetes/typed/autoscaling/v2alpha1","kubernetes/typed/batch/v1","kubernetes/typed/batch/v2alpha1","kubernetes/typed/certificates/v1beta1","kubernetes/typed/core/v1","kubernetes/typed/extensions/v1beta1","kubernetes/typed/networking/v1","kubernetes/typed/policy/v1beta1","kubernetes/typed/rbac/v1alpha1","kubernetes/typed/rbac/v1beta1","kubernetes/typed/settings/v1alpha1","kubernetes/typed/storage/v1","kubernetes/typed/storage/v1beta1","pkg/api","pkg/api/v1","pkg/api/v1/ref","pkg/apis/admissionregistration","pkg/apis/admissionregistration/v1alpha1","pkg/apis/apps","pkg/apis/apps/v1beta1","pkg/apis/authentication","pkg/apis/authentication/v1","pkg/apis/authentication/v1beta1","pkg/apis/authorization","pkg/apis/authorization/v1","pkg/apis/authorization/v1beta1","pkg/apis/autoscaling","pkg/apis/autoscaling/v1","pkg/apis/autoscaling/v2alpha1","pkg/apis/batch","pkg/apis/batch/v1","pkg/apis/batch/v2alpha1","pkg/apis/certificates","pkg/apis/certificates/v1beta1","pkg/apis/extensions","pkg/apis/extensions/v1beta1","pkg/apis/networking","pkg/apis/networking/v1","pkg/apis/policy","pkg/apis/policy/v1beta1","pkg/apis/rbac","pkg/apis/rbac/v1alpha1","pkg/apis/rbac/v1beta1","pkg/apis/settings","pkg/apis/settings/v1alpha1","pkg/apis/storage","pkg/apis/storage/v1","pkg/apis/storage/v1beta1","pkg/util","pkg/util/parsers","pkg/version","rest","rest/watch","testing","third_party/forked/golang/template","tools/cache","tools/clientcmd/api","tools/metrics","transport","util/cert","util/flowcontrol","util/integer","util/jsonpath","util/workqueue"]
   revision = "e356aa2e77ab4a5914c216c12ba14cce25a25ab0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "602bde840b8170fe2b9dd560daf0c21e953bf35a5349395d482153db9f0c844f"
+  inputs-digest = "5ea6f0f796f27fa0ff8f3be2df6c938202b50d184ee3c3408a17bc1d62fe8ae6"
   solver-name = "gps-cdcl"
   solver-version = 1

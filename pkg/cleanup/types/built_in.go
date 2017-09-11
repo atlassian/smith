@@ -17,8 +17,8 @@ var MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
-	{Group: sc_v1a1.GroupName, Kind: "Binding"}:  scBindingCleanup,
-	{Group: sc_v1a1.GroupName, Kind: "Instance"}: scInstanceCleanup,
+	{Group: sc_v1a1.GroupName, Kind: "ServiceInstanceCredential"}: scServiceInstanceCredentialCleanup,
+	{Group: sc_v1a1.GroupName, Kind: "ServiceInstance"}:           scServiceInstanceCleanup,
 }
 
 func deploymentCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -67,34 +67,34 @@ func serviceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unst
 	return updatedObj, nil
 }
 
-func scBindingCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	var bindingSpec sc_v1a1.Binding
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &bindingSpec); err != nil {
+func scServiceInstanceCredentialCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	var sicSpec sc_v1a1.ServiceInstanceCredential
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &sicSpec); err != nil {
 		return nil, err
 	}
-	var bindingActual sc_v1a1.Binding
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &bindingActual); err != nil {
+	var sicActual sc_v1a1.ServiceInstanceCredential
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &sicActual); err != nil {
 		return nil, err
 	}
 
-	bindingSpec.Spec.ExternalID = bindingActual.Spec.ExternalID
-	bindingSpec.Status = bindingActual.Status
+	sicSpec.Spec.ExternalID = sicActual.Spec.ExternalID
+	sicSpec.Status = sicActual.Status
 
 	updatedObj := &unstructured.Unstructured{
 		Object: make(map[string]interface{}),
 	}
-	if err := unstructured_conversion.DefaultConverter.ToUnstructured(&bindingSpec, &updatedObj.Object); err != nil {
+	if err := unstructured_conversion.DefaultConverter.ToUnstructured(&sicSpec, &updatedObj.Object); err != nil {
 		return nil, err
 	}
 	return updatedObj, nil
 }
 
-func scInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	var instanceSpec sc_v1a1.Instance
+func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	var instanceSpec sc_v1a1.ServiceInstance
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &instanceSpec); err != nil {
 		return nil, err
 	}
-	var instanceActual sc_v1a1.Instance
+	var instanceActual sc_v1a1.ServiceInstance
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &instanceActual); err != nil {
 		return nil, err
 	}

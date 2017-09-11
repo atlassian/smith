@@ -23,8 +23,8 @@ var MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
-	{Group: sc_v1a1.GroupName, Kind: "Binding"}:  isScBindingReady,
-	{Group: sc_v1a1.GroupName, Kind: "Instance"}: isScInstanceReady,
+	{Group: sc_v1a1.GroupName, Kind: "ServiceInstanceCredential"}: isScServiceInstanceCredentialReady,
+	{Group: sc_v1a1.GroupName, Kind: "ServiceInstance"}:           isScServiceInstanceReady,
 }
 
 func alwaysReady(_ *unstructured.Unstructured) (isReady, retriableError bool, e error) {
@@ -48,25 +48,25 @@ func isDeploymentReady(obj *unstructured.Unstructured) (isReady, retriableError 
 		deployment.Status.UpdatedReplicas == replicas, false, nil
 }
 
-func isScBindingReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
-	var binding sc_v1a1.Binding
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &binding); err != nil {
+func isScServiceInstanceCredentialReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
+	var sic sc_v1a1.ServiceInstanceCredential
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &sic); err != nil {
 		return false, false, err
 	}
-	readyCond := getBindingCondition(&binding, sc_v1a1.BindingConditionReady)
+	readyCond := getServiceInstanceCredentialCondition(&sic, sc_v1a1.ServiceInstanceCredentialConditionReady)
 	return readyCond != nil && readyCond.Status == sc_v1a1.ConditionTrue, false, nil
 }
 
-func isScInstanceReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
-	var instance sc_v1a1.Instance
+func isScServiceInstanceReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
+	var instance sc_v1a1.ServiceInstance
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &instance); err != nil {
 		return false, false, err
 	}
-	readyCond := getInstanceCondition(&instance, sc_v1a1.InstanceConditionReady)
+	readyCond := getServiceInstanceCondition(&instance, sc_v1a1.ServiceInstanceConditionReady)
 	return readyCond != nil && readyCond.Status == sc_v1a1.ConditionTrue, false, nil
 }
 
-func getInstanceCondition(instance *sc_v1a1.Instance, conditionType sc_v1a1.InstanceConditionType) *sc_v1a1.InstanceCondition {
+func getServiceInstanceCondition(instance *sc_v1a1.ServiceInstance, conditionType sc_v1a1.ServiceInstanceConditionType) *sc_v1a1.ServiceInstanceCondition {
 	for _, condition := range instance.Status.Conditions {
 		if condition.Type == conditionType {
 			return &condition
@@ -75,7 +75,7 @@ func getInstanceCondition(instance *sc_v1a1.Instance, conditionType sc_v1a1.Inst
 	return nil
 }
 
-func getBindingCondition(instance *sc_v1a1.Binding, conditionType sc_v1a1.BindingConditionType) *sc_v1a1.BindingCondition {
+func getServiceInstanceCredentialCondition(instance *sc_v1a1.ServiceInstanceCredential, conditionType sc_v1a1.ServiceInstanceCredentialConditionType) *sc_v1a1.ServiceInstanceCredentialCondition {
 	for _, condition := range instance.Status.Conditions {
 		if condition.Type == conditionType {
 			return &condition

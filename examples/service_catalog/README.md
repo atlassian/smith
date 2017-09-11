@@ -16,10 +16,10 @@ It allows us to provision resources through [Open Service Broker API](https://gi
 and produce Kubernetes Secret objects with credentials which we can inject as environment variables into Pods using PodPresets.
 
 The resulting graph of Kubernetes and Service Catalog objects consists of:
-- Pods for running application instances
-- PodPresets referencing Secrets and injecting them into Pods
-- Service Catalog Instance and Binding objects
-- Ingress and Service (don't confuse it with Service Catalog) objects for load balancing
+- `Pod`s for running application instances
+- `PodPreset`s referencing `Secret`s and injecting them into `Pod`s
+- Service Catalog `ServiceInstance` and `ServiceInstanceCredential` objects
+- `Ingress` and `Service` objects for load balancing
 
 ![Kubernetes objects graph](img/Kubernetes_graph.png?raw=true "Kubernetes objects graph")
 
@@ -43,7 +43,7 @@ spec:
   - name: instance1
     spec:
       apiVersion: servicecatalog.k8s.io/v1alpha1
-      kind: Instance
+      kind: ServiceInstance
       metadata:
         name: instance1
       spec:
@@ -59,7 +59,7 @@ spec:
     - instance1
     spec:
       apiVersion: servicecatalog.k8s.io/v1alpha1
-      kind: Binding
+      kind: ServiceInstanceCredential
       metadata:
         name: binding1
       spec:
