@@ -112,33 +112,33 @@ func (a *App) podPresetInformer(mainClient kubernetes.Interface) cache.SharedInd
 	)
 }
 
-func (a *App) bindingInformer(scClient scClientset.Interface) cache.SharedIndexInformer {
+func (a *App) serviceInstanceCredentialInformer(scClient scClientset.Interface) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return scClient.ServicecatalogV1alpha1().Bindings(a.Namespace).List(options)
+				return scClient.ServicecatalogV1alpha1().ServiceInstanceCredentials(a.Namespace).List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return scClient.ServicecatalogV1alpha1().Bindings(a.Namespace).Watch(options)
+				return scClient.ServicecatalogV1alpha1().ServiceInstanceCredentials(a.Namespace).Watch(options)
 			},
 		},
-		&sc_v1a1.Binding{},
+		&sc_v1a1.ServiceInstanceCredential{},
 		a.ResyncPeriod,
 		cache.Indexers{},
 	)
 }
 
-func (a *App) instanceInformer(scClient scClientset.Interface) cache.SharedIndexInformer {
+func (a *App) serviceInstanceInformer(scClient scClientset.Interface) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return scClient.ServicecatalogV1alpha1().Instances(a.Namespace).List(options)
+				return scClient.ServicecatalogV1alpha1().ServiceInstances(a.Namespace).List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return scClient.ServicecatalogV1alpha1().Instances(a.Namespace).Watch(options)
+				return scClient.ServicecatalogV1alpha1().ServiceInstances(a.Namespace).Watch(options)
 			},
 		},
-		&sc_v1a1.Instance{},
+		&sc_v1a1.ServiceInstance{},
 		a.ResyncPeriod,
 		cache.Indexers{},
 	)

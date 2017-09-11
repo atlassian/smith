@@ -189,8 +189,8 @@ func (a *App) resourceInformers(mainClient kubernetes.Interface, scClient scClie
 
 	// Service Catalog types
 	if scClient != nil {
-		infs[sc_v1a1.SchemeGroupVersion.WithKind("Binding")] = a.bindingInformer(scClient)
-		infs[sc_v1a1.SchemeGroupVersion.WithKind("Instance")] = a.instanceInformer(scClient)
+		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceInstanceCredential")] = a.serviceInstanceCredentialInformer(scClient)
+		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceInstance")] = a.serviceInstanceCredentialInformer(scClient)
 	}
 
 	return infs
