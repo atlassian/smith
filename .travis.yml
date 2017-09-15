@@ -35,6 +35,7 @@ script:
   - make update-bazel
   - make test-ci
   - make build-ci
+  - make docker
 
 after_success:
   - if [ "$TRAVIS_OS_NAME" == "linux" -a ! -z "$TRAVIS_TAG" ]; then
