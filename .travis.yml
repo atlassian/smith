@@ -21,7 +21,7 @@ before_install:
     go get -u github.com/golang/dep/cmd/dep
     V=0.5.4
     OS=linux
-    wget -O install.sh "https://github.com/bazelbuild/bazel/releases/download/${V}/bazel-${V}-installer-${OS}-x86_64.sh"
+    wget -nv -O install.sh "https://github.com/bazelbuild/bazel/releases/download/${V}/bazel-${V}-installer-${OS}-x86_64.sh"
     chmod +x install.sh
     ./install.sh --user
     rm -f install.sh
