@@ -17,10 +17,11 @@ go_register_toolchains("1.9")
 
 docker_repositories()
 
+# https://github.com/GoogleCloudPlatform/distroless/blob/master/base/README.md
 docker_pull(
-    name = "official_busybox",
-    digest = "sha256:b82b5740006c1ab823596d2c07f081084ecdb32fd258072707b99f52a3cb8692",
-    registry = "index.docker.io",
-    repository = "library/busybox",
+    name = "distroless_base",
+    digest = "sha256:872f258db0668e5cabfe997d4076b2fe5337e5b73cdd9ca47c7dbccd87e71341",
+    registry = "gcr.io",
+    repository = "distroless/base",
     tag = "latest",  # ignored, but kept here for documentation
 )
