@@ -35,7 +35,7 @@ go_binary(
 docker_build(
     name = "docker",
     base = "@distroless_base//image",
-    cmd = ["/smith"],
+    entrypoint = ["/smith"],
     files = [":smith"],
 )
 
