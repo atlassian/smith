@@ -1,0 +1,20 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: smith
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: smith
+    spec:
+      serviceAccountName: smith
+      containers:
+      - name: smith
+        image: "atlassianlabs/smith:0.0.X-XXXX"
+#        args:
+#        - '-service-catalog-url'
+#        - 'http://catalog-catalog-apiserver.catalog'
+#        - '-namespace'
+#        - "<your namespace>"
