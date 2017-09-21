@@ -30,14 +30,16 @@
 
 [[constraint]]
   name = "k8s.io/apiextensions-apiserver"
-  revision = "be41f5093e2b05c7a0befe35b04b715eb325ab43" # just before refactor to move to k8s.io/api/
+  branch = "release-1.7"
 
-# Transitive dependencies used by Service Catalog. Not resolved properly, have to override :(
-
-[[override]]
+[[constraint]]
   name = "k8s.io/apimachinery"
   branch = "release-1.7"
 
-[[override]]
+[[constraint]]
   name = "k8s.io/client-go"
   branch = "release-4.0"
+
+[[override]]
+  name = "github.com/ugorji/go"
+  revision = "8c0409fcbb70099c748d71f714529204975f6c3f" #newer revisions break backward compatibility
