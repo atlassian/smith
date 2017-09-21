@@ -41,7 +41,9 @@ func runWithContext(ctx context.Context) error {
 
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.BoolVar(&a.DisablePodPreset, "disable-pod-preset", false, "Disable PodPreset support")
+	scDisable := fs.Bool("disable-service-catalog", false, "Disable Service Catalog support")
 	scUrl := fs.String("service-catalog-url", "", "Service Catalog API server URL")
+	scInsecure := fs.Bool("service-catalog-insecure", false, "Disable TLS validation for Service Catalog")
 	fs.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	fs.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
 	fs.Parse(os.Args[1:]) // nolint: gas
@@ -55,11 +57,11 @@ func runWithContext(ctx context.Context) error {
 	}
 	config.UserAgent = "smith/" + Version + "/" + GitCommit
 	a.RestConfig = config
-	if *scUrl != "" {
+	if !*scDisable {
 		scConfig := *config // shallow copy
-		scConfig.Host = *scUrl
-		scConfig.TLSClientConfig = rest.TLSClientConfig{
-			Insecure: true,
+		scConfig.TLSClientConfig.Insecure = *scInsecure
+		if *scUrl != "" {
+			scConfig.Host = *scUrl
 		}
 		a.ServiceCatalogConfig = &scConfig
 	}
