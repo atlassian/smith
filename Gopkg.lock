@@ -40,8 +40,8 @@
 [[projects]]
   name = "github.com/emicklei/go-restful"
   packages = [".","log"]
-  revision = "68c9750c36bb8cb433f1b88c807b4b30df4acc40"
-  version = "v2.2.1"
+  revision = "7a380bfc22e94bfe4fc605b9a15a7be1347ebe39"
+  version = "v2.3.0"
 
 [[projects]]
   name = "github.com/emicklei/go-restful-swagger12"
@@ -137,7 +137,7 @@
   branch = "master"
   name = "github.com/kubernetes-incubator/service-catalog"
   packages = ["pkg/apis/servicecatalog","pkg/apis/servicecatalog/v1alpha1","pkg/client/clientset_generated/clientset","pkg/client/clientset_generated/clientset/scheme","pkg/client/clientset_generated/clientset/typed/servicecatalog/v1alpha1"]
-  revision = "50d9bdf4f60d50b61ff0a00f5759d3c128c3be14"
+  revision = "010d6e10b7ad2db698ffde8b2b9c44d9563ebbbc"
 
 [[projects]]
   branch = "master"
@@ -182,7 +182,6 @@
   revision = "890a5c3458b43e6104ff5da8dfa139d013d77544"
 
 [[projects]]
-  branch = "master"
   name = "github.com/ugorji/go"
   packages = ["codec"]
   revision = "8c0409fcbb70099c748d71f714529204975f6c3f"
@@ -191,13 +190,13 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["http2","http2/hpack","idna","lex/httplex"]
-  revision = "859d1a86bb617c0c20d154590c3c5d3fcb670b07"
+  revision = "b60f3a92103dfd93dfcb900ec77c6d0643510868"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable","width"]
-  revision = "ab5ac5f9a8deb4855a60fab02bc61a4ec770bd49"
+  revision = "1cbadb444a806fd9430d14ad08967ed91da4fa0a"
 
 [[projects]]
   name = "gopkg.in/inf.v0"
@@ -218,9 +217,10 @@
   revision = "eb3733d160e74a9c7e442f435eb3bea458e1d19f"
 
 [[projects]]
+  branch = "release-1.7"
   name = "k8s.io/apiextensions-apiserver"
   packages = ["pkg/apis/apiextensions","pkg/apis/apiextensions/v1beta1","pkg/client/clientset/clientset","pkg/client/clientset/clientset/scheme","pkg/client/clientset/clientset/typed/apiextensions/v1beta1","pkg/client/informers/externalversions","pkg/client/informers/externalversions/apiextensions","pkg/client/informers/externalversions/apiextensions/v1beta1","pkg/client/informers/externalversions/internalinterfaces","pkg/client/listers/apiextensions/v1beta1"]
-  revision = "be41f5093e2b05c7a0befe35b04b715eb325ab43"
+  revision = "fcd622fe88a4a6efcb5aea9e94ee87324ac1b036"
 
 [[projects]]
   branch = "release-1.7"
@@ -237,6 +237,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "04298bd79184871cb314ff14b31731a821c79f5ccf09ca0faed82a6adb1cc813"
+  inputs-digest = "1df891ecc881ac566c205dc02ed0c2679b4a8eeef182fa800d5736db32dce68f"
   solver-name = "gps-cdcl"
   solver-version = 1
