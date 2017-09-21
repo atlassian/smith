@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -14,6 +15,7 @@ import (
 )
 
 func main() {
+	flag.Parse()
 	if err := run(); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 		log.Fatalln(err)
 	}
