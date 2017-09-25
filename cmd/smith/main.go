@@ -58,7 +58,11 @@ func runWithContext(ctx context.Context) error {
 	a.RestConfig = config
 	if !*scDisable {
 		scConfig := *config // shallow copy
-		scConfig.TLSClientConfig.Insecure = *scInsecure
+		if *scInsecure {
+			scConfig.TLSClientConfig.Insecure = true
+			scConfig.TLSClientConfig.CAFile = ""
+			scConfig.TLSClientConfig.CAData = nil
+		}
 		if *scUrl != "" {
 			scConfig.Host = *scUrl
 		}
