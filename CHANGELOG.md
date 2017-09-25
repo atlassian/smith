@@ -1,3 +1,7 @@
+v0.1.3
+------
+- fix `service-catalog-insecure` flag not working
+
 v0.1.2
 ------
 - workaround glog mess
