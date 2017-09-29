@@ -23,7 +23,6 @@ build-ci:
 	bazel build //cmd/smith
 
 fmt:
-	gofmt -w=true -s $(ALL_GO_FILES)
 	goimports -w=true -d $(ALL_GO_FILES)
 
 generate: generate-client generate-deepcopy
