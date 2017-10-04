@@ -13,6 +13,7 @@ import (
 )
 
 func TestServiceCatalog(t *testing.T) {
+	t.Parallel()
 	instance := &sc_v1a1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
