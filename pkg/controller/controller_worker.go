@@ -232,11 +232,11 @@ func (c *BundleController) evalSpec(bundle *smith_v1.Bundle, res *smith_v1.Resou
 // createOrUpdate creates or updates a resources.
 func (c *BundleController) createOrUpdate(bundle *smith_v1.Bundle, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableRet bool, e error) {
 	// Prepare client
-	resClient, err := c.smartClient.ForGVK(spec.GroupVersionKind(), bundle.Namespace)
+	gvk := spec.GroupVersionKind()
+	resClient, err := c.smartClient.ForGVK(gvk, bundle.Namespace)
 	if err != nil {
 		return nil, false, err
 	}
-	gvk := spec.GetObjectKind().GroupVersionKind()
 
 	// Try to get the resource. We do read first to avoid generating unnecessary events.
 	obj, exists, err := c.store.Get(gvk, bundle.Namespace, spec.GetName())
@@ -245,21 +245,22 @@ func (c *BundleController) createOrUpdate(bundle *smith_v1.Bundle, spec *unstruc
 		return nil, false, err
 	}
 	if exists {
+		log.Printf("[WORKER][%s/%s] Object %s %q found, checking spec", bundle.Namespace, bundle.Name, gvk, spec.GetName())
 		return c.updateResource(bundle, resClient, spec, obj)
 	}
+	log.Printf("[WORKER][%s/%s] Object %s %q not found, creating", bundle.Namespace, bundle.Name, gvk, spec.GetName())
 	return c.createResource(bundle, resClient, spec)
 }
 
 func (c *BundleController) createResource(bundle *smith_v1.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
-	log.Printf("[WORKER][%s/%s] Object %q not found, creating", bundle.Namespace, bundle.Name, spec.GetName())
+	gvk := spec.GroupVersionKind()
 	response, err := resClient.Create(spec)
 	if err == nil {
-		log.Printf("[WORKER][%s/%s] Object %q created", bundle.Namespace, bundle.Name, spec.GetName())
+		log.Printf("[WORKER][%s/%s] Object %s %q created", bundle.Namespace, bundle.Name, gvk, spec.GetName())
 		return response, false, nil
 	}
 	if api_errors.IsAlreadyExists(err) {
 		// We let the next processKey() iteration, triggered by someone else creating the resource, to finish the work.
-		gvk := spec.GroupVersionKind()
 		err = api_errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, spec.GetName(), err)
 		return nil, false, errors.Wrapf(err, "object %q found, but not in Store yet (will re-process)", spec.GetName())
 	}
