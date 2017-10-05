@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"log"
 	"time"
 
@@ -107,8 +106,9 @@ func (a *App) Run(ctx context.Context) error {
 
 	// We must wait for crdInf to populate its cache to avoid reading from an empty cache
 	// in Ready Checker and in EnsureCrdExists().
+	log.Printf("Waiting for %s informer to sync", crdGVK)
 	if !cache.WaitForCacheSync(ctx.Done(), crdInf.HasSynced) {
-		return errors.New("wait for CRD Informer was cancelled")
+		return ctx.Err()
 	}
 
 	// Ensure CRD Bundle exists
@@ -142,6 +142,14 @@ func (a *App) Run(ctx context.Context) error {
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
 	}
 	stage.StartWithChannel(bundleInf.Run)
+	// Wait for all informers to sync
+	resourceInfs[smith_v1.BundleGVK] = bundleInf
+	for gvk, inf := range resourceInfs {
+		log.Printf("Waiting for %s informer to sync", gvk)
+		if !cache.WaitForCacheSync(ctx.Done(), inf.HasSynced) {
+			return ctx.Err()
+		}
+	}
 
 	cntrlr.Run(ctx)
 	return ctx.Err()
