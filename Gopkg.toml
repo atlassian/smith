@@ -21,10 +21,6 @@
 #  version = "2.4.0"
 
 [[constraint]]
-  branch = "master" # I want the latest commit from this branch, not just the latest tag.
-  name = "github.com/kubernetes-incubator/service-catalog"
-
-[[constraint]]
   branch = "master" # I want the latest commit from this branch, not just the latest tag or the version used by client-go.
   name = "github.com/stretchr/testify"
 

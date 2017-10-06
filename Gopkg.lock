@@ -40,8 +40,8 @@
 [[projects]]
   name = "github.com/emicklei/go-restful"
   packages = [".","log"]
-  revision = "7a380bfc22e94bfe4fc605b9a15a7be1347ebe39"
-  version = "v2.3.0"
+  revision = "5741799b275a3c4a5a9623a993576d7545cf7b5c"
+  version = "v2.4.0"
 
 [[projects]]
   name = "github.com/emicklei/go-restful-swagger12"
@@ -89,7 +89,7 @@
   branch = "master"
   name = "github.com/go-openapi/spec"
   packages = ["."]
-  revision = "7abd5745472fff5eb3685386d5fb8bf38683154d"
+  revision = "48c2a7185575f9103a5a3863eff950bb776899d2"
 
 [[projects]]
   branch = "master"
@@ -134,10 +134,10 @@
   revision = "5b9ff866471762aa2ab2dced63c9fb6f53921342"
 
 [[projects]]
-  branch = "master"
   name = "github.com/kubernetes-incubator/service-catalog"
   packages = ["pkg/apis/servicecatalog","pkg/apis/servicecatalog/v1alpha1","pkg/client/clientset_generated/clientset","pkg/client/clientset_generated/clientset/scheme","pkg/client/clientset_generated/clientset/typed/servicecatalog/v1alpha1"]
-  revision = "010d6e10b7ad2db698ffde8b2b9c44d9563ebbbc"
+  revision = "f6eac6e6cb07942563b95dc8bf610ac434322be7"
+  version = "v0.0.23"
 
 [[projects]]
   branch = "master"
@@ -190,13 +190,13 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["http2","http2/hpack","idna","lex/httplex"]
-  revision = "b60f3a92103dfd93dfcb900ec77c6d0643510868"
+  revision = "a04bdaca5b32abe1c069418fb7088ae607de5bd0"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable","width"]
-  revision = "1cbadb444a806fd9430d14ad08967ed91da4fa0a"
+  revision = "d82c1812e304abfeeabd31e995a115a2855bf642"
 
 [[projects]]
   name = "gopkg.in/inf.v0"
@@ -237,6 +237,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1df891ecc881ac566c205dc02ed0c2679b4a8eeef182fa800d5736db32dce68f"
+  inputs-digest = "b044b15ec1cf4596b16a08cf9514f3b96c439947d71e3800f0655b9bf7f9e43a"
   solver-name = "gps-cdcl"
   solver-version = 1
