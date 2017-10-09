@@ -17,34 +17,22 @@ import (
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
-	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
-	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
-	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-)
-
-var (
-	crdCreationBackoff = wait.Backoff{
-		Duration: 1 * time.Second,
-		Factor:   1.2,
-		Jitter:   0.1,
-		Steps:    7,
-	}
 )
 
 type App struct {
@@ -78,7 +66,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 	sc := smart.NewClient(a.RestConfig, a.ServiceCatalogConfig, clientset, scClient)
-	scheme, err := FullScheme(a.ServiceCatalogConfig != nil)
+	scheme, err := apitypes.FullScheme(a.ServiceCatalogConfig != nil)
 	if err != nil {
 		return err
 	}
@@ -100,6 +88,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	crdGVK := apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
 	multiStore.AddInformer(crdGVK, crdInf)
 	stage := stgr.NextStage()
 	stage.StartWithChannel(crdInf.Run) // Must be after store.AddInformer()
@@ -113,6 +102,12 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Ensure CRD Bundle exists
 	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
+	crdCreationBackoff := wait.Backoff{
+		Duration: 1 * time.Second,
+		Factor:   1.2,
+		Jitter:   0.1,
+		Steps:    7,
+	}
 	err = wait.ExponentialBackoff(crdCreationBackoff, func() (bool /*done*/, error) {
 		if err := resources.EnsureCrdExistsAndIsEstablished(ctx, scheme, crdClient, crdLister, resources.BundleCrd()); err != nil {
 			// TODO be smarter about what is retried
@@ -133,22 +128,21 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	resourceInfs := a.resourceInformers(clientset, scClient)
+	resourceInfs := apitypes.ResourceInformers(clientset, scClient, a.Namespace, a.ResyncPeriod, !a.DisablePodPreset)
 	cntrlr := a.controller(bundleInf, crdInf, bundleClient, bs, crdStore, sc, scheme, multiStore, resourceInfs)
 
+	infs := make([]cache.InformerSynced, 0, len(resourceInfs)+1)
 	// Add all informers to Multi store and start them
 	for gvk, inf := range resourceInfs {
 		multiStore.AddInformer(gvk, inf)
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
+		infs = append(infs, inf.HasSynced)
 	}
 	stage.StartWithChannel(bundleInf.Run)
-	// Wait for all informers to sync
-	resourceInfs[smith_v1.BundleGVK] = bundleInf
-	for gvk, inf := range resourceInfs {
-		log.Printf("Waiting for %s informer to sync", gvk)
-		if !cache.WaitForCacheSync(ctx.Done(), inf.HasSynced) {
-			return ctx.Err()
-		}
+	infs = append(infs, bundleInf.HasSynced)
+	log.Print("Waiting for informers to sync")
+	if !cache.WaitForCacheSync(ctx.Done(), infs...) {
+		return ctx.Err()
 	}
 
 	cntrlr.Run(ctx)
@@ -180,26 +174,4 @@ func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClie
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
 
 	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, scheme, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs)
-}
-
-func (a *App) resourceInformers(mainClient kubernetes.Interface, scClient scClientset.Interface) map[schema.GroupVersionKind]cache.SharedIndexInformer {
-	// Core API types
-	infs := map[schema.GroupVersionKind]cache.SharedIndexInformer{
-		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):     a.ingressInformer(mainClient),
-		api_v1.SchemeGroupVersion.WithKind("Service"):       a.serviceInformer(mainClient),
-		api_v1.SchemeGroupVersion.WithKind("ConfigMap"):     a.configMapInformer(mainClient),
-		api_v1.SchemeGroupVersion.WithKind("Secret"):        a.secretInformer(mainClient),
-		apps_v1b1.SchemeGroupVersion.WithKind("Deployment"): a.deploymentAppsInformer(mainClient),
-	}
-	if !a.DisablePodPreset {
-		infs[settings_v1a1.SchemeGroupVersion.WithKind("PodPreset")] = a.podPresetInformer(mainClient)
-	}
-
-	// Service Catalog types
-	if scClient != nil {
-		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceInstanceCredential")] = a.serviceInstanceCredentialInformer(scClient)
-		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceInstance")] = a.serviceInstanceCredentialInformer(scClient)
-	}
-
-	return infs
 }

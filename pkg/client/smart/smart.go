@@ -19,8 +19,15 @@ type Mapper interface {
 	RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error)
 }
 
+// ClientPool manages a pool of dynamic clients.
+type ClientPool interface {
+	// ClientForGroupVersionKind returns a client configured for the specified groupVersionKind.
+	// Kind may be empty.
+	ClientForGroupVersionKind(schema.GroupVersionKind) (*dynamic.Client, error)
+}
+
 type DynamicClient struct {
-	CoreDynamic, ScDynamic dynamic.ClientPool
+	CoreDynamic, ScDynamic ClientPool
 	Mapper, ScMapper       Mapper
 }
 
@@ -52,7 +59,7 @@ func NewClient(config, scConfig *rest.Config, clientset kubernetes.Interface, sc
 }
 
 func (c *DynamicClient) ForGVK(gvk schema.GroupVersionKind, namespace string) (*dynamic.ResourceClient, error) {
-	var clients dynamic.ClientPool
+	var clients ClientPool
 	var m Mapper
 	if gvk.Group == sc_v1a1.GroupName {
 		if c.ScDynamic == nil {
