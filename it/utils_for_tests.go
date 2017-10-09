@@ -204,6 +204,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 		apl := app.App{
 			RestConfig:           config,
 			ServiceCatalogConfig: scConfig,
+			Namespace:            cfg.Namespace,
 			Workers:              2,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
