@@ -16,6 +16,7 @@ import (
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/resources/apitypes"
 
 	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -150,7 +151,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	sc := smart.NewClient(config, scConfig, clientset, scClient)
 
-	scheme, err := app.FullScheme(serviceCatalog)
+	scheme, err := apitypes.FullScheme(serviceCatalog)
 	require.NoError(t, err)
 
 	cfg := &ItConfig{

@@ -26,7 +26,7 @@ type objectRef struct {
 	Name string
 }
 
-func (c *BundleController) worker(ctx context.Context) {
+func (c *BundleController) worker() {
 	for c.processNextWorkItem() {
 	}
 }

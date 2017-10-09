@@ -1,4 +1,4 @@
-package app
+package apitypes
 
 import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
@@ -11,10 +11,6 @@ import (
 	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
-)
-
-var (
-	crdGVK = apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
 )
 
 func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
