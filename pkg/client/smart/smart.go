@@ -23,7 +23,7 @@ type Mapper interface {
 type ClientPool interface {
 	// ClientForGroupVersionKind returns a client configured for the specified groupVersionKind.
 	// Kind may be empty.
-	ClientForGroupVersionKind(schema.GroupVersionKind) (*dynamic.Client, error)
+	ClientForGroupVersionKind(schema.GroupVersionKind) (dynamic.Interface, error)
 }
 
 type DynamicClient struct {
@@ -58,7 +58,7 @@ func NewClient(config, scConfig *rest.Config, clientset kubernetes.Interface, sc
 	}
 }
 
-func (c *DynamicClient) ForGVK(gvk schema.GroupVersionKind, namespace string) (*dynamic.ResourceClient, error) {
+func (c *DynamicClient) ForGVK(gvk schema.GroupVersionKind, namespace string) (dynamic.ResourceInterface, error) {
 	var clients ClientPool
 	var m Mapper
 	if gvk.Group == sc_v1a1.GroupName {

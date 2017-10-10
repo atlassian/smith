@@ -84,8 +84,8 @@ rules:
 - apiGroups:
   - servicecatalog.k8s.io
   resources:
-  - serviceinstancecredentials
-  - serviceinstance
+  - servicebindings
+  - serviceinstances
   verbs:
   - list
   - watch

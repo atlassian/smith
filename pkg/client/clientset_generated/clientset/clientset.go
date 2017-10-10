@@ -20,24 +20,18 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*smithv1.SmithV1Client
+	smithV1 *smithv1.SmithV1Client
 }
 
 // SmithV1 retrieves the SmithV1Client
 func (c *Clientset) SmithV1() smithv1.SmithV1Interface {
-	if c == nil {
-		return nil
-	}
-	return c.SmithV1Client
+	return c.smithV1
 }
 
 // Deprecated: Smith retrieves the default version of SmithClient.
 // Please explicitly pick a version.
 func (c *Clientset) Smith() smithv1.SmithV1Interface {
-	if c == nil {
-		return nil
-	}
-	return c.SmithV1Client
+	return c.smithV1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -56,7 +50,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.SmithV1Client, err = smithv1.NewForConfig(&configShallowCopy)
+	cs.smithV1, err = smithv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +67,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.SmithV1Client = smithv1.NewForConfigOrDie(c)
+	cs.smithV1 = smithv1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -82,7 +76,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.SmithV1Client = smithv1.New(c)
+	cs.smithV1 = smithv1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

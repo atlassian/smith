@@ -8,5 +8,5 @@ kubectl delete ingress/ingress1
 kubectl delete secrets/secret1
 kubectl delete secrets/secret2
 kubectl delete serviceinstance/instance1 --context=service-catalog
-kubectl delete serviceinstancecredential/binding1 --context=service-catalog
-kubectl delete serviceinstancecredential/binding2 --context=service-catalog
+kubectl delete servicebinding/binding1 --context=service-catalog
+kubectl delete servicebinding/binding2 --context=service-catalog

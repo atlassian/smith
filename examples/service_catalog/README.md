@@ -18,7 +18,7 @@ and produce Kubernetes Secret objects with credentials which we can inject as en
 The resulting graph of Kubernetes and Service Catalog objects consists of:
 - `Pod`s for running application instances
 - `PodPreset`s referencing `Secret`s and injecting them into `Pod`s
-- Service Catalog `ServiceInstance` and `ServiceInstanceCredential` objects
+- Service Catalog `ServiceInstance` and `ServiceBinding` objects
 - `Ingress` and `Service` objects for load balancing
 
 ![Kubernetes objects graph](img/Kubernetes_graph.png?raw=true "Kubernetes objects graph")
@@ -59,7 +59,7 @@ spec:
     - instance1
     spec:
       apiVersion: servicecatalog.k8s.io/v1alpha1
-      kind: ServiceInstanceCredential
+      kind: ServiceBinding
       metadata:
         name: binding1
       spec:

@@ -252,7 +252,7 @@ func (c *BundleController) createOrUpdate(bundle *smith_v1.Bundle, spec *unstruc
 	return c.createResource(bundle, resClient, spec)
 }
 
-func (c *BundleController) createResource(bundle *smith_v1.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
+func (c *BundleController) createResource(bundle *smith_v1.Bundle, resClient dynamic.ResourceInterface, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
 	gvk := spec.GroupVersionKind()
 	response, err := resClient.Create(spec)
 	if err == nil {
@@ -269,7 +269,7 @@ func (c *BundleController) createResource(bundle *smith_v1.Bundle, resClient *dy
 }
 
 // Mutates spec and actual.
-func (c *BundleController) updateResource(bundle *smith_v1.Bundle, resClient *dynamic.ResourceClient, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
+func (c *BundleController) updateResource(bundle *smith_v1.Bundle, resClient dynamic.ResourceInterface, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
 	actualMeta := actual.(meta_v1.Object)
 	// Check that the object is not marked for deletion
 	if actualMeta.GetDeletionTimestamp() != nil {

@@ -6,14 +6,15 @@ import (
 	"time"
 
 	"github.com/atlassian/smith/examples/sleeper"
+	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	api_v1 "k8s.io/api/core/v1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 )
 
 func TestAdoption(t *testing.T) {
@@ -30,15 +31,15 @@ func TestAdoption(t *testing.T) {
 			"a": "b",
 		},
 	}
-	sleeper := &sleeper.Sleeper{
+	sleeper := &sleeper_v1.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       sleeper.SleeperResourceKind,
-			APIVersion: sleeper.SleeperResourceGroupVersion,
+			Kind:       sleeper_v1.SleeperResourceKind,
+			APIVersion: sleeper_v1.SleeperResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "sleeper2",
 		},
-		Spec: sleeper.SleeperSpec{
+		Spec: sleeper_v1.SleeperSpec{
 			SleepFor:      1, // seconds,
 			WakeupMessage: "Hello there!",
 		},
@@ -82,7 +83,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...
 	})
 
 	cm := args[0].(*api_v1.ConfigMap)
-	sl := args[1].(*sleeper.Sleeper)
+	sl := args[1].(*sleeper_v1.Sleeper)
 
 	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
 	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
@@ -93,11 +94,11 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...
 	require.NoError(t, err)
 
 	// Create orphaned Sleeper
-	sleeperActual := &sleeper.Sleeper{}
+	sleeperActual := &sleeper_v1.Sleeper{}
 	err = sClient.Post().
 		Context(ctxTest).
 		Namespace(cfg.Namespace).
-		Resource(sleeper.SleeperResourcePlural).
+		Resource(sleeper_v1.SleeperResourcePlural).
 		Body(sl).
 		Do().
 		Into(sleeperActual)
@@ -149,7 +150,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...
 		err = sClient.Put().
 			Context(ctxTest).
 			Namespace(cfg.Namespace).
-			Resource(sleeper.SleeperResourcePlural).
+			Resource(sleeper_v1.SleeperResourcePlural).
 			Name(sleeperActual.Name).
 			Body(sleeperActual).
 			Do().
@@ -158,7 +159,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...
 			err = sClient.Get().
 				Context(ctxTest).
 				Namespace(cfg.Namespace).
-				Resource(sleeper.SleeperResourcePlural).
+				Resource(sleeper_v1.SleeperResourcePlural).
 				Name(sleeperActual.Name).
 				Do().
 				Into(sleeperActual)
@@ -190,7 +191,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...
 	err = sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.Namespace).
-		Resource(sleeper.SleeperResourcePlural).
+		Resource(sleeper_v1.SleeperResourcePlural).
 		Name(sleeperActual.Name).
 		Do().
 		Into(sleeperActual)

@@ -50,7 +50,7 @@ func emptyMap() *unstructured.Unstructured {
 				"name":            "map1",
 				"annotations":     map[string]interface{}{},
 				"labels":          map[string]interface{}{},
-				"ownerReferences": []map[string]interface{}{},
+				"ownerReferences": []interface{}{},
 				"finalizers":      []interface{}{},
 			},
 			"data": map[string]interface{}{
