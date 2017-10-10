@@ -7,14 +7,15 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/sleeper"
+	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	api_v1 "k8s.io/api/core/v1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 )
 
 func TestUpdate(t *testing.T) {
@@ -51,10 +52,10 @@ func TestUpdate(t *testing.T) {
 			"x": "y",
 		},
 	}
-	sleeper1 := &sleeper.Sleeper{
+	sleeper1 := &sleeper_v1.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       sleeper.SleeperResourceKind,
-			APIVersion: sleeper.SleeperResourceGroupVersion,
+			Kind:       sleeper_v1.SleeperResourceKind,
+			APIVersion: sleeper_v1.SleeperResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "sleeper2",
@@ -62,15 +63,15 @@ func TestUpdate(t *testing.T) {
 				"labelx": "labelxValue",
 			},
 		},
-		Spec: sleeper.SleeperSpec{
+		Spec: sleeper_v1.SleeperSpec{
 			SleepFor:      2, // seconds,
 			WakeupMessage: "Hello there!",
 		},
 	}
-	sleeper2 := &sleeper.Sleeper{
+	sleeper2 := &sleeper_v1.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       sleeper.SleeperResourceKind,
-			APIVersion: sleeper.SleeperResourceGroupVersion,
+			Kind:       sleeper_v1.SleeperResourceKind,
+			APIVersion: sleeper_v1.SleeperResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: sleeper1.Name,
@@ -80,7 +81,7 @@ func TestUpdate(t *testing.T) {
 				smith.BundleNameLabel: "configLabel123",
 			},
 		},
-		Spec: sleeper.SleeperSpec{
+		Spec: sleeper_v1.SleeperSpec{
 			SleepFor:      1, // seconds,
 			WakeupMessage: "Hello, martians!",
 		},
@@ -155,8 +156,8 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...in
 	})
 
 	cm2 := args[0].(*api_v1.ConfigMap)
-	sleeper1 := args[1].(*sleeper.Sleeper)
-	sleeper2 := args[2].(*sleeper.Sleeper)
+	sleeper1 := args[1].(*sleeper_v1.Sleeper)
+	sleeper2 := args[2].(*sleeper_v1.Sleeper)
 	bundle2 := args[3].(*smith_v1.Bundle)
 
 	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
@@ -185,11 +186,11 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...in
 	}, cfMap.Labels)
 	assert.Equal(t, cm2.Data, cfMap.Data)
 
-	var sleeperObj sleeper.Sleeper
+	var sleeperObj sleeper_v1.Sleeper
 	err = sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.Namespace).
-		Resource(sleeper.SleeperResourcePlural).
+		Resource(sleeper_v1.SleeperResourcePlural).
 		Name(sleeper2.Name).
 		Do().
 		Into(&sleeperObj)
@@ -200,7 +201,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...in
 		"overlappingLabel":    "overlappingConfigValue",
 		smith.BundleNameLabel: cfg.Bundle.Name,
 	}, sleeperObj.Labels)
-	assert.Equal(t, sleeper.Awake, sleeperObj.Status.State)
+	assert.Equal(t, sleeper_v1.Awake, sleeperObj.Status.State)
 	assert.Equal(t, sleeper2.Spec, sleeperObj.Spec)
 
 	emptyBundle := *cfg.Bundle
@@ -220,7 +221,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...in
 	err = sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.Namespace).
-		Resource(sleeper.SleeperResourcePlural).
+		Resource(sleeper_v1.SleeperResourcePlural).
 		Name(sleeper2.Name).
 		Do().
 		Into(&sleeperObj)

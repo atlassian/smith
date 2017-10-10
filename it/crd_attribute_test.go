@@ -7,6 +7,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/sleeper"
+	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"github.com/ash2k/stager"
@@ -17,15 +18,15 @@ import (
 
 func TestCrdAttribute(t *testing.T) {
 	t.Parallel()
-	sl := &sleeper.Sleeper{
+	sl := &sleeper_v1.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       sleeper.SleeperResourceKind,
-			APIVersion: sleeper.SleeperResourceGroupVersion,
+			Kind:       sleeper_v1.SleeperResourceKind,
+			APIVersion: sleeper_v1.SleeperResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "sleeper1",
 		},
-		Spec: sleeper.SleeperSpec{
+		Spec: sleeper_v1.SleeperSpec{
 			SleepFor:      1, // seconds,
 			WakeupMessage: "Hello, Infravators!",
 		},
@@ -51,7 +52,7 @@ func TestCrdAttribute(t *testing.T) {
 }
 
 func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...interface{}) {
-	sl := args[0].(*sleeper.Sleeper)
+	sl := args[0].(*sleeper_v1.Sleeper)
 	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
 	require.NoError(t, err)
 
@@ -73,11 +74,11 @@ func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *ItConfig, args
 
 	cfg.AssertBundle(ctxTimeout, cfg.Bundle, "")
 
-	var sleeperObj sleeper.Sleeper
+	var sleeperObj sleeper_v1.Sleeper
 	require.NoError(t, sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.Namespace).
-		Resource(sleeper.SleeperResourcePlural).
+		Resource(sleeper_v1.SleeperResourcePlural).
 		Name(sl.Name).
 		Do().
 		Into(&sleeperObj))
@@ -85,5 +86,5 @@ func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *ItConfig, args
 	assert.Equal(t, map[string]string{
 		smith.BundleNameLabel: cfg.Bundle.Name,
 	}, sleeperObj.Labels)
-	assert.Equal(t, sleeper.Awake, sleeperObj.Status.State)
+	assert.Equal(t, sleeper_v1.Awake, sleeperObj.Status.State)
 }

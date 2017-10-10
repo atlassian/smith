@@ -5,15 +5,15 @@ import (
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	apps_v1b1 "k8s.io/api/apps/v1beta1"
+	api_v1 "k8s.io/api/core/v1"
+	ext_v1b1 "k8s.io/api/extensions/v1beta1"
+	settings_v1a1 "k8s.io/api/settings/v1alpha1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
-	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
-	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -32,7 +32,7 @@ func ResourceInformers(mainClient kubernetes.Interface, scClient scClientset.Int
 
 	// Service Catalog types
 	if scClient != nil {
-		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceInstanceCredential")] = serviceInstanceCredentialInformer(scClient, namespace, resyncPeriod)
+		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceBinding")] = serviceBindingInformer(scClient, namespace, resyncPeriod)
 		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceInstance")] = serviceInstanceInformer(scClient, namespace, resyncPeriod)
 	}
 
@@ -137,17 +137,17 @@ func podPresetInformer(mainClient kubernetes.Interface, namespace string, resync
 	)
 }
 
-func serviceInstanceCredentialInformer(scClient scClientset.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func serviceBindingInformer(scClient scClientset.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return scClient.ServicecatalogV1alpha1().ServiceInstanceCredentials(namespace).List(options)
+				return scClient.ServicecatalogV1alpha1().ServiceBindings(namespace).List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return scClient.ServicecatalogV1alpha1().ServiceInstanceCredentials(namespace).Watch(options)
+				return scClient.ServicecatalogV1alpha1().ServiceBindings(namespace).Watch(options)
 			},
 		},
-		&sc_v1a1.ServiceInstanceCredential{},
+		&sc_v1a1.ServiceBinding{},
 		resyncPeriod,
 		cache.Indexers{},
 	)

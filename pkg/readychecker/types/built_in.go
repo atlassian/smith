@@ -4,13 +4,13 @@ import (
 	"github.com/atlassian/smith/pkg/readychecker"
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	apps_v1b1 "k8s.io/api/apps/v1beta1"
+	api_v1 "k8s.io/api/core/v1"
+	ext_v1b1 "k8s.io/api/extensions/v1beta1"
+	settings_v1a1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
-	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
-	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 )
 
 var MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
@@ -23,8 +23,8 @@ var MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
-	{Group: sc_v1a1.GroupName, Kind: "ServiceInstanceCredential"}: isScServiceInstanceCredentialReady,
-	{Group: sc_v1a1.GroupName, Kind: "ServiceInstance"}:           isScServiceInstanceReady,
+	{Group: sc_v1a1.GroupName, Kind: "ServiceBinding"}:  isScServiceBindingReady,
+	{Group: sc_v1a1.GroupName, Kind: "ServiceInstance"}: isScServiceInstanceReady,
 }
 
 func alwaysReady(_ *unstructured.Unstructured) (isReady, retriableError bool, e error) {
@@ -48,12 +48,12 @@ func isDeploymentReady(obj *unstructured.Unstructured) (isReady, retriableError 
 		deployment.Status.UpdatedReplicas == replicas, false, nil
 }
 
-func isScServiceInstanceCredentialReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
-	var sic sc_v1a1.ServiceInstanceCredential
+func isScServiceBindingReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
+	var sic sc_v1a1.ServiceBinding
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &sic); err != nil {
 		return false, false, err
 	}
-	readyCond := getServiceInstanceCredentialCondition(&sic, sc_v1a1.ServiceInstanceCredentialConditionReady)
+	readyCond := getServiceBindingCondition(&sic, sc_v1a1.ServiceBindingConditionReady)
 	return readyCond != nil && readyCond.Status == sc_v1a1.ConditionTrue, false, nil
 }
 
@@ -75,7 +75,7 @@ func getServiceInstanceCondition(instance *sc_v1a1.ServiceInstance, conditionTyp
 	return nil
 }
 
-func getServiceInstanceCredentialCondition(instance *sc_v1a1.ServiceInstanceCredential, conditionType sc_v1a1.ServiceInstanceCredentialConditionType) *sc_v1a1.ServiceInstanceCredentialCondition {
+func getServiceBindingCondition(instance *sc_v1a1.ServiceBinding, conditionType sc_v1a1.ServiceBindingConditionType) *sc_v1a1.ServiceBindingCondition {
 	for _, condition := range instance.Status.Conditions {
 		if condition.Type == conditionType {
 			return &condition

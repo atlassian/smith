@@ -127,7 +127,7 @@ and following the same behaviour, semantics and code "style" as native Kubernete
 ## Features
 
 - Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `PodPreset`, `Ingress`;
-- [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `ServiceInstance` and `ServiceInstanceCredential`.
+- [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `ServiceInstance` and `ServiceBinding`.
 See [an example](https://github.com/atlassian/smith/tree/master/examples/service_catalog) and
 [recording of the presentation](https://youtu.be/7fgPgtQh5Es) to [Service Catalog SIG](https://github.com/kubernetes/community/tree/master/sig-service-catalog);
 - Dynamic Custom Resources support via [special annotations](https://github.com/atlassian/smith/blob/master/docs/design/managing-resources.md#defined-annotations);

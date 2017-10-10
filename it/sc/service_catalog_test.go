@@ -8,8 +8,8 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	api_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 )
 
 func TestServiceCatalog(t *testing.T) {
@@ -23,19 +23,19 @@ func TestServiceCatalog(t *testing.T) {
 			Name: "instance1",
 		},
 		Spec: sc_v1a1.ServiceInstanceSpec{
-			ServiceClassName: "user-provided-service",
-			PlanName:         "default",
+			ExternalClusterServiceClassName: "user-provided-service",
+			ExternalClusterServicePlanName:  "default",
 		},
 	}
-	binding := &sc_v1a1.ServiceInstanceCredential{
+	binding := &sc_v1a1.ServiceBinding{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       "ServiceInstanceCredential",
+			Kind:       "ServiceBinding",
 			APIVersion: sc_v1a1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "binding1",
 		},
-		Spec: sc_v1a1.ServiceInstanceCredentialSpec{
+		Spec: sc_v1a1.ServiceBindingSpec{
 			ServiceInstanceRef: api_v1.LocalObjectReference{
 				Name: instance.Name,
 			},

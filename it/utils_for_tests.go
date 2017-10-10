@@ -11,6 +11,7 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
+	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
@@ -22,6 +23,7 @@ import (
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	api_v1 "k8s.io/api/core/v1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -82,7 +83,9 @@ func AssertCondition(t *testing.T, bundle *smith_v1.Bundle, conditionType smith_
 func SleeperScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
-	sleeper.AddToScheme(scheme)
+	if err := sleeper_v1.AddToScheme(scheme); err != nil {
+		panic(err)
+	}
 	return scheme
 }
 
@@ -165,7 +168,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	}
 
 	t.Logf("Creating namespace %q", cfg.Namespace)
-	_, err = clientset.Namespaces().Create(&api_v1.Namespace{
+	_, err = clientset.CoreV1().Namespaces().Create(&api_v1.Namespace{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: cfg.Namespace,
 		},
@@ -174,7 +177,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	defer func() {
 		t.Logf("Deleting namespace %q", cfg.Namespace)
-		assert.NoError(t, clientset.Namespaces().Delete(cfg.Namespace, nil))
+		assert.NoError(t, clientset.CoreV1().Namespaces().Delete(cfg.Namespace, nil))
 	}()
 
 	stgr := stager.New()

@@ -23,7 +23,7 @@ spec:
     - instance1
     spec:
       apiVersion: servicecatalog.k8s.io/v1alpha1
-      kind: ServiceInstanceCredential
+      kind: ServiceBinding
       metadata:
         name: binding1
       spec:
@@ -36,7 +36,7 @@ spec:
     - instance1
     spec:
       apiVersion: servicecatalog.k8s.io/v1alpha1
-      kind: ServiceInstanceCredential
+      kind: ServiceBinding
       metadata:
         name: binding2
       spec:

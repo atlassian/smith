@@ -4,13 +4,13 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	apps_v1b1 "k8s.io/api/apps/v1beta1"
+	api_v1 "k8s.io/api/core/v1"
+	ext_v1b1 "k8s.io/api/extensions/v1beta1"
+	settings_v1a1 "k8s.io/api/settings/v1alpha1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
-	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
-	ext_v1b1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	settings_v1a1 "k8s.io/client-go/pkg/apis/settings/v1alpha1"
 )
 
 func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {

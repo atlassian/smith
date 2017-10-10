@@ -43,6 +43,41 @@ func newBundles(c *SmithV1Client, namespace string) *bundles {
 	}
 }
 
+// Get takes name of the bundle, and returns the corresponding bundle object, and an error if there is any.
+func (c *bundles) Get(name string, options meta_v1.GetOptions) (result *v1.Bundle, err error) {
+	result = &v1.Bundle{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("bundles").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Bundles that match those selectors.
+func (c *bundles) List(opts meta_v1.ListOptions) (result *v1.BundleList, err error) {
+	result = &v1.BundleList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("bundles").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested bundles.
+func (c *bundles) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("bundles").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a bundle and creates it.  Returns the server's representation of the bundle, and an error, if there is any.
 func (c *bundles) Create(bundle *v1.Bundle) (result *v1.Bundle, err error) {
 	result = &v1.Bundle{}
@@ -88,41 +123,6 @@ func (c *bundles) DeleteCollection(options *meta_v1.DeleteOptions, listOptions m
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the bundle, and returns the corresponding bundle object, and an error if there is any.
-func (c *bundles) Get(name string, options meta_v1.GetOptions) (result *v1.Bundle, err error) {
-	result = &v1.Bundle{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("bundles").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Bundles that match those selectors.
-func (c *bundles) List(opts meta_v1.ListOptions) (result *v1.BundleList, err error) {
-	result = &v1.BundleList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("bundles").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested bundles.
-func (c *bundles) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("bundles").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched bundle.

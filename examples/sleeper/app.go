@@ -6,17 +6,18 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
+	api_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -33,7 +34,9 @@ type App struct {
 func (a *App) Run(ctx context.Context) error {
 	scheme := runtime.NewScheme()
 	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
-	AddToScheme(scheme)
+	if err := sleeper_v1.AddToScheme(scheme); err != nil {
+		return err
+	}
 	if err := apiext_v1b1.SchemeBuilder.AddToScheme(scheme); err != nil {
 		return err
 	}
@@ -81,8 +84,8 @@ func (a *App) Run(ctx context.Context) error {
 
 func (a *App) sleeperInformer(ctx context.Context, sClient rest.Interface, deepCopy smith.DeepCopy) cache.SharedInformer {
 	sleeperInf := cache.NewSharedInformer(
-		cache.NewListWatchFromClient(sClient, SleeperResourcePlural, a.Namespace, fields.Everything()),
-		&Sleeper{}, ResyncPeriod)
+		cache.NewListWatchFromClient(sClient, sleeper_v1.SleeperResourcePlural, a.Namespace, fields.Everything()),
+		&sleeper_v1.Sleeper{}, ResyncPeriod)
 
 	seh := &SleeperEventHandler{
 		ctx:      ctx,

@@ -10,6 +10,10 @@ setup-ci:
 	dep ensure
 	# workaround https://github.com/kubernetes/kubernetes/issues/50975
 	cp fixed_BUILD_for_sets.bazel vendor/k8s.io/apimachinery/pkg/util/sets/BUILD
+	# workaround gazelle not being able to process invalid Go files
+	rm -rf vendor/golang.org/x/tools/go/gcimporter15/testdata \
+		vendor/golang.org/x/tools/cmd \
+		vendor/golang.org/x/tools/go
 
 update-bazel:
 	bazel run //:gazelle
@@ -26,12 +30,17 @@ fmt:
 	goimports -w=true -d $(ALL_GO_FILES)
 
 generate: generate-client generate-deepcopy
-	# Make sure you have k8s.io/kubernetes cloned into build/go/src/k8s.io/kubernetes
-	# at revision ebb8d6e0fadfc95f3d64ccecc36c8ed2ac9224ef
-	# TODO automate this. We'll use k8s.io/kube-gen instead once we are on 1.8 and that repo is published
+	# RUN make generate-restore-godeps before running this
+	# Make sure you have https://github.com/kubernetes/code-generator cloned into build/go/src/k8s.io/code-generator
+	# at branch release-1.8
+	# TODO automate this using Bazel rules.
+
+generate-restore-godeps:
+	GOPATH=$(PWD)/build/go go get -u github.com/tools/godep
+	GOPATH=$(PWD)/build/go cd $(PWD)/build/go/src/k8s.io/code-generator; $(PWD)/build/go/bin/godep restore
 
 generate-client:
-	GOPATH=$(PWD)/build/go go build -i -o build/bin/client-gen k8s.io/kubernetes/cmd/libs/go2idl/client-gen
+	GOPATH=$(PWD)/build/go go build -i -o build/bin/client-gen k8s.io/code-generator/cmd/client-gen
 	# Generate the versioned clientset (pkg/client/clientset_generated/clientset)
 	build/bin/client-gen \
 	--input-base "github.com/atlassian/smith/pkg/apis/" \
@@ -41,13 +50,13 @@ generate-client:
 	--go-header-file "build/boilerplate.go.txt"
 
 generate-deepcopy:
-	GOPATH=$(PWD)/build/go go build -i -o build/bin/deepcopy-gen k8s.io/kubernetes/cmd/libs/go2idl/deepcopy-gen
+	GOPATH=$(PWD)/build/go go build -i -o build/bin/deepcopy-gen k8s.io/code-generator/cmd/deepcopy-gen
 	# Generate deep copies
 	build/bin/deepcopy-gen \
 	--v 1 --logtostderr \
 	--go-header-file "build/boilerplate.go.txt" \
-	--input-dirs "github.com/atlassian/smith/pkg/apis/smith/v1" \
-	--bounding-dirs "github.com/atlassian/smith" \
+	--input-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \
+	--bounding-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \
 	--output-file-base zz_generated.deepcopy
 
 minikube-test: fmt update-bazel
@@ -81,7 +90,7 @@ minikube-run: fmt update-bazel
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel run //cmd/smith:smith-race
+	bazel run //cmd/smith:smith-race -- -disable-service-catalog
 
 minikube-run-sc: fmt update-bazel
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
@@ -113,7 +122,7 @@ test-ci:
 	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
-		-- ... -cmd/... -vendor/...
+		-- ... -cmd/... -vendor/... -build/...
 
 check:
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor \
@@ -131,7 +140,7 @@ docker:
 docker-export:
 	bazel run --cpu=k8 //cmd/smith:docker
 
-release:
+release: update-bazel
 	bazel run --cpu=k8 //cmd/smith:push-docker
 
 .PHONY: build

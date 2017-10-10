@@ -4,11 +4,11 @@ import (
 	"github.com/atlassian/smith/pkg/cleanup"
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	apps_v1b1 "k8s.io/api/apps/v1beta1"
+	api_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
-	apps_v1b1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 )
 
 var MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
@@ -17,8 +17,8 @@ var MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
-	{Group: sc_v1a1.GroupName, Kind: "ServiceInstanceCredential"}: scServiceInstanceCredentialCleanup,
-	{Group: sc_v1a1.GroupName, Kind: "ServiceInstance"}:           scServiceInstanceCleanup,
+	{Group: sc_v1a1.GroupName, Kind: "ServiceBinding"}:  scServiceBindingCleanup,
+	{Group: sc_v1a1.GroupName, Kind: "ServiceInstance"}: scServiceInstanceCleanup,
 }
 
 func deploymentCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -58,21 +58,21 @@ func serviceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unst
 		}
 	}
 
-	updatedObj := &unstructured.Unstructured{
-		Object: make(map[string]interface{}),
-	}
-	if err := unstructured_conversion.DefaultConverter.ToUnstructured(&serviceSpec, &updatedObj.Object); err != nil {
+	var err error
+	updatedObj := &unstructured.Unstructured{}
+	updatedObj.Object, err = unstructured_conversion.DefaultConverter.ToUnstructured(&serviceSpec)
+	if err != nil {
 		return nil, err
 	}
 	return updatedObj, nil
 }
 
-func scServiceInstanceCredentialCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	var sicSpec sc_v1a1.ServiceInstanceCredential
+func scServiceBindingCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	var sicSpec sc_v1a1.ServiceBinding
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &sicSpec); err != nil {
 		return nil, err
 	}
-	var sicActual sc_v1a1.ServiceInstanceCredential
+	var sicActual sc_v1a1.ServiceBinding
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &sicActual); err != nil {
 		return nil, err
 	}
@@ -80,10 +80,10 @@ func scServiceInstanceCredentialCleanup(spec, actual *unstructured.Unstructured)
 	sicSpec.Spec.ExternalID = sicActual.Spec.ExternalID
 	sicSpec.Status = sicActual.Status
 
-	updatedObj := &unstructured.Unstructured{
-		Object: make(map[string]interface{}),
-	}
-	if err := unstructured_conversion.DefaultConverter.ToUnstructured(&sicSpec, &updatedObj.Object); err != nil {
+	var err error
+	updatedObj := &unstructured.Unstructured{}
+	updatedObj.Object, err = unstructured_conversion.DefaultConverter.ToUnstructured(&sicSpec)
+	if err != nil {
 		return nil, err
 	}
 	return updatedObj, nil
@@ -101,10 +101,10 @@ func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstruc
 
 	instanceSpec.Spec.ExternalID = instanceActual.Spec.ExternalID
 
-	updatedObj := &unstructured.Unstructured{
-		Object: make(map[string]interface{}),
-	}
-	if err := unstructured_conversion.DefaultConverter.ToUnstructured(&instanceSpec, &updatedObj.Object); err != nil {
+	var err error
+	updatedObj := &unstructured.Unstructured{}
+	updatedObj.Object, err = unstructured_conversion.DefaultConverter.ToUnstructured(&instanceSpec)
+	if err != nil {
 		return nil, err
 	}
 	return updatedObj, nil

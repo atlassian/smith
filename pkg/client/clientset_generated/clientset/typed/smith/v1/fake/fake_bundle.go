@@ -2,8 +2,8 @@
 package fake
 
 import (
-	v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
@@ -21,53 +21,21 @@ var bundlesResource = schema.GroupVersionResource{Group: "smith.atlassian.com", 
 
 var bundlesKind = schema.GroupVersionKind{Group: "smith.atlassian.com", Version: "v1", Kind: "Bundle"}
 
-func (c *FakeBundles) Create(bundle *v1.Bundle) (result *v1.Bundle, err error) {
+// Get takes name of the bundle, and returns the corresponding bundle object, and an error if there is any.
+func (c *FakeBundles) Get(name string, options v1.GetOptions) (result *smith_v1.Bundle, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(bundlesResource, c.ns, bundle), &v1.Bundle{})
+		Invokes(testing.NewGetAction(bundlesResource, c.ns, name), &smith_v1.Bundle{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1.Bundle), err
+	return obj.(*smith_v1.Bundle), err
 }
 
-func (c *FakeBundles) Update(bundle *v1.Bundle) (result *v1.Bundle, err error) {
+// List takes label and field selectors, and returns the list of Bundles that match those selectors.
+func (c *FakeBundles) List(opts v1.ListOptions) (result *smith_v1.BundleList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(bundlesResource, c.ns, bundle), &v1.Bundle{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.Bundle), err
-}
-
-func (c *FakeBundles) Delete(name string, options *meta_v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(bundlesResource, c.ns, name), &v1.Bundle{})
-
-	return err
-}
-
-func (c *FakeBundles) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(bundlesResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1.BundleList{})
-	return err
-}
-
-func (c *FakeBundles) Get(name string, options meta_v1.GetOptions) (result *v1.Bundle, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(bundlesResource, c.ns, name), &v1.Bundle{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.Bundle), err
-}
-
-func (c *FakeBundles) List(opts meta_v1.ListOptions) (result *v1.BundleList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(bundlesResource, bundlesKind, c.ns, opts), &v1.BundleList{})
+		Invokes(testing.NewListAction(bundlesResource, bundlesKind, c.ns, opts), &smith_v1.BundleList{})
 
 	if obj == nil {
 		return nil, err
@@ -77,8 +45,8 @@ func (c *FakeBundles) List(opts meta_v1.ListOptions) (result *v1.BundleList, err
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1.BundleList{}
-	for _, item := range obj.(*v1.BundleList).Items {
+	list := &smith_v1.BundleList{}
+	for _, item := range obj.(*smith_v1.BundleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -87,19 +55,57 @@ func (c *FakeBundles) List(opts meta_v1.ListOptions) (result *v1.BundleList, err
 }
 
 // Watch returns a watch.Interface that watches the requested bundles.
-func (c *FakeBundles) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *FakeBundles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(bundlesResource, c.ns, opts))
 
 }
 
-// Patch applies the patch and returns the patched bundle.
-func (c *FakeBundles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Bundle, err error) {
+// Create takes the representation of a bundle and creates it.  Returns the server's representation of the bundle, and an error, if there is any.
+func (c *FakeBundles) Create(bundle *smith_v1.Bundle) (result *smith_v1.Bundle, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(bundlesResource, c.ns, name, data, subresources...), &v1.Bundle{})
+		Invokes(testing.NewCreateAction(bundlesResource, c.ns, bundle), &smith_v1.Bundle{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1.Bundle), err
+	return obj.(*smith_v1.Bundle), err
+}
+
+// Update takes the representation of a bundle and updates it. Returns the server's representation of the bundle, and an error, if there is any.
+func (c *FakeBundles) Update(bundle *smith_v1.Bundle) (result *smith_v1.Bundle, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(bundlesResource, c.ns, bundle), &smith_v1.Bundle{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*smith_v1.Bundle), err
+}
+
+// Delete takes name of the bundle and deletes it. Returns an error if one occurs.
+func (c *FakeBundles) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(bundlesResource, c.ns, name), &smith_v1.Bundle{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeBundles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(bundlesResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &smith_v1.BundleList{})
+	return err
+}
+
+// Patch applies the patch and returns the patched bundle.
+func (c *FakeBundles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *smith_v1.Bundle, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(bundlesResource, c.ns, name, data, subresources...), &smith_v1.Bundle{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*smith_v1.Bundle), err
 }

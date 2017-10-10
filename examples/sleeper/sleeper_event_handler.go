@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/atlassian/smith"
+	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
@@ -22,8 +23,8 @@ func (h *SleeperEventHandler) OnAdd(obj interface{}) {
 }
 
 func (h *SleeperEventHandler) OnUpdate(oldObj, newObj interface{}) {
-	in := *newObj.(*Sleeper)
-	if in.Status.State == New {
+	in := *newObj.(*sleeper_v1.Sleeper)
+	if in.Status.State == sleeper_v1.New {
 		h.handle(newObj)
 	}
 }
@@ -37,10 +38,10 @@ func (h *SleeperEventHandler) handle(obj interface{}) {
 		log.Printf("[Sleeper] Failed to deep copy %T: %v", obj, err)
 		return
 	}
-	in := obj.(*Sleeper)
+	in := obj.(*sleeper_v1.Sleeper)
 	msg := in.Spec.WakeupMessage
-	log.Printf("[Sleeper] %s/%s was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Namespace, in.Name, Sleeping, in.Spec.SleepFor)
-	err = h.retryUpdate(in, Sleeping, "")
+	log.Printf("[Sleeper] %s/%s was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Namespace, in.Name, sleeper_v1.Sleeping, in.Spec.SleepFor)
+	err = h.retryUpdate(in, sleeper_v1.Sleeping, "")
 	if err != nil {
 		log.Printf("[Sleeper] Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
 		return
@@ -50,8 +51,8 @@ func (h *SleeperEventHandler) handle(obj interface{}) {
 		case <-h.ctx.Done():
 			return
 		case <-time.After(time.Duration(in.Spec.SleepFor) * time.Second):
-			log.Printf("[Sleeper] %s Updating %s/%s Status to %q", in.Spec.WakeupMessage, in.Namespace, in.Name, Awake)
-			err = h.retryUpdate(in, Awake, msg)
+			log.Printf("[Sleeper] %s Updating %s/%s Status to %q", in.Spec.WakeupMessage, in.Namespace, in.Name, sleeper_v1.Awake)
+			err = h.retryUpdate(in, sleeper_v1.Awake, msg)
 			if err != nil {
 				log.Printf("[Sleeper] Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
 			}
@@ -59,14 +60,14 @@ func (h *SleeperEventHandler) handle(obj interface{}) {
 	}()
 }
 
-func (h *SleeperEventHandler) retryUpdate(sleeper *Sleeper, state SleeperState, message string) error {
+func (h *SleeperEventHandler) retryUpdate(sleeper *sleeper_v1.Sleeper, state sleeper_v1.SleeperState, message string) error {
 	for {
 		sleeper.Status.State = state
 		sleeper.Status.Message = message
 		err := h.client.Put().
 			Context(h.ctx).
 			Namespace(sleeper.Namespace).
-			Resource(SleeperResourcePlural).
+			Resource(sleeper_v1.SleeperResourcePlural).
 			Name(sleeper.Name).
 			Body(sleeper).
 			Do().
@@ -75,7 +76,7 @@ func (h *SleeperEventHandler) retryUpdate(sleeper *Sleeper, state SleeperState, 
 			err = h.client.Get().
 				Context(h.ctx).
 				Namespace(sleeper.Namespace).
-				Resource(SleeperResourcePlural).
+				Resource(sleeper_v1.SleeperResourcePlural).
 				Name(sleeper.Name).
 				Do().
 				Into(sleeper)

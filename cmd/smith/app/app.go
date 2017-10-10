@@ -129,7 +129,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 	resourceInfs := apitypes.ResourceInformers(clientset, scClient, a.Namespace, a.ResyncPeriod, !a.DisablePodPreset)
-	cntrlr := a.controller(bundleInf, crdInf, bundleClient, bs, crdStore, sc, scheme, multiStore, resourceInfs)
+	cntrlr := a.controller(bundleInf, crdInf, bundleClient.SmithV1(), bs, crdStore, sc, scheme, multiStore, resourceInfs)
 
 	infs := make([]cache.InformerSynced, 0, len(resourceInfs)+1)
 	// Add all informers to Multi store and start them

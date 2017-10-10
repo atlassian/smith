@@ -1,4 +1,4 @@
-package sleeper
+package v1
 
 import (
 	"testing"

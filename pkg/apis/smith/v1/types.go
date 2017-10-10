@@ -53,6 +53,8 @@ const (
 
 var BundleGVK = SchemeGroupVersion.WithKind(BundleResourceKind)
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type BundleList struct {
 	meta_v1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -62,9 +64,11 @@ type BundleList struct {
 	Items []Bundle `json:"items"`
 }
 
-// +genclient=true
-// +genclientstatus=false
+// +genclient
+// +genclient:noStatus
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // Bundle describes a resources bundle.
 type Bundle struct {
 	meta_v1.TypeMeta `json:",inline"`
@@ -111,7 +115,7 @@ func (b *Bundle) UpdateCondition(condition *BundleCondition) bool {
 	isEqual := cond.Status == oldCondition.Status &&
 		cond.Reason == oldCondition.Reason &&
 		cond.Message == oldCondition.Message &&
-		cond.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+		cond.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
 
 	if !isEqual {
 		cond.LastUpdateTime = now
@@ -122,10 +126,12 @@ func (b *Bundle) UpdateCondition(condition *BundleCondition) bool {
 	return !isEqual
 }
 
+// +k8s:deepcopy-gen=true
 type BundleSpec struct {
 	Resources []Resource `json:"resources"`
 }
 
+// +k8s:deepcopy-gen=true
 // BundleCondition describes the state of a bundle at a certain point.
 type BundleCondition struct {
 	// Type of Bundle condition.
@@ -142,6 +148,7 @@ type BundleCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
+// +k8s:deepcopy-gen=true
 type BundleStatus struct {
 	// Represents the latest available observations of a Bundle's current state.
 	Conditions []BundleCondition `json:"conditions,omitempty"`
@@ -180,6 +187,7 @@ func (bs *BundleStatus) ShortString() string {
 // ResourceName is a reference to another Resource in the same bundle.
 type ResourceName string
 
+// +k8s:deepcopy-gen=true
 type Resource struct {
 	// Name of the resource for references.
 	Name ResourceName `json:"name"`
@@ -200,10 +208,9 @@ func (r *Resource) ToUnstructured(copy smith.DeepCopy) (*unstructured.Unstructur
 		}
 		return uCopy.(*unstructured.Unstructured), nil
 	}
-	u := &unstructured.Unstructured{
-		Object: make(map[string]interface{}),
-	}
-	err := unstructured_conversion.DefaultConverter.ToUnstructured(r.Spec, &u.Object)
+	u := &unstructured.Unstructured{}
+	var err error
+	u.Object, err = unstructured_conversion.DefaultConverter.ToUnstructured(r.Spec)
 	if err != nil {
 		return nil, err
 	}

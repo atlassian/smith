@@ -54,10 +54,9 @@ func (sc *SpecCheck) applyDefaults(spec runtime.Object) (*unstructured.Unstructu
 		}
 	}
 	sc.Scheme.Default(clone)
-	result := &unstructured.Unstructured{
-		Object: make(map[string]interface{}),
-	}
-	if err := unstructured_conversion.DefaultConverter.ToUnstructured(clone, &result.Object); err != nil {
+	result := &unstructured.Unstructured{}
+	result.Object, err = unstructured_conversion.DefaultConverter.ToUnstructured(clone)
+	if err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -142,10 +141,10 @@ func (sc *SpecCheck) cloneAsUnstructured(obj runtime.Object) (*unstructured.Unst
 		return clone.(*unstructured.Unstructured), nil
 	}
 	// ------
-	u := &unstructured.Unstructured{
-		Object: make(map[string]interface{}),
-	}
-	if err := unstructured_conversion.DefaultConverter.ToUnstructured(obj, &u.Object); err != nil {
+	var err error
+	u := &unstructured.Unstructured{}
+	u.Object, err = unstructured_conversion.DefaultConverter.ToUnstructured(obj)
+	if err != nil {
 		return nil, err
 	}
 	return u, nil

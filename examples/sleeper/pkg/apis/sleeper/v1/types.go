@@ -1,21 +1,18 @@
-package sleeper
+package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
-	CrdDomain            = "crd.atlassian.com"
-	SleeperResourceGroup = CrdDomain
+	CrdDomain = "crd.atlassian.com"
 
 	SleeperResourceSingular = "sleeper"
 	SleeperResourcePlural   = "sleepers"
 	SleeperResourceVersion  = "v1"
 	SleeperResourceKind     = "Sleeper"
 
-	SleeperResourceGroupVersion = SleeperResourceGroup + "/" + SleeperResourceVersion
+	SleeperResourceGroupVersion = GroupName + "/" + SleeperResourceVersion
 
 	SleeperResourceName = SleeperResourcePlural + "." + CrdDomain
 
@@ -32,21 +29,10 @@ const (
 	Error    SleeperState = "Error"
 )
 
-var GV = schema.GroupVersion{
-	Group:   SleeperResourceGroup,
-	Version: SleeperResourceVersion,
-}
+var SleeperGVK = SchemeGroupVersion.WithKind(SleeperResourceKind)
 
-var SleeperGVK = GV.WithKind(SleeperResourceKind)
-
-func AddToScheme(scheme *runtime.Scheme) {
-	scheme.AddKnownTypes(GV,
-		&Sleeper{},
-		&SleeperList{},
-	)
-	meta_v1.AddToGroupVersion(scheme, GV)
-}
-
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type SleeperList struct {
 	meta_v1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -56,6 +42,8 @@ type SleeperList struct {
 	Items []Sleeper `json:"items"`
 }
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // Sleeper describes a sleeping resource.
 type Sleeper struct {
 	meta_v1.TypeMeta `json:",inline"`
@@ -70,11 +58,13 @@ type Sleeper struct {
 	Status SleeperStatus `json:"status,omitempty"`
 }
 
+// +k8s:deepcopy-gen=true
 type SleeperSpec struct {
 	SleepFor      int    `json:"sleepFor"`
 	WakeupMessage string `json:"wakeupMessage"`
 }
 
+// +k8s:deepcopy-gen=true
 type SleeperStatus struct {
 	State   SleeperState `json:"state,omitempty"`
 	Message string       `json:"message,omitempty"`

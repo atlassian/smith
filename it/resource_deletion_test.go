@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/atlassian/smith/examples/sleeper"
+	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	api_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 )
 
 func TestResourceDeletion(t *testing.T) {
@@ -29,15 +30,15 @@ func TestResourceDeletion(t *testing.T) {
 			"a": "b",
 		},
 	}
-	sl := &sleeper.Sleeper{
+	sl := &sleeper_v1.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
-			Kind:       sleeper.SleeperResourceKind,
-			APIVersion: sleeper.SleeperResourceGroupVersion,
+			Kind:       sleeper_v1.SleeperResourceKind,
+			APIVersion: sleeper_v1.SleeperResourceGroupVersion,
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "sleeper2",
 		},
-		Spec: sleeper.SleeperSpec{
+		Spec: sleeper_v1.SleeperSpec{
 			SleepFor:      1, // seconds,
 			WakeupMessage: "Hello there!",
 		},
@@ -81,7 +82,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *ItConfig, 
 	})
 
 	cm := args[0].(*api_v1.ConfigMap)
-	sl := args[1].(*sleeper.Sleeper)
+	sl := args[1].(*sleeper_v1.Sleeper)
 
 	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
 	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
@@ -92,11 +93,11 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *ItConfig, 
 	require.NoError(t, err)
 
 	// Create orphaned Sleeper
-	sleeperActual := &sleeper.Sleeper{}
+	sleeperActual := &sleeper_v1.Sleeper{}
 	err = sClient.Post().
 		Context(ctxTest).
 		Namespace(cfg.Namespace).
-		Resource(sleeper.SleeperResourcePlural).
+		Resource(sleeper_v1.SleeperResourcePlural).
 		Body(sl).
 		Do().
 		Into(sleeperActual)
@@ -141,7 +142,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *ItConfig, 
 	err = sClient.Delete().
 		Context(ctxTest).
 		Namespace(cfg.Namespace).
-		Resource(sleeper.SleeperResourcePlural).
+		Resource(sleeper_v1.SleeperResourcePlural).
 		Name(sleeperActual.Name).
 		Body(&meta_v1.DeleteOptions{
 			Preconditions: &meta_v1.Preconditions{
@@ -162,7 +163,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *ItConfig, 
 	// Sleeper should have BlockOwnerDeletion updated
 	err = sClient.Get().
 		Namespace(cfg.Namespace).
-		Resource(sleeper.SleeperResourcePlural).
+		Resource(sleeper_v1.SleeperResourcePlural).
 		Name(sleeperActual.Name).
 		Do().
 		Into(sleeperActual)
