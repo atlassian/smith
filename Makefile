@@ -10,10 +10,6 @@ setup-ci:
 	dep ensure
 	# workaround https://github.com/kubernetes/kubernetes/issues/50975
 	cp fixed_BUILD_for_sets.bazel vendor/k8s.io/apimachinery/pkg/util/sets/BUILD
-	# workaround gazelle not being able to process invalid Go files
-	rm -rf vendor/golang.org/x/tools/go/gcimporter15/testdata \
-		vendor/golang.org/x/tools/cmd \
-		vendor/golang.org/x/tools/go
 
 update-bazel:
 	bazel run //:gazelle
@@ -122,7 +118,7 @@ test-ci:
 	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
-		-- ... -cmd/... -vendor/... -build/...
+		-- ... -cmd/... -vendor/...
 
 check:
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor \
