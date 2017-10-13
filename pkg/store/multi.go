@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 
@@ -19,14 +18,12 @@ const (
 )
 
 type Multi struct {
-	deepCopy  smith.DeepCopy
 	mx        sync.RWMutex // protects the map
 	informers map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
-func NewMulti(deepCopy smith.DeepCopy) *Multi {
+func NewMulti() *Multi {
 	return &Multi{
-		deepCopy:  deepCopy,
 		informers: make(map[schema.GroupVersionKind]cache.SharedIndexInformer),
 	}
 }
@@ -91,11 +88,7 @@ func (s *Multi) getFromIndexer(indexer cache.Indexer, gvk schema.GroupVersionKin
 	if err != nil || !exists {
 		return nil, exists, err
 	}
-	objCopy, err := s.deepCopy(obj)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to deep copy %T: %v", obj, err)
-	}
-	ro := objCopy.(runtime.Object)
+	ro := obj.(runtime.Object).DeepCopyObject()
 	ro.GetObjectKind().SetGroupVersionKind(gvk) // Objects from type-specific informers don't have GVK set
 	return ro, true, nil
 }
@@ -109,11 +102,7 @@ func (s *Multi) GetObjectsForBundle(namespace, bundleName string) ([]runtime.Obj
 			return nil, fmt.Errorf("failed to get objects for bundle from %s informer: %v", gvk, err)
 		}
 		for _, obj := range objs {
-			o, err := s.deepCopy(obj)
-			if err != nil {
-				return nil, fmt.Errorf("failed to deep copy %T: %v", obj, err)
-			}
-			ro := o.(runtime.Object)
+			ro := obj.(runtime.Object).DeepCopyObject()
 			ro.GetObjectKind().SetGroupVersionKind(gvk) // Objects from type-specific informers don't have GVK set
 			result = append(result, ro)
 		}

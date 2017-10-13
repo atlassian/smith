@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/atlassian/smith"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/store"
@@ -53,7 +52,7 @@ func (a *App) Run(ctx context.Context) error {
 	stgr := stager.New()
 	defer stgr.Shutdown()
 
-	multiStore := store.NewMulti(scheme.DeepCopy)
+	multiStore := store.NewMulti()
 
 	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, ResyncPeriod)
 	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
@@ -75,22 +74,21 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// 2. Create an Informer for Sleeper objects
-	sleeperInformer := a.sleeperInformer(ctx, sClient, scheme.DeepCopy)
+	sleeperInformer := a.sleeperInformer(ctx, sClient)
 
 	// 3. Run until a signal to stop
 	sleeperInformer.Run(ctx.Done())
 	return ctx.Err()
 }
 
-func (a *App) sleeperInformer(ctx context.Context, sClient rest.Interface, deepCopy smith.DeepCopy) cache.SharedInformer {
+func (a *App) sleeperInformer(ctx context.Context, sClient rest.Interface) cache.SharedInformer {
 	sleeperInf := cache.NewSharedInformer(
 		cache.NewListWatchFromClient(sClient, sleeper_v1.SleeperResourcePlural, a.Namespace, fields.Everything()),
 		&sleeper_v1.Sleeper{}, ResyncPeriod)
 
 	seh := &SleeperEventHandler{
-		ctx:      ctx,
-		client:   sClient,
-		deepCopy: deepCopy,
+		ctx:    ctx,
+		client: sClient,
 	}
 
 	sleeperInf.AddEventHandler(seh)

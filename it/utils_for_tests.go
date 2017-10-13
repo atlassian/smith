@@ -234,11 +234,11 @@ func (cfg *ItConfig) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, 
 	AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, smith_v1.ConditionFalse)
 	if assert.Len(cfg.T, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
 		for i, res := range bundle.Spec.Resources {
-			spec, err := res.ToUnstructured(noCopy)
+			spec, err := res.ToUnstructured()
 			if !assert.NoError(cfg.T, err) {
 				continue
 			}
-			actual, err := bundleRes.Spec.Resources[i].ToUnstructured(noCopy)
+			actual, err := bundleRes.Spec.Resources[i].ToUnstructured()
 			if !assert.NoError(cfg.T, err) {
 				continue
 			}
@@ -253,10 +253,4 @@ func (cfg *ItConfig) AssertBundleTimeout(ctx context.Context, bundle *smith_v1.B
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return cfg.AssertBundle(ctxTimeout, bundle, resourceVersion...)
-}
-
-// noCopy is a noop implementation of DeepCopy.
-// Can be used when a real copy is not needed.
-func noCopy(src interface{}) (interface{}, error) {
-	return src, nil
 }

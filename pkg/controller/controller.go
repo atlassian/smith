@@ -10,7 +10,6 @@ import (
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 
 	"github.com/ash2k/stager/wait"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -36,7 +35,6 @@ type BundleController struct {
 	bundleStore  BundleStore
 	smartClient  smith.SmartClient
 	rc           ReadyChecker
-	scheme       *runtime.Scheme
 	store        Store
 	specCheck    SpecCheck
 	// Bundle objects that need to be synced.
@@ -49,7 +47,7 @@ type BundleController struct {
 }
 
 func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore BundleStore,
-	sc smith.SmartClient, rc ReadyChecker, scheme *runtime.Scheme, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
+	sc smith.SmartClient, rc ReadyChecker, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
 	workers int, crdResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
 	c := &BundleController{
 		bundleInf:       bundleInf,
@@ -58,7 +56,6 @@ func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v
 		bundleStore:     bundleStore,
 		smartClient:     sc,
 		rc:              rc,
-		scheme:          scheme,
 		store:           store,
 		specCheck:       specCheck,
 		queue:           queue,

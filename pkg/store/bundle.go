@@ -21,10 +21,9 @@ const (
 type BundleStore struct {
 	store         smith.ByNameStore
 	bundleByIndex func(indexName, indexKey string) ([]interface{}, error)
-	deepCopy      smith.DeepCopy
 }
 
-func NewBundle(bundleInf cache.SharedIndexInformer, store smith.ByNameStore, deepCopy smith.DeepCopy) (*BundleStore, error) {
+func NewBundle(bundleInf cache.SharedIndexInformer, store smith.ByNameStore) (*BundleStore, error) {
 	err := bundleInf.AddIndexers(cache.Indexers{
 		byCrdGroupKindIndexName: byCrdGroupKindIndex,
 		byObjectIndexName:       byObjectIndex,
@@ -35,7 +34,6 @@ func NewBundle(bundleInf cache.SharedIndexInformer, store smith.ByNameStore, dee
 	return &BundleStore{
 		store:         store,
 		bundleByIndex: bundleInf.GetIndexer().ByIndex,
-		deepCopy:      deepCopy,
 	}, nil
 }
 
@@ -66,11 +64,7 @@ func (s *BundleStore) getBundles(indexName, indexKey string) ([]*smith_v1.Bundle
 	}
 	result := make([]*smith_v1.Bundle, 0, len(bundles))
 	for _, bundle := range bundles {
-		b, err := s.deepCopy(bundle)
-		if err != nil {
-			return nil, fmt.Errorf("failed to deep copy %T: %v", bundle, err)
-		}
-		result = append(result, b.(*smith_v1.Bundle))
+		result = append(result, bundle.(*smith_v1.Bundle).DeepCopy())
 	}
 	return result, nil
 }

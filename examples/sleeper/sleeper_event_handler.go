@@ -5,7 +5,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/atlassian/smith"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -13,9 +12,8 @@ import (
 )
 
 type SleeperEventHandler struct {
-	ctx      context.Context
-	client   rest.Interface
-	deepCopy smith.DeepCopy
+	ctx    context.Context
+	client rest.Interface
 }
 
 func (h *SleeperEventHandler) OnAdd(obj interface{}) {
@@ -33,15 +31,10 @@ func (h *SleeperEventHandler) OnDelete(obj interface{}) {
 }
 
 func (h *SleeperEventHandler) handle(obj interface{}) {
-	obj, err := h.deepCopy(obj)
-	if err != nil {
-		log.Printf("[Sleeper] Failed to deep copy %T: %v", obj, err)
-		return
-	}
-	in := obj.(*sleeper_v1.Sleeper)
+	in := obj.(*sleeper_v1.Sleeper).DeepCopy()
 	msg := in.Spec.WakeupMessage
 	log.Printf("[Sleeper] %s/%s was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Namespace, in.Name, sleeper_v1.Sleeping, in.Spec.SleepFor)
-	err = h.retryUpdate(in, sleeper_v1.Sleeping, "")
+	err := h.retryUpdate(in, sleeper_v1.Sleeping, "")
 	if err != nil {
 		log.Printf("[Sleeper] Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
 		return

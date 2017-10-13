@@ -3,8 +3,6 @@ package store
 import (
 	"fmt"
 
-	"github.com/atlassian/smith"
-
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -15,11 +13,10 @@ const (
 )
 
 type Crd struct {
-	byIndex  func(indexName, indexKey string) ([]interface{}, error)
-	deepCopy smith.DeepCopy
+	byIndex func(indexName, indexKey string) ([]interface{}, error)
 }
 
-func NewCrd(crdInf cache.SharedIndexInformer, deepCopy smith.DeepCopy) (*Crd, error) {
+func NewCrd(crdInf cache.SharedIndexInformer) (*Crd, error) {
 	err := crdInf.AddIndexers(cache.Indexers{
 		byGroupKindIndexName: byGroupKindIndex,
 	})
@@ -27,8 +24,7 @@ func NewCrd(crdInf cache.SharedIndexInformer, deepCopy smith.DeepCopy) (*Crd, er
 		return nil, err
 	}
 	return &Crd{
-		byIndex:  crdInf.GetIndexer().ByIndex,
-		deepCopy: deepCopy,
+		byIndex: crdInf.GetIndexer().ByIndex,
 	}, nil
 }
 
@@ -42,11 +38,7 @@ func (s *Crd) Get(resource schema.GroupKind) (*apiext_v1b1.CustomResourceDefinit
 	case 0:
 		return nil, nil
 	case 1:
-		obj, err := s.deepCopy(objs[0])
-		if err != nil {
-			return nil, err
-		}
-		crd := obj.(*apiext_v1b1.CustomResourceDefinition)
+		crd := objs[0].(*apiext_v1b1.CustomResourceDefinition).DeepCopy()
 		// Objects from type-specific informers don't have GVK set
 		crd.Kind = "CustomResourceDefinition"
 		crd.APIVersion = apiext_v1b1.SchemeGroupVersion.String()
