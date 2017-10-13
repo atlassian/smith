@@ -38,8 +38,8 @@ func (sc *SpecCheck) applyDefaults(spec runtime.Object) (*unstructured.Unstructu
 		return sc.cloneAsUnstructured(spec)
 	}
 	var clone runtime.Object
-	var err error
 	if specUnstr, ok := spec.(*unstructured.Unstructured); ok {
+		var err error
 		clone, err = sc.Scheme.New(gvk)
 		if err != nil {
 			return nil, err
@@ -48,10 +48,7 @@ func (sc *SpecCheck) applyDefaults(spec runtime.Object) (*unstructured.Unstructu
 			return nil, err
 		}
 	} else {
-		clone, err = sc.Scheme.Copy(spec)
-		if err != nil {
-			return nil, err
-		}
+		clone = spec.DeepCopyObject()
 	}
 	sc.Scheme.Default(clone)
 	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(clone)
@@ -67,18 +64,10 @@ func (sc *SpecCheck) applyDefaults(spec runtime.Object) (*unstructured.Unstructu
 // If actual matches spec then actual is returned untouched otherwise an updated object is returned.
 // Mutates spec (reuses parts of it).
 func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, bool /*match*/, error) {
-	upd, err := sc.Scheme.DeepCopy(actual)
-	if err != nil {
-		return nil, false, err
-	}
-	updated := upd.(*unstructured.Unstructured)
+	updated := actual.DeepCopy()
 	delete(updated.Object, "status")
 
-	actClone, err := sc.Scheme.DeepCopy(updated)
-	if err != nil {
-		return nil, false, err
-	}
-	actualClone := actClone.(*unstructured.Unstructured)
+	actualClone := updated.DeepCopy()
 
 	// This is to ensure those fields actually exist in underlying map whether they are nil or empty slices/map
 	actualClone.SetKind(spec.GetKind())             // Objects from type-specific informers don't have kind/api version
@@ -103,7 +92,7 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	}
 
 	// 3. Ignore fields managed by server
-	updated, err = sc.Cleaner.Cleanup(updated, actualClone)
+	updated, err := sc.Cleaner.Cleanup(updated, actualClone)
 	if err != nil {
 		return nil, false, err
 	}
@@ -133,15 +122,6 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 }
 
 func (sc *SpecCheck) cloneAsUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
-	// ------ TODO this block is a workaround for https://github.com/kubernetes/kubernetes/issues/47889
-	if _, ok := obj.(*unstructured.Unstructured); ok {
-		clone, err := sc.Scheme.DeepCopy(obj)
-		if err != nil {
-			return nil, err
-		}
-		return clone.(*unstructured.Unstructured), nil
-	}
-	// ------
 	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(obj)
 	if err != nil {
 		return nil, err

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/atlassian/smith"
-
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
@@ -200,13 +198,9 @@ type Resource struct {
 
 // ToUnstructured returns Spec field as an Unstructured object.
 // It makes a copy if it is an Unstructured already.
-func (r *Resource) ToUnstructured(copy smith.DeepCopy) (*unstructured.Unstructured, error) {
-	if _, ok := r.Spec.(*unstructured.Unstructured); ok {
-		uCopy, err := copy(r.Spec)
-		if err != nil {
-			return nil, err
-		}
-		return uCopy.(*unstructured.Unstructured), nil
+func (r *Resource) ToUnstructured() (*unstructured.Unstructured, error) {
+	if u, ok := r.Spec.(*unstructured.Unstructured); ok {
+		return u.DeepCopy(), nil
 	}
 	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(r.Spec)
 	if err != nil {

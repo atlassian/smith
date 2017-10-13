@@ -76,7 +76,7 @@ func (a *App) Run(ctx context.Context) error {
 	defer stgr.Shutdown()
 
 	// Multi store
-	multiStore := store.NewMulti(scheme.DeepCopy)
+	multiStore := store.NewMulti()
 
 	// Informers
 	bundleInf := client.BundleInformer(bundleClient.SmithV1(), a.Namespace, a.ResyncPeriod)
@@ -84,7 +84,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, a.ResyncPeriod)
 	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
-	crdStore, err := store.NewCrd(crdInf, scheme.DeepCopy)
+	crdStore, err := store.NewCrd(crdInf)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// Controller
-	bs, err := store.NewBundle(bundleInf, multiStore, scheme.DeepCopy)
+	bs, err := store.NewBundle(bundleInf, multiStore)
 	if err != nil {
 		return err
 	}
@@ -173,5 +173,5 @@ func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClie
 	}
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
 
-	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, scheme, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs)
+	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs)
 }

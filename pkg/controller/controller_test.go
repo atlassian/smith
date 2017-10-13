@@ -142,13 +142,13 @@ func (tc *testCase) run(t *testing.T) {
 	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
 	require.NoError(t, err)
 
-	multiStore := store.NewMulti(scheme.DeepCopy)
+	multiStore := store.NewMulti()
 
-	bs, err := store.NewBundle(bundleInf, multiStore, scheme.DeepCopy)
+	bs, err := store.NewBundle(bundleInf, multiStore)
 	require.NoError(t, err)
 	resourceInfs := apitypes.ResourceInformers(mainClient, scClient, meta_v1.NamespaceAll, 0, true)
 
-	crdStore, err := store.NewCrd(crdInf, scheme.DeepCopy)
+	crdStore, err := store.NewCrd(crdInf)
 	require.NoError(t, err)
 
 	// Ready Checker
@@ -199,7 +199,6 @@ func (tc *testCase) run(t *testing.T) {
 		bs,
 		sc,
 		rc,
-		scheme,
 		multiStore,
 		specCheck,
 		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle"),

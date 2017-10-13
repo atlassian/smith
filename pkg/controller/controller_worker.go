@@ -80,11 +80,7 @@ func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
 	}
 
 	// Deep-copy otherwise we are mutating our cache.
-	bundleObjCopy, err := c.scheme.DeepCopy(bundleObj)
-	if err != nil {
-		return false, err
-	}
-	bundle := bundleObjCopy.(*smith_v1.Bundle)
+	bundle := bundleObj.(*smith_v1.Bundle).DeepCopy()
 	var isReady, retriable bool
 	isReady, retriable, err = c.process(bundle)
 	if err != nil && api_errors.IsConflict(errors.Cause(err)) {
@@ -179,7 +175,7 @@ func (c *BundleController) checkResource(bundle *smith_v1.Bundle, res *smith_v1.
 // evalSpec evaluates the resource specification and returns the result.
 func (c *BundleController) evalSpec(bundle *smith_v1.Bundle, res *smith_v1.Resource, readyResources map[smith_v1.ResourceName]*unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	// 0. Convert to Unstructured
-	spec, err := res.ToUnstructured(c.scheme.DeepCopy)
+	spec, err := res.ToUnstructured()
 	if err != nil {
 		return nil, err
 	}
