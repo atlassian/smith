@@ -8,7 +8,6 @@ import (
 
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util/graph"
 
 	"github.com/pkg/errors"
@@ -273,7 +272,7 @@ func (c *BundleController) updateResource(bundle *smith_v1.Bundle, resClient dyn
 	}
 
 	// Check that this bundle owns the object
-	if !isOwner(actualMeta, bundle) {
+	if !meta_v1.IsControlledBy(actualMeta, bundle) {
 		return nil, false, fmt.Errorf("object %v %q is not owned by the Bundle", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName())
 	}
 
@@ -313,7 +312,7 @@ func (c *BundleController) deleteRemovedResources(bundle *smith_v1.Bundle) (retr
 			// Object is marked for deletion already
 			continue
 		}
-		if !isOwner(m, bundle) {
+		if !meta_v1.IsControlledBy(m, bundle) {
 			// Object is not owned by that bundle
 			log.Printf("[WORKER][%s/%s] Object %v %q is not owned by the bundle with UID=%q. Owner references: %v",
 				bundle.Namespace, bundle.Name, obj.GetObjectKind().GroupVersionKind(), m.GetName(), bundle.GetUID(), m.GetOwnerReferences())
@@ -433,14 +432,6 @@ func mergeLabels(labels ...map[string]string) map[string]string {
 		}
 	}
 	return result
-}
-
-func isOwner(obj meta_v1.Object, bundle *smith_v1.Bundle) bool {
-	ref := resources.GetControllerOf(obj)
-	// Theoretically Bundle may be represented by multiple API versions, hence we only check name and UID.
-	return ref != nil &&
-		ref.Name == bundle.Name &&
-		ref.UID == bundle.UID
 }
 
 func sortBundle(bundle *smith_v1.Bundle) (*graph.Graph, []graph.V, error) {
