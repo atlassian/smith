@@ -58,13 +58,13 @@ func serviceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unst
 		}
 	}
 
-	var err error
-	updatedObj := &unstructured.Unstructured{}
-	updatedObj.Object, err = unstructured_conversion.DefaultConverter.ToUnstructured(&serviceSpec)
+	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(&serviceSpec)
 	if err != nil {
 		return nil, err
 	}
-	return updatedObj, nil
+	return &unstructured.Unstructured{
+		Object: u,
+	}, nil
 }
 
 func scServiceBindingCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -80,13 +80,13 @@ func scServiceBindingCleanup(spec, actual *unstructured.Unstructured) (*unstruct
 	sicSpec.Spec.ExternalID = sicActual.Spec.ExternalID
 	sicSpec.Status = sicActual.Status
 
-	var err error
-	updatedObj := &unstructured.Unstructured{}
-	updatedObj.Object, err = unstructured_conversion.DefaultConverter.ToUnstructured(&sicSpec)
+	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(&sicSpec)
 	if err != nil {
 		return nil, err
 	}
-	return updatedObj, nil
+	return &unstructured.Unstructured{
+		Object: u,
+	}, nil
 }
 
 func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -101,11 +101,11 @@ func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstruc
 
 	instanceSpec.Spec.ExternalID = instanceActual.Spec.ExternalID
 
-	var err error
-	updatedObj := &unstructured.Unstructured{}
-	updatedObj.Object, err = unstructured_conversion.DefaultConverter.ToUnstructured(&instanceSpec)
+	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(&instanceSpec)
 	if err != nil {
 		return nil, err
 	}
-	return updatedObj, nil
+	return &unstructured.Unstructured{
+		Object: u,
+	}, nil
 }

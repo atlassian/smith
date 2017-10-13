@@ -208,13 +208,13 @@ func (r *Resource) ToUnstructured(copy smith.DeepCopy) (*unstructured.Unstructur
 		}
 		return uCopy.(*unstructured.Unstructured), nil
 	}
-	u := &unstructured.Unstructured{}
-	var err error
-	u.Object, err = unstructured_conversion.DefaultConverter.ToUnstructured(r.Spec)
+	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(r.Spec)
 	if err != nil {
 		return nil, err
 	}
-	return u, nil
+	return &unstructured.Unstructured{
+		Object: u,
+	}, nil
 }
 
 func (r *Resource) UnmarshalJSON(data []byte) error {
