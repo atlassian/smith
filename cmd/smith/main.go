@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -45,6 +47,7 @@ func runWithContext(ctx context.Context) error {
 	scInsecure := flag.Bool("service-catalog-insecure", false, "Disable TLS validation for Service Catalog")
 	flag.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flag.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
+	pprofAddr := flag.String("pprof-address", "", "Address for pprof to listen on")
 	flag.Parse()
 
 	config, err := client.ConfigFromEnv()
@@ -67,6 +70,12 @@ func runWithContext(ctx context.Context) error {
 			scConfig.Host = *scUrl
 		}
 		a.ServiceCatalogConfig = &scConfig
+	}
+
+	if pprofAddr != nil && *pprofAddr != "" {
+		go func() {
+			log.Fatalf("pprof server failed: %v", http.ListenAndServe(*pprofAddr, nil))
+		}()
 	}
 
 	return a.Run(ctx)
