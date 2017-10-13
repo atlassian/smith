@@ -5,14 +5,16 @@ import (
 
 	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	sc_v1a1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1alpha1"
 	apps_v1b1 "k8s.io/api/apps/v1beta1"
 	api_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	settings_v1a1 "k8s.io/api/settings/v1alpha1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
+	apps_v1b1inf "k8s.io/client-go/informers/apps/v1beta1"
+	core_v1inf "k8s.io/client-go/informers/core/v1"
+	ext_v1b1inf "k8s.io/client-go/informers/extensions/v1beta1"
+	settings_v1a1inf "k8s.io/client-go/informers/settings/v1alpha1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 )
@@ -20,151 +22,21 @@ import (
 func ResourceInformers(mainClient kubernetes.Interface, scClient scClientset.Interface, namespace string, resyncPeriod time.Duration, enablePodPreset bool) map[schema.GroupVersionKind]cache.SharedIndexInformer {
 	// Core API types
 	infs := map[schema.GroupVersionKind]cache.SharedIndexInformer{
-		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):     ingressInformer(mainClient, namespace, resyncPeriod),
-		api_v1.SchemeGroupVersion.WithKind("Service"):       serviceInformer(mainClient, namespace, resyncPeriod),
-		api_v1.SchemeGroupVersion.WithKind("ConfigMap"):     configMapInformer(mainClient, namespace, resyncPeriod),
-		api_v1.SchemeGroupVersion.WithKind("Secret"):        secretInformer(mainClient, namespace, resyncPeriod),
-		apps_v1b1.SchemeGroupVersion.WithKind("Deployment"): deploymentAppsInformer(mainClient, namespace, resyncPeriod),
+		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):     ext_v1b1inf.NewIngressInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		api_v1.SchemeGroupVersion.WithKind("Service"):       core_v1inf.NewServiceInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		api_v1.SchemeGroupVersion.WithKind("ConfigMap"):     core_v1inf.NewConfigMapInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		api_v1.SchemeGroupVersion.WithKind("Secret"):        core_v1inf.NewSecretInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		apps_v1b1.SchemeGroupVersion.WithKind("Deployment"): apps_v1b1inf.NewDeploymentInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
 	}
 	if enablePodPreset {
-		infs[settings_v1a1.SchemeGroupVersion.WithKind("PodPreset")] = podPresetInformer(mainClient, namespace, resyncPeriod)
+		infs[settings_v1a1.SchemeGroupVersion.WithKind("PodPreset")] = settings_v1a1inf.NewPodPresetInformer(mainClient, namespace, resyncPeriod, cache.Indexers{})
 	}
 
 	// Service Catalog types
 	if scClient != nil {
-		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceBinding")] = serviceBindingInformer(scClient, namespace, resyncPeriod)
-		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceInstance")] = serviceInstanceInformer(scClient, namespace, resyncPeriod)
+		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceBinding")] = sc_v1a1inf.NewServiceBindingInformer(scClient, namespace, resyncPeriod, cache.Indexers{})
+		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceInstance")] = sc_v1a1inf.NewServiceInstanceInformer(scClient, namespace, resyncPeriod, cache.Indexers{})
 	}
 
 	return infs
-}
-
-// TODO replace methods below with upstream functions https://github.com/kubernetes/kubernetes/issues/45939
-
-func ingressInformer(mainClient kubernetes.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return mainClient.ExtensionsV1beta1().Ingresses(namespace).List(options)
-			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return mainClient.ExtensionsV1beta1().Ingresses(namespace).Watch(options)
-			},
-		},
-		&ext_v1b1.Ingress{},
-		resyncPeriod,
-		cache.Indexers{},
-	)
-}
-
-func serviceInformer(mainClient kubernetes.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return mainClient.CoreV1().Services(namespace).List(options)
-			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return mainClient.CoreV1().Services(namespace).Watch(options)
-			},
-		},
-		&api_v1.Service{},
-		resyncPeriod,
-		cache.Indexers{},
-	)
-}
-
-func configMapInformer(mainClient kubernetes.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return mainClient.CoreV1().ConfigMaps(namespace).List(options)
-			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return mainClient.CoreV1().ConfigMaps(namespace).Watch(options)
-			},
-		},
-		&api_v1.ConfigMap{},
-		resyncPeriod,
-		cache.Indexers{},
-	)
-}
-
-func secretInformer(mainClient kubernetes.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return mainClient.CoreV1().Secrets(namespace).List(options)
-			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return mainClient.CoreV1().Secrets(namespace).Watch(options)
-			},
-		},
-		&api_v1.Secret{},
-		resyncPeriod,
-		cache.Indexers{},
-	)
-}
-
-func deploymentAppsInformer(mainClient kubernetes.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return mainClient.AppsV1beta1().Deployments(namespace).List(options)
-			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return mainClient.AppsV1beta1().Deployments(namespace).Watch(options)
-			},
-		},
-		&apps_v1b1.Deployment{},
-		resyncPeriod,
-		cache.Indexers{},
-	)
-}
-
-func podPresetInformer(mainClient kubernetes.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return mainClient.SettingsV1alpha1().PodPresets(namespace).List(options)
-			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return mainClient.SettingsV1alpha1().PodPresets(namespace).Watch(options)
-			},
-		},
-		&settings_v1a1.PodPreset{},
-		resyncPeriod,
-		cache.Indexers{},
-	)
-}
-
-func serviceBindingInformer(scClient scClientset.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return scClient.ServicecatalogV1alpha1().ServiceBindings(namespace).List(options)
-			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return scClient.ServicecatalogV1alpha1().ServiceBindings(namespace).Watch(options)
-			},
-		},
-		&sc_v1a1.ServiceBinding{},
-		resyncPeriod,
-		cache.Indexers{},
-	)
-}
-
-func serviceInstanceInformer(scClient scClientset.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return scClient.ServicecatalogV1alpha1().ServiceInstances(namespace).List(options)
-			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return scClient.ServicecatalogV1alpha1().ServiceInstances(namespace).Watch(options)
-			},
-		},
-		&sc_v1a1.ServiceInstance{},
-		resyncPeriod,
-		cache.Indexers{},
-	)
 }
