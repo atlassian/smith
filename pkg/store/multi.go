@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/resources"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -115,7 +114,7 @@ func byNamespaceAndBundleNameIndex(obj interface{}) ([]string, error) {
 		return []string{string(key)}, nil
 	}
 	m := obj.(meta_v1.Object)
-	ref := resources.GetControllerOf(m)
+	ref := meta_v1.GetControllerOf(m)
 	if ref != nil && ref.APIVersion == smith_v1.BundleResourceGroupVersion && ref.Kind == smith_v1.BundleResourceKind {
 		return []string{ByNamespaceAndBundleNameIndexKey(m.GetNamespace(), ref.Name)}, nil
 	}

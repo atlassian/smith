@@ -4,7 +4,6 @@ import (
 	"log"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/resources"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,7 +74,7 @@ func (c *BundleController) rebuildByName(namespace, bundleName, addUpdateDelete 
 func getBundleNameAndNamespace(obj interface{}) (string, string) {
 	var bundleName string
 	meta := obj.(meta_v1.Object)
-	ref := resources.GetControllerOf(meta)
+	ref := meta_v1.GetControllerOf(meta)
 	if ref != nil && ref.APIVersion == smith_v1.BundleResourceGroupVersion && ref.Kind == smith_v1.BundleResourceKind {
 		bundleName = ref.Name
 	}
