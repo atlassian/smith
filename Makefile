@@ -10,6 +10,9 @@ setup-ci:
 	dep ensure
 	# workaround https://github.com/kubernetes/kubernetes/issues/50975
 	cp fixed_BUILD_for_sets.bazel vendor/k8s.io/apimachinery/pkg/util/sets/BUILD
+	# workaround https://github.com/bazelbuild/rules_go/issues/900
+	rm $$(find ./vendor -type f -name '*.proto')
+	bazel run //:gazelle-fix
 
 update-bazel:
 	bazel run //:gazelle
