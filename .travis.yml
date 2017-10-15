@@ -6,7 +6,7 @@ cache:
     - $GOPATH/pkg/dep
 
 go:
-  - 1.9
+  - 1.9.1
 
 os:
   - linux
@@ -17,20 +17,20 @@ env:
     - secure: "Hv6Sj29d9gI63bORCGHVeX5KqEryAAXf9INQL1ABs33a46wVzGCHM/9H/mE3FItHN7RZaeOEeUoDSePOt/8NBtZSAZ1PvbqhMgztvSWtweS9ezzClUHxN3BRZPSyNmZdrK0S9fo+NXgcgqcmOM9gQzrAduHIkWOOwdSGWgT6zNlAZovddwJ8RUtKavZ7U4szJyMtzlQ8S2K8PdTX9glH1U+8ZLHr54uDrhl3WqsCoBEV0GV59eOIaIseDorCEscVj1EDYCPdkYdU6/AWiuUlqXeOvC67CLcu/5W8m05YWXrEhKG+17jEWRPM+G+Kiyj6HccvjTTaXqTsx9ZLuWmSt86mgo15DmJlVtzpvkptgHhheDyp5MkifValXN3gvWzk3VqjHIUh81dP2o8iAWrGfJcYg+8hdv/obfNGvfcSKwgdefIp4B6f/VRvIySvHUqKavj2fEAGDMYHqahHyKGF/VegHuQbCT+F+mI+GdAwun7XzuDVAlftnbrl2kPq7Kjs+ahU4ZIU4pk6eY15rh/WPlR2v0M7O4nfv1IoyHh9F/G6foqwqDoT+RBF1VMr9WDEezz5B35si6ILI/+SG/7BnbHkFRGorOw86ZqMoIs7dkdpz8uHiz+ba83COuASbrHUMfTG3HQ65XY7puqccSPBQzg7yoVmqPUJJNkaroVMWmU="
 
 before_install:
+  - go get -u github.com/golang/dep/cmd/dep
   - |
-    go get -u github.com/golang/dep/cmd/dep
-    V=0.5.4
+    V=0.6.1
     OS=linux
     wget -nv -O install.sh "https://github.com/bazelbuild/bazel/releases/download/${V}/bazel-${V}-installer-${OS}-x86_64.sh"
     chmod +x install.sh
     ./install.sh --user
     rm -f install.sh
+    mv .bazelrc.travis .bazelrc
 
 install:
   - make setup-ci
 
 script:
-  - mv .bazelrc.travis .bazelrc
   - make verify
   - make update-bazel
   - make test-ci
