@@ -6,6 +6,13 @@ gazelle(
     prefix = "github.com/atlassian/smith",
 )
 
+gazelle(
+    name = "gazelle-fix",
+    command = "fix",
+    external = "vendored",
+    prefix = "github.com/atlassian/smith",
+)
+
 go_library(
     name = "go_default_library",
     srcs = [
