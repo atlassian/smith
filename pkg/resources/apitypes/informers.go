@@ -3,9 +3,9 @@ package apitypes
 import (
 	"time"
 
-	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
-	sc_v1a1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1alpha1"
+	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
 	apps_v1b1 "k8s.io/api/apps/v1beta1"
 	api_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
@@ -34,8 +34,8 @@ func ResourceInformers(mainClient kubernetes.Interface, scClient scClientset.Int
 
 	// Service Catalog types
 	if scClient != nil {
-		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceBinding")] = sc_v1a1inf.NewServiceBindingInformer(scClient, namespace, resyncPeriod, cache.Indexers{})
-		infs[sc_v1a1.SchemeGroupVersion.WithKind("ServiceInstance")] = sc_v1a1inf.NewServiceInstanceInformer(scClient, namespace, resyncPeriod, cache.Indexers{})
+		infs[sc_v1b1.SchemeGroupVersion.WithKind("ServiceBinding")] = sc_v1b1inf.NewServiceBindingInformer(scClient, namespace, resyncPeriod, cache.Indexers{})
+		infs[sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance")] = sc_v1b1inf.NewServiceInstanceInformer(scClient, namespace, resyncPeriod, cache.Indexers{})
 	}
 
 	return infs

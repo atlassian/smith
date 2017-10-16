@@ -3,7 +3,7 @@ package types
 import (
 	"github.com/atlassian/smith/pkg/readychecker"
 
-	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	apps_v1b1 "k8s.io/api/apps/v1beta1"
 	api_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
@@ -23,8 +23,8 @@ var MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
-	{Group: sc_v1a1.GroupName, Kind: "ServiceBinding"}:  isScServiceBindingReady,
-	{Group: sc_v1a1.GroupName, Kind: "ServiceInstance"}: isScServiceInstanceReady,
+	{Group: sc_v1b1.GroupName, Kind: "ServiceBinding"}:  isScServiceBindingReady,
+	{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: isScServiceInstanceReady,
 }
 
 func alwaysReady(_ *unstructured.Unstructured) (isReady, retriableError bool, e error) {
@@ -49,24 +49,24 @@ func isDeploymentReady(obj *unstructured.Unstructured) (isReady, retriableError 
 }
 
 func isScServiceBindingReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
-	var sic sc_v1a1.ServiceBinding
+	var sic sc_v1b1.ServiceBinding
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &sic); err != nil {
 		return false, false, err
 	}
-	readyCond := getServiceBindingCondition(&sic, sc_v1a1.ServiceBindingConditionReady)
-	return readyCond != nil && readyCond.Status == sc_v1a1.ConditionTrue, false, nil
+	readyCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionReady)
+	return readyCond != nil && readyCond.Status == sc_v1b1.ConditionTrue, false, nil
 }
 
 func isScServiceInstanceReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
-	var instance sc_v1a1.ServiceInstance
+	var instance sc_v1b1.ServiceInstance
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &instance); err != nil {
 		return false, false, err
 	}
-	readyCond := getServiceInstanceCondition(&instance, sc_v1a1.ServiceInstanceConditionReady)
-	return readyCond != nil && readyCond.Status == sc_v1a1.ConditionTrue, false, nil
+	readyCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionReady)
+	return readyCond != nil && readyCond.Status == sc_v1b1.ConditionTrue, false, nil
 }
 
-func getServiceInstanceCondition(instance *sc_v1a1.ServiceInstance, conditionType sc_v1a1.ServiceInstanceConditionType) *sc_v1a1.ServiceInstanceCondition {
+func getServiceInstanceCondition(instance *sc_v1b1.ServiceInstance, conditionType sc_v1b1.ServiceInstanceConditionType) *sc_v1b1.ServiceInstanceCondition {
 	for _, condition := range instance.Status.Conditions {
 		if condition.Type == conditionType {
 			return &condition
@@ -75,7 +75,7 @@ func getServiceInstanceCondition(instance *sc_v1a1.ServiceInstance, conditionTyp
 	return nil
 }
 
-func getServiceBindingCondition(instance *sc_v1a1.ServiceBinding, conditionType sc_v1a1.ServiceBindingConditionType) *sc_v1a1.ServiceBindingCondition {
+func getServiceBindingCondition(instance *sc_v1b1.ServiceBinding, conditionType sc_v1b1.ServiceBindingConditionType) *sc_v1b1.ServiceBindingCondition {
 	for _, condition := range instance.Status.Conditions {
 		if condition.Type == conditionType {
 			return &condition

@@ -7,35 +7,35 @@ import (
 	"github.com/atlassian/smith/it"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
-	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	api_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestServiceCatalog(t *testing.T) {
 	t.Parallel()
-	instance := &sc_v1a1.ServiceInstance{
+	instance := &sc_v1b1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
-			APIVersion: sc_v1a1.SchemeGroupVersion.String(),
+			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "instance1",
 		},
-		Spec: sc_v1a1.ServiceInstanceSpec{
+		Spec: sc_v1b1.ServiceInstanceSpec{
 			ExternalClusterServiceClassName: "user-provided-service",
 			ExternalClusterServicePlanName:  "default",
 		},
 	}
-	binding := &sc_v1a1.ServiceBinding{
+	binding := &sc_v1b1.ServiceBinding{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceBinding",
-			APIVersion: sc_v1a1.SchemeGroupVersion.String(),
+			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "binding1",
 		},
-		Spec: sc_v1a1.ServiceBindingSpec{
+		Spec: sc_v1b1.ServiceBindingSpec{
 			ServiceInstanceRef: api_v1.LocalObjectReference{
 				Name: instance.Name,
 			},

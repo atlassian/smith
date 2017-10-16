@@ -3,7 +3,7 @@ package apitypes
 import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
-	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	apps_v1b1 "k8s.io/api/apps/v1beta1"
 	api_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
@@ -23,7 +23,7 @@ func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
 	sb.Register(settings_v1a1.SchemeBuilder...)
 	sb.Register(apiext_v1b1.SchemeBuilder...)
 	if serviceCatalog {
-		sb.Register(sc_v1a1.SchemeBuilder...)
+		sb.Register(sc_v1b1.SchemeBuilder...)
 	}
 	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
 	if err := sb.AddToScheme(scheme); err != nil {

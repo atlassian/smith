@@ -129,9 +129,9 @@
 
 [[projects]]
   name = "github.com/kubernetes-incubator/service-catalog"
-  packages = ["pkg/apis/servicecatalog","pkg/apis/servicecatalog/v1alpha1","pkg/client/clientset_generated/clientset","pkg/client/clientset_generated/clientset/fake","pkg/client/clientset_generated/clientset/scheme","pkg/client/clientset_generated/clientset/typed/servicecatalog/v1alpha1","pkg/client/clientset_generated/clientset/typed/servicecatalog/v1alpha1/fake"]
-  revision = "8f55a995ea0184a1c127ac5938ff0e9640389ddb"
-  version = "v0.0.24"
+  packages = ["pkg/apis/servicecatalog","pkg/apis/servicecatalog/v1beta1","pkg/client/clientset_generated/clientset","pkg/client/clientset_generated/clientset/fake","pkg/client/clientset_generated/clientset/scheme","pkg/client/clientset_generated/clientset/typed/servicecatalog/v1beta1","pkg/client/clientset_generated/clientset/typed/servicecatalog/v1beta1/fake"]
+  revision = "ffd6b8be6c33346eadcffb74c5d37d2c32e1b93d"
+  version = "v0.1.0-rc1"
 
 [[projects]]
   branch = "master"
@@ -238,6 +238,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8848dce0a8a1668ddeb0e3dd6051d5a007ded0f963639dc26fdcebea97de98de"
+  inputs-digest = "3d5c7568828bbed42468923d427d29dce3ed25e42726bbb41d68ff0f0800ca5c"
   solver-name = "gps-cdcl"
   solver-version = 1

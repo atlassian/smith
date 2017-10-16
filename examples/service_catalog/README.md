@@ -12,7 +12,7 @@ Imagine that we want to deploy a service to Kubernetes, which consists of:
 ![Application diagram](img/Application_example.png?raw=true "Application diagram")
 
 For provisioning resources in AWS we can use [Service Catalog](https://github.com/kubernetes-incubator/service-catalog).
-It allows us to provision resources through [Open Service Broker API](https://github.com/openservicebrokerapi/servicebroker) 
+It allows us to provision resources through [Open Service Broker API](https://github.com/openservicebrokerapi/servicebroker)
 and produce Kubernetes Secret objects with credentials which we can inject as environment variables into Pods using PodPresets.
 
 The resulting graph of Kubernetes and Service Catalog objects consists of:
@@ -42,7 +42,7 @@ spec:
 
   - name: instance1
     spec:
-      apiVersion: servicecatalog.k8s.io/v1alpha1
+      apiVersion: servicecatalog.k8s.io/v1beta1
       kind: ServiceInstance
       metadata:
         name: instance1
@@ -58,7 +58,7 @@ spec:
     dependsOn:
     - instance1
     spec:
-      apiVersion: servicecatalog.k8s.io/v1alpha1
+      apiVersion: servicecatalog.k8s.io/v1beta1
       kind: ServiceBinding
       metadata:
         name: binding1
@@ -71,7 +71,7 @@ spec:
     dependsOn:
     - instance1
     spec:
-      apiVersion: servicecatalog.k8s.io/v1alpha1
+      apiVersion: servicecatalog.k8s.io/v1beta1
       kind: Binding
       metadata:
         name: binding2
@@ -85,7 +85,7 @@ spec:
     - binding1
     - binding2
     spec:
-      apiVersion: settings.k8s.io/v1alpha1
+      apiVersion: settings.k8s.io/v1beta1
       kind: PodPreset
       metadata:
         name: podpreset1
