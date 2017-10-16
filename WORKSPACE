@@ -12,19 +12,19 @@ git_repository(
 
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains")
 load("@io_bazel_rules_go//proto:def.bzl", "proto_register_toolchains")
-load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker_pull")
+load("@io_bazel_rules_docker//container:container.bzl", "container_pull", container_repositories = "repositories")
 
 go_rules_dependencies()
 go_register_toolchains()
 proto_register_toolchains()
 
-docker_repositories()
+container_repositories()
 
 # https://github.com/GoogleCloudPlatform/distroless/blob/master/base/README.md
-docker_pull(
+container_pull(
     name = "distroless_base",
     digest = "sha256:872f258db0668e5cabfe997d4076b2fe5337e5b73cdd9ca47c7dbccd87e71341",
     registry = "gcr.io",
     repository = "distroless/base",
-    tag = "latest",  # ignored, but kept here for documentation
+    #tag = "latest",  # ignored, but kept here for documentation
 )
