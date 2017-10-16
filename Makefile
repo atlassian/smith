@@ -133,13 +133,13 @@ check-all:
 		--dupl-threshold=65
 
 docker:
-	bazel build --cpu=k8 //cmd/smith:docker
+	bazel build --cpu=k8 //cmd/smith:container
 
 # Export docker image into local Docker
 docker-export:
-	bazel run --cpu=k8 //cmd/smith:docker
+	bazel run --cpu=k8 //cmd/smith:container
 
 release: update-bazel
-	bazel run --cpu=k8 //cmd/smith:push-docker
+	bazel run --cpu=k8 //cmd/smith:push-container
 
 .PHONY: build

@@ -1,5 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
-load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_push")
+load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_push")
 
 go_library(
     name = "go_default_library",
@@ -32,18 +32,19 @@ go_binary(
     visibility = ["//visibility:public"],
 )
 
-docker_build(
-    name = "docker",
+container_image(
+    name = "container",
     base = "@distroless_base//image",
     entrypoint = ["/smith"],
     files = [":smith"],
 )
 
-docker_push(
-    name = "push-docker",
-    image = ":docker",
-    registry = "index.docker.io",
-    repository = "atlassianlabs/smith",
+container_push(
+    name = "push-container",
+    format = "Docker",
+    image = ":container",
+    registry = "docker.atl-paas.net",
+    repository = "micros/smith",
     stamp = True,
     tag = "{STABLE_BUILD_GIT_TAG}-{STABLE_BUILD_GIT_COMMIT}",
 )
