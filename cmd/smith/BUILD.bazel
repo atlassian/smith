@@ -42,9 +42,9 @@ container_image(
 container_push(
     name = "push-container",
     format = "Docker",
-    image = ":container",
-    registry = "docker.atl-paas.net",
-    repository = "micros/smith",
+    image = ":docker",
+    registry = "index.docker.io",
+    repository = "atlassianlabs/smith",
     stamp = True,
     tag = "{STABLE_BUILD_GIT_TAG}-{STABLE_BUILD_GIT_COMMIT}",
 )
