@@ -72,7 +72,7 @@ spec:
     - instance1
     spec:
       apiVersion: servicecatalog.k8s.io/v1beta1
-      kind: Binding
+      kind: ServiceBinding
       metadata:
         name: binding2
       spec:
