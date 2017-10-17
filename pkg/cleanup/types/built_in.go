@@ -3,7 +3,7 @@ package types
 import (
 	"github.com/atlassian/smith/pkg/cleanup"
 
-	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	apps_v1b1 "k8s.io/api/apps/v1beta1"
 	api_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -17,8 +17,8 @@ var MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
-	{Group: sc_v1a1.GroupName, Kind: "ServiceBinding"}:  scServiceBindingCleanup,
-	{Group: sc_v1a1.GroupName, Kind: "ServiceInstance"}: scServiceInstanceCleanup,
+	{Group: sc_v1b1.GroupName, Kind: "ServiceBinding"}:  scServiceBindingCleanup,
+	{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: scServiceInstanceCleanup,
 }
 
 func deploymentCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -68,11 +68,11 @@ func serviceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unst
 }
 
 func scServiceBindingCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	var sicSpec sc_v1a1.ServiceBinding
+	var sicSpec sc_v1b1.ServiceBinding
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &sicSpec); err != nil {
 		return nil, err
 	}
-	var sicActual sc_v1a1.ServiceBinding
+	var sicActual sc_v1b1.ServiceBinding
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &sicActual); err != nil {
 		return nil, err
 	}
@@ -90,13 +90,21 @@ func scServiceBindingCleanup(spec, actual *unstructured.Unstructured) (*unstruct
 }
 
 func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	var instanceSpec sc_v1a1.ServiceInstance
+	var instanceSpec sc_v1b1.ServiceInstance
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &instanceSpec); err != nil {
 		return nil, err
 	}
-	var instanceActual sc_v1a1.ServiceInstance
+	var instanceActual sc_v1b1.ServiceInstance
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &instanceActual); err != nil {
 		return nil, err
+	}
+
+	if instanceActual.Spec.ExternalClusterServiceClassName == instanceSpec.Spec.ExternalClusterServiceClassName {
+		instanceSpec.Spec.ClusterServiceClassRef = instanceActual.Spec.ClusterServiceClassRef
+	}
+
+	if instanceActual.Spec.ExternalClusterServicePlanName == instanceSpec.Spec.ExternalClusterServicePlanName {
+		instanceSpec.Spec.ClusterServicePlanRef = instanceActual.Spec.ClusterServicePlanRef
 	}
 
 	instanceSpec.Spec.ExternalID = instanceActual.Spec.ExternalID

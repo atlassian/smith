@@ -99,7 +99,9 @@ minikube-run-sc: fmt update-bazel
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel run //cmd/smith:smith-race -- -service-catalog-url="https://$$(minikube ip):30443"
+	bazel run //cmd/smith:smith-race -- \
+	-service-catalog-url="https://$$(minikube ip):30443" \
+	-service-catalog-insecure
 
 minikube-sleeper-run: fmt update-bazel
 	KUBE_PATCH_CONVERSION_DETECTOR=true \

@@ -3,7 +3,7 @@ package smart
 import (
 	"fmt"
 
-	sc_v1a1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +61,7 @@ func NewClient(config, scConfig *rest.Config, clientset kubernetes.Interface, sc
 func (c *DynamicClient) ForGVK(gvk schema.GroupVersionKind, namespace string) (dynamic.ResourceInterface, error) {
 	var clients ClientPool
 	var m Mapper
-	if gvk.Group == sc_v1a1.GroupName {
+	if gvk.Group == sc_v1b1.GroupName {
 		if c.ScDynamic == nil {
 			return nil, fmt.Errorf("client for Service Catalog is not configured, cannot work with object %s", gvk)
 		}
