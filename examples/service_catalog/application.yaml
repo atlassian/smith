@@ -49,7 +49,7 @@ spec:
     - binding1
     - binding2
     spec:
-      apiVersion: settings.k8s.io/v1beta1
+      apiVersion: settings.k8s.io/v1alpha1
       kind: PodPreset
       metadata:
         name: podpreset1
