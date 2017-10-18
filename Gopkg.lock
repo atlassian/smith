@@ -118,8 +118,8 @@
 [[projects]]
   name = "github.com/json-iterator/go"
   packages = ["."]
-  revision = "6ed27152e0428abfde127acb33b08b03a1e67cac"
-  version = "1.0.2"
+  revision = "6240e1e7983a85228f7fd9c3e1b6932d46ec58e2"
+  version = "1.0.3"
 
 [[projects]]
   branch = "master"
@@ -130,14 +130,14 @@
 [[projects]]
   name = "github.com/kubernetes-incubator/service-catalog"
   packages = ["pkg/apis/servicecatalog","pkg/apis/servicecatalog/v1beta1","pkg/client/clientset_generated/clientset","pkg/client/clientset_generated/clientset/fake","pkg/client/clientset_generated/clientset/scheme","pkg/client/clientset_generated/clientset/typed/servicecatalog/v1beta1","pkg/client/clientset_generated/clientset/typed/servicecatalog/v1beta1/fake","pkg/client/informers_generated/externalversions/internalinterfaces","pkg/client/informers_generated/externalversions/servicecatalog/v1beta1","pkg/client/listers_generated/servicecatalog/v1beta1"]
-  revision = "ffd6b8be6c33346eadcffb74c5d37d2c32e1b93d"
-  version = "v0.1.0-rc1"
+  revision = "bcf37fdc36b9a61c349a68958f0c4c2985bc7e72"
+  version = "v0.1.0-rc2"
 
 [[projects]]
   branch = "master"
   name = "github.com/mailru/easyjson"
   packages = ["buffer","jlexer","jwriter"]
-  revision = "2a92e673c9a6302dd05c3a691ae1f24aef46457d"
+  revision = "3fd5e860b68f3cc81671ece2e226c78a6bbf54d3"
 
 [[projects]]
   branch = "master"
@@ -185,13 +185,13 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","http2","http2/hpack","idna","lex/httplex"]
-  revision = "a04bdaca5b32abe1c069418fb7088ae607de5bd0"
+  revision = "1087133bc4af3073e18add999345c6ae75918503"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable","width"]
-  revision = "825fc78a2fd6fa0a5447e300189e3219e05e1f25"
+  revision = "c01e4764d870b77f8abe5096ee19ad20d80e8075"
 
 [[projects]]
   name = "gopkg.in/inf.v0"
@@ -209,7 +209,7 @@
   branch = "release-1.8"
   name = "k8s.io/api"
   packages = ["admissionregistration/v1alpha1","apps/v1beta1","apps/v1beta2","authentication/v1","authentication/v1beta1","authorization/v1","authorization/v1beta1","autoscaling/v1","autoscaling/v2beta1","batch/v1","batch/v1beta1","batch/v2alpha1","certificates/v1beta1","core/v1","extensions/v1beta1","networking/v1","policy/v1beta1","rbac/v1","rbac/v1alpha1","rbac/v1beta1","scheduling/v1alpha1","settings/v1alpha1","storage/v1","storage/v1beta1"]
-  revision = "fe29995db37613b9c5b2a647544cf627bfa8d299"
+  revision = "6c6dac0277229b9e9578c5ca3f74a4345d35cdc2"
 
 [[projects]]
   branch = "release-1.8"
@@ -221,13 +221,13 @@
   branch = "release-1.8"
   name = "k8s.io/apimachinery"
   packages = ["pkg/api/equality","pkg/api/errors","pkg/api/meta","pkg/api/resource","pkg/apis/meta/internalversion","pkg/apis/meta/v1","pkg/apis/meta/v1/unstructured","pkg/apis/meta/v1alpha1","pkg/conversion","pkg/conversion/queryparams","pkg/conversion/unstructured","pkg/fields","pkg/labels","pkg/runtime","pkg/runtime/schema","pkg/runtime/serializer","pkg/runtime/serializer/json","pkg/runtime/serializer/protobuf","pkg/runtime/serializer/recognizer","pkg/runtime/serializer/streaming","pkg/runtime/serializer/versioning","pkg/selection","pkg/types","pkg/util/cache","pkg/util/clock","pkg/util/diff","pkg/util/errors","pkg/util/framer","pkg/util/intstr","pkg/util/json","pkg/util/net","pkg/util/runtime","pkg/util/sets","pkg/util/validation","pkg/util/validation/field","pkg/util/wait","pkg/util/yaml","pkg/version","pkg/watch","third_party/forked/golang/reflect"]
-  revision = "9d38e20d609d27e00d4ec18f7b9db67105a2bde0"
+  revision = "019ae5ada31de202164b118aee88ee2d14075c31"
 
 [[projects]]
   branch = "release-5.0"
   name = "k8s.io/client-go"
   packages = ["discovery","discovery/fake","dynamic","informers/apps/v1beta1","informers/core/v1","informers/extensions/v1beta1","informers/internalinterfaces","informers/settings/v1alpha1","kubernetes","kubernetes/fake","kubernetes/scheme","kubernetes/typed/admissionregistration/v1alpha1","kubernetes/typed/admissionregistration/v1alpha1/fake","kubernetes/typed/apps/v1beta1","kubernetes/typed/apps/v1beta1/fake","kubernetes/typed/apps/v1beta2","kubernetes/typed/apps/v1beta2/fake","kubernetes/typed/authentication/v1","kubernetes/typed/authentication/v1/fake","kubernetes/typed/authentication/v1beta1","kubernetes/typed/authentication/v1beta1/fake","kubernetes/typed/authorization/v1","kubernetes/typed/authorization/v1/fake","kubernetes/typed/authorization/v1beta1","kubernetes/typed/authorization/v1beta1/fake","kubernetes/typed/autoscaling/v1","kubernetes/typed/autoscaling/v1/fake","kubernetes/typed/autoscaling/v2beta1","kubernetes/typed/autoscaling/v2beta1/fake","kubernetes/typed/batch/v1","kubernetes/typed/batch/v1/fake","kubernetes/typed/batch/v1beta1","kubernetes/typed/batch/v1beta1/fake","kubernetes/typed/batch/v2alpha1","kubernetes/typed/batch/v2alpha1/fake","kubernetes/typed/certificates/v1beta1","kubernetes/typed/certificates/v1beta1/fake","kubernetes/typed/core/v1","kubernetes/typed/core/v1/fake","kubernetes/typed/extensions/v1beta1","kubernetes/typed/extensions/v1beta1/fake","kubernetes/typed/networking/v1","kubernetes/typed/networking/v1/fake","kubernetes/typed/policy/v1beta1","kubernetes/typed/policy/v1beta1/fake","kubernetes/typed/rbac/v1","kubernetes/typed/rbac/v1/fake","kubernetes/typed/rbac/v1alpha1","kubernetes/typed/rbac/v1alpha1/fake","kubernetes/typed/rbac/v1beta1","kubernetes/typed/rbac/v1beta1/fake","kubernetes/typed/scheduling/v1alpha1","kubernetes/typed/scheduling/v1alpha1/fake","kubernetes/typed/settings/v1alpha1","kubernetes/typed/settings/v1alpha1/fake","kubernetes/typed/storage/v1","kubernetes/typed/storage/v1/fake","kubernetes/typed/storage/v1beta1","kubernetes/typed/storage/v1beta1/fake","listers/apps/v1beta1","listers/core/v1","listers/extensions/v1beta1","listers/settings/v1alpha1","pkg/version","rest","rest/watch","testing","third_party/forked/golang/template","tools/cache","tools/clientcmd/api","tools/metrics","tools/pager","tools/reference","transport","util/cert","util/flowcontrol","util/integer","util/jsonpath","util/workqueue"]
-  revision = "afb4606c45bae77c4dc2c15291d4d7d6d792196c"
+  revision = "1fb83015bea362f028381bc0fcfb2a4e3eb7390b"
 
 [[projects]]
   branch = "master"
