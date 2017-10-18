@@ -42,7 +42,7 @@ container_image(
 container_push(
     name = "push-container",
     format = "Docker",
-    image = ":docker",
+    image = ":container",
     registry = "index.docker.io",
     repository = "atlassianlabs/smith",
     stamp = True,
