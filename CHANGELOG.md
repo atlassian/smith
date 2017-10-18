@@ -1,3 +1,9 @@
+v0.2.0
+------
+- use Kubernetes 1.8 libraries
+- update Service Catalog to v0.1.0-rc2
+- add `pprof-address` flag to enable pprof on the address
+
 v0.1.3
 ------
 - fix `service-catalog-insecure` flag not working
