@@ -9,13 +9,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestWorkflow(t *testing.T) {
 	t.Parallel()
-	c1 := &api_v1.ConfigMap{
+	c1 := &core_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
@@ -32,7 +32,7 @@ func TestWorkflow(t *testing.T) {
 			"a": "b",
 		},
 	}
-	s1 := &api_v1.Secret{
+	s1 := &core_v1.Secret{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",

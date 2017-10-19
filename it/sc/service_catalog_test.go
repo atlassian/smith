@@ -8,7 +8,7 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,7 +38,7 @@ func TestServiceCatalog(t *testing.T) {
 			Name: "binding1",
 		},
 		Spec: sc_v1b1.ServiceBindingSpec{
-			ServiceInstanceRef: api_v1.LocalObjectReference{
+			ServiceInstanceRef: core_v1.LocalObjectReference{
 				Name: instance.Name,
 			},
 			SecretName: "secret1",

@@ -5,7 +5,7 @@ import (
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	apps_v1b1 "k8s.io/api/apps/v1beta1"
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -13,7 +13,7 @@ import (
 
 var MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
 	{Group: apps_v1b1.GroupName, Kind: "Deployment"}: deploymentCleanup,
-	{Group: api_v1.GroupName, Kind: "Service"}:       serviceCleanup,
+	{Group: core_v1.GroupName, Kind: "Service"}:      serviceCleanup,
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
@@ -33,11 +33,11 @@ func deploymentCleanup(spec, actual *unstructured.Unstructured) (*unstructured.U
 }
 
 func serviceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	var serviceSpec api_v1.Service
+	var serviceSpec core_v1.Service
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &serviceSpec); err != nil {
 		return nil, err
 	}
-	var serviceActual api_v1.Service
+	var serviceActual core_v1.Service
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &serviceActual); err != nil {
 		return nil, err
 	}

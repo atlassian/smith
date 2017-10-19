@@ -23,7 +23,7 @@ import (
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,7 +82,7 @@ func AssertCondition(t *testing.T, bundle *smith_v1.Bundle, conditionType smith_
 
 func SleeperScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
-	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
+	scheme.AddUnversionedTypes(core_v1.SchemeGroupVersion, &meta_v1.Status{})
 	if err := sleeper_v1.AddToScheme(scheme); err != nil {
 		panic(err)
 	}
@@ -168,7 +168,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	}
 
 	t.Logf("Creating namespace %q", cfg.Namespace)
-	_, err = clientset.CoreV1().Namespaces().Create(&api_v1.Namespace{
+	_, err = clientset.CoreV1().Namespaces().Create(&core_v1.Namespace{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: cfg.Namespace,
 		},

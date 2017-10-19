@@ -10,7 +10,7 @@ import (
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
@@ -32,7 +32,7 @@ type App struct {
 
 func (a *App) Run(ctx context.Context) error {
 	scheme := runtime.NewScheme()
-	scheme.AddUnversionedTypes(api_v1.SchemeGroupVersion, &meta_v1.Status{})
+	scheme.AddUnversionedTypes(core_v1.SchemeGroupVersion, &meta_v1.Status{})
 	if err := sleeper_v1.AddToScheme(scheme); err != nil {
 		return err
 	}

@@ -13,14 +13,14 @@ import (
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestUpdate(t *testing.T) {
 	t.Parallel()
-	cm1 := &api_v1.ConfigMap{
+	cm1 := &core_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
@@ -35,7 +35,7 @@ func TestUpdate(t *testing.T) {
 			"a": "b",
 		},
 	}
-	cm2 := &api_v1.ConfigMap{
+	cm2 := &core_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
@@ -155,7 +155,7 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...in
 		}
 	})
 
-	cm2 := args[0].(*api_v1.ConfigMap)
+	cm2 := args[0].(*core_v1.ConfigMap)
 	sleeper1 := args[1].(*sleeper_v1.Sleeper)
 	sleeper2 := args[2].(*sleeper_v1.Sleeper)
 	bundle2 := args[3].(*smith_v1.Bundle)

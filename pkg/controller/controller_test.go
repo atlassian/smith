@@ -26,7 +26,7 @@ import (
 	scFake "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
@@ -72,7 +72,7 @@ func TestController(t *testing.T) {
 	testcases := map[string]testCase{
 		"deletes owned object that is not in bundle": {
 			mainClientObjects: []runtime.Object{
-				&api_v1.ConfigMap{
+				&core_v1.ConfigMap{
 					ObjectMeta: meta_v1.ObjectMeta{
 						Name:      "map1",
 						Namespace: "n1",

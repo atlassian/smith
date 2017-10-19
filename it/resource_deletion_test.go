@@ -12,13 +12,13 @@ import (
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	api_v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestResourceDeletion(t *testing.T) {
 	t.Parallel()
-	cm := &api_v1.ConfigMap{
+	cm := &core_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
@@ -81,7 +81,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *ItConfig, 
 		}
 	})
 
-	cm := args[0].(*api_v1.ConfigMap)
+	cm := args[0].(*core_v1.ConfigMap)
 	sl := args[1].(*sleeper_v1.Sleeper)
 
 	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
