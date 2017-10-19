@@ -23,8 +23,10 @@ func TestServiceCatalog(t *testing.T) {
 			Name: "instance1",
 		},
 		Spec: sc_v1b1.ServiceInstanceSpec{
-			ExternalClusterServiceClassName: "user-provided-service",
-			ExternalClusterServicePlanName:  "default",
+			PlanReference: sc_v1b1.PlanReference{
+				ExternalClusterServiceClassName: "user-provided-service",
+				ExternalClusterServicePlanName:  "default",
+			},
 		},
 	}
 	binding := &sc_v1b1.ServiceBinding{
