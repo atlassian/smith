@@ -39,7 +39,3 @@
 [[constraint]]
   name = "k8s.io/api"
   branch = "release-1.8"
-
-[[override]]
-  name = "github.com/ugorji/go"
-  revision = "8c0409fcbb70099c748d71f714529204975f6c3f" #newer revisions break backward compatibility
