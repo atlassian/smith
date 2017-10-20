@@ -29,31 +29,23 @@ fmt:
 	goimports -w=true -d $(ALL_GO_FILES)
 
 generate: generate-client generate-deepcopy
-	# RUN make generate-restore-godeps before running this
-	# Make sure you have https://github.com/kubernetes/code-generator cloned into build/go/src/k8s.io/code-generator
-	# at branch release-1.8
-	# TODO automate this using Bazel rules.
-
-generate-restore-godeps:
-	GOPATH=$(PWD)/build/go go get -u github.com/tools/godep
-	GOPATH=$(PWD)/build/go cd $(PWD)/build/go/src/k8s.io/code-generator; $(PWD)/build/go/bin/godep restore
 
 generate-client:
-	GOPATH=$(PWD)/build/go go build -i -o build/bin/client-gen k8s.io/code-generator/cmd/client-gen
+	go build -i -o build/bin/client-gen k8s.io/code-generator/cmd/client-gen
 	# Generate the versioned clientset (pkg/client/clientset_generated/clientset)
 	build/bin/client-gen \
 	--input-base "github.com/atlassian/smith/pkg/apis/" \
 	--input "smith/v1" \
 	--clientset-path "github.com/atlassian/smith/pkg/client/clientset_generated/" \
 	--clientset-name "clientset" \
-	--go-header-file "build/boilerplate.go.txt"
+	--go-header-file "build/code-generator/boilerplate.go.txt"
 
 generate-deepcopy:
-	GOPATH=$(PWD)/build/go go build -i -o build/bin/deepcopy-gen k8s.io/code-generator/cmd/deepcopy-gen
+	go build -i -o build/bin/deepcopy-gen k8s.io/code-generator/cmd/deepcopy-gen
 	# Generate deep copies
 	build/bin/deepcopy-gen \
 	--v 1 --logtostderr \
-	--go-header-file "build/boilerplate.go.txt" \
+	--go-header-file "build/code-generator/boilerplate.go.txt" \
 	--input-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \
 	--bounding-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \
 	--output-file-base zz_generated.deepcopy

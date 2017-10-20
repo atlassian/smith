@@ -230,6 +230,18 @@
   revision = "1fb83015bea362f028381bc0fcfb2a4e3eb7390b"
 
 [[projects]]
+  branch = "release-1.8"
+  name = "k8s.io/code-generator"
+  packages = ["cmd/client-gen","cmd/client-gen/args","cmd/client-gen/generators","cmd/client-gen/generators/fake","cmd/client-gen/generators/scheme","cmd/client-gen/generators/util","cmd/client-gen/path","cmd/client-gen/types","cmd/deepcopy-gen"]
+  revision = "0c5165a97e055df28cca8bbcb8b7c8ae1019b3f1"
+
+[[projects]]
+  branch = "master"
+  name = "k8s.io/gengo"
+  packages = ["args","examples/deepcopy-gen/generators","examples/set-gen/sets","generator","namer","parser","types"]
+  revision = "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+
+[[projects]]
   branch = "master"
   name = "k8s.io/kube-openapi"
   packages = ["pkg/common"]
@@ -238,6 +250,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9d1c4c1d27cc332168a3c65ac4af014c74126fefc2865c64605231554bbe2f48"
+  inputs-digest = "073fd7a75f41fe0ea4b34da1150d3d1bd125cabc743fccfd816fdc0d49be7a49"
   solver-name = "gps-cdcl"
   solver-version = 1
