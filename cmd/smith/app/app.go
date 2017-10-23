@@ -40,7 +40,6 @@ type App struct {
 	ServiceCatalogConfig *rest.Config
 	ResyncPeriod         time.Duration
 	Namespace            string
-	KubeConfig           string
 	DisablePodPreset     bool
 	Workers              int
 }
