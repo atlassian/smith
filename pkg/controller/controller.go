@@ -52,11 +52,13 @@ type BundleController struct {
 	// CRD
 	crdResyncPeriod time.Duration
 	resourceHandler cache.ResourceEventHandler
+	namespace       string
 }
 
 func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore BundleStore,
 	sc smith.SmartClient, rc ReadyChecker, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
-	workers int, crdResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *BundleController {
+	workers int, crdResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer,
+	namespace string) *BundleController {
 	c := &BundleController{
 		bundleInf:       bundleInf,
 		crdInf:          crdInf,
@@ -69,6 +71,7 @@ func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v
 		queue:           queue,
 		workers:         workers,
 		crdResyncPeriod: crdResyncPeriod,
+		namespace:       namespace,
 	}
 	bundleInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onBundleAdd,
@@ -103,6 +106,7 @@ func (c *BundleController) Run(ctx context.Context) {
 		ctx:              ctx,
 		BundleController: c,
 		watchers:         make(map[string]watchState),
+		namespace:        c.namespace,
 	})
 
 	if !cache.WaitForCacheSync(ctx.Done(), c.bundleInf.HasSynced) {

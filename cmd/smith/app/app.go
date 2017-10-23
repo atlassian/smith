@@ -40,6 +40,7 @@ type App struct {
 	ServiceCatalogConfig *rest.Config
 	ResyncPeriod         time.Duration
 	Namespace            string
+	KubeConfig           string
 	DisablePodPreset     bool
 	Workers              int
 }
@@ -174,5 +175,5 @@ func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClie
 	}
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
 
-	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs)
+	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs, a.Namespace)
 }
