@@ -67,6 +67,13 @@ One example is `ServiceBinding` that produces a `Secret`.
 
 A resource must have the group/version/kind of the object that is going to be produced specified.
 
+A plugin must:
+1. Be a pure function - plugin must not depend on any external state;
+2. Be deterministic - same set of inputs should always produce identical output. I.e. no unordered data structures
+or unstable sort algorithms should be used;
+3. Output an object of the correct Group/Version/Kind - GVK is declared in the plugin resource definition and
+is known in advance.
+
 ## Plugin skeleton:
 
 ```go
