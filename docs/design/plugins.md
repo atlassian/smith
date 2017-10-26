@@ -6,7 +6,7 @@ dependencies and their outputs into specifications of objects to be created.
 ## Motivation
 
 A typical example when a runtime transformation is needed is two `ServiceInstance`s, one producing inputs for the
-other. Say `a` dependsOn `b`. Quite often the shape of data `ServiceInstance` `a` produces does not match what
+other. Say `b` depends on `a`. Quite often the shape of data `ServiceInstance` `a` produces does not match what
 `ServiceInstance` `b` expects.
 
 ```yaml
@@ -48,17 +48,18 @@ spec:
       metadata:
         name: b
       spec:
-        # need data from a-binding-secret but transformed e.g. only keys which start with "FOO_"
+        # need data from a-binding-secret but transformed
+        # e.g. only keys which start with "FOO_" when full names of the keys are not known in advance.
 ```
 
 ## Specification
 
 Smith plugins are [Go plugins](https://golang.org/pkg/plugin/). They are eagerly loaded at Smith startup to detect
 issues early. Names of plugins to load are passed via command line.
-Each plugin publishes a `Process()` function with a signature matching `pkg/plugin.Func`
-`func(smith_v1.Resource, map[smith_v1.ResourceName]Dependency) (TransformResult, error)`:
+Each plugin publishes a `Process(smith_v1.Resource, map[smith_v1.ResourceName]Dependency) (TransformResult, error)`
+function.
 
-When Smith comes across a resource with `type: plugin` and `pluginType: foobar` it invokes
+When Smith comes across a resource with `type: plugin` and `pluginName: foobar` it invokes
 the plugin `foobar`. To do that it inspects all the dependencies of the resource specified in `dependsOn` attribute
 and fetches their outputs to include in the invocation along with the dependencies themselves. Smith needs to
 recognize resource group/version/kinds to be able to fetch the output (if there is one).
@@ -128,17 +129,11 @@ spec:
           name: "{{a#metadata.name}}"
         secretName: a-binding-secret
 
-  - name: filter
-    dependsOn:
-      apiVersion: v1
-      kind: Secret # will produce a Secret
-      name: filter
-      spec:
-
   - name: b
     dependsOn:
     - a-binding
     type: plugin
+    pluginName: filter
     pluginSpec:
       apiVersion: servicecatalog.k8s.io/v1beta1
       kind: ServiceInstance
@@ -165,5 +160,5 @@ spec:
 
 ## Glossary
 
-- resource - `Bundle` contains a list of resources. Each one is either an object definition or a plugin
-invocation definition.
+- resource - Each resource is either an object definition or a plugin
+invocation definition. `Bundle` contains a list of resources.
