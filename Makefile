@@ -20,7 +20,7 @@ update-bazel:
 build: fmt update-bazel build-ci
 
 build-race: fmt update-bazel
-	bazel build //cmd/smith:smith-race
+	bazel build //cmd/smith --output_groups=race
 
 build-ci:
 	bazel build //cmd/smith
@@ -73,7 +73,7 @@ minikube-test-sc: fmt update-bazel
 		--test_env=SERVICE_CATALOG_URL="http://$$(minikube ip):30080" \
 		//it/sc:go_default_test
 
-minikube-run: fmt update-bazel
+minikube-run: fmt update-bazel build-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -81,9 +81,9 @@ minikube-run: fmt update-bazel
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel run //cmd/smith:smith-race -- -disable-service-catalog
+	bazel-bin/cmd/smith/smith.race -disable-service-catalog
 
-minikube-run-sc: fmt update-bazel
+minikube-run-sc: fmt update-bazel build-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -91,11 +91,12 @@ minikube-run-sc: fmt update-bazel
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel run //cmd/smith:smith-race -- \
+	bazel-bin/cmd/smith/smith.race  \
 	-service-catalog-url="https://$$(minikube ip):30443" \
 	-service-catalog-insecure
 
 minikube-sleeper-run: fmt update-bazel
+	bazel build //examples/sleeper/main --output_groups=race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -103,7 +104,7 @@ minikube-sleeper-run: fmt update-bazel
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel run //examples/sleeper/main:main-race
+	bazel-bin/examples/sleeper/main/main.race
 
 test: fmt update-bazel test-ci
 
