@@ -99,11 +99,11 @@ func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstruc
 		return nil, err
 	}
 
-	if instanceActual.Spec.ExternalClusterServiceClassName == instanceSpec.Spec.ExternalClusterServiceClassName {
+	if instanceActual.Spec.ClusterServiceClassExternalName == instanceSpec.Spec.ClusterServiceClassExternalName {
 		instanceSpec.Spec.ClusterServiceClassRef = instanceActual.Spec.ClusterServiceClassRef
 	}
 
-	if instanceActual.Spec.ExternalClusterServicePlanName == instanceSpec.Spec.ExternalClusterServicePlanName {
+	if instanceActual.Spec.ClusterServicePlanExternalName == instanceSpec.Spec.ClusterServicePlanExternalName {
 		instanceSpec.Spec.ClusterServicePlanRef = instanceActual.Spec.ClusterServicePlanRef
 	}
 
