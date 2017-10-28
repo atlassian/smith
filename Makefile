@@ -135,6 +135,6 @@ docker-export:
 	bazel run --cpu=k8 //cmd/smith:container
 
 release: update-bazel
-	bazel run --cpu=k8 //cmd/smith:push-container
+	bazel run --cpu=k8 //cmd/smith:push-docker
 
 .PHONY: build
