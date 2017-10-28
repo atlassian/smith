@@ -13,14 +13,6 @@ go_library(
 )
 
 go_binary(
-    name = "main-race",
-    gc_linkopts = ["-race"],
-    importpath = "github.com/atlassian/smith/examples/sleeper/main",
-    library = ":go_default_library",
-    visibility = ["//visibility:public"],
-)
-
-go_binary(
     name = "main",
     importpath = "github.com/atlassian/smith/examples/sleeper/main",
     library = ":go_default_library",

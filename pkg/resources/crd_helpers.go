@@ -40,7 +40,7 @@ func EnsureCrdExistsAndIsEstablished(ctx context.Context, scheme *runtime.Scheme
 	if err != nil {
 		return err
 	}
-	log.Printf("Waiting for CustomResourceDefinition %s it to become established", crd.Name)
+	log.Printf("Waiting for CustomResourceDefinition %s to become established", crd.Name)
 	return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
 }
 
