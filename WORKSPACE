@@ -1,13 +1,12 @@
 git_repository(
     name = "io_bazel_rules_go",
     remote = "https://github.com/bazelbuild/rules_go.git",
-    commit = "a280fbac1a0a4c67b0eee660b4fd1b3db7c9f058",
+    commit = "bcc7a4ff5a21ff2640f86cb302a7d976e33d89f1",
 )
 git_repository(
     name = "io_bazel_rules_docker",
     remote = "https://github.com/bazelbuild/rules_docker.git",
-    commit = "9dd92c73e7c8cf07ad5e0dca89a3c3c422a3ab7d",
-#    tag = "v0.3.0",
+    commit = "58d022892232e5d59daba7760289976d5f6e7433",
 )
 
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains")
