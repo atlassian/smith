@@ -35,8 +35,8 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 	}
 }
 
-func EnsureCrdExistsAndIsEstablished(ctx context.Context, scheme *runtime.Scheme, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
-	err := EnsureCrdExists(ctx, scheme, clientset, crdLister, crd)
+func EnsureCrdExistsAndIsEstablished(ctx context.Context, defaulter runtime.ObjectDefaulter, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+	err := EnsureCrdExists(ctx, defaulter, clientset, crdLister, crd)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func EnsureCrdExistsAndIsEstablished(ctx context.Context, scheme *runtime.Scheme
 	return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
 }
 
-func EnsureCrdExists(ctx context.Context, scheme *runtime.Scheme, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+func EnsureCrdExists(ctx context.Context, defaulter runtime.ObjectDefaulter, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
 	for {
 		obj, err := crdLister.Get(crd.Name)
 		notFound := api_errors.IsNotFound(err)
@@ -53,7 +53,7 @@ func EnsureCrdExists(ctx context.Context, scheme *runtime.Scheme, clientset crdC
 		}
 		if notFound {
 			log.Printf("Creating CustomResourceDefinition %s", crd.Name)
-			_, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+			_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 			if err == nil {
 				log.Printf("CustomResourceDefinition %s created", crd.Name)
 				return nil
@@ -63,7 +63,7 @@ func EnsureCrdExists(ctx context.Context, scheme *runtime.Scheme, clientset crdC
 			}
 			log.Printf("CustomResourceDefinition %s was created concurrently", crd.Name)
 		} else {
-			if IsEqualCrd(crd, obj, scheme) {
+			if IsEqualCrd(crd, obj, defaulter) {
 				return nil
 			}
 			log.Printf("Updating CustomResourceDefinition %s", crd.Name)
@@ -131,14 +131,14 @@ func IsCrdConditionPresentAndEqual(crd *apiext_v1b1.CustomResourceDefinition, co
 	return false
 }
 
-func IsEqualCrd(a, b *apiext_v1b1.CustomResourceDefinition, scheme *runtime.Scheme) bool {
+func IsEqualCrd(a, b *apiext_v1b1.CustomResourceDefinition, defaulter runtime.ObjectDefaulter) bool {
 	aCopy := *a
 	bCopy := *b
 	a = &aCopy
 	b = &bCopy
 
-	scheme.Default(a)
-	scheme.Default(b)
+	defaulter.Default(a)
+	defaulter.Default(b)
 
 	// Ignoring labels and annotations for now
 	as := a.Spec

@@ -68,6 +68,6 @@ func TestServiceCatalog(t *testing.T) {
 	it.SetupApp(t, bundle, true, true, testServiceCatalog)
 }
 
-func testServiceCatalog(t *testing.T, ctx context.Context, cfg *it.ItConfig, args ...interface{}) {
+func testServiceCatalog(ctx context.Context, t *testing.T, cfg *it.Config, args ...interface{}) {
 	cfg.AssertBundleTimeout(ctx, cfg.Bundle, "")
 }

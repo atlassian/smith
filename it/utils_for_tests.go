@@ -39,9 +39,9 @@ const (
 	serviceCatalogUrlEnvParam = "SERVICE_CATALOG_URL"
 )
 
-type TestFunc func(*testing.T, context.Context, *ItConfig, ...interface{})
+type TestFunc func(context.Context, *testing.T, *Config, ...interface{})
 
-type ItConfig struct {
+type Config struct {
 	T             *testing.T
 	Namespace     string
 	Bundle        *smith_v1.Bundle
@@ -52,7 +52,7 @@ type ItConfig struct {
 	BundleClient  smithClientset.Interface
 }
 
-func (cfg *ItConfig) CreateObject(ctxTest context.Context, obj, res runtime.Object, resourcePath string, client rest.Interface) {
+func (cfg *Config) CreateObject(ctxTest context.Context, obj, res runtime.Object, resourcePath string, client rest.Interface) {
 	metaObj := obj.(meta_v1.Object)
 
 	cfg.T.Logf("Creating a new object %s/%s of kind %s", cfg.Namespace, metaObj.GetName(), obj.GetObjectKind().GroupVersionKind().Kind)
@@ -65,7 +65,7 @@ func (cfg *ItConfig) CreateObject(ctxTest context.Context, obj, res runtime.Obje
 		Into(res))
 }
 
-func (cfg *ItConfig) AwaitBundleCondition(conditions ...watch.ConditionFunc) *smith_v1.Bundle {
+func (cfg *Config) AwaitBundleCondition(conditions ...watch.ConditionFunc) *smith_v1.Bundle {
 	lw := cache.NewListWatchFromClient(cfg.BundleClient.SmithV1().RESTClient(), smith_v1.BundleResourcePlural, cfg.Namespace, fields.Everything())
 	event, err := cache.ListWatchUntil(10*time.Second, lw, conditions...)
 	require.NoError(cfg.T, err)
@@ -157,7 +157,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	scheme, err := apitypes.FullScheme(serviceCatalog)
 	require.NoError(t, err)
 
-	cfg := &ItConfig{
+	cfg := &Config{
 		T:            t,
 		Namespace:    fmt.Sprintf("smith-it-%d", rand.Uint32()),
 		Bundle:       bundle,
@@ -223,10 +223,10 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 		cfg.CreatedBundle = res
 	}
 
-	test(t, ctxTest, cfg, args...)
+	test(ctxTest, t, cfg, args...)
 }
 
-func (cfg *ItConfig) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, resourceVersions ...string) *smith_v1.Bundle {
+func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, resourceVersions ...string) *smith_v1.Bundle {
 	bundleRes := cfg.AwaitBundleCondition(IsBundleNewerCond(cfg.Namespace, bundle.Name, resourceVersions...), IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleReady, smith_v1.ConditionTrue))
 
 	AssertCondition(cfg.T, bundleRes, smith_v1.BundleReady, smith_v1.ConditionTrue)
@@ -249,7 +249,7 @@ func (cfg *ItConfig) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, 
 	return bundleRes
 }
 
-func (cfg *ItConfig) AssertBundleTimeout(ctx context.Context, bundle *smith_v1.Bundle, resourceVersion ...string) *smith_v1.Bundle {
+func (cfg *Config) AssertBundleTimeout(ctx context.Context, bundle *smith_v1.Bundle, resourceVersion ...string) *smith_v1.Bundle {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return cfg.AssertBundle(ctxTimeout, bundle, resourceVersion...)

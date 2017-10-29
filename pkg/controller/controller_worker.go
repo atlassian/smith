@@ -67,7 +67,7 @@ func (c *BundleController) processKey(key string) (retriableRet bool, e error) {
 		if conflict {
 			msg = " (conflict)"
 		}
-		log.Printf("[WORKER][%s] Synced Bundle in %v%s", key, time.Now().Sub(startTime), msg)
+		log.Printf("[WORKER][%s] Synced Bundle in %v%s", key, time.Since(startTime), msg)
 	}()
 	bundleObj, exists, err := c.bundleInf.GetIndexer().GetByKey(key)
 	if err != nil {
@@ -102,7 +102,7 @@ func (c *BundleController) process(bundle *smith_v1.Bundle) (isReady, retriableE
 	resourceMap := make(map[smith_v1.ResourceName]smith_v1.Resource, len(bundle.Spec.Resources))
 	for _, res := range bundle.Spec.Resources {
 		if _, exist := resourceMap[res.Name]; exist {
-			return false, false, errors.New(fmt.Sprintf("bundle contains two resources with the same name %q", res.Name))
+			return false, false, errors.Errorf("bundle contains two resources with the same name %q", res.Name)
 		}
 		resourceMap[res.Name] = res
 	}

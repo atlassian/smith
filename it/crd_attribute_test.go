@@ -51,7 +51,7 @@ func TestCrdAttribute(t *testing.T) {
 	SetupApp(t, bundle, false, true, testCrdAttribute, sl)
 }
 
-func testCrdAttribute(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...interface{}) {
+func testCrdAttribute(ctxTest context.Context, t *testing.T, cfg *Config, args ...interface{}) {
 	sl := args[0].(*sleeper_v1.Sleeper)
 	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
 	require.NoError(t, err)
