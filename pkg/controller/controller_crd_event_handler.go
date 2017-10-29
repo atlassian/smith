@@ -104,6 +104,11 @@ func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition)
 			return res.Watch(options)
 		},
 	}, &unstructured.Unstructured{}, h.crdResyncPeriod, cache.Indexers{})
+	h.wgLock.Lock()
+	defer h.wgLock.Unlock()
+	if h.stopping {
+		return false
+	}
 	crdInf.AddEventHandler(h.resourceHandler)
 	ctx, cancel := context.WithCancel(h.ctx)
 	h.watchers[crd.Name] = watchState{cancel: cancel}
