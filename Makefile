@@ -33,7 +33,7 @@ generate: generate-client generate-deepcopy
 generate-client:
 	bazel build //vendor/k8s.io/code-generator/cmd/client-gen
 	# Generate the versioned clientset (pkg/client/clientset_generated/clientset)
-	bazel-bin/vendor/k8s.io/code-generator/cmd/client-gen/client-gen \
+	bazel-bin/vendor/k8s.io/code-generator/cmd/client-gen/client-gen $(VERIFY_CODE) \
 	--input-base "github.com/atlassian/smith/pkg/apis/" \
 	--input "smith/v1" \
 	--clientset-path "github.com/atlassian/smith/pkg/client/clientset_generated/" \
@@ -43,7 +43,7 @@ generate-client:
 generate-deepcopy:
 	bazel build //vendor/k8s.io/code-generator/cmd/deepcopy-gen
 	# Generate deep copies
-	bazel-bin/vendor/k8s.io/code-generator/cmd/deepcopy-gen/deepcopy-gen \
+	bazel-bin/vendor/k8s.io/code-generator/cmd/deepcopy-gen/deepcopy-gen $(VERIFY_CODE) \
 	--v 1 --logtostderr \
 	--go-header-file "build/code-generator/boilerplate.go.txt" \
 	--input-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \
@@ -109,6 +109,7 @@ minikube-sleeper-run: fmt update-bazel
 test: fmt update-bazel test-ci
 
 verify:
+	VERIFY_CODE=--verify-only make generate
 	# TODO verify BUILD.bazel files are up to date
 
 test-ci:
