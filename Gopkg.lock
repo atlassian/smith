@@ -239,7 +239,7 @@
   branch = "master"
   name = "k8s.io/gengo"
   packages = ["args","examples/deepcopy-gen/generators","examples/set-gen/sets","generator","namer","parser","types"]
-  revision = "70ad626ed2d7a483d89d2c4c56364d60b48ee8fc"
+  revision = "75356185a9af8f0464efa792e2e9508d5b4be83c"
 
 [[projects]]
   branch = "master"
@@ -250,6 +250,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "073fd7a75f41fe0ea4b34da1150d3d1bd125cabc743fccfd816fdc0d49be7a49"
+  inputs-digest = "254284729e7dbc716a9fc048731922449df1668c5d3dad909b971a8fe879f3f8"
   solver-name = "gps-cdcl"
   solver-version = 1

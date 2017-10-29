@@ -31,9 +31,9 @@ fmt:
 generate: generate-client generate-deepcopy
 
 generate-client:
-	go build -i -o build/bin/client-gen k8s.io/code-generator/cmd/client-gen
+	bazel build //vendor/k8s.io/code-generator/cmd/client-gen
 	# Generate the versioned clientset (pkg/client/clientset_generated/clientset)
-	build/bin/client-gen \
+	bazel-bin/vendor/k8s.io/code-generator/cmd/client-gen/client-gen \
 	--input-base "github.com/atlassian/smith/pkg/apis/" \
 	--input "smith/v1" \
 	--clientset-path "github.com/atlassian/smith/pkg/client/clientset_generated/" \
@@ -41,9 +41,9 @@ generate-client:
 	--go-header-file "build/code-generator/boilerplate.go.txt"
 
 generate-deepcopy:
-	go build -i -o build/bin/deepcopy-gen k8s.io/code-generator/cmd/deepcopy-gen
+	bazel build //vendor/k8s.io/code-generator/cmd/deepcopy-gen
 	# Generate deep copies
-	build/bin/deepcopy-gen \
+	bazel-bin/vendor/k8s.io/code-generator/cmd/deepcopy-gen/deepcopy-gen \
 	--v 1 --logtostderr \
 	--go-header-file "build/code-generator/boilerplate.go.txt" \
 	--input-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \

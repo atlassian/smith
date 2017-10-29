@@ -26,6 +26,10 @@ required = ["k8s.io/code-generator/cmd/client-gen", "k8s.io/code-generator/cmd/d
   branch = "release-1.8" # correct branch
   name = "k8s.io/code-generator"
 
+[[override]]
+revision = "75356185a9af8f0464efa792e2e9508d5b4be83c" # workaround https://github.com/kubernetes/code-generator/issues/13
+name = "k8s.io/gengo"
+
 [[constraint]]
   branch = "master" # I want the latest commit from this branch, not just the latest tag or the version used by client-go.
   name = "github.com/stretchr/testify"

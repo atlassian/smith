@@ -1,6 +1,4 @@
 /vendor/
-/build/bin/
-/build/go/
 /.idea/
 /.vscode/
 /bazel-bin
