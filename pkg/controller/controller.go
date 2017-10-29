@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/atlassian/smith"
@@ -28,7 +29,14 @@ const (
 )
 
 type BundleController struct {
-	wg           wait.Group
+	// wg.Wait() is called from Run() and first wg.Add() may be called concurrently from CRD listener
+	// to start an Informer. This is a data race. This mutex is used to ensure ordering.
+	// See https://github.com/atlassian/smith/issues/156
+	// See https://github.com/golang/go/blob/fbc8973a6bc88b50509ea738f475b36ef756bf90/src/sync/waitgroup.go#L123-L126
+	wgLock   sync.Mutex
+	wg       wait.Group
+	stopping bool
+
 	bundleInf    cache.SharedIndexInformer
 	crdInf       cache.SharedIndexInformer
 	bundleClient smithClient_v1.BundlesGetter
@@ -81,6 +89,11 @@ func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v
 // Run begins watching and syncing.
 func (c *BundleController) Run(ctx context.Context) {
 	defer c.wg.Wait()
+	defer func() {
+		c.wgLock.Lock()
+		defer c.wgLock.Unlock()
+		c.stopping = true
+	}()
 	defer c.queue.ShutDown()
 
 	log.Print("Starting Bundle controller")
