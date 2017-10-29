@@ -161,10 +161,9 @@ usecase is a PaaS that delegates (some) object manipulations to Smith.
 ## Requirements
 
 * Please run on recent enough Kubernetes version because earlier versions have some bugs that may prevent Smith from
-working properly. We test on 1.6+;
+working properly. We test on 1.8+;
 * Go 1.7+ is required because [context package](https://golang.org/doc/go1.7#context) is used and it was added to
 standard library in this version;
-* Working Docker installation - build process uses dockerized Go to isolate from the host system;
 * List of project dependencies and their versions can be found in `Gopkg.toml` and `Gopkg.lock` files.
 
 ## Building
