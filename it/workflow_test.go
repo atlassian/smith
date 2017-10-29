@@ -74,7 +74,7 @@ func TestWorkflow(t *testing.T) {
 	SetupApp(t, bundle, false, true, testWorkflow)
 }
 
-func testWorkflow(t *testing.T, ctx context.Context, cfg *ItConfig, args ...interface{}) {
+func testWorkflow(ctx context.Context, t *testing.T, cfg *Config, args ...interface{}) {
 	bundleRes := cfg.AssertBundleTimeout(ctx, cfg.Bundle, cfg.CreatedBundle.ResourceVersion)
 
 	cfMap, err := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace).Get("config1", meta_v1.GetOptions{})

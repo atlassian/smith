@@ -68,7 +68,7 @@ func TestAdoption(t *testing.T) {
 	SetupApp(t, bundle, false, false, testAdoption, cm, sleeper)
 }
 
-func testAdoption(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...interface{}) {
+func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...interface{}) {
 	stgr := stager.New()
 	defer stgr.Shutdown()
 	stage := stgr.NextStage()
@@ -133,7 +133,7 @@ func testAdoption(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...
 			Controller: &trueVar,
 		},
 	}
-	cmActual, err = cmClient.Update(cmActual)
+	_, err = cmClient.Update(cmActual)
 	require.NoError(t, err)
 
 	// Point Sleeper controller reference to Bundle

@@ -69,8 +69,8 @@ type testCase struct {
 func TestController(t *testing.T) {
 	t.Parallel()
 	tr := true
-	testcases := map[string]testCase{
-		"deletes owned object that is not in bundle": {
+	testcases := map[string]*testCase{
+		"deletes owned object that is not in bundle": &testCase{
 			mainClientObjects: []runtime.Object{
 				&core_v1.ConfigMap{
 					ObjectMeta: meta_v1.ObjectMeta{

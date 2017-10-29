@@ -67,7 +67,7 @@ func TestResourceDeletion(t *testing.T) {
 	SetupApp(t, bundle, false, false, testResourceDeletion, cm, sl)
 }
 
-func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...interface{}) {
+func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, args ...interface{}) {
 	stgr := stager.New()
 	defer stgr.Shutdown()
 	stage := stgr.NextStage()
@@ -157,7 +157,7 @@ func testResourceDeletion(t *testing.T, ctxTest context.Context, cfg *ItConfig, 
 	cfg.AssertBundle(ctxTest, cfg.Bundle)
 
 	// ConfigMap should exist by now
-	cmActual, err = cmClient.Get(cm.Name, meta_v1.GetOptions{})
+	_, err = cmClient.Get(cm.Name, meta_v1.GetOptions{})
 	require.NoError(t, err)
 
 	// Sleeper should have BlockOwnerDeletion updated

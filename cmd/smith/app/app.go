@@ -108,13 +108,14 @@ func (a *App) Run(ctx context.Context) error {
 		Jitter:   0.1,
 		Steps:    7,
 	}
+	crd := resources.BundleCrd()
 	err = wait.ExponentialBackoff(crdCreationBackoff, func() (bool /*done*/, error) {
-		if err := resources.EnsureCrdExistsAndIsEstablished(ctx, scheme, crdClient, crdLister, resources.BundleCrd()); err != nil {
+		if errEnsure := resources.EnsureCrdExistsAndIsEstablished(ctx, scheme, crdClient, crdLister, crd); errEnsure != nil {
 			// TODO be smarter about what is retried
-			if err == context.Canceled || err == context.DeadlineExceeded {
-				return true, err
+			if errEnsure == context.Canceled || errEnsure == context.DeadlineExceeded {
+				return true, errEnsure
 			}
-			log.Printf("Failed to create CRD %s: %v", smith_v1.BundleResourceName, err)
+			log.Printf("Failed to create CRD %s: %v", crd.Name, errEnsure)
 			return false, nil
 		}
 		return true, nil

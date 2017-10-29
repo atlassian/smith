@@ -141,7 +141,7 @@ func TestUpdate(t *testing.T) {
 	SetupApp(t, bundle1, false, true, testUpdate, cm2, sleeper1, sleeper2, bundle2)
 }
 
-func testUpdate(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...interface{}) {
+func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...interface{}) {
 	stgr := stager.New()
 	defer stgr.Shutdown()
 	stage := stgr.NextStage()
@@ -169,9 +169,8 @@ func testUpdate(t *testing.T, ctxTest context.Context, cfg *ItConfig, args ...in
 
 	bundleRes1 := cfg.AssertBundle(ctxTimeout, cfg.Bundle, cfg.CreatedBundle.ResourceVersion)
 
-	res := &smith_v1.Bundle{}
 	bundle2.ResourceVersion = bundleRes1.ResourceVersion
-	res, err = cfg.BundleClient.SmithV1().Bundles(cfg.Namespace).Update(bundle2)
+	res, err := cfg.BundleClient.SmithV1().Bundles(cfg.Namespace).Update(bundle2)
 	require.NoError(t, err)
 
 	bundleRes2 := cfg.AssertBundle(ctxTimeout, bundle2, bundle2.ResourceVersion, res.ResourceVersion)
