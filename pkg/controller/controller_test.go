@@ -4,11 +4,13 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ash2k/stager"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/cleanup"
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
@@ -20,18 +22,19 @@ import (
 	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
-
-	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	scFake "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
+	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -59,6 +62,7 @@ type testCase struct {
 	scClientObjects    []runtime.Object
 	scReactors         []reaction
 	bundle             *smith_v1.Bundle
+	namespace          string
 
 	expectedActions      sets.String
 	enableServiceCatalog bool
@@ -69,6 +73,7 @@ type testCase struct {
 func TestController(t *testing.T) {
 	t.Parallel()
 	tr := true
+	testNamespace := "test:namespace"
 	testcases := map[string]*testCase{
 		"deletes owned object that is not in bundle": &testCase{
 			mainClientObjects: []runtime.Object{
@@ -97,6 +102,56 @@ func TestController(t *testing.T) {
 				},
 			},
 			expectedActions: sets.NewString("DELETE=/api/v1/namespaces/n1/configmaps/map1"),
+			namespace:       meta_v1.NamespaceNone,
+		},
+		"can list crds in another namespace": &testCase{
+			crdClientObjects: []runtime.Object{
+				&apiextensionsv1beta1.CustomResourceDefinition{
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name: "a CRD",
+					},
+					Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+						Group:   crv1.GroupName,
+						Version: crv1.SchemeGroupVersion.Version,
+						Scope:   apiextensionsv1beta1.NamespaceScoped,
+						Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+							Plural: crv1.ExampleResourcePlural,
+							Kind:   reflect.TypeOf(crv1.Example{}).Name(),
+						},
+					},
+					Status: apiextensionsv1beta1.CustomResourceDefinitionStatus{
+						Conditions: []apiextensionsv1beta1.CustomResourceDefinitionCondition{
+							{Type: apiextensionsv1beta1.Established, Status: apiextensionsv1beta1.ConditionTrue},
+							{Type: apiextensionsv1beta1.NamesAccepted, Status: apiextensionsv1beta1.ConditionTrue},
+						},
+					},
+				},
+			},
+			bundle: &smith_v1.Bundle{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "bundle1",
+					Namespace: "n1",
+					UID:       "uid123",
+				},
+			},
+			expectedActions: sets.NewString("GET=/apis/cr.client-go.k8s.io/v1/namespaces/" + testNamespace + "/examples"),
+			namespace:       testNamespace,
+			test: func(t *testing.T, ctx context.Context, bundleController *BundleController, testcase *testCase) {
+				subContext, _ := context.WithTimeout(ctx, 1000*time.Millisecond)
+				bundleController.Run(subContext)
+			},
+			testHandler: fakeActionHandler{
+				response: map[path]fakeResponse{
+					{
+						method: "GET",
+						watch:  true,
+						path:   "/apis/cr.client-go.k8s.io/v1/namespaces/" + testNamespace + "/examples",
+					}: {
+						statusCode: 200,
+						content:    []byte(`{"type": "ADDED", "object": { "kind": "Unknown" } }`),
+					},
+				},
+			},
 		},
 		// TODO add tests :D
 	}
@@ -140,7 +195,17 @@ func (tc *testCase) run(t *testing.T) {
 	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
 	bundleInf := client.BundleInformer(bundleClient.SmithV1(), meta_v1.NamespaceAll, 0)
 	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
-	require.NoError(t, err)
+
+	for _, object := range tc.crdClientObjects {
+		crd := object.(*apiextensionsv1beta1.CustomResourceDefinition)
+		scheme.AddKnownTypeWithName(schema.GroupVersionKind{
+			Group:   crd.Spec.Group,
+			Version: crd.Spec.Version,
+			Kind:    crd.Spec.Names.Kind,
+			// obj: unstructured.Unstructured
+			// is here _only_ to keep rest scheme happy, we do not currently use scheme to deserialize
+		}, &unstructured.Unstructured{})
+	}
 
 	multiStore := store.NewMulti()
 
@@ -204,7 +269,8 @@ func (tc *testCase) run(t *testing.T) {
 		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle"),
 		2,
 		0,
-		resourceInfs)
+		resourceInfs,
+		tc.namespace)
 
 	crdGVK := apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
 	resourceInfs[crdGVK] = crdInf
@@ -275,10 +341,16 @@ type fakeResponse struct {
 	content    []byte
 }
 
+type path struct {
+	method string
+	path   string
+	watch  bool
+}
+
 // fakeActionHandler holds a list of fakeActions received
 type fakeActionHandler struct {
 	// statusCode and content returned by this handler for different method + path.
-	response map[string]fakeResponse
+	response map[path]fakeResponse
 
 	lock    sync.Mutex
 	actions []fakeAction
@@ -290,11 +362,12 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	defer f.lock.Unlock()
 
 	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path, query: request.URL.RawQuery})
-	fakeResp, ok := f.response[request.Method+request.URL.Path]
+	key := path{method: request.Method, path: request.URL.Path, watch: strings.Contains(request.URL.RawQuery, "watch=true")}
+	fakeResp, ok := f.response[key]
 	if !ok {
 		fakeResp = fakeResponse{
 			statusCode: http.StatusOK,
-			content:    []byte("{\"kind\": \"List\"}"),
+			content:    []byte(`{"kind": "List", "items": []}`),
 		}
 	}
 	response.Header().Set("Content-Type", "application/json")

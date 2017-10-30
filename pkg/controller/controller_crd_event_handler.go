@@ -25,8 +25,7 @@ type watchState struct {
 type crdEventHandler struct {
 	ctx context.Context
 	*BundleController
-	watchers  map[string]watchState // CRD name -> state
-	namespace string
+	watchers map[string]watchState // CRD name -> state
 }
 
 // OnAdd handles just added CRDs and CRDs that existed before CRD informer was started.

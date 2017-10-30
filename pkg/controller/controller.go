@@ -106,7 +106,6 @@ func (c *BundleController) Run(ctx context.Context) {
 		ctx:              ctx,
 		BundleController: c,
 		watchers:         make(map[string]watchState),
-		namespace:        c.namespace,
 	})
 
 	if !cache.WaitForCacheSync(ctx.Done(), c.bundleInf.HasSynced) {
