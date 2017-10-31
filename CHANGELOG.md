@@ -1,3 +1,7 @@
+v0.2.1
+------
+- informers respect namespace set on smith command line
+
 v0.2.0
 ------
 - use Kubernetes 1.8 libraries
