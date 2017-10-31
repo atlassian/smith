@@ -4,13 +4,13 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ash2k/stager"
+	"github.com/atlassian/smith/examples/sleeper"
+	"github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/cleanup"
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
@@ -22,14 +22,14 @@ import (
 	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
+
+	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	scFake "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
-	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -73,7 +73,7 @@ type testCase struct {
 func TestController(t *testing.T) {
 	t.Parallel()
 	tr := true
-	testNamespace := "test:namespace"
+	testNamespace := "test-namespace"
 	testcases := map[string]*testCase{
 		"deletes owned object that is not in bundle": &testCase{
 			mainClientObjects: []runtime.Object{
@@ -102,40 +102,19 @@ func TestController(t *testing.T) {
 				},
 			},
 			expectedActions: sets.NewString("DELETE=/api/v1/namespaces/n1/configmaps/map1"),
-			namespace:       meta_v1.NamespaceNone,
+			namespace:       meta_v1.NamespaceAll,
 		},
 		"can list crds in another namespace": &testCase{
 			crdClientObjects: []runtime.Object{
-				&apiextensionsv1beta1.CustomResourceDefinition{
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "a CRD",
-					},
-					Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-						Group:   crv1.GroupName,
-						Version: crv1.SchemeGroupVersion.Version,
-						Scope:   apiextensionsv1beta1.NamespaceScoped,
-						Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-							Plural: crv1.ExampleResourcePlural,
-							Kind:   reflect.TypeOf(crv1.Example{}).Name(),
-						},
-					},
-					Status: apiextensionsv1beta1.CustomResourceDefinitionStatus{
-						Conditions: []apiextensionsv1beta1.CustomResourceDefinitionCondition{
-							{Type: apiextensionsv1beta1.Established, Status: apiextensionsv1beta1.ConditionTrue},
-							{Type: apiextensionsv1beta1.NamesAccepted, Status: apiextensionsv1beta1.ConditionTrue},
-						},
-					},
-				},
+				SleeperCrdWithStatus(),
 			},
-			bundle: &smith_v1.Bundle{
-				ObjectMeta: meta_v1.ObjectMeta{
-					Name:      "bundle1",
-					Namespace: "n1",
-					UID:       "uid123",
-				},
-			},
-			expectedActions: sets.NewString("GET=/apis/cr.client-go.k8s.io/v1/namespaces/" + testNamespace + "/examples"),
-			namespace:       testNamespace,
+			expectedActions: sets.NewString(
+				"GET=/apis/"+v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+v1.SleeperResourcePlural+
+					"=resourceVersion=0",
+				"GET=/apis/"+v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+v1.SleeperResourcePlural+
+					"=watch",
+			),
+			namespace: testNamespace,
 			test: func(t *testing.T, ctx context.Context, bundleController *BundleController, testcase *testCase) {
 				subContext, _ := context.WithTimeout(ctx, 1000*time.Millisecond)
 				bundleController.Run(subContext)
@@ -145,9 +124,9 @@ func TestController(t *testing.T) {
 					{
 						method: "GET",
 						watch:  true,
-						path:   "/apis/cr.client-go.k8s.io/v1/namespaces/" + testNamespace + "/examples",
+						path:   "/apis/" + v1.SleeperResourceGroupVersion + "/namespaces/" + testNamespace + "/" + v1.SleeperResourcePlural,
 					}: {
-						statusCode: 200,
+						statusCode: http.StatusOK,
 						content:    []byte(`{"type": "ADDED", "object": { "kind": "Unknown" } }`),
 					},
 				},
@@ -197,7 +176,7 @@ func (tc *testCase) run(t *testing.T) {
 	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
 
 	for _, object := range tc.crdClientObjects {
-		crd := object.(*apiextensionsv1beta1.CustomResourceDefinition)
+		crd := object.(*apiext_v1b1.CustomResourceDefinition)
 		scheme.AddKnownTypeWithName(schema.GroupVersionKind{
 			Group:   crd.Spec.Group,
 			Version: crd.Spec.Version,
@@ -333,6 +312,12 @@ type fakeAction struct {
 
 // String returns method=path to aid in testing
 func (f *fakeAction) String() string {
+	if strings.Contains(f.query, "watch=true") {
+		return strings.Join([]string{f.method, f.path, "watch"}, "=")
+	}
+	if f.query != "" {
+		return strings.Join([]string{f.method, f.path, f.query}, "=")
+	}
 	return strings.Join([]string{f.method, f.path}, "=")
 }
 
@@ -373,4 +358,15 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	response.Header().Set("Content-Type", "application/json")
 	response.WriteHeader(fakeResp.statusCode)
 	response.Write(fakeResp.content)
+}
+
+func SleeperCrdWithStatus() *apiext_v1b1.CustomResourceDefinition {
+	crd := sleeper.SleeperCrd()
+	crd.Status = apiext_v1b1.CustomResourceDefinitionStatus{
+		Conditions: []apiext_v1b1.CustomResourceDefinitionCondition{
+			{Type: apiext_v1b1.Established, Status: apiext_v1b1.ConditionTrue},
+			{Type: apiext_v1b1.NamesAccepted, Status: apiext_v1b1.ConditionTrue},
+		},
+	}
+	return crd
 }
