@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/atlassian/smith/examples/sleeper"
+	"github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/cleanup"
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
@@ -32,6 +34,7 @@ import (
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -59,6 +62,7 @@ type testCase struct {
 	scClientObjects    []runtime.Object
 	scReactors         []reaction
 	bundle             *smith_v1.Bundle
+	namespace          string
 
 	expectedActions      sets.String
 	enableServiceCatalog bool
@@ -69,6 +73,7 @@ type testCase struct {
 func TestController(t *testing.T) {
 	t.Parallel()
 	tr := true
+	testNamespace := "test-namespace"
 	testcases := map[string]*testCase{
 		"deletes owned object that is not in bundle": &testCase{
 			mainClientObjects: []runtime.Object{
@@ -97,6 +102,35 @@ func TestController(t *testing.T) {
 				},
 			},
 			expectedActions: sets.NewString("DELETE=/api/v1/namespaces/n1/configmaps/map1"),
+			namespace:       meta_v1.NamespaceAll,
+		},
+		"can list crds in another namespace": &testCase{
+			crdClientObjects: []runtime.Object{
+				SleeperCrdWithStatus(),
+			},
+			expectedActions: sets.NewString(
+				"GET=/apis/"+v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+v1.SleeperResourcePlural+
+					"=resourceVersion=0",
+				"GET=/apis/"+v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+v1.SleeperResourcePlural+
+					"=watch",
+			),
+			namespace: testNamespace,
+			test: func(t *testing.T, ctx context.Context, bundleController *BundleController, testcase *testCase) {
+				subContext, _ := context.WithTimeout(ctx, 1000*time.Millisecond)
+				bundleController.Run(subContext)
+			},
+			testHandler: fakeActionHandler{
+				response: map[path]fakeResponse{
+					{
+						method: "GET",
+						watch:  true,
+						path:   "/apis/" + v1.SleeperResourceGroupVersion + "/namespaces/" + testNamespace + "/" + v1.SleeperResourcePlural,
+					}: {
+						statusCode: http.StatusOK,
+						content:    []byte(`{"type": "ADDED", "object": { "kind": "Unknown" } }`),
+					},
+				},
+			},
 		},
 		// TODO add tests :D
 	}
@@ -140,7 +174,17 @@ func (tc *testCase) run(t *testing.T) {
 	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
 	bundleInf := client.BundleInformer(bundleClient.SmithV1(), meta_v1.NamespaceAll, 0)
 	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
-	require.NoError(t, err)
+
+	for _, object := range tc.crdClientObjects {
+		crd := object.(*apiext_v1b1.CustomResourceDefinition)
+		scheme.AddKnownTypeWithName(schema.GroupVersionKind{
+			Group:   crd.Spec.Group,
+			Version: crd.Spec.Version,
+			Kind:    crd.Spec.Names.Kind,
+			// obj: unstructured.Unstructured
+			// is here _only_ to keep rest scheme happy, we do not currently use scheme to deserialize
+		}, &unstructured.Unstructured{})
+	}
 
 	multiStore := store.NewMulti()
 
@@ -204,7 +248,8 @@ func (tc *testCase) run(t *testing.T) {
 		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle"),
 		2,
 		0,
-		resourceInfs)
+		resourceInfs,
+		tc.namespace)
 
 	crdGVK := apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
 	resourceInfs[crdGVK] = crdInf
@@ -267,6 +312,12 @@ type fakeAction struct {
 
 // String returns method=path to aid in testing
 func (f *fakeAction) String() string {
+	if strings.Contains(f.query, "watch=true") {
+		return strings.Join([]string{f.method, f.path, "watch"}, "=")
+	}
+	if f.query != "" {
+		return strings.Join([]string{f.method, f.path, f.query}, "=")
+	}
 	return strings.Join([]string{f.method, f.path}, "=")
 }
 
@@ -275,10 +326,16 @@ type fakeResponse struct {
 	content    []byte
 }
 
+type path struct {
+	method string
+	path   string
+	watch  bool
+}
+
 // fakeActionHandler holds a list of fakeActions received
 type fakeActionHandler struct {
 	// statusCode and content returned by this handler for different method + path.
-	response map[string]fakeResponse
+	response map[path]fakeResponse
 
 	lock    sync.Mutex
 	actions []fakeAction
@@ -290,14 +347,26 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	defer f.lock.Unlock()
 
 	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path, query: request.URL.RawQuery})
-	fakeResp, ok := f.response[request.Method+request.URL.Path]
+	key := path{method: request.Method, path: request.URL.Path, watch: strings.Contains(request.URL.RawQuery, "watch=true")}
+	fakeResp, ok := f.response[key]
 	if !ok {
 		fakeResp = fakeResponse{
 			statusCode: http.StatusOK,
-			content:    []byte("{\"kind\": \"List\"}"),
+			content:    []byte(`{"kind": "List", "items": []}`),
 		}
 	}
 	response.Header().Set("Content-Type", "application/json")
 	response.WriteHeader(fakeResp.statusCode)
 	response.Write(fakeResp.content)
+}
+
+func SleeperCrdWithStatus() *apiext_v1b1.CustomResourceDefinition {
+	crd := sleeper.SleeperCrd()
+	crd.Status = apiext_v1b1.CustomResourceDefinitionStatus{
+		Conditions: []apiext_v1b1.CustomResourceDefinitionCondition{
+			{Type: apiext_v1b1.Established, Status: apiext_v1b1.ConditionTrue},
+			{Type: apiext_v1b1.NamesAccepted, Status: apiext_v1b1.ConditionTrue},
+		},
+	}
+	return crd
 }

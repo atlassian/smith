@@ -91,7 +91,7 @@ func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition)
 		Kind:    crd.Spec.Names.Kind,
 	}
 	log.Printf("[CRDEH] Configuring watch for CRD %s", crd.Name)
-	res, err := h.smartClient.ForGVK(gvk, meta_v1.NamespaceNone)
+	res, err := h.smartClient.ForGVK(gvk, h.namespace)
 	if err != nil {
 		log.Printf("[CRDEH] Failed to setup informer for CRD %s: %v", crd.Name, err)
 		return false
