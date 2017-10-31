@@ -214,7 +214,7 @@
 [[projects]]
   branch = "release-1.8"
   name = "k8s.io/apiextensions-apiserver"
-  packages = ["examples/client-go/apis/cr/v1","pkg/apis/apiextensions","pkg/apis/apiextensions/v1beta1","pkg/client/clientset/clientset","pkg/client/clientset/clientset/fake","pkg/client/clientset/clientset/scheme","pkg/client/clientset/clientset/typed/apiextensions/v1beta1","pkg/client/clientset/clientset/typed/apiextensions/v1beta1/fake","pkg/client/informers/externalversions","pkg/client/informers/externalversions/apiextensions","pkg/client/informers/externalversions/apiextensions/v1beta1","pkg/client/informers/externalversions/internalinterfaces","pkg/client/listers/apiextensions/v1beta1"]
+  packages = ["pkg/apis/apiextensions","pkg/apis/apiextensions/v1beta1","pkg/client/clientset/clientset","pkg/client/clientset/clientset/fake","pkg/client/clientset/clientset/scheme","pkg/client/clientset/clientset/typed/apiextensions/v1beta1","pkg/client/clientset/clientset/typed/apiextensions/v1beta1/fake","pkg/client/informers/externalversions","pkg/client/informers/externalversions/apiextensions","pkg/client/informers/externalversions/apiextensions/v1beta1","pkg/client/informers/externalversions/internalinterfaces","pkg/client/listers/apiextensions/v1beta1"]
   revision = "5bc0d8f05a92b3a09bcf1a9db442a29c0b7a514d"
 
 [[projects]]
@@ -249,6 +249,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6f76f4615fbfc44271d2f703fe973b260dc0cd7040d98b2dc40ad72be861184a"
+  inputs-digest = "254284729e7dbc716a9fc048731922449df1668c5d3dad909b971a8fe879f3f8"
   solver-name = "gps-cdcl"
   solver-version = 1
