@@ -1,6 +1,8 @@
 package types
 
 import (
+	"errors"
+
 	"github.com/atlassian/smith/pkg/cleanup"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
@@ -99,12 +101,24 @@ func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstruc
 		return nil, err
 	}
 
+	if instanceSpec.Spec.ClusterServiceClassName != "" &&
+		instanceSpec.Spec.ClusterServiceClassName != instanceActual.Spec.ClusterServiceClassName {
+		return nil, errors.New("clusterServiceClassName has changed when it should be immutable")
+	}
+
+	if instanceSpec.Spec.ClusterServicePlanName != "" &&
+		instanceSpec.Spec.ClusterServicePlanName != instanceActual.Spec.ClusterServicePlanName {
+		return nil, errors.New("clusterServicePlanName has changed when it should be immutable")
+	}
+
 	if instanceActual.Spec.ClusterServiceClassExternalName == instanceSpec.Spec.ClusterServiceClassExternalName {
 		instanceSpec.Spec.ClusterServiceClassRef = instanceActual.Spec.ClusterServiceClassRef
+		instanceSpec.Spec.ClusterServiceClassName = instanceActual.Spec.ClusterServiceClassName
 	}
 
 	if instanceActual.Spec.ClusterServicePlanExternalName == instanceSpec.Spec.ClusterServicePlanExternalName {
 		instanceSpec.Spec.ClusterServicePlanRef = instanceActual.Spec.ClusterServicePlanRef
+		instanceSpec.Spec.ClusterServicePlanName = instanceActual.Spec.ClusterServicePlanName
 	}
 
 	instanceSpec.ObjectMeta.Finalizers = instanceActual.ObjectMeta.Finalizers
