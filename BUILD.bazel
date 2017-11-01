@@ -1,3 +1,5 @@
+# workaround https://github.com/bazelbuild/rules_go/issues/900
+# gazelle:proto disable
 load("@io_bazel_rules_go//go:def.bzl", "gazelle", "go_library")
 
 gazelle(
