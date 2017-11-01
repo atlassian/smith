@@ -107,6 +107,8 @@ func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstruc
 		instanceSpec.Spec.ClusterServicePlanRef = instanceActual.Spec.ClusterServicePlanRef
 	}
 
+	instanceSpec.ObjectMeta.Finalizers = instanceActual.ObjectMeta.Finalizers
+
 	instanceSpec.Spec.ExternalID = instanceActual.Spec.ExternalID
 
 	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(&instanceSpec)
