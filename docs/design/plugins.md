@@ -106,7 +106,7 @@ func Process(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]
 	return smith_plugin.ProcessResult{
 		//Object: object literal here
 	}, nil
-} 
+}
 ```
 
 ## Example
@@ -126,7 +126,10 @@ spec:
       metadata:
         name: a
       spec:
-        foo: bar
+        clusterServiceClassExternalName: user-provided-service
+        clusterServicePlanExternalName: default
+        parameters:
+          foo: bar
 
   - name: a-binding
     dependsOn:
@@ -151,7 +154,7 @@ spec:
       kind: ServiceInstance
       name: b
       spec:
-        filterByPrefix: "FOO_" # only keys which start with "FOO_"          
+        filterByPrefix: "FOO_" # only keys which start with "FOO_"
 ```
 
 When the plugin `filter` is invoked, it returns the following object:

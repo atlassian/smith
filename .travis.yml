@@ -6,7 +6,7 @@ cache:
     - $GOPATH/pkg/dep
 
 go:
-  - 1.9.1
+  - 1.9.2
 
 os:
   - linux
@@ -19,7 +19,7 @@ env:
 before_install:
   - go get -u github.com/golang/dep/cmd/dep
   - |
-    V=0.7.0
+    V=0.8.0
     OS=linux
     wget -nv -O install.sh "https://github.com/bazelbuild/bazel/releases/download/${V}/bazel-${V}-installer-${OS}-x86_64.sh"
     chmod +x install.sh

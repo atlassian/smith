@@ -8,7 +8,6 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
@@ -73,7 +72,10 @@ func byCrdGroupKindIndex(obj interface{}) ([]string, error) {
 	bundle := obj.(*smith_v1.Bundle)
 	var result []string
 	for _, resource := range bundle.Spec.Resources {
-		gvk := resource.Spec.GetObjectKind().GroupVersionKind()
+		gvk, err := resource.ObjectGVK()
+		if err != nil {
+			return nil, err
+		}
 		if strings.IndexByte(gvk.Group, '.') == -1 {
 			// CRD names are of form <plural>.<domain>.<tld> so there should be at least
 			// one dot between domain and tld
@@ -92,8 +94,15 @@ func byObjectIndex(obj interface{}) ([]string, error) {
 	bundle := obj.(*smith_v1.Bundle)
 	result := make([]string, 0, len(bundle.Spec.Resources))
 	for _, resource := range bundle.Spec.Resources {
-		m := resource.Spec.(meta_v1.Object)
-		result = append(result, byObjectIndexKey(resource.Spec.GetObjectKind().GroupVersionKind().GroupKind(), bundle.Namespace, m.GetName()))
+		gvk, err := resource.ObjectGVK()
+		if err != nil {
+			return nil, err
+		}
+		name, err := resource.ObjectName()
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, byObjectIndexKey(gvk.GroupKind(), bundle.Namespace, name))
 	}
 	return result, nil
 }

@@ -1,5 +1,8 @@
 METALINTER_CONCURRENCY ?= 4
 ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*" -not -path './pkg/client/clientset_generated/*' -not -name 'zz_generated.*')
+GOVERSION := 1.9.2
+GP := /gopath
+GOPATH ?= "$$HOME/go"
 
 setup: setup-ci
 	go get -u golang.org/x/tools/cmd/goimports
@@ -78,7 +81,7 @@ minikube-test-sc: fmt update-bazel
 		--test_env=SERVICE_CATALOG_URL="http://$$(minikube ip):30080" \
 		//it/sc:go_default_test
 
-minikube-run: fmt update-bazel build-race
+minikube-run: fmt update-bazel build
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -88,7 +91,7 @@ minikube-run: fmt update-bazel build-race
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	bazel-bin/cmd/smith/smith -disable-service-catalog
 
-minikube-run-sc: fmt update-bazel build-race
+minikube-run-sc: fmt update-bazel build
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \

@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/atlassian/smith/pkg/cleanup"
+	"github.com/atlassian/smith/pkg/util"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	apps_v1b2 "k8s.io/api/apps/v1beta2"
@@ -60,35 +61,23 @@ func serviceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unst
 		}
 	}
 
-	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(&serviceSpec)
-	if err != nil {
-		return nil, err
-	}
-	return &unstructured.Unstructured{
-		Object: u,
-	}, nil
+	return util.RuntimeToUnstructured(&serviceSpec)
 }
 
 func scServiceBindingCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	var sicSpec sc_v1b1.ServiceBinding
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &sicSpec); err != nil {
+	var sbSpec sc_v1b1.ServiceBinding
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &sbSpec); err != nil {
 		return nil, err
 	}
-	var sicActual sc_v1b1.ServiceBinding
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &sicActual); err != nil {
+	var sbActual sc_v1b1.ServiceBinding
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(actual.Object, &sbActual); err != nil {
 		return nil, err
 	}
 
-	sicSpec.Spec.ExternalID = sicActual.Spec.ExternalID
-	sicSpec.Status = sicActual.Status
+	sbSpec.Spec.ExternalID = sbActual.Spec.ExternalID
+	sbSpec.Status = sbActual.Status
 
-	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(&sicSpec)
-	if err != nil {
-		return nil, err
-	}
-	return &unstructured.Unstructured{
-		Object: u,
-	}, nil
+	return util.RuntimeToUnstructured(&sbSpec)
 }
 
 func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -125,11 +114,5 @@ func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstruc
 
 	instanceSpec.Spec.ExternalID = instanceActual.Spec.ExternalID
 
-	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(&instanceSpec)
-	if err != nil {
-		return nil, err
-	}
-	return &unstructured.Unstructured{
-		Object: u,
-	}, nil
+	return util.RuntimeToUnstructured(&instanceSpec)
 }

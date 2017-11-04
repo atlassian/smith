@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"log"
+	"path/filepath"
+	"plugin"
 	"time"
 
 	"github.com/atlassian/smith"
@@ -14,6 +16,7 @@ import (
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
+	smithPlugin "github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources"
@@ -23,6 +26,7 @@ import (
 
 	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	"github.com/pkg/errors"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
@@ -40,11 +44,22 @@ type App struct {
 	ServiceCatalogConfig *rest.Config
 	ResyncPeriod         time.Duration
 	Namespace            string
-	DisablePodPreset     bool
+	PluginsDir           string
+	Plugins              []string
 	Workers              int
+	DisablePodPreset     bool
 }
 
 func (a *App) Run(ctx context.Context) error {
+	// Plugins
+	plugins, err := a.loadPlugins()
+	if err != nil {
+		return err
+	}
+	for pluginName := range plugins {
+		log.Printf("Loaded plugin: %s", pluginName)
+	}
+
 	// Clients
 	clientset, err := kubernetes.NewForConfig(a.RestConfig)
 	if err != nil {
@@ -130,7 +145,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 	resourceInfs := apitypes.ResourceInformers(clientset, scClient, a.Namespace, a.ResyncPeriod, !a.DisablePodPreset)
-	cntrlr := a.controller(bundleInf, crdInf, bundleClient.SmithV1(), bs, crdStore, sc, scheme, multiStore, resourceInfs)
+	cntrlr := a.controller(bundleInf, crdInf, bundleClient.SmithV1(), bs, crdStore, sc, scheme, multiStore, resourceInfs, plugins)
 
 	infs := make([]cache.InformerSynced, 0, len(resourceInfs)+1)
 	// Add all informers to Multi store and start them
@@ -151,7 +166,7 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore controller.BundleStore, crdStore readychecker.CrdStore,
-	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) *controller.BundleController {
+	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer, plugins map[string]smithPlugin.Func) *controller.BundleController {
 
 	// Ready Checker
 	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
@@ -174,5 +189,26 @@ func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClie
 	}
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle")
 
-	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs, a.Namespace)
+	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs, a.Namespace, plugins, scheme)
+}
+
+func (a *App) loadPlugins() (map[string]smithPlugin.Func, error) {
+	plugs := make(map[string]smithPlugin.Func, len(a.Plugins))
+	for _, p := range a.Plugins {
+		filePath := filepath.Join(a.PluginsDir, p)
+		plug, err := plugin.Open(filePath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to load plugin from %q", filePath)
+		}
+		symbol, err := plug.Lookup(smithPlugin.FuncName)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to load symbol from plugin %q", p)
+		}
+		f, ok := symbol.(func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smithPlugin.Dependency) (smithPlugin.ProcessResult, error))
+		if !ok {
+			return nil, errors.Errorf("loaded symbol from plugin %q does not have the right signature", p)
+		}
+		plugs[p] = f
+	}
+	return plugs, nil
 }

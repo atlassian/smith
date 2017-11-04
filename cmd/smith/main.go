@@ -8,6 +8,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -48,6 +49,8 @@ func runWithContext(ctx context.Context) error {
 	flag.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flag.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
 	pprofAddr := flag.String("pprof-address", "", "Address for pprof to listen on")
+	flag.StringVar(&a.PluginsDir, "plugins-dir", "", "Directory to load plugins from. Defaults to working directory")
+	plugins := flag.String("plugins", "", "Comma separated names of plugins to load")
 	flag.Parse()
 
 	config, err := client.ConfigFromEnv()
@@ -70,6 +73,10 @@ func runWithContext(ctx context.Context) error {
 			scConfig.Host = *scUrl
 		}
 		a.ServiceCatalogConfig = &scConfig
+	}
+
+	if *plugins != "" {
+		a.Plugins = strings.Split(*plugins, ",")
 	}
 
 	if pprofAddr != nil && *pprofAddr != "" {

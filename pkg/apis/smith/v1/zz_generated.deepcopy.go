@@ -184,6 +184,15 @@ func (in *Resource) DeepCopyInto(out *Resource) {
 	} else {
 		out.Spec = in.Spec.DeepCopyObject()
 	}
+	if in.PluginSpec != nil {
+		in, out := &in.PluginSpec, &out.PluginSpec
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(PluginSpec)
+			**out = **in
+		}
+	}
 	return
 }
 
