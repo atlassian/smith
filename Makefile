@@ -18,7 +18,7 @@ update-bazel:
 build: fmt update-bazel build-ci
 
 build-race: fmt update-bazel
-	bazel build //cmd/smith --output_groups=race
+	bazel build --features=race //cmd/smith
 
 build-ci:
 	bazel build //cmd/smith
@@ -94,7 +94,7 @@ minikube-run-sc: fmt update-bazel build-race
 	-service-catalog-insecure
 
 minikube-sleeper-run: fmt update-bazel
-	bazel build //examples/sleeper/main --output_groups=race
+	bazel build --features=race //examples/sleeper/main
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \

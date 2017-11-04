@@ -1,12 +1,12 @@
 git_repository(
     name = "io_bazel_rules_go",
     remote = "https://github.com/bazelbuild/rules_go.git",
-    commit = "bcc7a4ff5a21ff2640f86cb302a7d976e33d89f1",
+    commit = "9ae53ed3b7e9ee529101a111881ba730b020d4ad",
 )
 git_repository(
     name = "io_bazel_rules_docker",
     remote = "https://github.com/bazelbuild/rules_docker.git",
-    commit = "58d022892232e5d59daba7760289976d5f6e7433",
+    commit = "04165ef6de8e12975740238445cad6a623e6de2f",
 )
 
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains")
@@ -20,7 +20,7 @@ container_repositories()
 # https://github.com/GoogleCloudPlatform/distroless/blob/master/base/README.md
 container_pull(
     name = "distroless_base",
-    digest = "sha256:872f258db0668e5cabfe997d4076b2fe5337e5b73cdd9ca47c7dbccd87e71341",
+    digest = "sha256:4a8979a768c3ef8d0a8ed8d0af43dc5920be45a51749a9c611d178240f136eb4",
     registry = "gcr.io",
     repository = "distroless/base",
     #tag = "latest",  # ignored, but kept here for documentation
