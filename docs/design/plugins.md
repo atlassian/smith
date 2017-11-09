@@ -56,7 +56,7 @@ spec:
 
 Smith plugins are [Go plugins](https://golang.org/pkg/plugin/). They are eagerly loaded at Smith startup to detect
 issues early. Names of plugins to load are passed via command line.
-Each plugin publishes a `Process(smith_v1.Resource, map[smith_v1.ResourceName]Dependency) (TransformResult, error)`
+Each plugin publishes a `Process(smith_v1.Resource, map[smith_v1.ResourceName]Dependency) (ProcessResult, error)`
 function.
 
 When Smith comes across a resource with `type: plugin` and `pluginName: foobar` it invokes
@@ -69,8 +69,10 @@ A resource must have the group/version/kind of the object that is going to be pr
 
 A plugin must:
 1. Be a pure function - plugin must not depend on any external state;
-2. Be deterministic - same set of inputs should always produce identical output. I.e. no unordered data structures
-or unstable sort algorithms should be used;
+2. Be deterministic - same set of inputs should always produce identical output:
+  - no unordered data structures;
+  - no unstable sort algorithms;
+  - no timestamps.
 3. Output an object of the correct Group/Version/Kind - GVK is declared in the plugin resource definition and
 is known in advance.
 
@@ -158,10 +160,10 @@ name: b
 spec:
   parametersFrom:
   - secretKeyRef:
-    name: a
+    name: a-binding-secret
     key: FOO_BAR1
   - secretKeyRef:
-    name: a
+    name: a-binding-secret
     key: FOO_BAR2
 ```
 
