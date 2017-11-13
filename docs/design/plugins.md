@@ -60,10 +60,12 @@ Each plugin publishes a `Process(smith_v1.Resource, map[smith_v1.ResourceName]De
 function.
 
 When Smith comes across a resource with `type: plugin` and `pluginName: foobar` it invokes
-the plugin `foobar`. To do that it inspects all the dependencies of the resource specified in `dependsOn` attribute
-and fetches their outputs to include in the invocation along with the dependencies themselves. Smith needs to
-recognize resource group/version/kinds to be able to fetch the output (if there is one).
-One example is `ServiceBinding` that produces a `Secret`.
+the plugin `foobar`. For each dependency (resources that are referenced in `dependsOn` attribute) of the
+resource with plugin invocation Smith fetches its output objects (if any) and auxilary objects (if any) to
+include in the plugin invocation along with the dependencies themselves.
+Smith needs to recognize resource group/version/kinds to be able to fetch the outputs and auxialry objects.
+One example is `ServiceBinding` that produces a `Secret` (output object) and references a `ServiceInstance`
+(an auxilary object).
 
 A resource must have the group/version/kind of the object that is going to be produced specified.
 
