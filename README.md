@@ -104,7 +104,7 @@ Some resource types can have Outputs:
 - New objects likes [Secrets](https://kubernetes.io/docs/user-guide/secrets/) and/or [ConfigMaps](https://kubernetes.io/docs/user-guide/configmap/)
 - [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) [objects](https://github.com/kubernetes-incubator/service-catalog/blob/master/docs/v1/api.md)
 
-Resources can reference outputs of other resources within the same bundle. [See what is supported](./docs/design/managing-resources.md). 
+Resources can reference outputs of other resources within the same bundle. [See what is supported](./docs/design/field-references.md). 
 
 ### Dependencies
 Resources may depend on each other explicitly via `DependsOn` object references. Resources are created in the reverse dependency order.
