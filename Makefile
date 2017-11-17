@@ -79,7 +79,7 @@ minikube-run: fmt update-bazel build-race
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/cmd/smith/smith.race -disable-service-catalog
+	bazel-bin/cmd/smith/smith -disable-service-catalog
 
 minikube-run-sc: fmt update-bazel build-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
@@ -89,7 +89,7 @@ minikube-run-sc: fmt update-bazel build-race
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/cmd/smith/smith.race  \
+	bazel-bin/cmd/smith/smith  \
 	-service-catalog-url="https://$$(minikube ip):30443" \
 	-service-catalog-insecure
 
@@ -102,7 +102,7 @@ minikube-sleeper-run: fmt update-bazel
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/examples/sleeper/main/main.race
+	bazel-bin/examples/sleeper/main/main
 
 test: fmt update-bazel test-ci
 
