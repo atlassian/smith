@@ -4,7 +4,7 @@ import (
 	"github.com/atlassian/smith/pkg/readychecker"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
-	apps_v1b1 "k8s.io/api/apps/v1beta1"
+	apps_v1b2 "k8s.io/api/apps/v1beta2"
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	settings_v1a1 "k8s.io/api/settings/v1alpha1"
@@ -17,7 +17,7 @@ var MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
 	{Group: core_v1.GroupName, Kind: "ConfigMap"}:       alwaysReady,
 	{Group: core_v1.GroupName, Kind: "Secret"}:          alwaysReady,
 	{Group: core_v1.GroupName, Kind: "Service"}:         alwaysReady,
-	{Group: apps_v1b1.GroupName, Kind: "Deployment"}:    isDeploymentReady,
+	{Group: apps_v1b2.GroupName, Kind: "Deployment"}:    isDeploymentReady,
 	{Group: settings_v1a1.GroupName, Kind: "PodPreset"}: alwaysReady,
 	{Group: ext_v1b1.GroupName, Kind: "Ingress"}:        alwaysReady,
 }
@@ -34,7 +34,7 @@ func alwaysReady(_ *unstructured.Unstructured) (isReady, retriableError bool, e 
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
 func isDeploymentReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
-	var deployment apps_v1b1.Deployment
+	var deployment apps_v1b2.Deployment
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &deployment); err != nil {
 		return false, false, err
 	}

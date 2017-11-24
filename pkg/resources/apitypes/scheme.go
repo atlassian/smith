@@ -4,7 +4,7 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
-	apps_v1b1 "k8s.io/api/apps/v1beta1"
+	apps_v1b2 "k8s.io/api/apps/v1beta2"
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	settings_v1a1 "k8s.io/api/settings/v1alpha1"
@@ -19,7 +19,7 @@ func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
 	sb.Register(smith_v1.SchemeBuilder...)
 	sb.Register(ext_v1b1.SchemeBuilder...)
 	sb.Register(core_v1.SchemeBuilder...)
-	sb.Register(apps_v1b1.SchemeBuilder...)
+	sb.Register(apps_v1b2.SchemeBuilder...)
 	sb.Register(settings_v1a1.SchemeBuilder...)
 	sb.Register(apiext_v1b1.SchemeBuilder...)
 	if serviceCatalog {
