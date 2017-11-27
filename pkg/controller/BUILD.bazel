@@ -7,6 +7,7 @@ go_library(
         "controller_bundle_event_handler.go",
         "controller_crd_event_handler.go",
         "controller_resource_event_handler.go",
+        "controller_sync_task.go",
         "controller_worker.go",
         "spec_processor.go",
         "types.go",
