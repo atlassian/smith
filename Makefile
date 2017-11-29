@@ -10,9 +10,16 @@ setup-ci:
 	dep ensure
 	# workaround https://github.com/kubernetes/kubernetes/issues/50975
 	cp fixed_BUILD_for_sets.bazel vendor/k8s.io/apimachinery/pkg/util/sets/BUILD
+	go build -o build/bin/buildozer vendor/github.com/bazelbuild/buildtools/buildozer/*.go
+	rm -rf vendor/github.com/bazelbuild
 	bazel run //:gazelle-fix
 
 update-bazel:
+	-build/bin/buildozer 'set race "on"' \
+		//cmd/...:%go_test \
+		//examples/...:%go_test \
+		//it/...:%go_test \
+		//pkg/...:%go_test
 	bazel run //:gazelle
 
 build: fmt update-bazel build-ci

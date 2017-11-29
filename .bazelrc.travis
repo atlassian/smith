@@ -4,4 +4,3 @@ build --curses=no
 build --show_timestamps
 
 test --test_output=all
-test --features=race
