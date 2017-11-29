@@ -1,7 +1,7 @@
 METALINTER_CONCURRENCY ?= 4
 ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*" -not -path './pkg/client/clientset_generated/*' -not -name 'zz_generated.*')
 
-setup: setup-ci update-bazel
+setup: setup-ci
 	go get -u golang.org/x/tools/cmd/goimports
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
@@ -122,7 +122,7 @@ test-ci:
 	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
-		-- ... -cmd/... -vendor/...
+		-- //... -//cmd/... -//vendor/...
 
 check:
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor \
