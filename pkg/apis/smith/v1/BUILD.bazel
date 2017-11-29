@@ -27,6 +27,7 @@ go_test(
     srcs = ["types_test.go"],
     embed = [":go_default_library"],
     importpath = "github.com/atlassian/smith/pkg/apis/smith/v1",
+    race = "on",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

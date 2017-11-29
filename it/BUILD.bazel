@@ -46,6 +46,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     importpath = "github.com/atlassian/smith/it",
+    race = "on",
     tags = [
         "external",
         "manual",

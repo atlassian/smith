@@ -20,6 +20,12 @@
   revision = "6e9c7b0eacd465286fac042bfb29a170aa8c2c3f"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/bazelbuild/buildtools"
+  packages = ["api_proto","build","build_proto","buildozer","edit","file","lang","tables","wspace"]
+  revision = "8e0238105b594d7533683827882cfff71d07963b"
+
+[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
@@ -249,6 +255,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "254284729e7dbc716a9fc048731922449df1668c5d3dad909b971a8fe879f3f8"
+  inputs-digest = "b26980a969cc841028bf73c99bd43652674bc2c03e7770002916477ad41eb1c0"
   solver-name = "gps-cdcl"
   solver-version = 1

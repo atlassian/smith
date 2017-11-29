@@ -45,6 +45,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     importpath = "github.com/atlassian/smith/pkg/controller",
+    race = "on",
     deps = [
         "//examples/sleeper:go_default_library",
         "//examples/sleeper/pkg/apis/sleeper/v1:go_default_library",

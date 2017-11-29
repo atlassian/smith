@@ -5,6 +5,7 @@ go_test(
     timeout = "short",
     srcs = ["service_catalog_test.go"],
     importpath = "github.com/atlassian/smith/it/sc",
+    race = "on",
     tags = [
         "external",
         "manual",

@@ -6,3 +6,4 @@
 /bazel-out
 /bazel-smith
 /bazel-testlogs
+/build/bin/

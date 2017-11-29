@@ -1,3 +1,1 @@
 build --workspace_status_command build/print-workspace-status.sh
-
-test --features=race

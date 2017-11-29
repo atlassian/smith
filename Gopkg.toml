@@ -20,11 +20,19 @@
 #  name = "github.com/x/y"
 #  version = "2.4.0"
 
-required = ["k8s.io/code-generator/cmd/client-gen", "k8s.io/code-generator/cmd/deepcopy-gen"]
+required = [
+    "k8s.io/code-generator/cmd/client-gen",
+    "k8s.io/code-generator/cmd/deepcopy-gen",
+    "github.com/bazelbuild/buildtools/buildozer"
+]
 
 [[constraint]]
   branch = "release-1.8" # correct branch
   name = "k8s.io/code-generator"
+
+[[constraint]]
+  branch = "master" # latest
+  name = "github.com/bazelbuild/buildtools"
 
 [[override]]
 revision = "75356185a9af8f0464efa792e2e9508d5b4be83c" # workaround https://github.com/kubernetes/code-generator/issues/13
