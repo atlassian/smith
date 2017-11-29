@@ -41,7 +41,7 @@ spec:
 
   - name: b
     dependsOn:
-    - a
+    - a-binding
     spec:
       apiVersion: servicecatalog.k8s.io/v1beta1
       kind: ServiceInstance
