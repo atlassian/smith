@@ -9,9 +9,10 @@ import (
 type Func func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]Dependency) (ProcessResult, error)
 
 type Dependency struct {
-	Spec    smith_v1.Resource
-	Actual  runtime.Object
-	Outputs []runtime.Object
+	Spec      smith_v1.Resource
+	Actual    runtime.Object
+	Outputs   []runtime.Object
+	Auxiliary []runtime.Object
 }
 
 type ProcessResult struct {

@@ -61,11 +61,11 @@ function.
 
 When Smith comes across a resource with `type: plugin` and `pluginName: foobar` it invokes
 the plugin `foobar`. For each dependency (resources that are referenced in `dependsOn` attribute) of the
-resource with plugin invocation Smith fetches its output objects (if any) and auxilary objects (if any) to
+resource with plugin invocation Smith fetches its output objects (if any) and auxiliary objects (if any) to
 include in the plugin invocation along with the dependencies themselves.
-Smith needs to recognize resource group/version/kinds to be able to fetch the outputs and auxialry objects.
+Smith needs to recognize resource group/version/kinds to be able to fetch the outputs and auxiliary objects.
 One example is `ServiceBinding` that produces a `Secret` (output object) and references a `ServiceInstance`
-(an auxilary object).
+(an auxiliary object).
 
 A resource must have the group/version/kind of the object that is going to be produced specified.
 
@@ -91,9 +91,10 @@ import (
 // For reference:
 //
 //type Dependency struct {
-//	Spec    smith_v1.Resource
-//	Actual  runtime.Object
-//	Outputs []runtime.Object
+//	Spec      smith_v1.Resource
+//	Actual    runtime.Object
+//	Outputs   []runtime.Object
+//	Auxiliary []runtime.Object
 //}
 //
 //type ProcessResult struct {
