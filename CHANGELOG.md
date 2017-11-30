@@ -1,3 +1,12 @@
+v0.2.3
+------
+- plugin support doc and plugin types
+
+v0.2.2
+------
+- refactoring and cleanups
+- proper plan name and service name handling
+
 v0.2.1
 ------
 - informers respect namespace set on smith command line
