@@ -56,14 +56,14 @@ type BundleController struct {
 	resourceHandler cache.ResourceEventHandler
 	namespace       string
 
-	plugins map[string]smithPlugin.Func
+	plugins []smithPlugin.Plugin
 	scheme  *runtime.Scheme
 }
 
 func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore BundleStore,
 	sc smith.SmartClient, rc ReadyChecker, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
 	workers int, crdResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer,
-	namespace string, plugins map[string]smithPlugin.Func, scheme *runtime.Scheme) *BundleController {
+	namespace string, plugins []smithPlugin.Plugin, scheme *runtime.Scheme) *BundleController {
 	c := &BundleController{
 		bundleInf:       bundleInf,
 		crdInf:          crdInf,

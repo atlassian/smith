@@ -1,0 +1,30 @@
+load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_push")
+load("@cpp_bundle//file:packages.bzl", "packages")
+
+# This should be invoked by the makefile because it depends on binaries
+# created by a go-build
+container_image(
+    name = "container",
+    base = "@distroless_base//image",
+    debs = [
+        packages["libstdc++6"],
+        packages["multiarch-support"],
+        packages["libc6"],
+        packages["libgcc1"],
+    ],
+    entrypoint = ["/smith"],
+    files = [
+        ":bin/linux/smith",
+        ":bin/linux/shim",
+    ],
+)
+
+# container_push(
+#     name = "push-docker",
+#     format = "Docker",
+#     image = ":container",
+#     registry = "index.docker.io",
+#     repository = "atlassianlabs/smith",
+#     stamp = True,
+#     tag = "{STABLE_BUILD_GIT_TAG}-{STABLE_BUILD_GIT_COMMIT}",
+# )
