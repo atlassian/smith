@@ -33,7 +33,7 @@ type syncTask struct {
 	specCheck      SpecCheck
 	bundle         *smith_v1.Bundle
 	readyResources map[smith_v1.ResourceName]*unstructured.Unstructured
-	plugins        map[string]smith_plugin.Func
+	plugins        []smithPlugin.Plugin
 	scheme         *runtime.Scheme
 }
 
@@ -174,16 +174,29 @@ func (st *syncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unstructured
 
 // evalPluginSpec evaluates the plugin resource specification and returns the result.
 func (st *syncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
-	plugin, ok := st.plugins[res.PluginName]
-	if !ok {
-		return nil, errors.Errorf("no such plugin %q", res.PluginName)
+	var plugin smithPlugin.Plugin
+	pluginFound := false
+	for _, p := range st.plugins {
+		isSupported, err := p.IsSupported(res.PluginName)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to call IsSupported")
+		}
+		if isSupported {
+			plugin = p
+			pluginFound = true
+			break
+		}
 	}
+	if !pluginFound {
+		return nil, errors.Errorf("no plugins found to handle %q", res.PluginName)
+	}
+
 	dependencies, err := st.prepareDependencies(res.DependsOn)
 	if err != nil {
 		return nil, err
 	}
 	log.Printf("Plugin %s dependencies: %+v", res.PluginName, dependencies)
-	result, err := plugin(*res, dependencies)
+	result, err := plugin.Process(*res, dependencies)
 	if err != nil {
 		return nil, err
 	}

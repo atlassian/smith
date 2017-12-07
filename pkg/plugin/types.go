@@ -11,10 +11,18 @@ import (
 )
 
 const (
-	FuncName = "Process"
+	ProcessFuncName     = "Process"
+	IsSupportedFuncName = "IsSupported"
 )
 
-type Func func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]Dependency) (ProcessResult, error)
+type Process func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]Dependency) (ProcessResult, error)
+type IsSupported func(plugin string) (bool, error)
+
+type Plugin struct {
+	Name        string
+	Process     Process
+	IsSupported IsSupported
+}
 
 type Dependency struct {
 	Spec      smith_v1.Resource

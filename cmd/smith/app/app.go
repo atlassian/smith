@@ -56,9 +56,6 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for pluginName := range plugins {
-		log.Printf("Loaded plugin: %s", pluginName)
-	}
 
 	// Clients
 	clientset, err := kubernetes.NewForConfig(a.RestConfig)
@@ -166,7 +163,7 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore controller.BundleStore, crdStore readychecker.CrdStore,
-	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer, plugins map[string]smith_plugin.Func) *controller.BundleController {
+	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer, plugins []smithPlugin.Plugin) *controller.BundleController {
 
 	// Ready Checker
 	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
@@ -192,23 +189,49 @@ func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClie
 	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs, a.Namespace, plugins, scheme)
 }
 
-func (a *App) loadPlugins() (map[string]smith_plugin.Func, error) {
-	plugs := make(map[string]smith_plugin.Func, len(a.Plugins))
+func (a *App) loadPlugins() ([]smithPlugin.Plugin, error) {
+	plugs := make([]smithPlugin.Plugin, 0, len(a.Plugins))
 	for _, p := range a.Plugins {
 		filePath := filepath.Join(a.PluginsDir, p)
 		plug, err := plugin.Open(filePath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to load plugin from %q", filePath)
 		}
-		symbol, err := plug.Lookup(smith_plugin.FuncName)
+
+		processSymbol, err := plug.Lookup(smithPlugin.ProcessFuncName)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to load symbol from plugin %q", p)
+			return nil, errors.Wrapf(err, "failed to load Process symbol from plugin %q", p)
 		}
-		f, ok := symbol.(func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smith_plugin.Dependency) (smith_plugin.ProcessResult, error))
+
+		supportedSymbol, err := plug.Lookup(smithPlugin.IsSupportedFuncName)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to load IsSupported symbol from plugin %q", p)
+		}
+		if supportedSymbol == nil {
+			return nil, errors.New("WTF?????????")
+		}
+
+		processFunc, ok := processSymbol.(func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smithPlugin.Dependency) (smithPlugin.ProcessResult, error))
+
 		if !ok {
-			return nil, errors.Errorf("loaded symbol from plugin %q does not have the right signature", p)
+			return nil, errors.Errorf("loaded Process from plugin %q does not have the right signature", p)
 		}
-		plugs[p] = f
+
+		supportedFunc, ok := supportedSymbol.(func(plugin string) (bool, error))
+		if !ok {
+			return nil, errors.Errorf("loaded IsSupported from plugin %q does not have the right signature", p)
+		}
+		if supportedFunc == nil {
+			return nil, errors.New("OMG?????????")
+		}
+
+		plugs = append(plugs, smithPlugin.Plugin{
+			Name:        p,
+			Process:     processFunc,
+			IsSupported: supportedFunc,
+		})
+
+		log.Printf("Loaded plugin: %q", p)
 	}
 	return plugs, nil
 }

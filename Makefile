@@ -1,8 +1,15 @@
 METALINTER_CONCURRENCY ?= 4
 ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*" -not -path './pkg/client/clientset_generated/*' -not -name 'zz_generated.*')
-GOVERSION := 1.9.2
+
+# Go Build flags
 GP := /gopath
 GOPATH ?= "$$HOME/go"
+GOVERSION := 1.9.2
+ARCH ?= darwin
+BINARY_NAME := smith
+MAIN_PKG := github.com/atlassian/smith/cmd/smith
+PLUGIN_SHIM_NAME := shim
+PLUGIN_SHIM_PKG := github.com/atlassian/smith/plugins/shim
 
 setup: setup-ci
 	go get -u golang.org/x/tools/cmd/goimports
@@ -145,5 +152,31 @@ docker-export:
 
 release: update-bazel
 	bazel run --cpu=k8 //cmd/smith:push-docker
+
+.PHONY: docker-pull-go
+docker-pull-go:
+	docker pull golang:$(GOVERSION)
+
+go-build: fmt
+	docker run \
+		--rm \
+		-v "$(GOPATH)":"$(GP)" \
+		-w "$(GP)/src/github.com/atlassian/smith" \
+		-e GOPATH="$(GP)" \
+		golang:$(GOVERSION) \
+		go build -i -o build/bin/linux/$(BINARY_NAME) $(MAIN_PKG)
+	
+go-build-shim: fmt
+	docker run \
+		--rm \
+		-v "$(GOPATH)":"$(GP)" \
+		-w "$(GP)/src/github.com/atlassian/smith" \
+		-e GOPATH="$(GP)" \
+		golang:$(GOVERSION) \
+		go build -i -buildmode=plugin -o build/bin/linux/$(PLUGIN_SHIM_NAME) $(PLUGIN_SHIM_PKG)
+
+# build the docker image
+go-build-docker: go-build go-build-shim
+	bazel run --cpu=k8 //build:container
 
 .PHONY: build
