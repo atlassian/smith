@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/pkg/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
@@ -193,38 +195,48 @@ type Resource struct {
 	// Explicit dependencies.
 	DependsOn []ResourceName `json:"dependsOn,omitempty"`
 
-	Spec runtime.Object `json:"spec"`
+	// TODO nilebox: make "Normal" default type; there are no defaults for Bundle yet?
+	Type ResourceType `json:"type"`
+
+	Spec runtime.Object `json:"spec,omitempty"`
+
+	PluginName string      `json:"pluginName,omitempty"`
+	PluginSpec *PluginSpec `json:"pluginSpec,omitempty"`
 }
 
-// ToUnstructured returns Spec field as an Unstructured object.
-// It makes a copy if it is an Unstructured already.
-func (r *Resource) ToUnstructured() (*unstructured.Unstructured, error) {
-	if u, ok := r.Spec.(*unstructured.Unstructured); ok {
-		return u.DeepCopy(), nil
-	}
-	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(r.Spec)
-	if err != nil {
-		return nil, err
-	}
-	return &unstructured.Unstructured{
-		Object: u,
-	}, nil
+type ResourceType string
+
+const (
+	Normal ResourceType = ""
+	Plugin ResourceType = "plugin"
+)
+
+type PluginSpec struct {
+	ApiVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	Name       string `json:"name"`
 }
 
 func (r *Resource) UnmarshalJSON(data []byte) error {
-	type resource struct {
-		Name      ResourceName              `json:"name"`
-		DependsOn []ResourceName            `json:"dependsOn"`
-		Spec      unstructured.Unstructured `json:"spec"`
+	var res struct {
+		Name      ResourceName               `json:"name"`
+		DependsOn []ResourceName             `json:"dependsOn"`
+		Type      ResourceType               `json:"type"`
+		Spec      *unstructured.Unstructured `json:"spec,omitempty"`
+
+		PluginName string      `json:"pluginName,omitempty"`
+		PluginSpec *PluginSpec `json:"pluginSpec,omitempty"`
 	}
-	var res resource
 	err := json.Unmarshal(data, &res)
 	if err != nil {
 		return err
 	}
 	r.Name = res.Name
 	r.DependsOn = res.DependsOn
-	r.Spec = &res.Spec
+	r.Type = res.Type
+	r.Spec = res.Spec
+	r.PluginName = res.PluginName
+	r.PluginSpec = res.PluginSpec
 	return nil
 }
 
@@ -233,6 +245,9 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 // Note that it does not perform a deep copy in case of typed API object.
 // Note that this method may fail if references are used where a non-string value is expected.
 func (r *Resource) IntoTyped(obj runtime.Object) error {
+	if r.Type != Normal {
+		return errors.Errorf("cannot convert non-Normal into typed (%s)", r.Type)
+	}
 	objT := reflect.TypeOf(r.Spec)
 	if objT == reflect.TypeOf(obj) && objT.Kind() == reflect.Ptr {
 		objV := reflect.ValueOf(obj)
@@ -245,4 +260,54 @@ func (r *Resource) IntoTyped(obj runtime.Object) error {
 		return unstructured_conversion.DefaultConverter.FromUnstructured(specUnstr.Object, obj)
 	}
 	return fmt.Errorf("cannot convert %T into typed object %T", r.Spec, obj)
+}
+
+func (r *Resource) Validate() error {
+	switch r.Type {
+	case Normal:
+		if r.PluginName != "" || r.PluginSpec != nil {
+			return errors.New("normal resource has plugin information")
+		}
+	case Plugin:
+		if r.Spec != nil {
+			return errors.New("plugin resource has normal information")
+		}
+	default:
+		return errors.Errorf("invalid resource type %q", r.Type)
+	}
+
+	return nil
+}
+
+func (r *Resource) ObjectGVK() (schema.GroupVersionKind, error) {
+	switch r.Type {
+	case Normal:
+		return r.Spec.GetObjectKind().GroupVersionKind(), nil
+	case Plugin:
+		if r.PluginSpec == nil {
+			return schema.GroupVersionKind{}, errors.New("plugin specification is missing")
+		}
+		gv, err := schema.ParseGroupVersion(r.PluginSpec.ApiVersion)
+		if err != nil {
+			return schema.GroupVersionKind{}, errors.WithStack(err)
+		}
+		return gv.WithKind(r.PluginSpec.Kind), nil
+	default:
+		return schema.GroupVersionKind{}, errors.Errorf("invalid resource type %q", r.Type)
+	}
+}
+
+func (r *Resource) ObjectName() (string, error) {
+	switch r.Type {
+	case Normal:
+		m := r.Spec.(meta_v1.Object)
+		return m.GetName(), nil
+	case Plugin:
+		if r.PluginSpec == nil {
+			return "", errors.New("plugin specification is missing")
+		}
+		return r.PluginSpec.Name, nil
+	default:
+		return "", errors.Errorf("invalid resource type %q", r.Type)
+	}
 }

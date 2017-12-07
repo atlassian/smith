@@ -35,7 +35,7 @@ func (oc *SpecCleaner) Cleanup(spec, actual *unstructured.Unstructured) (updated
 	gk := gvk.GroupKind()
 
 	if gk.Kind == "" || gvk.Version == "" { // Group can be empty e.g. built-in objects like ConfigMap
-		return nil, fmt.Errorf("object %q has empty kind/version: %v", spec.GetName(), gvk)
+		return nil, fmt.Errorf("object has empty kind/version: %v", gvk)
 	}
 
 	if objCleanup, ok := oc.KnownTypes[gk]; ok {

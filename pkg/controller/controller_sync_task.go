@@ -8,12 +8,17 @@ import (
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
+	smith_plugin "github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/util"
 	"github.com/atlassian/smith/pkg/util/graph"
 
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
+	core_v1 "k8s.io/api/core/v1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,6 +33,8 @@ type syncTask struct {
 	specCheck      SpecCheck
 	bundle         *smith_v1.Bundle
 	readyResources map[smith_v1.ResourceName]*unstructured.Unstructured
+	plugins        map[string]smith_plugin.Func
+	scheme         *runtime.Scheme
 }
 
 // Parse bundle, build resource graph, traverse graph, assert each resource exists.
@@ -71,7 +78,7 @@ nextVertex:
 		res := resourceMap[v.(smith_v1.ResourceName)]
 		readyResource, retriable, err := st.checkResource(&res)
 		if err != nil {
-			return retriable, err
+			return retriable, errors.Wrapf(err, "failed to process resource %q", res.Name)
 		}
 		log.Printf("[WORKER][%s/%s] Resource %q, ready: %t", st.bundle.Namespace, st.bundle.Name, v, readyResource != nil)
 		if readyResource != nil {
@@ -103,37 +110,41 @@ func (st *syncTask) checkResource(res *smith_v1.Resource) (readyResource *unstru
 	// 3. Check if resource is ready
 	ready, retriable, err := st.rc.IsReady(resUpdated)
 	if err != nil || !ready {
-		return nil, retriable, err
+		return nil, retriable, errors.Wrap(err, "readiness check failed")
 	}
 	return resUpdated, false, nil
 }
 
 // evalSpec evaluates the resource specification and returns the result.
 func (st *syncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
-	// 0. Convert to Unstructured
-	spec, err := res.ToUnstructured()
+	// 1. Process the spec
+	var obj *unstructured.Unstructured
+	var err error
+	switch res.Type {
+	case smith_v1.Normal:
+		obj, err = st.evalNormalSpec(res)
+	case smith_v1.Plugin:
+		obj, err = st.evalPluginSpec(res)
+	default:
+		return nil, fmt.Errorf("unsupported resource type %q", res.Type)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	// 1. Process references
-	sp := NewSpec(res.Name, st.readyResources, res.DependsOn)
-	if err := sp.ProcessObject(spec.Object); err != nil {
-		return nil, err
-	}
-
 	// 2. Update label to point at the parent bundle
-	spec.SetLabels(mergeLabels(
+	obj.SetLabels(mergeLabels(
 		st.bundle.Labels,
-		spec.GetLabels(),
+		obj.GetLabels(),
 		map[string]string{smith.BundleNameLabel: st.bundle.Name}))
 
 	// 3. Update OwnerReferences
 	trueRef := true
-	refs := spec.GetOwnerReferences()
+	refs := obj.GetOwnerReferences()
 	for i, ref := range refs {
 		if ref.Controller != nil && *ref.Controller {
-			return nil, fmt.Errorf("cannot create resource %q with controller owner reference %v", res.Name, ref)
+			return nil, errors.Errorf("cannot create resource with controller owner reference %v", ref)
 		}
 		refs[i].BlockOwnerDeletion = &trueRef
 	}
@@ -156,7 +167,93 @@ func (st *syncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unstructured
 			BlockOwnerDeletion: &trueRef,
 		})
 	}
-	spec.SetOwnerReferences(refs)
+	obj.SetOwnerReferences(refs)
+
+	return obj, nil
+}
+
+// evalPluginSpec evaluates the plugin resource specification and returns the result.
+func (st *syncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
+	plugin, ok := st.plugins[res.PluginName]
+	if !ok {
+		return nil, errors.Errorf("no such plugin %q", res.PluginName)
+	}
+	dependencies, err := st.prepareDependencies(res.DependsOn)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Plugin %s dependencies: %+v", res.PluginName, dependencies)
+	result, err := plugin(*res, dependencies)
+	if err != nil {
+		return nil, err
+	}
+	// TODO validate pluginSpec GVK/name against result.Object.Spec
+	// and validate type of object against schema if possible
+
+	log.Printf("Plugin %s result: %+v", res.PluginName, result.Object)
+	return util.RuntimeToUnstructured(result.Object)
+}
+
+func (st *syncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[smith_v1.ResourceName]smith_plugin.Dependency, error) {
+	dependencies := make(map[smith_v1.ResourceName]smith_plugin.Dependency, len(dependsOn))
+	for _, name := range dependsOn {
+		var dependency smith_plugin.Dependency
+		unstructuredActual := st.readyResources[name]
+		gvk := unstructuredActual.GroupVersionKind()
+		actual, err := st.scheme.New(gvk)
+		if err != nil {
+			return nil, err
+		}
+		if err = unstructured_conversion.DefaultConverter.FromUnstructured(unstructuredActual.Object, actual); err != nil {
+			return nil, err
+		}
+		dependency.Actual = actual
+		switch obj := actual.(type) {
+		case *sc_v1b1.ServiceBinding:
+			if err = st.prepareServiceBindingDependency(&dependency, obj); err != nil {
+				return nil, errors.Wrapf(err, "error processing ServiceBinding %q", obj.Name)
+			}
+		}
+		dependencies[name] = dependency
+	}
+	return dependencies, nil
+}
+
+func (st *syncTask) prepareServiceBindingDependency(dependency *smith_plugin.Dependency, obj *sc_v1b1.ServiceBinding) error {
+	secret, exists, err := st.store.Get(core_v1.SchemeGroupVersion.WithKind("Secret"), obj.Namespace, obj.Spec.SecretName)
+	if err != nil {
+		return errors.Wrap(err, "error finding output Secret")
+	}
+	if !exists {
+		return errors.New("cannot find output Secret")
+	}
+	dependency.Outputs = append(dependency.Outputs, secret)
+
+	serviceInstance, exists, err := st.store.Get(sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), obj.Namespace, obj.Spec.ServiceInstanceRef.Name)
+	if err != nil {
+		return errors.Wrapf(err, "error finding ServiceInstance %q", obj.Spec.ServiceInstanceRef.Name)
+	}
+	if !exists {
+		return errors.Errorf("cannot find ServiceInstance %q", obj.Spec.ServiceInstanceRef.Name)
+	}
+	dependency.Auxiliary = append(dependency.Auxiliary, serviceInstance)
+	return nil
+}
+
+// evalNormalSpec evaluates the regular resource specification and returns the result.
+func (st *syncTask) evalNormalSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
+	// Convert Spec to Unstructured
+	spec, err := util.RuntimeToUnstructured(res.Spec)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Process references
+	sp := NewSpec(res.Name, st.readyResources, res.DependsOn)
+	if err := sp.ProcessObject(spec.Object); err != nil {
+		return nil, err
+	}
 
 	return spec, nil
 }
@@ -167,14 +264,14 @@ func (st *syncTask) createOrUpdate(spec *unstructured.Unstructured) (actualRet *
 	gvk := spec.GroupVersionKind()
 	resClient, err := st.smartClient.ForGVK(gvk, st.bundle.Namespace)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.Wrapf(err, "failed to get the client for %q", gvk)
 	}
 
 	// Try to get the resource. We do read first to avoid generating unnecessary events.
 	obj, exists, err := st.store.Get(gvk, st.bundle.Namespace, spec.GetName())
 	if err != nil {
 		// Unexpected error
-		return nil, false, err
+		return nil, false, errors.Wrap(err, "failed to get object from the Store")
 	}
 	if exists {
 		log.Printf("[WORKER][%s/%s] Object %s %q found, checking spec", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
@@ -216,7 +313,7 @@ func (st *syncTask) updateResource(resClient dynamic.ResourceInterface, spec *un
 	// Compare spec and existing resource
 	updated, match, err := st.specCheck.CompareActualVsSpec(spec, actual)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.Wrap(err, "specification check failed")
 	}
 	if match {
 		log.Printf("[WORKER][%s/%s] Object %q has correct spec", st.bundle.Namespace, st.bundle.Name, spec.GetName())
@@ -262,10 +359,17 @@ func (st *syncTask) deleteRemovedResources() (retriableError bool, e error) {
 		existingObjs[ref] = m.GetUID()
 	}
 	for _, res := range st.bundle.Spec.Resources {
-		m := res.Spec.(meta_v1.Object)
+		gvk, err := res.ObjectGVK()
+		if err != nil {
+			return false, err
+		}
+		name, err := res.ObjectName()
+		if err != nil {
+			return false, err
+		}
 		ref := objectRef{
-			GroupVersionKind: res.Spec.GetObjectKind().GroupVersionKind(),
-			Name:             m.GetName(),
+			GroupVersionKind: gvk,
+			Name:             name,
 		}
 		delete(existingObjs, ref)
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/resources/apitypes"
+	"github.com/atlassian/smith/pkg/util"
 
 	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -139,6 +140,14 @@ func TestSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClients
 }
 
 func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundle bool, test TestFunc, args ...interface{}) {
+	// Convert all typed objects into unstructured ones
+	for i, res := range bundle.Spec.Resources {
+		if res.Type == smith_v1.Normal {
+			resUnstr, err := util.RuntimeToUnstructured(res.Spec)
+			require.NoError(t, err)
+			bundle.Spec.Resources[i].Spec = resUnstr
+		}
+	}
 	config, clientset, bundleClient := TestSetup(t)
 	var scConfig *rest.Config
 	var scClient scClientset.Interface
@@ -234,11 +243,11 @@ func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, re
 	AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, smith_v1.ConditionFalse)
 	if assert.Len(cfg.T, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
 		for i, res := range bundle.Spec.Resources {
-			spec, err := res.ToUnstructured()
+			spec, err := util.RuntimeToUnstructured(res.Spec)
 			if !assert.NoError(cfg.T, err) {
 				continue
 			}
-			actual, err := bundleRes.Spec.Resources[i].ToUnstructured()
+			actual, err := util.RuntimeToUnstructured(bundleRes.Spec.Resources[i].Spec)
 			if !assert.NoError(cfg.T, err) {
 				continue
 			}

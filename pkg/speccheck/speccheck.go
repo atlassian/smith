@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/atlassian/smith/pkg/util"
+
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
@@ -23,7 +26,7 @@ func (sc *SpecCheck) CompareActualVsSpec(spec, actual runtime.Object) (*unstruct
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to apply defaults to object spec %v: %v", spec.GetObjectKind().GroupVersionKind(), err)
 	}
-	actualUnstr, err := sc.cloneAsUnstructured(actual)
+	actualUnstr, err := util.RuntimeToUnstructured(actual)
 	if err != nil {
 		return nil, false, err
 	}
@@ -35,7 +38,7 @@ func (sc *SpecCheck) applyDefaults(spec runtime.Object) (*unstructured.Unstructu
 	gvk := spec.GetObjectKind().GroupVersionKind()
 	if !sc.Scheme.Recognizes(gvk) {
 		log.Printf("Unrecognized object type %v - not applying defaults", gvk)
-		return sc.cloneAsUnstructured(spec)
+		return util.RuntimeToUnstructured(spec)
 	}
 	var clone runtime.Object
 	if specUnstr, ok := spec.(*unstructured.Unstructured); ok {
@@ -51,13 +54,7 @@ func (sc *SpecCheck) applyDefaults(spec runtime.Object) (*unstructured.Unstructu
 		clone = spec.DeepCopyObject()
 	}
 	sc.Scheme.Default(clone)
-	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(clone)
-	if err != nil {
-		return nil, err
-	}
-	return &unstructured.Unstructured{
-		Object: u,
-	}, nil
+	return util.RuntimeToUnstructured(clone)
 }
 
 // compareActualVsSpec checks if actual resource satisfies the desired spec.
@@ -94,7 +91,7 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	// 3. Ignore fields managed by server
 	updated, err := sc.Cleaner.Cleanup(updated, actualClone)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.Wrapf(err, "cleanup failed")
 	}
 
 	// 4. Some stuff from ObjectMeta
@@ -119,16 +116,6 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 		return updated, false, nil
 	}
 	return actual, true, nil
-}
-
-func (sc *SpecCheck) cloneAsUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
-	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
-	}
-	return &unstructured.Unstructured{
-		Object: u,
-	}, nil
 }
 
 func processAnnotations(spec, actual map[string]string) map[string]string {

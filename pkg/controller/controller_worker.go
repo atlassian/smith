@@ -76,6 +76,8 @@ func (c *BundleController) processKey(key string) (retriableRet bool, errRet err
 		store:        c.store,
 		specCheck:    c.specCheck,
 		bundle:       bundleObj.(*smith_v1.Bundle).DeepCopy(), // Deep-copy otherwise we are mutating our cache.
+		plugins:      c.plugins,
+		scheme:       c.scheme,
 	}
 	retriable, err := st.process()
 	return st.handleProcessResult(retriable, err)

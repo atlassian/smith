@@ -9,8 +9,10 @@ import (
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
+	smith_plugin "github.com/atlassian/smith/pkg/plugin"
 
 	"github.com/ash2k/stager/wait"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -53,12 +55,15 @@ type BundleController struct {
 	crdResyncPeriod time.Duration
 	resourceHandler cache.ResourceEventHandler
 	namespace       string
+
+	plugins map[string]smith_plugin.Func
+	scheme  *runtime.Scheme
 }
 
 func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore BundleStore,
 	sc smith.SmartClient, rc ReadyChecker, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
 	workers int, crdResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer,
-	namespace string) *BundleController {
+	namespace string, plugins map[string]smith_plugin.Func, scheme *runtime.Scheme) *BundleController {
 	c := &BundleController{
 		bundleInf:       bundleInf,
 		crdInf:          crdInf,
@@ -72,6 +77,8 @@ func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v
 		workers:         workers,
 		crdResyncPeriod: crdResyncPeriod,
 		namespace:       namespace,
+		plugins:         plugins,
+		scheme:          scheme,
 	}
 	bundleInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onBundleAdd,

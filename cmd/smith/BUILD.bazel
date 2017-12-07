@@ -28,7 +28,9 @@ container_image(
     name = "container",
     base = "@distroless_base//image",
     entrypoint = ["/smith"],
-    files = [":smith"],
+    files = [
+        ":smith",
+    ],
 )
 
 container_push(

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/sleeper"
 	"github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
@@ -17,15 +18,19 @@ import (
 	"github.com/atlassian/smith/pkg/client"
 	smithFake "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/fake"
 	"github.com/atlassian/smith/pkg/client/smart"
+	smith_plugin "github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
+	"github.com/atlassian/smith/pkg/util"
 
 	"github.com/ash2k/stager"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	scFake "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
@@ -37,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	mainFake "k8s.io/client-go/kubernetes/fake"
@@ -68,19 +74,23 @@ type testCase struct {
 	enableServiceCatalog bool
 	testHandler          fakeActionHandler
 	test                 func(*testing.T, context.Context, *BundleController, *testCase)
+	plugins              map[string]func(*testing.T) smith_plugin.Func
 }
+
+const (
+	testNamespace = "test-namespace"
+)
 
 func TestController(t *testing.T) {
 	t.Parallel()
 	tr := true
-	testNamespace := "test-namespace"
 	testcases := map[string]*testCase{
 		"deletes owned object that is not in bundle": &testCase{
 			mainClientObjects: []runtime.Object{
 				&core_v1.ConfigMap{
 					ObjectMeta: meta_v1.ObjectMeta{
 						Name:      "map1",
-						Namespace: "n1",
+						Namespace: testNamespace,
 						OwnerReferences: []meta_v1.OwnerReference{
 							{
 								APIVersion:         smith_v1.BundleResourceGroupVersion,
@@ -97,11 +107,11 @@ func TestController(t *testing.T) {
 			bundle: &smith_v1.Bundle{
 				ObjectMeta: meta_v1.ObjectMeta{
 					Name:      "bundle1",
-					Namespace: "n1",
+					Namespace: testNamespace,
 					UID:       "uid123",
 				},
 			},
-			expectedActions: sets.NewString("DELETE=/api/v1/namespaces/n1/configmaps/map1"),
+			expectedActions: sets.NewString("DELETE=/api/v1/namespaces/" + testNamespace + "/configmaps/map1"),
 			namespace:       meta_v1.NamespaceAll,
 		},
 		"can list crds in another namespace": &testCase{
@@ -132,14 +142,190 @@ func TestController(t *testing.T) {
 				},
 			},
 		},
-		// TODO add tests :D
+		"plugin spec is processed": &testCase{
+			mainClientObjects: []runtime.Object{
+				&core_v1.Secret{
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "s1",
+						Namespace: testNamespace,
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         sc_v1b1.SchemeGroupVersion.String(),
+								Kind:               "ServiceBinding",
+								Name:               "sb1",
+								UID:                types.UID("sb1-uid"),
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+					Data: map[string][]byte{
+						"data": []byte("bla"),
+					},
+					Type: core_v1.SecretTypeOpaque,
+				},
+			},
+			scClientObjects: []runtime.Object{
+				&sc_v1b1.ServiceInstance{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ServiceInstance",
+						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "si1",
+						Namespace: testNamespace,
+						UID:       types.UID("si1-uid"),
+						Labels: map[string]string{
+							smith.BundleNameLabel: "bundle1",
+						},
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         smith_v1.BundleResourceGroupVersion,
+								Kind:               smith_v1.BundleResourceKind,
+								Name:               "bundle1",
+								UID:                "uid123",
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+					Status: sc_v1b1.ServiceInstanceStatus{
+						Conditions: []sc_v1b1.ServiceInstanceCondition{
+							{
+								Type:   sc_v1b1.ServiceInstanceConditionReady,
+								Status: sc_v1b1.ConditionTrue,
+							},
+						},
+					},
+				},
+				&sc_v1b1.ServiceBinding{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ServiceBinding",
+						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "sb1",
+						Namespace: testNamespace,
+						UID:       types.UID("sb1-uid"),
+						Labels: map[string]string{
+							smith.BundleNameLabel: "bundle1",
+						},
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         smith_v1.BundleResourceGroupVersion,
+								Kind:               smith_v1.BundleResourceKind,
+								Name:               "bundle1",
+								UID:                "uid123",
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+							{
+								APIVersion:         sc_v1b1.SchemeGroupVersion.String(),
+								Kind:               "ServiceInstance",
+								Name:               "si1",
+								UID:                "si1-uid",
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+					Spec: sc_v1b1.ServiceBindingSpec{
+						ServiceInstanceRef: sc_v1b1.LocalObjectReference{
+							Name: "si1",
+						},
+						SecretName: "s1",
+					},
+					Status: sc_v1b1.ServiceBindingStatus{
+						Conditions: []sc_v1b1.ServiceBindingCondition{
+							{
+								Type:   sc_v1b1.ServiceBindingConditionReady,
+								Status: sc_v1b1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			bundle: &smith_v1.Bundle{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "bundle1",
+					Namespace: testNamespace,
+					UID:       "uid123",
+				},
+				Spec: smith_v1.BundleSpec{
+					Resources: []smith_v1.Resource{
+						{
+							Name: "si1",
+							Spec: &sc_v1b1.ServiceInstance{
+								TypeMeta: meta_v1.TypeMeta{
+									Kind:       "ServiceInstance",
+									APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+								},
+								ObjectMeta: meta_v1.ObjectMeta{
+									Name: "si1",
+								},
+							},
+						},
+						{
+							Name: "sb1",
+							DependsOn: []smith_v1.ResourceName{
+								"si1",
+							},
+							Spec: &sc_v1b1.ServiceBinding{
+								TypeMeta: meta_v1.TypeMeta{
+									Kind:       "ServiceBinding",
+									APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+								},
+								ObjectMeta: meta_v1.ObjectMeta{
+									Name: "sb1",
+								},
+								Spec: sc_v1b1.ServiceBindingSpec{
+									ServiceInstanceRef: sc_v1b1.LocalObjectReference{
+										Name: "si1",
+									},
+									SecretName: "s1",
+								},
+							},
+						},
+						{
+							Name: "p1",
+							DependsOn: []smith_v1.ResourceName{
+								"sb1",
+							},
+							Type:       smith_v1.Plugin,
+							PluginName: "testPlugin",
+							PluginSpec: &smith_v1.PluginSpec{
+								Kind:       "ConfigMap",
+								ApiVersion: core_v1.SchemeGroupVersion.String(),
+								Name:       "m1",
+							},
+						},
+					},
+				},
+			},
+			namespace:            testNamespace,
+			expectedActions:      sets.NewString("POST=/api/v1/namespaces/" + testNamespace + "/configmaps"),
+			enableServiceCatalog: true,
+			testHandler: fakeActionHandler{
+				response: map[path]fakeResponse{
+					{
+						method: "POST",
+						path:   "/api/v1/namespaces/" + testNamespace + "/configmaps",
+					}: {
+						statusCode: http.StatusCreated,
+						content:    []byte(`{ "apiVersion": "v1", "kind": "ConfigMap", "metadata": { "name": "m1", "namespace": "` + testNamespace + `" } }`),
+					},
+				},
+			},
+			plugins: map[string]func(*testing.T) smith_plugin.Func{
+				"testPlugin": testPlugin,
+			},
+		},
 	}
 	for name, tc := range testcases {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			defer tc.verifyActions(t)
 			tc.run(t)
-			tc.verifyActions(t)
 		})
 	}
 }
@@ -150,6 +336,13 @@ func (tc *testCase) run(t *testing.T) {
 		mainClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
 	if tc.bundle != nil {
+		for i, res := range tc.bundle.Spec.Resources {
+			if res.Type == smith_v1.Normal {
+				resUnstr, err := util.RuntimeToUnstructured(res.Spec)
+				require.NoError(t, err)
+				tc.bundle.Spec.Resources[i].Spec = resUnstr
+			}
+		}
 		tc.smithClientObjects = append(tc.smithClientObjects, tc.bundle)
 	}
 	bundleClient := smithFake.NewSimpleClientset(tc.smithClientObjects...)
@@ -236,6 +429,11 @@ func (tc *testCase) run(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
+	plugins := make(map[string]smith_plugin.Func, len(tc.plugins))
+	for name, factory := range tc.plugins {
+		plugins[name] = factory(t)
+	}
+
 	c := New(
 		bundleInf,
 		crdInf,
@@ -249,7 +447,9 @@ func (tc *testCase) run(t *testing.T) {
 		2,
 		0,
 		resourceInfs,
-		tc.namespace)
+		tc.namespace,
+		plugins,
+		scheme)
 
 	crdGVK := apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
 	resourceInfs[crdGVK] = crdInf
@@ -369,4 +569,59 @@ func SleeperCrdWithStatus() *apiext_v1b1.CustomResourceDefinition {
 		},
 	}
 	return crd
+}
+
+func testPlugin(t *testing.T) smith_plugin.Func {
+	return func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smith_plugin.Dependency) (smith_plugin.ProcessResult, error) {
+		failed := t.Failed()
+		assert.Equal(t, "testPlugin", resource.PluginName)
+		assert.Equal(t, []smith_v1.ResourceName{"sb1"}, resource.DependsOn)
+		assert.Len(t, dependencies, 1)
+		bindingDep, ok := dependencies["sb1"]
+		if assert.True(t, ok) {
+			// Actual
+			if assert.IsType(t, &sc_v1b1.ServiceBinding{}, bindingDep.Actual) {
+				b := bindingDep.Actual.(*sc_v1b1.ServiceBinding)
+				assert.Equal(t, "sb1", b.Name)
+				assert.Equal(t, testNamespace, b.Namespace)
+				assert.Equal(t, sc_v1b1.SchemeGroupVersion.WithKind("ServiceBinding"), b.GroupVersionKind())
+			}
+			// Outputs
+			if assert.Len(t, bindingDep.Outputs, 1) {
+				secret := bindingDep.Outputs[0]
+				if assert.IsType(t, &core_v1.Secret{}, secret) {
+					s := secret.(*core_v1.Secret)
+					assert.Equal(t, "s1", s.Name)
+					assert.Equal(t, testNamespace, s.Namespace)
+					assert.Equal(t, core_v1.SchemeGroupVersion.WithKind("Secret"), s.GroupVersionKind())
+				}
+			}
+			// Aux
+			if assert.Len(t, bindingDep.Auxiliary, 1) {
+				svcInst := bindingDep.Auxiliary[0]
+				if assert.IsType(t, &sc_v1b1.ServiceInstance{}, svcInst) {
+					inst := svcInst.(*sc_v1b1.ServiceInstance)
+					assert.Equal(t, "si1", inst.Name)
+					assert.Equal(t, testNamespace, inst.Namespace)
+					assert.Equal(t, sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), inst.GroupVersionKind())
+				}
+			}
+		}
+
+		if !failed && t.Failed() { // one of the assertions failed and it was the first failure in the test
+			return smith_plugin.ProcessResult{}, errors.New("plugin failed BOOM!")
+		}
+
+		return smith_plugin.ProcessResult{
+			Object: &core_v1.ConfigMap{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: core_v1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: resource.PluginSpec.Name,
+				},
+			},
+		}, nil
+	}
 }

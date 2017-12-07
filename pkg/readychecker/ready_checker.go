@@ -7,6 +7,7 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
+	"github.com/pkg/errors"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,7 +49,7 @@ func (rc *ReadyChecker) IsReady(obj *unstructured.Unstructured) (isReady, retria
 	gk := gvk.GroupKind()
 
 	if gk.Kind == "" || gvk.Version == "" { // Group can be empty e.g. built-in objects like ConfigMap
-		return false, false, fmt.Errorf("object %q has empty kind/version: %v", obj.GetName(), gvk)
+		return false, false, errors.Errorf("object has empty kind/version: %v", gvk)
 	}
 
 	// 1. Check if it is a known built-in resource
