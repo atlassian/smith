@@ -8,7 +8,7 @@ import (
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
-	smithPlugin "github.com/atlassian/smith/pkg/plugin"
+	smith_plugin "github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/atlassian/smith/pkg/util/graph"
 
@@ -33,7 +33,7 @@ type syncTask struct {
 	specCheck      SpecCheck
 	bundle         *smith_v1.Bundle
 	readyResources map[smith_v1.ResourceName]*unstructured.Unstructured
-	plugins        map[string]smithPlugin.Func
+	plugins        map[string]smith_plugin.Func
 	scheme         *runtime.Scheme
 }
 
@@ -178,40 +178,9 @@ func (st *syncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstru
 	if !ok {
 		return nil, errors.Errorf("no such plugin %q", res.PluginName)
 	}
-	dependencies := make(map[smith_v1.ResourceName]smithPlugin.Dependency, len(res.DependsOn))
-	for _, name := range res.DependsOn {
-		var dependency smithPlugin.Dependency
-		unstructuredActual := st.readyResources[name]
-		gvk := unstructuredActual.GroupVersionKind()
-		actual, err := st.scheme.New(gvk)
-		if err != nil {
-			return nil, err
-		}
-		if err = unstructured_conversion.DefaultConverter.FromUnstructured(unstructuredActual.Object, actual); err != nil {
-			return nil, err
-		}
-		dependency.Actual = actual
-		switch obj := actual.(type) {
-		case *sc_v1b1.ServiceBinding:
-			secret, exists, err := st.store.Get(core_v1.SchemeGroupVersion.WithKind("Secret"), obj.Namespace, obj.Spec.SecretName)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error finding output Secret for ServiceBinding %q", obj.Name)
-			}
-			if !exists {
-				return nil, errors.Errorf("cannot find output Secret for ServiceBinding %q", obj.Name)
-			}
-			dependency.Outputs = append(dependency.Outputs, secret)
-
-			serviceInstance, exists, err := st.store.Get(sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), obj.Namespace, obj.Spec.ServiceInstanceRef.Name)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error finding ServiceInstance for ServiceBinding %q", obj.Name)
-			}
-			if !exists {
-				return nil, errors.Errorf("cannot find ServiceInstance for ServiceBinding %q", obj.Name)
-			}
-			dependency.Auxiliary = append(dependency.Auxiliary, serviceInstance)
-		}
-		dependencies[name] = dependency
+	dependencies, err := st.prepareDependencies(res.DependsOn)
+	if err != nil {
+		return nil, err
 	}
 	log.Printf("Plugin %s dependencies: %+v", res.PluginName, dependencies)
 	result, err := plugin(*res, dependencies)
@@ -225,16 +194,62 @@ func (st *syncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstru
 	return util.RuntimeToUnstructured(result.Object)
 }
 
+func (st *syncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[smith_v1.ResourceName]smith_plugin.Dependency, error) {
+	dependencies := make(map[smith_v1.ResourceName]smith_plugin.Dependency, len(dependsOn))
+	for _, name := range dependsOn {
+		var dependency smith_plugin.Dependency
+		unstructuredActual := st.readyResources[name]
+		gvk := unstructuredActual.GroupVersionKind()
+		actual, err := st.scheme.New(gvk)
+		if err != nil {
+			return nil, err
+		}
+		if err = unstructured_conversion.DefaultConverter.FromUnstructured(unstructuredActual.Object, actual); err != nil {
+			return nil, err
+		}
+		dependency.Actual = actual
+		switch obj := actual.(type) {
+		case *sc_v1b1.ServiceBinding:
+			if err = st.prepareServiceBindingDependency(&dependency, obj); err != nil {
+				return nil, errors.Wrapf(err, "error processing ServiceBinding %q", obj.Name)
+			}
+		}
+		dependencies[name] = dependency
+	}
+	return dependencies, nil
+}
+
+func (st *syncTask) prepareServiceBindingDependency(dependency *smith_plugin.Dependency, obj *sc_v1b1.ServiceBinding) error {
+	secret, exists, err := st.store.Get(core_v1.SchemeGroupVersion.WithKind("Secret"), obj.Namespace, obj.Spec.SecretName)
+	if err != nil {
+		return errors.Wrap(err, "error finding output Secret")
+	}
+	if !exists {
+		return errors.New("cannot find output Secret")
+	}
+	dependency.Outputs = append(dependency.Outputs, secret)
+
+	serviceInstance, exists, err := st.store.Get(sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), obj.Namespace, obj.Spec.ServiceInstanceRef.Name)
+	if err != nil {
+		return errors.Wrapf(err, "error finding ServiceInstance %q", obj.Spec.ServiceInstanceRef.Name)
+	}
+	if !exists {
+		return errors.Errorf("cannot find ServiceInstance %q", obj.Spec.ServiceInstanceRef.Name)
+	}
+	dependency.Auxiliary = append(dependency.Auxiliary, serviceInstance)
+	return nil
+}
+
 // evalNormalSpec evaluates the regular resource specification and returns the result.
 func (st *syncTask) evalNormalSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
-	// 0. Convert Spec to Unstructured
+	// Convert Spec to Unstructured
 	spec, err := util.RuntimeToUnstructured(res.Spec)
 
 	if err != nil {
 		return nil, err
 	}
 
-	// 1. Process references
+	// Process references
 	sp := NewSpec(res.Name, st.readyResources, res.DependsOn)
 	if err := sp.ProcessObject(spec.Object); err != nil {
 		return nil, err

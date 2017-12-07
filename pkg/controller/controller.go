@@ -9,7 +9,7 @@ import (
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
-	smithPlugin "github.com/atlassian/smith/pkg/plugin"
+	smith_plugin "github.com/atlassian/smith/pkg/plugin"
 
 	"github.com/ash2k/stager/wait"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -56,14 +56,14 @@ type BundleController struct {
 	resourceHandler cache.ResourceEventHandler
 	namespace       string
 
-	plugins map[string]smithPlugin.Func
+	plugins map[string]smith_plugin.Func
 	scheme  *runtime.Scheme
 }
 
 func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore BundleStore,
 	sc smith.SmartClient, rc ReadyChecker, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
 	workers int, crdResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer,
-	namespace string, plugins map[string]smithPlugin.Func, scheme *runtime.Scheme) *BundleController {
+	namespace string, plugins map[string]smith_plugin.Func, scheme *runtime.Scheme) *BundleController {
 	c := &BundleController{
 		bundleInf:       bundleInf,
 		crdInf:          crdInf,

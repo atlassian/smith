@@ -16,7 +16,7 @@ import (
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
-	smithPlugin "github.com/atlassian/smith/pkg/plugin"
+	smith_plugin "github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources"
@@ -166,7 +166,7 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore controller.BundleStore, crdStore readychecker.CrdStore,
-	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer, plugins map[string]smithPlugin.Func) *controller.BundleController {
+	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer, plugins map[string]smith_plugin.Func) *controller.BundleController {
 
 	// Ready Checker
 	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
@@ -192,19 +192,19 @@ func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClie
 	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs, a.Namespace, plugins, scheme)
 }
 
-func (a *App) loadPlugins() (map[string]smithPlugin.Func, error) {
-	plugs := make(map[string]smithPlugin.Func, len(a.Plugins))
+func (a *App) loadPlugins() (map[string]smith_plugin.Func, error) {
+	plugs := make(map[string]smith_plugin.Func, len(a.Plugins))
 	for _, p := range a.Plugins {
 		filePath := filepath.Join(a.PluginsDir, p)
 		plug, err := plugin.Open(filePath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to load plugin from %q", filePath)
 		}
-		symbol, err := plug.Lookup(smithPlugin.FuncName)
+		symbol, err := plug.Lookup(smith_plugin.FuncName)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to load symbol from plugin %q", p)
 		}
-		f, ok := symbol.(func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smithPlugin.Dependency) (smithPlugin.ProcessResult, error))
+		f, ok := symbol.(func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smith_plugin.Dependency) (smith_plugin.ProcessResult, error))
 		if !ok {
 			return nil, errors.Errorf("loaded symbol from plugin %q does not have the right signature", p)
 		}

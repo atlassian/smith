@@ -129,7 +129,8 @@ spec:
         clusterServiceClassExternalName: user-provided-service
         clusterServicePlanExternalName: default
         parameters:
-          foo: bar
+          credentials:
+            foo: bar
 
   - name: a-binding
     dependsOn:

@@ -18,7 +18,7 @@ import (
 	"github.com/atlassian/smith/pkg/client"
 	smithFake "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/fake"
 	"github.com/atlassian/smith/pkg/client/smart"
-	smithPlugin "github.com/atlassian/smith/pkg/plugin"
+	smith_plugin "github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources/apitypes"
@@ -74,7 +74,7 @@ type testCase struct {
 	enableServiceCatalog bool
 	testHandler          fakeActionHandler
 	test                 func(*testing.T, context.Context, *BundleController, *testCase)
-	plugins              map[string]func(*testing.T) smithPlugin.Func
+	plugins              map[string]func(*testing.T) smith_plugin.Func
 }
 
 const (
@@ -315,7 +315,7 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			plugins: map[string]func(*testing.T) smithPlugin.Func{
+			plugins: map[string]func(*testing.T) smith_plugin.Func{
 				"testPlugin": testPlugin,
 			},
 		},
@@ -429,7 +429,7 @@ func (tc *testCase) run(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	plugins := make(map[string]smithPlugin.Func, len(tc.plugins))
+	plugins := make(map[string]smith_plugin.Func, len(tc.plugins))
 	for name, factory := range tc.plugins {
 		plugins[name] = factory(t)
 	}
@@ -571,8 +571,8 @@ func SleeperCrdWithStatus() *apiext_v1b1.CustomResourceDefinition {
 	return crd
 }
 
-func testPlugin(t *testing.T) smithPlugin.Func {
-	return func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smithPlugin.Dependency) (smithPlugin.ProcessResult, error) {
+func testPlugin(t *testing.T) smith_plugin.Func {
+	return func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smith_plugin.Dependency) (smith_plugin.ProcessResult, error) {
 		failed := t.Failed()
 		assert.Equal(t, "testPlugin", resource.PluginName)
 		assert.Equal(t, []smith_v1.ResourceName{"sb1"}, resource.DependsOn)
@@ -609,10 +609,10 @@ func testPlugin(t *testing.T) smithPlugin.Func {
 		}
 
 		if !failed && t.Failed() { // one of the assertions failed and it was the first failure in the test
-			return smithPlugin.ProcessResult{}, errors.New("plugin failed BOOM!")
+			return smith_plugin.ProcessResult{}, errors.New("plugin failed BOOM!")
 		}
 
-		return smithPlugin.ProcessResult{
+		return smith_plugin.ProcessResult{
 			Object: &core_v1.ConfigMap{
 				TypeMeta: meta_v1.TypeMeta{
 					Kind:       "ConfigMap",
