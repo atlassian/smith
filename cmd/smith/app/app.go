@@ -16,7 +16,7 @@ import (
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
-	smithPlugin "github.com/atlassian/smith/pkg/plugin"
+	smith_plugin "github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources"
@@ -212,6 +212,7 @@ func (a *App) loadPlugins() ([]smithPlugin.Plugin, error) {
 		}
 
 		processFunc, ok := processSymbol.(func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smithPlugin.Dependency) (smithPlugin.ProcessResult, error))
+
 		if !ok {
 			return nil, errors.Errorf("loaded Process from plugin %q does not have the right signature", p)
 		}
