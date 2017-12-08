@@ -25,10 +25,9 @@ func run() error {
 }
 
 func runWithContext(ctx context.Context) error {
-	a := app.App{}
-	if err := a.ParseFlags(flag.CommandLine, os.Args[1:]); err != nil {
+	a, err := app.NewFromFlags(flag.CommandLine, os.Args[1:])
+	if err != nil {
 		return err
 	}
-
 	return a.Run(ctx)
 }

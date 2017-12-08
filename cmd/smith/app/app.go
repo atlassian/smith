@@ -229,7 +229,8 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 	}()
 }
 
-func (a *App) ParseFlags(flagset *flag.FlagSet, arguments []string) error {
+func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
+	a := App{}
 	flagset.BoolVar(&a.DisablePodPreset, "disable-pod-preset", false, "Disable PodPreset support")
 	scDisable := flagset.Bool("disable-service-catalog", false, "Disable Service Catalog support")
 	scUrl := flagset.String("service-catalog-url", "", "Service Catalog API server URL")
@@ -239,14 +240,14 @@ func (a *App) ParseFlags(flagset *flag.FlagSet, arguments []string) error {
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
 	pprofAddr := flag.String("pprof-address", "", "Address for pprof to listen on")
 	if err := flagset.Parse(arguments); err != nil {
-		return err
+		return nil, err
 	}
 
 	config, err := client.ConfigFromEnv()
 	if err != nil {
 		config, err = rest.InClusterConfig()
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	config.UserAgent = "smith"
@@ -269,5 +270,5 @@ func (a *App) ParseFlags(flagset *flag.FlagSet, arguments []string) error {
 			log.Fatalf("pprof server failed: %v", http.ListenAndServe(*pprofAddr, nil))
 		}()
 	}
-	return nil
+	return &a, nil
 }
