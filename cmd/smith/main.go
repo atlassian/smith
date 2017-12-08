@@ -25,9 +25,7 @@ func run() error {
 }
 
 func runWithContext(ctx context.Context) error {
-	a := app.App{
-		Workers: 2,
-	}
+	a := app.App{}
 	if err := a.ParseFlags(flag.CommandLine, os.Args[1:]); err != nil {
 		return err
 	}

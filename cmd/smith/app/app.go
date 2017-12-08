@@ -235,6 +235,7 @@ func (a *App) ParseFlags(flagset *flag.FlagSet, arguments []string) error {
 	scUrl := flagset.String("service-catalog-url", "", "Service Catalog API server URL")
 	scInsecure := flagset.Bool("service-catalog-insecure", false, "Disable TLS validation for Service Catalog")
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
+	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
 	pprofAddr := flag.String("pprof-address", "", "Address for pprof to listen on")
 	if err := flagset.Parse(arguments); err != nil {
