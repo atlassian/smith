@@ -2,9 +2,12 @@ package app
 
 import (
 	"context"
+	"flag"
 	"log"
-	"path/filepath"
-	"plugin"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/atlassian/smith"
@@ -16,7 +19,7 @@ import (
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
-	smith_plugin "github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources"
@@ -30,6 +33,7 @@ import (
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -39,13 +43,16 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+const (
+	defaultResyncPeriod = 20 * time.Minute
+)
+
 type App struct {
 	RestConfig           *rest.Config
 	ServiceCatalogConfig *rest.Config
 	ResyncPeriod         time.Duration
 	Namespace            string
-	PluginsDir           string
-	Plugins              []string
+	Plugins              []plugin.NewFunc
 	Workers              int
 	DisablePodPreset     bool
 }
@@ -57,7 +64,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 	for pluginName := range plugins {
-		log.Printf("Loaded plugin: %s", pluginName)
+		log.Printf("Loaded plugin: %q", pluginName)
 	}
 
 	// Clients
@@ -166,7 +173,7 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore controller.BundleStore, crdStore readychecker.CrdStore,
-	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer, plugins map[string]smith_plugin.Func) *controller.BundleController {
+	sc smith.SmartClient, scheme *runtime.Scheme, cStore controller.Store, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer, plugins map[smith_v1.PluginName]plugin.Plugin) *controller.BundleController {
 
 	// Ready Checker
 	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
@@ -192,23 +199,76 @@ func (a *App) controller(bundleInf, crdInf cache.SharedIndexInformer, bundleClie
 	return controller.New(bundleInf, crdInf, bundleClient, bundleStore, sc, rc, cStore, specCheck, queue, a.Workers, a.ResyncPeriod, resourceInfs, a.Namespace, plugins, scheme)
 }
 
-func (a *App) loadPlugins() (map[string]smith_plugin.Func, error) {
-	plugs := make(map[string]smith_plugin.Func, len(a.Plugins))
+func (a *App) loadPlugins() (map[smith_v1.PluginName]plugin.Plugin, error) {
+	plugs := make(map[smith_v1.PluginName]plugin.Plugin, len(a.Plugins))
 	for _, p := range a.Plugins {
-		filePath := filepath.Join(a.PluginsDir, p)
-		plug, err := plugin.Open(filePath)
+		plug, err := p()
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to load plugin from %q", filePath)
+			return nil, errors.Wrapf(err, "failed to instantiate plugin %T", p)
 		}
-		symbol, err := plug.Lookup(smith_plugin.FuncName)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to load symbol from plugin %q", p)
+		description := plug.Describe()
+		if _, ok := plugs[description.Name]; ok {
+			return nil, errors.Wrapf(err, "plugins with same name found %q", description.Name)
 		}
-		f, ok := symbol.(func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smith_plugin.Dependency) (smith_plugin.ProcessResult, error))
-		if !ok {
-			return nil, errors.Errorf("loaded symbol from plugin %q does not have the right signature", p)
-		}
-		plugs[p] = f
+		plugs[description.Name] = plug
 	}
 	return plugs, nil
+}
+
+// CancelOnInterrupt calls f when os.Interrupt or SIGTERM is received.
+// It ignores subsequent interrupts on purpose - program should exit correctly after the first signal.
+func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-c:
+			f()
+		}
+	}()
+}
+
+func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
+	a := App{}
+	flagset.BoolVar(&a.DisablePodPreset, "disable-pod-preset", false, "Disable PodPreset support")
+	scDisable := flagset.Bool("disable-service-catalog", false, "Disable Service Catalog support")
+	scUrl := flagset.String("service-catalog-url", "", "Service Catalog API server URL")
+	scInsecure := flagset.Bool("service-catalog-insecure", false, "Disable TLS validation for Service Catalog")
+	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
+	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
+	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
+	pprofAddr := flag.String("pprof-address", "", "Address for pprof to listen on")
+	if err := flagset.Parse(arguments); err != nil {
+		return nil, err
+	}
+
+	config, err := client.ConfigFromEnv()
+	if err != nil {
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+	}
+	config.UserAgent = "smith"
+	a.RestConfig = config
+	if !*scDisable {
+		scConfig := *config // shallow copy
+		if *scInsecure {
+			scConfig.TLSClientConfig.Insecure = true
+			scConfig.TLSClientConfig.CAFile = ""
+			scConfig.TLSClientConfig.CAData = nil
+		}
+		if *scUrl != "" {
+			scConfig.Host = *scUrl
+		}
+		a.ServiceCatalogConfig = &scConfig
+	}
+
+	if pprofAddr != nil && *pprofAddr != "" {
+		go func() {
+			log.Fatalf("pprof server failed: %v", http.ListenAndServe(*pprofAddr, nil))
+		}()
+	}
+	return &a, nil
 }

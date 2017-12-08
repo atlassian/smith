@@ -18,7 +18,7 @@ import (
 	"github.com/atlassian/smith/pkg/client"
 	smithFake "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/fake"
 	"github.com/atlassian/smith/pkg/client/smart"
-	smith_plugin "github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources/apitypes"
@@ -74,7 +74,7 @@ type testCase struct {
 	enableServiceCatalog bool
 	testHandler          fakeActionHandler
 	test                 func(*testing.T, context.Context, *BundleController, *testCase)
-	plugins              map[string]func(*testing.T) smith_plugin.Func
+	plugins              map[smith_v1.PluginName]func(*testing.T) plugin.Plugin
 }
 
 const (
@@ -315,7 +315,7 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			plugins: map[string]func(*testing.T) smith_plugin.Func{
+			plugins: map[smith_v1.PluginName]func(*testing.T) plugin.Plugin{
 				"testPlugin": testPlugin,
 			},
 		},
@@ -429,7 +429,7 @@ func (tc *testCase) run(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	plugins := make(map[string]smith_plugin.Func, len(tc.plugins))
+	plugins := make(map[smith_v1.PluginName]plugin.Plugin, len(tc.plugins))
 	for name, factory := range tc.plugins {
 		plugins[name] = factory(t)
 	}
@@ -571,57 +571,71 @@ func SleeperCrdWithStatus() *apiext_v1b1.CustomResourceDefinition {
 	return crd
 }
 
-func testPlugin(t *testing.T) smith_plugin.Func {
-	return func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smith_plugin.Dependency) (smith_plugin.ProcessResult, error) {
-		failed := t.Failed()
-		assert.Equal(t, "testPlugin", resource.PluginName)
-		assert.Equal(t, []smith_v1.ResourceName{"sb1"}, resource.DependsOn)
-		assert.Len(t, dependencies, 1)
-		bindingDep, ok := dependencies["sb1"]
-		if assert.True(t, ok) {
-			// Actual
-			if assert.IsType(t, &sc_v1b1.ServiceBinding{}, bindingDep.Actual) {
-				b := bindingDep.Actual.(*sc_v1b1.ServiceBinding)
-				assert.Equal(t, "sb1", b.Name)
-				assert.Equal(t, testNamespace, b.Namespace)
-				assert.Equal(t, sc_v1b1.SchemeGroupVersion.WithKind("ServiceBinding"), b.GroupVersionKind())
-			}
-			// Outputs
-			if assert.Len(t, bindingDep.Outputs, 1) {
-				secret := bindingDep.Outputs[0]
-				if assert.IsType(t, &core_v1.Secret{}, secret) {
-					s := secret.(*core_v1.Secret)
-					assert.Equal(t, "s1", s.Name)
-					assert.Equal(t, testNamespace, s.Namespace)
-					assert.Equal(t, core_v1.SchemeGroupVersion.WithKind("Secret"), s.GroupVersionKind())
-				}
-			}
-			// Aux
-			if assert.Len(t, bindingDep.Auxiliary, 1) {
-				svcInst := bindingDep.Auxiliary[0]
-				if assert.IsType(t, &sc_v1b1.ServiceInstance{}, svcInst) {
-					inst := svcInst.(*sc_v1b1.ServiceInstance)
-					assert.Equal(t, "si1", inst.Name)
-					assert.Equal(t, testNamespace, inst.Namespace)
-					assert.Equal(t, sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), inst.GroupVersionKind())
-				}
-			}
-		}
-
-		if !failed && t.Failed() { // one of the assertions failed and it was the first failure in the test
-			return smith_plugin.ProcessResult{}, errors.New("plugin failed BOOM!")
-		}
-
-		return smith_plugin.ProcessResult{
-			Object: &core_v1.ConfigMap{
-				TypeMeta: meta_v1.TypeMeta{
-					Kind:       "ConfigMap",
-					APIVersion: core_v1.SchemeGroupVersion.String(),
-				},
-				ObjectMeta: meta_v1.ObjectMeta{
-					Name: resource.PluginSpec.Name,
-				},
-			},
-		}, nil
+func testPlugin(t *testing.T) plugin.Plugin {
+	return &tp{
+		t: t,
 	}
+}
+
+type tp struct {
+	t *testing.T
+}
+
+func (p *tp) Describe() *plugin.Description {
+	return &plugin.Description{
+		Name: "testPlugin",
+	}
+}
+
+func (p *tp) Process(resource *smith_v1.Resource, context *plugin.Context) (*plugin.ProcessResult, error) {
+	failed := p.t.Failed()
+	assert.Equal(p.t, smith_v1.PluginName("testPlugin"), resource.PluginName)
+	assert.Equal(p.t, []smith_v1.ResourceName{"sb1"}, resource.DependsOn)
+	assert.Len(p.t, context.Dependencies, 1)
+	bindingDep, ok := context.Dependencies["sb1"]
+	if assert.True(p.t, ok) {
+		// Actual
+		if assert.IsType(p.t, &sc_v1b1.ServiceBinding{}, bindingDep.Actual) {
+			b := bindingDep.Actual.(*sc_v1b1.ServiceBinding)
+			assert.Equal(p.t, "sb1", b.Name)
+			assert.Equal(p.t, testNamespace, b.Namespace)
+			assert.Equal(p.t, sc_v1b1.SchemeGroupVersion.WithKind("ServiceBinding"), b.GroupVersionKind())
+		}
+		// Outputs
+		if assert.Len(p.t, bindingDep.Outputs, 1) {
+			secret := bindingDep.Outputs[0]
+			if assert.IsType(p.t, &core_v1.Secret{}, secret) {
+				s := secret.(*core_v1.Secret)
+				assert.Equal(p.t, "s1", s.Name)
+				assert.Equal(p.t, testNamespace, s.Namespace)
+				assert.Equal(p.t, core_v1.SchemeGroupVersion.WithKind("Secret"), s.GroupVersionKind())
+			}
+		}
+		// Aux
+		if assert.Len(p.t, bindingDep.Auxiliary, 1) {
+			svcInst := bindingDep.Auxiliary[0]
+			if assert.IsType(p.t, &sc_v1b1.ServiceInstance{}, svcInst) {
+				inst := svcInst.(*sc_v1b1.ServiceInstance)
+				assert.Equal(p.t, "si1", inst.Name)
+				assert.Equal(p.t, testNamespace, inst.Namespace)
+				assert.Equal(p.t, sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), inst.GroupVersionKind())
+			}
+		}
+	}
+
+	if !failed && p.t.Failed() { // one of the assertions failed and it was the first failure in the test
+		return nil, errors.New("plugin failed BOOM!")
+	}
+
+	return &plugin.ProcessResult{
+		Object: &core_v1.ConfigMap{
+			TypeMeta: meta_v1.TypeMeta{
+				Kind:       "ConfigMap",
+				APIVersion: core_v1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: meta_v1.ObjectMeta{
+				Name: resource.PluginSpec.Name,
+			},
+		},
+	}, nil
 }
