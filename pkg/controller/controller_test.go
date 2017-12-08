@@ -26,6 +26,8 @@ import (
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util"
 
+	"encoding/json"
+
 	"github.com/ash2k/stager"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -84,6 +86,8 @@ const (
 func TestController(t *testing.T) {
 	t.Parallel()
 	tr := true
+	pluginSpec := json.RawMessage(`{ "p1": "v1", "p2": "v2" }`)
+
 	testcases := map[string]*testCase{
 		"deletes owned object that is not in bundle": &testCase{
 			mainClientObjects: []runtime.Object{
@@ -296,6 +300,7 @@ func TestController(t *testing.T) {
 								Kind:       "ConfigMap",
 								ApiVersion: core_v1.SchemeGroupVersion.String(),
 								Name:       "m1",
+								Spec:       &pluginSpec,
 							},
 						},
 					},
@@ -587,10 +592,9 @@ func (p *tp) Describe() *plugin.Description {
 	}
 }
 
-func (p *tp) Process(resource *smith_v1.Resource, context *plugin.Context) (*plugin.ProcessResult, error) {
+func (p *tp) Process(pluginSpec *json.RawMessage, context *plugin.Context) (*plugin.ProcessResult, error) {
 	failed := p.t.Failed()
-	assert.Equal(p.t, smith_v1.PluginName("testPlugin"), resource.PluginName)
-	assert.Equal(p.t, []smith_v1.ResourceName{"sb1"}, resource.DependsOn)
+	assert.Equal(p.t, `{ "p1": "v1", "p2": "v2" }`, string(*pluginSpec))
 	assert.Len(p.t, context.Dependencies, 1)
 	bindingDep, ok := context.Dependencies["sb1"]
 	if assert.True(p.t, ok) {
@@ -632,9 +636,6 @@ func (p *tp) Process(resource *smith_v1.Resource, context *plugin.Context) (*plu
 			TypeMeta: meta_v1.TypeMeta{
 				Kind:       "ConfigMap",
 				APIVersion: core_v1.SchemeGroupVersion.String(),
-			},
-			ObjectMeta: meta_v1.ObjectMeta{
-				Name: resource.PluginSpec.Name,
 			},
 		},
 	}, nil

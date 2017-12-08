@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"reflect"
 
+	"encoding/json"
+
 	"github.com/pkg/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/json"
+	k8s_json "k8s.io/apimachinery/pkg/util/json"
 )
 
 type BundleConditionType string
@@ -218,6 +220,10 @@ type PluginSpec struct {
 	ApiVersion string `json:"apiVersion"`
 	Kind       string `json:"kind"`
 	Name       string `json:"name"`
+	// I feel like this should be json.RawMessage, but for reasons I don't properly
+	// understand Service Catalog uses runtime.RawExtension for its Parameters (even
+	// though they never get unpacked into a 'real' object?). So ...
+	Spec *json.RawMessage `json:"spec,omitempty"`
 }
 
 func (r *Resource) UnmarshalJSON(data []byte) error {
@@ -230,7 +236,7 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 		PluginName PluginName  `json:"pluginName,omitempty"`
 		PluginSpec *PluginSpec `json:"pluginSpec,omitempty"`
 	}
-	err := json.Unmarshal(data, &res)
+	err := k8s_json.Unmarshal(data, &res)
 	if err != nil {
 		return err
 	}

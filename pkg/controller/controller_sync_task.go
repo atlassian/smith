@@ -183,17 +183,31 @@ func (st *syncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstru
 		return nil, err
 	}
 	log.Printf("Plugin %s dependencies: %+v", res.PluginName, dependencies)
-	result, err := pluginInstance.Process(res, &plugin.Context{
+
+	result, err := pluginInstance.Process(res.PluginSpec.Spec, &plugin.Context{
 		Dependencies: dependencies,
 	})
 	if err != nil {
 		return nil, err
 	}
-	// TODO validate pluginSpec GVK/name against result.Object.Spec
-	// and validate type of object against schema if possible
 
-	log.Printf("Plugin %q result: %+v", res.PluginName, result.Object)
-	return util.RuntimeToUnstructured(result.Object)
+	// Make sure plugin is returning us something that obeys the PluginSpec.
+	object, err := util.RuntimeToUnstructured(result.Object)
+	if err != nil {
+		return nil, errors.Wrap(err, "plugin output cannot be converted from runtime.Object")
+	}
+	expectedGVK, err := res.ObjectGVK()
+	if err != nil {
+		return nil, errors.Wrap(err, "pluginSpec has invalid GVK")
+	}
+	if object.GroupVersionKind() != expectedGVK {
+		return nil, errors.Errorf("unexpected GVK from plugin (wanted %v, got %v)", expectedGVK, object.GroupVersionKind())
+	}
+	// We are in charge of naming.
+	object.SetName(res.PluginSpec.Name)
+
+	log.Printf("Plugin %q result: %+v", res.PluginName, object)
+	return object, nil
 }
 
 func (st *syncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[smith_v1.ResourceName]plugin.Dependency, error) {

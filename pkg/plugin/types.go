@@ -7,6 +7,8 @@ package plugin
 import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
+	"encoding/json"
+
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -14,7 +16,7 @@ type NewFunc func() (Plugin, error)
 
 type Plugin interface {
 	Describe() *Description
-	Process(*smith_v1.Resource, *Context) (*ProcessResult, error)
+	Process(*json.RawMessage, *Context) (*ProcessResult, error)
 }
 
 type Description struct {
