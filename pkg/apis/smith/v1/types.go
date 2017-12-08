@@ -187,6 +187,9 @@ func (bs *BundleStatus) ShortString() string {
 // ResourceName is a reference to another Resource in the same bundle.
 type ResourceName string
 
+// PluginName is a name of a plugin to be invoked.
+type PluginName string
+
 // +k8s:deepcopy-gen=true
 type Resource struct {
 	// Name of the resource for references.
@@ -200,7 +203,7 @@ type Resource struct {
 
 	Spec runtime.Object `json:"spec,omitempty"`
 
-	PluginName string      `json:"pluginName,omitempty"`
+	PluginName PluginName  `json:"pluginName,omitempty"`
 	PluginSpec *PluginSpec `json:"pluginSpec,omitempty"`
 }
 
@@ -224,7 +227,7 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 		Type      ResourceType               `json:"type"`
 		Spec      *unstructured.Unstructured `json:"spec,omitempty"`
 
-		PluginName string      `json:"pluginName,omitempty"`
+		PluginName PluginName  `json:"pluginName,omitempty"`
 		PluginSpec *PluginSpec `json:"pluginSpec,omitempty"`
 	}
 	err := json.Unmarshal(data, &res)

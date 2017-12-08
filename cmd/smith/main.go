@@ -4,23 +4,10 @@ import (
 	"context"
 	"flag"
 	"log"
-	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" // This is here to avoid adding pprof handler in app package. It may not be always desired.
 	"os"
-	"os/signal"
-	"strings"
-	"syscall"
-	"time"
 
 	"github.com/atlassian/smith/cmd/smith/app"
-	"github.com/atlassian/smith/pkg/client"
-
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
-)
-
-const (
-	defaultResyncPeriod = 20 * time.Minute
 )
 
 func main() {
@@ -32,7 +19,7 @@ func main() {
 func run() error {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	cancelOnInterrupt(ctx, cancelFunc)
+	app.CancelOnInterrupt(ctx, cancelFunc)
 
 	return runWithContext(ctx)
 }
@@ -41,63 +28,9 @@ func runWithContext(ctx context.Context) error {
 	a := app.App{
 		Workers: 2,
 	}
-
-	flag.BoolVar(&a.DisablePodPreset, "disable-pod-preset", false, "Disable PodPreset support")
-	scDisable := flag.Bool("disable-service-catalog", false, "Disable Service Catalog support")
-	scUrl := flag.String("service-catalog-url", "", "Service Catalog API server URL")
-	scInsecure := flag.Bool("service-catalog-insecure", false, "Disable TLS validation for Service Catalog")
-	flag.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
-	flag.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
-	pprofAddr := flag.String("pprof-address", "", "Address for pprof to listen on")
-	flag.StringVar(&a.PluginsDir, "plugins-dir", "", "Directory to load plugins from. Defaults to working directory")
-	plugins := flag.String("plugins", "", "Comma separated names of plugins to load")
-	flag.Parse()
-
-	config, err := client.ConfigFromEnv()
-	if err != nil {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return err
-		}
-	}
-	config.UserAgent = "smith/" + Version + "/" + GitCommit
-	a.RestConfig = config
-	if !*scDisable {
-		scConfig := *config // shallow copy
-		if *scInsecure {
-			scConfig.TLSClientConfig.Insecure = true
-			scConfig.TLSClientConfig.CAFile = ""
-			scConfig.TLSClientConfig.CAData = nil
-		}
-		if *scUrl != "" {
-			scConfig.Host = *scUrl
-		}
-		a.ServiceCatalogConfig = &scConfig
-	}
-
-	if *plugins != "" {
-		a.Plugins = strings.Split(*plugins, ",")
-	}
-
-	if pprofAddr != nil && *pprofAddr != "" {
-		go func() {
-			log.Fatalf("pprof server failed: %v", http.ListenAndServe(*pprofAddr, nil))
-		}()
+	if err := a.ParseFlags(flag.CommandLine, os.Args[1:]); err != nil {
+		return err
 	}
 
 	return a.Run(ctx)
-}
-
-// cancelOnInterrupt calls f when os.Interrupt or SIGTERM is received.
-// It ignores subsequent interrupts on purpose - program should exit correctly after the first signal.
-func cancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		select {
-		case <-ctx.Done():
-		case <-c:
-			f()
-		}
-	}()
 }

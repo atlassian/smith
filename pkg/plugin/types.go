@@ -10,11 +10,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-const (
-	FuncName = "Process"
-)
+type NewFunc func() (Plugin, error)
 
-type Func func(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]Dependency) (ProcessResult, error)
+type Plugin interface {
+	Describe() *Description
+	Process(*smith_v1.Resource, *Context) (*ProcessResult, error)
+}
+
+type Description struct {
+	Name smith_v1.PluginName
+}
+
+type Context struct {
+	Dependencies map[smith_v1.ResourceName]Dependency
+}
 
 type Dependency struct {
 	Spec      smith_v1.Resource

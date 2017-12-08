@@ -8,7 +8,7 @@ import (
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
-	smith_plugin "github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/atlassian/smith/pkg/util/graph"
 
@@ -33,7 +33,7 @@ type syncTask struct {
 	specCheck      SpecCheck
 	bundle         *smith_v1.Bundle
 	readyResources map[smith_v1.ResourceName]*unstructured.Unstructured
-	plugins        map[string]smith_plugin.Func
+	plugins        map[smith_v1.PluginName]plugin.Plugin
 	scheme         *runtime.Scheme
 }
 
@@ -174,7 +174,7 @@ func (st *syncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unstructured
 
 // evalPluginSpec evaluates the plugin resource specification and returns the result.
 func (st *syncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
-	plugin, ok := st.plugins[res.PluginName]
+	pluginInstance, ok := st.plugins[res.PluginName]
 	if !ok {
 		return nil, errors.Errorf("no such plugin %q", res.PluginName)
 	}
@@ -183,21 +183,23 @@ func (st *syncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstru
 		return nil, err
 	}
 	log.Printf("Plugin %s dependencies: %+v", res.PluginName, dependencies)
-	result, err := plugin(*res, dependencies)
+	result, err := pluginInstance.Process(res, &plugin.Context{
+		Dependencies: dependencies,
+	})
 	if err != nil {
 		return nil, err
 	}
 	// TODO validate pluginSpec GVK/name against result.Object.Spec
 	// and validate type of object against schema if possible
 
-	log.Printf("Plugin %s result: %+v", res.PluginName, result.Object)
+	log.Printf("Plugin %q result: %+v", res.PluginName, result.Object)
 	return util.RuntimeToUnstructured(result.Object)
 }
 
-func (st *syncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[smith_v1.ResourceName]smith_plugin.Dependency, error) {
-	dependencies := make(map[smith_v1.ResourceName]smith_plugin.Dependency, len(dependsOn))
+func (st *syncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[smith_v1.ResourceName]plugin.Dependency, error) {
+	dependencies := make(map[smith_v1.ResourceName]plugin.Dependency, len(dependsOn))
 	for _, name := range dependsOn {
-		var dependency smith_plugin.Dependency
+		var dependency plugin.Dependency
 		unstructuredActual := st.readyResources[name]
 		gvk := unstructuredActual.GroupVersionKind()
 		actual, err := st.scheme.New(gvk)
@@ -219,7 +221,7 @@ func (st *syncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[
 	return dependencies, nil
 }
 
-func (st *syncTask) prepareServiceBindingDependency(dependency *smith_plugin.Dependency, obj *sc_v1b1.ServiceBinding) error {
+func (st *syncTask) prepareServiceBindingDependency(dependency *plugin.Dependency, obj *sc_v1b1.ServiceBinding) error {
 	secret, exists, err := st.store.Get(core_v1.SchemeGroupVersion.WithKind("Secret"), obj.Namespace, obj.Spec.SecretName)
 	if err != nil {
 		return errors.Wrap(err, "error finding output Secret")

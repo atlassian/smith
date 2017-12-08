@@ -4,18 +4,10 @@ load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "main.go",
-        "version.go",
-    ],
+    srcs = ["main.go"],
     importpath = "github.com/atlassian/smith/cmd/smith",
     visibility = ["//visibility:private"],
-    deps = [
-        "//cmd/smith/app:go_default_library",
-        "//pkg/client:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-    ],
+    deps = ["//cmd/smith/app:go_default_library"],
 )
 
 go_binary(
