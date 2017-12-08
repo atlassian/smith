@@ -52,7 +52,6 @@ generate-deepcopy:
 	bazel build //vendor/k8s.io/code-generator/cmd/deepcopy-gen
 	# Generate deep copies
 	bazel-bin/vendor/k8s.io/code-generator/cmd/deepcopy-gen/deepcopy-gen $(VERIFY_CODE) \
-	--v 1 --logtostderr \
 	--go-header-file "build/code-generator/boilerplate.go.txt" \
 	--input-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \
 	--bounding-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \
