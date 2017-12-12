@@ -380,8 +380,7 @@ func (st *syncTask) deleteRemovedResources() (retriableError bool, e error) {
 			gvk = st.plugins[res.Spec.Plugin.Name].Describe().GVK
 			name = res.Spec.Plugin.ObjectName
 		} else {
-			// Invalid object, ignore
-			continue
+			panic(errors.New(`neither "object" nor "plugin" field is specified`))
 		}
 		ref := objectRef{
 			GroupVersionKind: gvk,
