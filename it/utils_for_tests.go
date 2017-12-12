@@ -142,10 +142,10 @@ func TestSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClients
 func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundle bool, test TestFunc, args ...interface{}) {
 	// Convert all typed objects into unstructured ones
 	for i, res := range bundle.Spec.Resources {
-		if res.Type == smith_v1.Normal {
-			resUnstr, err := util.RuntimeToUnstructured(res.Spec)
+		if res.Spec.Object != nil {
+			resUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
 			require.NoError(t, err)
-			bundle.Spec.Resources[i].Spec = resUnstr
+			bundle.Spec.Resources[i].Spec.Object = resUnstr
 		}
 	}
 	config, clientset, bundleClient := TestSetup(t)
@@ -243,11 +243,11 @@ func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, re
 	AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, smith_v1.ConditionFalse)
 	if assert.Len(cfg.T, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
 		for i, res := range bundle.Spec.Resources {
-			spec, err := util.RuntimeToUnstructured(res.Spec)
+			spec, err := util.RuntimeToUnstructured(res.Spec.Object)
 			if !assert.NoError(cfg.T, err) {
 				continue
 			}
-			actual, err := util.RuntimeToUnstructured(bundleRes.Spec.Resources[i].Spec)
+			actual, err := util.RuntimeToUnstructured(bundleRes.Spec.Resources[i].Spec.Object)
 			if !assert.NoError(cfg.T, err) {
 				continue
 			}

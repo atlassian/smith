@@ -254,13 +254,15 @@ func TestController(t *testing.T) {
 					Resources: []smith_v1.Resource{
 						{
 							Name: "si1",
-							Spec: &sc_v1b1.ServiceInstance{
-								TypeMeta: meta_v1.TypeMeta{
-									Kind:       "ServiceInstance",
-									APIVersion: sc_v1b1.SchemeGroupVersion.String(),
-								},
-								ObjectMeta: meta_v1.ObjectMeta{
-									Name: "si1",
+							Spec: smith_v1.ResourceSpec{
+								Object: &sc_v1b1.ServiceInstance{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ServiceInstance",
+										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: "si1",
+									},
 								},
 							},
 						},
@@ -269,19 +271,21 @@ func TestController(t *testing.T) {
 							DependsOn: []smith_v1.ResourceName{
 								"si1",
 							},
-							Spec: &sc_v1b1.ServiceBinding{
-								TypeMeta: meta_v1.TypeMeta{
-									Kind:       "ServiceBinding",
-									APIVersion: sc_v1b1.SchemeGroupVersion.String(),
-								},
-								ObjectMeta: meta_v1.ObjectMeta{
-									Name: "sb1",
-								},
-								Spec: sc_v1b1.ServiceBindingSpec{
-									ServiceInstanceRef: sc_v1b1.LocalObjectReference{
-										Name: "si1",
+							Spec: smith_v1.ResourceSpec{
+								Object: &sc_v1b1.ServiceBinding{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ServiceBinding",
+										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 									},
-									SecretName: "s1",
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: "sb1",
+									},
+									Spec: sc_v1b1.ServiceBindingSpec{
+										ServiceInstanceRef: sc_v1b1.LocalObjectReference{
+											Name: "si1",
+										},
+										SecretName: "s1",
+									},
 								},
 							},
 						},
@@ -290,12 +294,13 @@ func TestController(t *testing.T) {
 							DependsOn: []smith_v1.ResourceName{
 								"sb1",
 							},
-							Type:       smith_v1.Plugin,
-							PluginName: "testPlugin",
-							PluginSpec: &smith_v1.PluginSpec{
-								Kind:       "ConfigMap",
-								ApiVersion: core_v1.SchemeGroupVersion.String(),
-								Name:       "m1",
+							Spec: smith_v1.ResourceSpec{
+								Plugin: &smith_v1.PluginSpec{
+									Name: "testPlugin",
+									Spec: runtime.RawExtension{
+										Raw: []byte(`{ "p1": "v1", "p2": "v2" }`),
+									},
+								},
 							},
 						},
 					},
@@ -337,10 +342,10 @@ func (tc *testCase) run(t *testing.T) {
 	}
 	if tc.bundle != nil {
 		for i, res := range tc.bundle.Spec.Resources {
-			if res.Type == smith_v1.Normal {
-				resUnstr, err := util.RuntimeToUnstructured(res.Spec)
+			if res.Spec.Object != nil {
+				resUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
 				require.NoError(t, err)
-				tc.bundle.Spec.Resources[i].Spec = resUnstr
+				tc.bundle.Spec.Resources[i].Spec.Object = resUnstr
 			}
 		}
 		tc.smithClientObjects = append(tc.smithClientObjects, tc.bundle)
@@ -381,7 +386,7 @@ func (tc *testCase) run(t *testing.T) {
 
 	multiStore := store.NewMulti()
 
-	bs, err := store.NewBundle(bundleInf, multiStore)
+	bs, err := store.NewBundle(bundleInf, multiStore, nil)
 	require.NoError(t, err)
 	resourceInfs := apitypes.ResourceInformers(mainClient, scClient, meta_v1.NamespaceAll, 0, true)
 
@@ -584,13 +589,13 @@ type tp struct {
 func (p *tp) Describe() *plugin.Description {
 	return &plugin.Description{
 		Name: "testPlugin",
+		GVK:  core_v1.SchemeGroupVersion.WithKind("ConfigMap"),
 	}
 }
 
-func (p *tp) Process(resource *smith_v1.Resource, context *plugin.Context) (*plugin.ProcessResult, error) {
+func (p *tp) Process(pluginSpec runtime.RawExtension, context *plugin.Context) (*plugin.ProcessResult, error) {
 	failed := p.t.Failed()
-	assert.Equal(p.t, smith_v1.PluginName("testPlugin"), resource.PluginName)
-	assert.Equal(p.t, []smith_v1.ResourceName{"sb1"}, resource.DependsOn)
+	assert.Equal(p.t, `{ "p1": "v1", "p2": "v2" }`, string(pluginSpec.Raw))
 	assert.Len(p.t, context.Dependencies, 1)
 	bindingDep, ok := context.Dependencies["sb1"]
 	if assert.True(p.t, ok) {
@@ -632,9 +637,6 @@ func (p *tp) Process(resource *smith_v1.Resource, context *plugin.Context) (*plu
 			TypeMeta: meta_v1.TypeMeta{
 				Kind:       "ConfigMap",
 				APIVersion: core_v1.SchemeGroupVersion.String(),
-			},
-			ObjectMeta: meta_v1.ObjectMeta{
-				Name: resource.PluginSpec.Name,
 			},
 		},
 	}, nil

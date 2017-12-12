@@ -147,7 +147,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// Controller
-	bs, err := store.NewBundle(bundleInf, multiStore)
+	bs, err := store.NewBundle(bundleInf, multiStore, plugins)
 	if err != nil {
 		return err
 	}

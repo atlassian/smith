@@ -120,13 +120,12 @@ func (st *syncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unstructured
 	// 1. Process the spec
 	var obj *unstructured.Unstructured
 	var err error
-	switch res.Type {
-	case smith_v1.Normal:
-		obj, err = st.evalNormalSpec(res)
-	case smith_v1.Plugin:
+	if res.Spec.Object != nil {
+		obj, err = st.evalObjectSpec(res)
+	} else if res.Spec.Plugin != nil {
 		obj, err = st.evalPluginSpec(res)
-	default:
-		return nil, fmt.Errorf("unsupported resource type %q", res.Type)
+	} else {
+		return nil, errors.New("invalid resource")
 	}
 
 	if err != nil {
@@ -174,26 +173,37 @@ func (st *syncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unstructured
 
 // evalPluginSpec evaluates the plugin resource specification and returns the result.
 func (st *syncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
-	pluginInstance, ok := st.plugins[res.PluginName]
+	pluginInstance, ok := st.plugins[res.Spec.Plugin.Name]
 	if !ok {
-		return nil, errors.Errorf("no such plugin %q", res.PluginName)
+		return nil, errors.Errorf("no such plugin %q", res.Spec.Plugin.Name)
 	}
 	dependencies, err := st.prepareDependencies(res.DependsOn)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Plugin %s dependencies: %+v", res.PluginName, dependencies)
-	result, err := pluginInstance.Process(res, &plugin.Context{
+	log.Printf("Plugin %q dependencies: %+v", res.Spec.Plugin.Name, dependencies)
+
+	result, err := pluginInstance.Process(res.Spec.Plugin.Spec, &plugin.Context{
 		Dependencies: dependencies,
 	})
 	if err != nil {
 		return nil, err
 	}
-	// TODO validate pluginSpec GVK/name against result.Object.Spec
-	// and validate type of object against schema if possible
 
-	log.Printf("Plugin %q result: %+v", res.PluginName, result.Object)
-	return util.RuntimeToUnstructured(result.Object)
+	// Make sure plugin is returning us something that obeys the PluginSpec.
+	object, err := util.RuntimeToUnstructured(result.Object)
+	if err != nil {
+		return nil, errors.Wrap(err, "plugin output cannot be converted from runtime.Object")
+	}
+	expectedGVK := pluginInstance.Describe().GVK
+	if object.GroupVersionKind() != expectedGVK {
+		return nil, errors.Errorf("unexpected GVK from plugin (wanted %v, got %v)", expectedGVK, object.GroupVersionKind())
+	}
+	// We are in charge of naming.
+	object.SetName(res.Spec.Plugin.ObjectName)
+
+	log.Printf("Plugin %q result: %+v", res.Spec.Plugin.Name, object)
+	return object, nil
 }
 
 func (st *syncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[smith_v1.ResourceName]plugin.Dependency, error) {
@@ -242,10 +252,10 @@ func (st *syncTask) prepareServiceBindingDependency(dependency *plugin.Dependenc
 	return nil
 }
 
-// evalNormalSpec evaluates the regular resource specification and returns the result.
-func (st *syncTask) evalNormalSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
+// evalObjectSpec evaluates the regular resource specification and returns the result.
+func (st *syncTask) evalObjectSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
 	// Convert Spec to Unstructured
-	spec, err := util.RuntimeToUnstructured(res.Spec)
+	spec, err := util.RuntimeToUnstructured(res.Spec.Object)
 
 	if err != nil {
 		return nil, err
@@ -361,13 +371,16 @@ func (st *syncTask) deleteRemovedResources() (retriableError bool, e error) {
 		existingObjs[ref] = m.GetUID()
 	}
 	for _, res := range st.bundle.Spec.Resources {
-		gvk, err := res.ObjectGVK()
-		if err != nil {
-			return false, err
-		}
-		name, err := res.ObjectName()
-		if err != nil {
-			return false, err
+		var gvk schema.GroupVersionKind
+		var name string
+		if res.Spec.Object != nil {
+			gvk = res.Spec.Object.GetObjectKind().GroupVersionKind()
+			name = res.Spec.Object.(meta_v1.Object).GetName()
+		} else if res.Spec.Plugin != nil {
+			gvk = st.plugins[res.Spec.Plugin.Name].Describe().GVK
+			name = res.Spec.Plugin.ObjectName
+		} else {
+			panic(errors.New(`neither "object" nor "plugin" field is specified`))
 		}
 		ref := objectRef{
 			GroupVersionKind: gvk,

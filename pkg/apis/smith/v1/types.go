@@ -10,8 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/json"
+	k8s_json "k8s.io/apimachinery/pkg/util/json"
 )
 
 type BundleConditionType string
@@ -198,48 +197,38 @@ type Resource struct {
 	// Explicit dependencies.
 	DependsOn []ResourceName `json:"dependsOn,omitempty"`
 
-	// TODO nilebox: make "Normal" default type; there are no defaults for Bundle yet?
-	Type ResourceType `json:"type"`
-
-	Spec runtime.Object `json:"spec,omitempty"`
-
-	PluginName PluginName  `json:"pluginName,omitempty"`
-	PluginSpec *PluginSpec `json:"pluginSpec,omitempty"`
+	Spec ResourceSpec `json:"spec"`
 }
 
-type ResourceType string
+// +k8s:deepcopy-gen=true
+// ResourceSpec is a union type - either object of plugin can be specified.
+type ResourceSpec struct {
+	Object runtime.Object `json:"object,omitempty"`
+	Plugin *PluginSpec    `json:"plugin,omitempty"`
+}
 
-const (
-	Normal ResourceType = ""
-	Plugin ResourceType = "plugin"
-)
-
+// +k8s:deepcopy-gen=true
+// PluginSpec holds the specification for a plugin.
 type PluginSpec struct {
-	ApiVersion string `json:"apiVersion"`
-	Kind       string `json:"kind"`
-	Name       string `json:"name"`
+	Name       PluginName `json:"name"`
+	ObjectName string     `json:"objectName"`
+	// I feel like this should be json.RawMessage, but for reasons I don't properly
+	// understand Service Catalog uses runtime.RawExtension for its Parameters (even
+	// though they never get unpacked into a 'real' object?). So ...
+	Spec runtime.RawExtension `json:"spec,omitempty"`
 }
 
-func (r *Resource) UnmarshalJSON(data []byte) error {
+func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
 	var res struct {
-		Name      ResourceName               `json:"name"`
-		DependsOn []ResourceName             `json:"dependsOn"`
-		Type      ResourceType               `json:"type"`
-		Spec      *unstructured.Unstructured `json:"spec,omitempty"`
-
-		PluginName PluginName  `json:"pluginName,omitempty"`
-		PluginSpec *PluginSpec `json:"pluginSpec,omitempty"`
+		Object *unstructured.Unstructured `json:"object,omitempty"`
+		Plugin *PluginSpec                `json:"plugin,omitempty"`
 	}
-	err := json.Unmarshal(data, &res)
+	err := k8s_json.Unmarshal(data, &res)
 	if err != nil {
 		return err
 	}
-	r.Name = res.Name
-	r.DependsOn = res.DependsOn
-	r.Type = res.Type
-	r.Spec = res.Spec
-	r.PluginName = res.PluginName
-	r.PluginSpec = res.PluginSpec
+	rs.Object = res.Object
+	rs.Plugin = res.Plugin
 	return nil
 }
 
@@ -247,70 +236,20 @@ func (r *Resource) UnmarshalJSON(data []byte) error {
 // It supports objects of the same type and Unstructured.
 // Note that it does not perform a deep copy in case of typed API object.
 // Note that this method may fail if references are used where a non-string value is expected.
-func (r *Resource) IntoTyped(obj runtime.Object) error {
-	if r.Type != Normal {
-		return errors.Errorf("cannot convert non-Normal into typed (%s)", r.Type)
+func (rs *ResourceSpec) IntoTyped(obj runtime.Object) error {
+	if rs.Object == nil {
+		return errors.New("cannot convert non-Object into typed")
 	}
-	objT := reflect.TypeOf(r.Spec)
+	objT := reflect.TypeOf(rs.Object)
 	if objT == reflect.TypeOf(obj) && objT.Kind() == reflect.Ptr {
 		objV := reflect.ValueOf(obj)
-		specV := reflect.ValueOf(r.Spec)
+		specV := reflect.ValueOf(rs.Object)
 
 		objV.Elem().Set(specV.Elem()) // types are the same, dereference and assign value
 		return nil
 	}
-	if specUnstr, ok := r.Spec.(*unstructured.Unstructured); ok {
+	if specUnstr, ok := rs.Object.(*unstructured.Unstructured); ok {
 		return unstructured_conversion.DefaultConverter.FromUnstructured(specUnstr.Object, obj)
 	}
-	return fmt.Errorf("cannot convert %T into typed object %T", r.Spec, obj)
-}
-
-func (r *Resource) Validate() error {
-	switch r.Type {
-	case Normal:
-		if r.PluginName != "" || r.PluginSpec != nil {
-			return errors.New("normal resource has plugin information")
-		}
-	case Plugin:
-		if r.Spec != nil {
-			return errors.New("plugin resource has normal information")
-		}
-	default:
-		return errors.Errorf("invalid resource type %q", r.Type)
-	}
-
-	return nil
-}
-
-func (r *Resource) ObjectGVK() (schema.GroupVersionKind, error) {
-	switch r.Type {
-	case Normal:
-		return r.Spec.GetObjectKind().GroupVersionKind(), nil
-	case Plugin:
-		if r.PluginSpec == nil {
-			return schema.GroupVersionKind{}, errors.New("plugin specification is missing")
-		}
-		gv, err := schema.ParseGroupVersion(r.PluginSpec.ApiVersion)
-		if err != nil {
-			return schema.GroupVersionKind{}, errors.WithStack(err)
-		}
-		return gv.WithKind(r.PluginSpec.Kind), nil
-	default:
-		return schema.GroupVersionKind{}, errors.Errorf("invalid resource type %q", r.Type)
-	}
-}
-
-func (r *Resource) ObjectName() (string, error) {
-	switch r.Type {
-	case Normal:
-		m := r.Spec.(meta_v1.Object)
-		return m.GetName(), nil
-	case Plugin:
-		if r.PluginSpec == nil {
-			return "", errors.New("plugin specification is missing")
-		}
-		return r.PluginSpec.Name, nil
-	default:
-		return "", errors.Errorf("invalid resource type %q", r.Type)
-	}
+	return fmt.Errorf("cannot convert %T into typed object %T", rs.Object, obj)
 }
