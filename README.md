@@ -72,30 +72,32 @@ spec:
   resources:
   - name: db1
     spec:
-      apiVersion: smith.atlassian.com/v1
-      kind: PostgresqlResource
-      metadata:
-        name: db1
-      spec:
-        disk: 100GiB
+      object:
+        apiVersion: smith.atlassian.com/v1
+        kind: PostgresqlResource
+        metadata:
+          name: db1
+        spec:
+          disk: 100GiB
   - name: app1
     dependsOn:
     - db1
     spec:
-      apiVersion: apps/v1beta1
-      kind: Deployment
-      metadata:
-        name: app1
-      spec:
-        replicas: 1
-        bundle:
-          metadata:
-            labels:
-              app: app1
-          spec:
-            containers:
-            - name: app1
-              image: quay.io/some/app1
+      object:
+        apiVersion: apps/v1beta1
+        kind: Deployment
+        metadata:
+          name: app1
+        spec:
+          replicas: 1
+          bundle:
+            metadata:
+              labels:
+                app: app1
+            spec:
+              containers:
+              - name: app1
+                image: quay.io/some/app1
 ```
 
 ### Outputs

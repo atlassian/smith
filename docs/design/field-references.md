@@ -22,13 +22,14 @@ spec:
   resources:
   - name: sleeper1
     spec:
-      apiVersion: crd.atlassian.com/v1
-      kind: Sleeper
-      metadata:
-        name: sleeper1
-      spec:
-        sleepFor: 3
-        wakeupMessage: Hello, Infravators!
+      object:
+        apiVersion: crd.atlassian.com/v1
+        kind: Sleeper
+        metadata:
+          name: sleeper1
+        spec:
+          sleepFor: 3
+          wakeupMessage: Hello, Infravators!
         
 --- comes later
       status:
@@ -37,20 +38,22 @@ spec:
     dependsOn:
     - sleeper1
     spec:
-      apiVersion: crd.atlassian.com/v1
-      kind: Sleeper
-      metadata:
-        name: sleeper2
-      spec:
-        sleepFor: 4
-        wakeupMessage: "{{sleeper1#status.message}}"
+      object:
+        apiVersion: crd.atlassian.com/v1
+        kind: Sleeper
+        metadata:
+          name: sleeper2
+        spec:
+          sleepFor: 4
+          wakeupMessage: "{{sleeper1#status.message}}"
   - name: sleeper3
     dependsOn:
     - sleeper2
     spec:
-      apiVersion: crd.atlassian.com/v1
-      kind: Sleeper
-      metadata:
-        name: sleeper3
-      spec: "{{{sleeper2#spec}}}"
+      object:
+        apiVersion: crd.atlassian.com/v1
+        kind: Sleeper
+        metadata:
+          name: sleeper3
+        spec: "{{{sleeper2#spec}}}"
 ```

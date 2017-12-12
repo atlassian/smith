@@ -19,55 +19,58 @@ spec:
 
   - name: a
     spec:
-      apiVersion: servicecatalog.k8s.io/v1beta1
-      kind: ServiceInstance
-      metadata:
-        name: a
-      spec:
-        foo: bar
+      object:
+        apiVersion: servicecatalog.k8s.io/v1beta1
+        kind: ServiceInstance
+        metadata:
+          name: a
+        spec:
+          foo: bar
 
   - name: a-binding
     dependsOn:
     - a
     spec:
-      apiVersion: servicecatalog.k8s.io/v1beta1
-      kind: ServiceBinding
-      metadata:
-        name: a-binding
-      spec:
-        instanceRef:
-          name: "{{a#metadata.name}}"
-        secretName: a-binding-secret
+      object:
+        apiVersion: servicecatalog.k8s.io/v1beta1
+        kind: ServiceBinding
+        metadata:
+          name: a-binding
+        spec:
+          instanceRef:
+            name: "{{a#metadata.name}}"
+          secretName: a-binding-secret
 
   - name: b
     dependsOn:
     - a-binding
     spec:
-      apiVersion: servicecatalog.k8s.io/v1beta1
-      kind: ServiceInstance
-      metadata:
-        name: b
-      spec:
-        # need data from a-binding-secret but transformed
-        # e.g. only keys which start with "FOO_" when full names of the keys are not known in advance.
+      object:
+        apiVersion: servicecatalog.k8s.io/v1beta1
+        kind: ServiceInstance
+        metadata:
+          name: b
+        spec:
+          # need data from a-binding-secret but transformed
+          # e.g. only keys which start with "FOO_" when full names of the keys are not known in advance.
 ```
 
 ## Specification
 
-Smith plugins are [Go plugins](https://golang.org/pkg/plugin/). They are eagerly loaded at Smith startup to detect
-issues early. Names of plugins to load are passed via command line.
-Each plugin publishes a `Process(smith_v1.Resource, map[smith_v1.ResourceName]Dependency) (ProcessResult, error)`
-function.
+Smith plugins are a way to extend Smith with functionality to do additional runtime processing.
+Plugins are eagerly loaded at Smith startup to detect issues early.
+Each plugin publishes a factory function `New() (Plugin, error)` that is called once upon Smith startup to
+get an instance of a plugin.
 
-When Smith comes across a resource with `type: plugin` and `pluginName: foobar` it invokes
+See types in `pkg/plugin` for more details.
+
+When Smith comes across a resource with `spec.plugin` field set and `spec.plugin.name: foobar` it invokes
 the plugin `foobar`. For each dependency (resources that are referenced in `dependsOn` attribute) of the
 resource with plugin invocation Smith fetches its output objects (if any) and auxiliary objects (if any) to
 include in the plugin invocation along with the dependencies themselves.
 Smith needs to recognize resource group/version/kinds to be able to fetch the outputs and auxiliary objects.
 One example is `ServiceBinding` that produces a `Secret` (output object) and references a `ServiceInstance`
 (an auxiliary object).
-
-A resource must have the group/version/kind of the object that is going to be produced specified.
 
 A plugin must:
 1. Be a pure function - plugin must not depend on any external state;
@@ -121,41 +124,41 @@ spec:
 
   - name: a
     spec:
-      apiVersion: servicecatalog.k8s.io/v1beta1
-      kind: ServiceInstance
-      metadata:
-        name: a
-      spec:
-        clusterServiceClassExternalName: user-provided-service
-        clusterServicePlanExternalName: default
-        parameters:
-          credentials:
-            foo: bar
+      object:
+        apiVersion: servicecatalog.k8s.io/v1beta1
+        kind: ServiceInstance
+        metadata:
+          name: a
+        spec:
+          clusterServiceClassExternalName: user-provided-service
+          clusterServicePlanExternalName: default
+          parameters:
+            credentials:
+              foo: bar
 
   - name: a-binding
     dependsOn:
     - a
     spec:
-      apiVersion: servicecatalog.k8s.io/v1beta1
-      kind: ServiceBinding
-      metadata:
-        name: a-binding
-      spec:
-        instanceRef:
-          name: "{{a#metadata.name}}"
-        secretName: a-binding-secret
+      object:
+        apiVersion: servicecatalog.k8s.io/v1beta1
+        kind: ServiceBinding
+        metadata:
+          name: a-binding
+        spec:
+          instanceRef:
+            name: "{{a#metadata.name}}"
+          secretName: a-binding-secret
 
   - name: b
     dependsOn:
     - a-binding
-    type: plugin
-    pluginName: filter
-    pluginSpec:
-      apiVersion: servicecatalog.k8s.io/v1beta1
-      kind: ServiceInstance
-      name: b
-      spec:
-        filterByPrefix: "FOO_" # only keys which start with "FOO_"
+    spec:
+      plugin:
+        name: filter
+        spec:
+          name: b
+          filterByPrefix: "FOO_" # only keys which start with "FOO_"
 ```
 
 When the plugin `filter` is invoked, it returns the following object:
