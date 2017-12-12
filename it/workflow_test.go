@@ -62,11 +62,15 @@ func TestWorkflow(t *testing.T) {
 				{
 					Name:      "config1res",
 					DependsOn: []smith_v1.ResourceName{"secret2res"},
-					Spec:      c1,
+					Spec: smith_v1.ResourceSpec{
+						Object: c1,
+					},
 				},
 				{
 					Name: "secret2res",
-					Spec: s1,
+					Spec: smith_v1.ResourceSpec{
+						Object: s1,
+					},
 				},
 			},
 		},

@@ -56,11 +56,15 @@ func TestAdoption(t *testing.T) {
 			Resources: []smith_v1.Resource{
 				{
 					Name: smith_v1.ResourceName(cm.Name),
-					Spec: cm,
+					Spec: smith_v1.ResourceSpec{
+						Object: cm,
+					},
 				},
 				{
 					Name: smith_v1.ResourceName(sleeper.Name),
-					Spec: sleeper,
+					Spec: smith_v1.ResourceSpec{
+						Object: sleeper,
+					},
 				},
 			},
 		},

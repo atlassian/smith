@@ -43,7 +43,9 @@ func TestCrdAttribute(t *testing.T) {
 			Resources: []smith_v1.Resource{
 				{
 					Name: smith_v1.ResourceName(sl.Name),
-					Spec: sl,
+					Spec: smith_v1.ResourceSpec{
+						Object: sl,
+					},
 				},
 			},
 		},

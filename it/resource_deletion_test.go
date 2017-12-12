@@ -55,11 +55,15 @@ func TestResourceDeletion(t *testing.T) {
 			Resources: []smith_v1.Resource{
 				{
 					Name: smith_v1.ResourceName(cm.Name),
-					Spec: cm,
+					Spec: smith_v1.ResourceSpec{
+						Object: cm,
+					},
 				},
 				{
 					Name: smith_v1.ResourceName(sl.Name),
-					Spec: sl,
+					Spec: smith_v1.ResourceSpec{
+						Object: sl,
+					},
 				},
 			},
 		},

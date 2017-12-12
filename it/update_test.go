@@ -103,11 +103,15 @@ func TestUpdate(t *testing.T) {
 			Resources: []smith_v1.Resource{
 				{
 					Name: smith_v1.ResourceName(cm1.Name),
-					Spec: cm1,
+					Spec: smith_v1.ResourceSpec{
+						Object: cm1,
+					},
 				},
 				{
 					Name: smith_v1.ResourceName(sleeper1.Name),
-					Spec: sleeper1,
+					Spec: smith_v1.ResourceSpec{
+						Object: sleeper1,
+					},
 				},
 			},
 		},
@@ -129,11 +133,15 @@ func TestUpdate(t *testing.T) {
 			Resources: []smith_v1.Resource{
 				{
 					Name: smith_v1.ResourceName(cm2.Name),
-					Spec: cm2,
+					Spec: smith_v1.ResourceSpec{
+						Object: cm2,
+					},
 				},
 				{
 					Name: smith_v1.ResourceName(sleeper2.Name),
-					Spec: sleeper2,
+					Spec: smith_v1.ResourceSpec{
+						Object: sleeper2,
+					},
 				},
 			},
 		},
