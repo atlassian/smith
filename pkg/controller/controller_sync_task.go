@@ -181,7 +181,6 @@ func (st *syncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstru
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Plugin %q dependencies: %+v", res.Spec.Plugin.Name, dependencies)
 
 	result, err := pluginInstance.Process(res.Spec.Plugin.Spec, &plugin.Context{
 		Dependencies: dependencies,
@@ -202,7 +201,6 @@ func (st *syncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstru
 	// We are in charge of naming.
 	object.SetName(res.Spec.Plugin.ObjectName)
 
-	log.Printf("Plugin %q result: %+v", res.Spec.Plugin.Name, object)
 	return object, nil
 }
 
