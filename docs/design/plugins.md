@@ -25,7 +25,11 @@ spec:
         metadata:
           name: a
         spec:
-          foo: bar
+          clusterServiceClassExternalName: user-provided-service
+          clusterServicePlanExternalName: default
+          parameters:
+            credentials:
+              foo: bar
 
   - name: a-binding
     dependsOn:
