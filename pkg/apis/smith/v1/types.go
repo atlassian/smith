@@ -227,7 +227,12 @@ func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	rs.Object = res.Object
+
+	// If we blindly do this copy, we get nils with type info (i.e. != nil)
+	if res.Object != nil {
+		rs.Object = res.Object
+	}
+
 	rs.Plugin = res.Plugin
 	return nil
 }
