@@ -9,7 +9,7 @@ gazelle(
 )
 
 gazelle(
-    name = "gazelle-fix",
+    name = "gazelle_fix",
     command = "fix",
     external = "vendored",
     prefix = "github.com/atlassian/smith",

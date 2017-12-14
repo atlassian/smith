@@ -23,7 +23,7 @@ go_image(
 )
 
 container_push(
-    name = "push-docker",
+    name = "push_docker",
     format = "Docker",
     image = ":container",
     registry = "index.docker.io",

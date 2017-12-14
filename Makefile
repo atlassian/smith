@@ -15,7 +15,7 @@ setup-ci:
 	cp fixed_BUILD_for_sets.bazel vendor/k8s.io/apimachinery/pkg/util/sets/BUILD
 	go build -o build/bin/buildozer vendor/github.com/bazelbuild/buildtools/buildozer/*.go
 	rm -rf vendor/github.com/bazelbuild
-	bazel run //:gazelle-fix
+	bazel run //:gazelle_fix
 
 update-bazel:
 	-build/bin/buildozer 'set race "on"' \
@@ -143,6 +143,6 @@ docker-export:
 	bazel run --cpu=k8 //cmd/smith:container
 
 release: update-bazel
-	bazel run --cpu=k8 //cmd/smith:push-docker
+	bazel run --cpu=k8 //cmd/smith:push_docker
 
 .PHONY: build
