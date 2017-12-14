@@ -3,12 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "bundle_sync_task.go",
         "controller.go",
         "controller_bundle_event_handler.go",
         "controller_crd_event_handler.go",
         "controller_resource_event_handler.go",
-        "controller_sync_task.go",
         "controller_worker.go",
+        "resource_sync_task.go",
         "spec_processor.go",
         "types.go",
     ],
