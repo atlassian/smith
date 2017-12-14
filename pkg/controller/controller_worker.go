@@ -69,7 +69,7 @@ func (c *BundleController) processKey(key string) (retriableRet bool, errRet err
 		return false, nil
 	}
 
-	st := syncTask{
+	st := bundleSyncTask{
 		bundleClient: c.bundleClient,
 		smartClient:  c.smartClient,
 		rc:           c.rc,
