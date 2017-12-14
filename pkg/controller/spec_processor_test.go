@@ -14,8 +14,8 @@ import (
 func TestSpecProcessor(t *testing.T) {
 	t.Parallel()
 	sp := SpecProcessor{
-		selfName:       "abc",
-		readyResources: readyResources(),
+		selfName:  "abc",
+		resources: processedResources(),
 		allowedResources: map[smith_v1.ResourceName]struct{}{
 			"res1": {},
 		},
@@ -200,8 +200,8 @@ func TestSpecProcessorErrors(t *testing.T) {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
 			sp := SpecProcessor{
-				selfName:       "self1",
-				readyResources: readyResources(),
+				selfName:  "self1",
+				resources: processedResources(),
 				allowedResources: map[smith_v1.ResourceName]struct{}{
 					"res1": {},
 				},
@@ -211,38 +211,44 @@ func TestSpecProcessorErrors(t *testing.T) {
 	}
 }
 
-func readyResources() map[smith_v1.ResourceName]*unstructured.Unstructured {
-	return map[smith_v1.ResourceName]*unstructured.Unstructured{
+func processedResources() map[smith_v1.ResourceName]*resourceInfo {
+	return map[smith_v1.ResourceName]*resourceInfo{
 		"res1": {
-			Object: map[string]interface{}{
-				"a": map[string]interface{}{
-					"string":  "string1",
-					"int":     int(42),
-					"bool":    true,
-					"float64": float64(1.1),
-					"object": map[string]interface{}{
-						"a": 1,
-						"b": "str",
-					},
-					"slice": []interface{}{
-						map[string]interface{}{
-							"label": "label1",
-							"value": "value1",
+			actual: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"a": map[string]interface{}{
+						"string":  "string1",
+						"int":     int(42),
+						"bool":    true,
+						"float64": float64(1.1),
+						"object": map[string]interface{}{
+							"a": 1,
+							"b": "str",
 						},
-						map[string]interface{}{
-							"label": "label2",
-							"value": "value2",
+						"slice": []interface{}{
+							map[string]interface{}{
+								"label": "label1",
+								"value": "value1",
+							},
+							map[string]interface{}{
+								"label": "label2",
+								"value": "value2",
+							},
 						},
 					},
 				},
 			},
+			status: resourceStatusReady{},
 		},
 		"resX": {
-			Object: map[string]interface{}{
-				"a": map[string]interface{}{
-					"string": "string1",
+			actual: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"a": map[string]interface{}{
+						"string": "string1",
+					},
 				},
 			},
+			status: resourceStatusReady{},
 		},
 	}
 }

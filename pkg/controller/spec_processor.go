@@ -9,8 +9,6 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
@@ -26,18 +24,18 @@ var (
 
 type SpecProcessor struct {
 	selfName         smith_v1.ResourceName
-	readyResources   map[smith_v1.ResourceName]*unstructured.Unstructured
+	resources        map[smith_v1.ResourceName]*resourceInfo
 	allowedResources map[smith_v1.ResourceName]struct{}
 }
 
-func NewSpec(selfName smith_v1.ResourceName, readyResources map[smith_v1.ResourceName]*unstructured.Unstructured, allowedResources []smith_v1.ResourceName) *SpecProcessor {
+func NewSpec(selfName smith_v1.ResourceName, resources map[smith_v1.ResourceName]*resourceInfo, allowedResources []smith_v1.ResourceName) *SpecProcessor {
 	ar := make(map[smith_v1.ResourceName]struct{}, len(allowedResources))
 	for _, allowedResource := range allowedResources {
 		ar[allowedResource] = struct{}{}
 	}
 	return &SpecProcessor{
 		selfName:         selfName,
-		readyResources:   readyResources,
+		resources:        resources,
 		allowedResources: ar,
 	}
 }
@@ -117,8 +115,8 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	if objName == sp.selfName {
 		return nil, fmt.Errorf("self references are not allowed: %s", selector)
 	}
-	res := sp.readyResources[objName]
-	if res == nil {
+	resInfo := sp.resources[objName]
+	if resInfo == nil {
 		return nil, fmt.Errorf("object not found: %s", selector)
 	}
 	if _, allowed := sp.allowedResources[objName]; !allowed {
@@ -127,7 +125,7 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	// To avoid overcomplicated format of reference like this: {{{res1#{$.a.string}}}}
 	// And have something like this instead: {{{res1#a.string}}}
 	jsonPath := fmt.Sprintf("{$.%s}", parts[1])
-	fieldValue, err := resources.GetJsonPathValue(res.Object, jsonPath, false)
+	fieldValue, err := resources.GetJsonPathValue(resInfo.actual.Object, jsonPath, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process JsonPath reference %s: %v", selector, err)
 	}

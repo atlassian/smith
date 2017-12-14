@@ -25,16 +25,52 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+// resourceStatus is one of "resourceStatus*" structs.
+// It is a mechanism to communicate the status of a resource.
+type resourceStatus interface{}
+
+type resourceStatusDependenciesNotReady struct {
+	dependencies []smith_v1.ResourceName
+}
+
+type resourceStatusError struct {
+	err              error
+	isRetriableError bool
+}
+
+type resourceStatusInProgress struct {
+}
+
+type resourceStatusReady struct {
+}
+
+type resourceInfo struct {
+	actual *unstructured.Unstructured
+	status resourceStatus
+}
+
+func (ri *resourceInfo) isReady() bool {
+	_, ok := ri.status.(resourceStatusReady)
+	return ok
+}
+
+func (ri *resourceInfo) fetchError() (bool, error) {
+	if rse, ok := ri.status.(resourceStatusError); ok {
+		return rse.isRetriableError, rse.err
+	}
+	return false, nil
+}
+
 type syncTask struct {
-	bundleClient   smithClient_v1.BundlesGetter
-	smartClient    smith.SmartClient
-	rc             ReadyChecker
-	store          Store
-	specCheck      SpecCheck
-	bundle         *smith_v1.Bundle
-	readyResources map[smith_v1.ResourceName]*unstructured.Unstructured
-	plugins        map[smith_v1.PluginName]plugin.Plugin
-	scheme         *runtime.Scheme
+	bundleClient       smithClient_v1.BundlesGetter
+	smartClient        smith.SmartClient
+	rc                 ReadyChecker
+	store              Store
+	specCheck          SpecCheck
+	bundle             *smith_v1.Bundle
+	processedResources map[smith_v1.ResourceName]*resourceInfo
+	plugins            map[smith_v1.PluginName]plugin.Plugin
+	scheme             *runtime.Scheme
 }
 
 // Parse bundle, build resource graph, traverse graph, assert each resource exists.
@@ -56,34 +92,24 @@ func (st *syncTask) process() (retriableError bool, e error) {
 	}
 
 	// Build the graph and topologically sort it
-	g, sorted, sortErr := sortBundle(st.bundle)
+	_, sorted, sortErr := sortBundle(st.bundle)
 	if sortErr != nil {
-		return false, sortErr
+		return false, errors.Wrap(sortErr, "topological sort of resources failed")
 	}
 
-	st.readyResources = make(map[smith_v1.ResourceName]*unstructured.Unstructured, len(st.bundle.Spec.Resources))
+	st.processedResources = make(map[smith_v1.ResourceName]*resourceInfo, len(st.bundle.Spec.Resources))
 
 	// Visit vertices in sorted order
-nextVertex:
-	for _, v := range sorted {
-		// Check if all resource dependencies are ready (so we can start processing this one)
-		for _, dependency := range g.Vertices[v].Edges() {
-			if _, ok := st.readyResources[dependency.(smith_v1.ResourceName)]; !ok {
-				log.Printf("[WORKER][%s/%s] Dependency %q is required by resource %q but it's not ready", st.bundle.Namespace, st.bundle.Name, dependency, v)
-				continue nextVertex // Move to the next resource
-			}
-		}
+	for _, resName := range sorted {
 		// Process the resource
-		log.Printf("[WORKER][%s/%s] Checking resource %q", st.bundle.Namespace, st.bundle.Name, v)
-		res := resourceMap[v.(smith_v1.ResourceName)]
-		readyResource, retriable, err := st.checkResource(&res)
-		if err != nil {
-			return retriable, errors.Wrapf(err, "failed to process resource %q", res.Name)
+		res := resourceMap[resName.(smith_v1.ResourceName)]
+		resInfo := st.processResource(&res)
+		if retriable, err := resInfo.fetchError(); err != nil && api_errors.IsConflict(errors.Cause(err)) {
+			// Short circuit on conflict
+			return retriable, err
 		}
-		log.Printf("[WORKER][%s/%s] Resource %q, ready: %t", st.bundle.Namespace, st.bundle.Name, v, readyResource != nil)
-		if readyResource != nil {
-			st.readyResources[v.(smith_v1.ResourceName)] = readyResource
-		}
+		log.Printf("[WORKER][%s/%s] Resource %q, ready: %t", st.bundle.Namespace, st.bundle.Name, resName, resInfo.isReady())
+		st.processedResources[resName.(smith_v1.ResourceName)] = &resInfo
 	}
 	// Delete objects which were removed from the bundle
 	retriable, err := st.deleteRemovedResources()
@@ -94,25 +120,77 @@ nextVertex:
 	return false, nil
 }
 
-func (st *syncTask) checkResource(res *smith_v1.Resource) (readyResource *unstructured.Unstructured, retriableError bool, e error) {
-	// 1. Eval spec
+func (st *syncTask) processResource(res *smith_v1.Resource) resourceInfo {
+	log.Printf("[WORKER][%s/%s] Processing resource %q", st.bundle.Namespace, st.bundle.Name, res.Name)
+
+	// Check if all resource dependencies are ready (so we can start processing this one)
+	status := st.checkAllDependenciesAreReady(res)
+	if status != nil {
+		return resourceInfo{
+			status: status,
+		}
+	}
+
+	// Eval spec
 	spec, err := st.evalSpec(res)
 	if err != nil {
-		return nil, false, err
+		return resourceInfo{
+			status: resourceStatusError{
+				err: err,
+			},
+		}
 	}
 
-	// 2. Create or update resource
+	// Create or update resource
 	resUpdated, retriable, err := st.createOrUpdate(spec)
 	if err != nil {
-		return nil, retriable, err
+		return resourceInfo{
+			actual: resUpdated,
+			status: resourceStatusError{
+				err:              err,
+				isRetriableError: retriable,
+			},
+		}
 	}
 
-	// 3. Check if resource is ready
+	// Check if resource is ready
 	ready, retriable, err := st.rc.IsReady(resUpdated)
-	if err != nil || !ready {
-		return nil, retriable, errors.Wrap(err, "readiness check failed")
+	if err != nil {
+		return resourceInfo{
+			actual: resUpdated,
+			status: resourceStatusError{
+				err:              errors.Wrap(err, "readiness check failed"),
+				isRetriableError: retriable,
+			},
+		}
 	}
-	return resUpdated, false, nil
+	if ready {
+		return resourceInfo{
+			actual: resUpdated,
+			status: resourceStatusReady{},
+		}
+	} else {
+		return resourceInfo{
+			actual: resUpdated,
+			status: resourceStatusInProgress{},
+		}
+	}
+}
+
+func (st *syncTask) checkAllDependenciesAreReady(res *smith_v1.Resource) resourceStatus {
+	var notReadyDependencies []smith_v1.ResourceName
+	for _, dependency := range res.DependsOn {
+		if !st.processedResources[dependency].isReady() {
+			log.Printf("[WORKER][%s/%s] Dependency %q is required by resource %q but it's not ready", st.bundle.Namespace, st.bundle.Name, dependency, res.Name)
+			notReadyDependencies = append(notReadyDependencies, dependency)
+		}
+	}
+	if len(notReadyDependencies) > 0 {
+		return resourceStatusDependenciesNotReady{
+			dependencies: notReadyDependencies,
+		}
+	}
+	return nil
 }
 
 // evalSpec evaluates the resource specification and returns the result.
@@ -157,7 +235,7 @@ func (st *syncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unstructured
 		BlockOwnerDeletion: &trueRef,
 	})
 	for _, dep := range res.DependsOn {
-		obj := st.readyResources[dep] // this is ok because we've checked earlier that readyResources contains all dependencies
+		obj := st.processedResources[dep].actual // this is ok because we've checked earlier that resources contains all dependencies
 		refs = append(refs, meta_v1.OwnerReference{
 			APIVersion:         obj.GetAPIVersion(),
 			Kind:               obj.GetKind(),
@@ -208,7 +286,7 @@ func (st *syncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[
 	dependencies := make(map[smith_v1.ResourceName]plugin.Dependency, len(dependsOn))
 	for _, name := range dependsOn {
 		var dependency plugin.Dependency
-		unstructuredActual := st.readyResources[name]
+		unstructuredActual := st.processedResources[name].actual
 		gvk := unstructuredActual.GroupVersionKind()
 		actual, err := st.scheme.New(gvk)
 		if err != nil {
@@ -260,7 +338,7 @@ func (st *syncTask) evalObjectSpec(res *smith_v1.Resource) (*unstructured.Unstru
 	}
 
 	// Process references
-	sp := NewSpec(res.Name, st.readyResources, res.DependsOn)
+	sp := NewSpec(res.Name, st.processedResources, res.DependsOn)
 	if err := sp.ProcessObject(spec.Object); err != nil {
 		return nil, err
 	}
@@ -433,7 +511,7 @@ func (st *syncTask) setBundleStatus() error {
 			// It is safe to ignore this conflict because we will reiterate because of the update event.
 			return nil
 		}
-		return fmt.Errorf("failed to set bundle %s/%s status to %v: %v", st.bundle.Namespace, st.bundle.Name, st.bundle.Status.ShortString(), err)
+		return fmt.Errorf("failed to set bundle status to %s: %v", st.bundle.Status.ShortString(), err)
 	}
 	log.Printf("[WORKER][%s/%s] Set bundle status to %s", st.bundle.Namespace, st.bundle.Name, bundleUpdated.Status.ShortString())
 	return nil
@@ -449,6 +527,20 @@ func (st *syncTask) handleProcessResult(retriable bool, processErr error) (bool 
 	inProgressCond := smith_v1.BundleCondition{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionFalse}
 	readyCond := smith_v1.BundleCondition{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse}
 	errorCond := smith_v1.BundleCondition{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse}
+	if processErr == nil {
+		// Check for errors in resources
+		var failedResources []smith_v1.ResourceName
+		for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
+			resInfo := st.processedResources[res.Name]
+			if isRetriableErr, err := resInfo.fetchError(); err != nil {
+				failedResources = append(failedResources, res.Name)
+				retriable = retriable || isRetriableErr // If at least one error is retriable...
+			}
+		}
+		if len(failedResources) > 0 {
+			processErr = errors.Errorf("error processing resource(s): %q", failedResources)
+		}
+	}
 	if processErr == nil {
 		if st.isBundleReady() {
 			readyCond.Status = smith_v1.ConditionTrue
@@ -483,7 +575,8 @@ func (st *syncTask) handleProcessResult(retriable bool, processErr error) (bool 
 
 func (st *syncTask) isBundleReady() bool {
 	for _, res := range st.bundle.Spec.Resources {
-		if r := st.readyResources[res.Name]; r == nil {
+		res := st.processedResources[res.Name]
+		if res == nil || !res.isReady() {
 			return false
 		}
 	}

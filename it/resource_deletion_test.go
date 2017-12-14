@@ -122,7 +122,7 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	cond := AssertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
 	if cond != nil {
 		assert.Equal(t, "TerminalError", cond.Reason)
-		assert.Equal(t, "failed to process resource \"cm\": object /v1, Kind=ConfigMap \"cm\" is not owned by the Bundle", cond.Message)
+		assert.Equal(t, "error processing resource(s): [\"cm\" \"sleeper2\"]", cond.Message)
 	}
 
 	// Delete conflicting ConfigMap
