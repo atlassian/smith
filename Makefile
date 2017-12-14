@@ -1,5 +1,8 @@
 METALINTER_CONCURRENCY ?= 4
 ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*" -not -path './pkg/client/clientset_generated/*' -not -name 'zz_generated.*')
+OS = $$(uname -s | tr A-Z a-z)
+BINARY_PREFIX_DIRECTORY=$(OS)_amd64_stripped
+BINARY_RACE_PREFIX_DIRECTORY=$(OS)_amd64_race_stripped
 
 .PHONY: setup
 setup: setup-ci
@@ -47,7 +50,7 @@ generate: generate-client generate-deepcopy
 generate-client:
 	bazel build //vendor/k8s.io/code-generator/cmd/client-gen
 	# Generate the versioned clientset (pkg/client/clientset_generated/clientset)
-	bazel-bin/vendor/k8s.io/code-generator/cmd/client-gen/client-gen $(VERIFY_CODE) \
+	bazel-bin/vendor/k8s.io/code-generator/cmd/client-gen/$(BINARY_PREFIX_DIRECTORY)/client-gen $(VERIFY_CODE) \
 	--input-base "github.com/atlassian/smith/pkg/apis/" \
 	--input "smith/v1" \
 	--clientset-path "github.com/atlassian/smith/pkg/client/clientset_generated/" \
@@ -58,7 +61,7 @@ generate-client:
 generate-deepcopy:
 	bazel build //vendor/k8s.io/code-generator/cmd/deepcopy-gen
 	# Generate deep copies
-	bazel-bin/vendor/k8s.io/code-generator/cmd/deepcopy-gen/deepcopy-gen $(VERIFY_CODE) \
+	bazel-bin/vendor/k8s.io/code-generator/cmd/deepcopy-gen/$(BINARY_PREFIX_DIRECTORY)/deepcopy-gen $(VERIFY_CODE) \
 	--go-header-file "build/code-generator/boilerplate.go.txt" \
 	--input-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \
 	--bounding-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \
@@ -90,7 +93,7 @@ minikube-test-sc: fmt update-bazel
 		//it/sc:go_default_test
 
 .PHONY: minikube-run
-minikube-run: fmt update-bazel build
+minikube-run: fmt update-bazel build-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -98,10 +101,10 @@ minikube-run: fmt update-bazel build
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/cmd/smith/smith -disable-service-catalog
+	bazel-bin/cmd/smith/$(BINARY_RACE_PREFIX_DIRECTORY)/smith -disable-service-catalog
 
 .PHONY: minikube-run-sc
-minikube-run-sc: fmt update-bazel build
+minikube-run-sc: fmt update-bazel build-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
@@ -109,7 +112,7 @@ minikube-run-sc: fmt update-bazel build
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/cmd/smith/smith  \
+	bazel-bin/cmd/smith/$(BINARY_RACE_PREFIX_DIRECTORY)/smith  \
 	-service-catalog-url="https://$$(minikube ip):30443" \
 	-service-catalog-insecure
 
@@ -123,7 +126,7 @@ minikube-sleeper-run: fmt update-bazel
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/examples/sleeper/main/main
+	bazel-bin/examples/sleeper/main/$(BINARY_RACE_PREFIX_DIRECTORY)/main
 
 .PHONY: test
 test: fmt update-bazel test-ci
