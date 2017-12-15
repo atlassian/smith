@@ -14,6 +14,7 @@ go_binary(
     name = "smith",
     embed = [":go_default_library"],
     importpath = "github.com/atlassian/smith/cmd/smith",
+    pure = "on",
     visibility = ["//visibility:public"],
 )
 
