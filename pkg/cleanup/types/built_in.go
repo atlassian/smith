@@ -75,6 +75,9 @@ func scServiceBindingCleanup(spec, actual *unstructured.Unstructured) (*unstruct
 	}
 
 	sbSpec.Spec.ExternalID = sbActual.Spec.ExternalID
+	if sbActual.Spec.UserInfo != nil {
+		sbSpec.Spec.UserInfo = sbActual.Spec.UserInfo.DeepCopy()
+	}
 	sbSpec.Status = sbActual.Status
 
 	return util.RuntimeToUnstructured(&sbSpec)
@@ -113,6 +116,9 @@ func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstruc
 	instanceSpec.ObjectMeta.Finalizers = instanceActual.ObjectMeta.Finalizers
 
 	instanceSpec.Spec.ExternalID = instanceActual.Spec.ExternalID
+	if instanceActual.Spec.UserInfo != nil {
+		instanceSpec.Spec.UserInfo = instanceActual.Spec.UserInfo.DeepCopy()
+	}
 
 	return util.RuntimeToUnstructured(&instanceSpec)
 }
