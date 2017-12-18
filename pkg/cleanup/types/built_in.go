@@ -113,6 +113,9 @@ func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (*unstruc
 	instanceSpec.ObjectMeta.Finalizers = instanceActual.ObjectMeta.Finalizers
 
 	instanceSpec.Spec.ExternalID = instanceActual.Spec.ExternalID
+	if instanceActual.Spec.UserInfo != nil {
+		instanceSpec.Spec.UserInfo = instanceActual.Spec.UserInfo.DeepCopy()
+	}
 
 	return util.RuntimeToUnstructured(&instanceSpec)
 }
