@@ -174,8 +174,8 @@ func (in *BundleStatus) DeepCopyInto(out *BundleStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.ResourceStatus != nil {
-		in, out := &in.ResourceStatus, &out.ResourceStatus
+	if in.ResourceStatuses != nil {
+		in, out := &in.ResourceStatuses, &out.ResourceStatuses
 		*out = make([]ResourceStatus, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

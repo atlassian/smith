@@ -278,7 +278,7 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 
 	// Update the bundle status
 	if statusUpdated {
-		st.bundle.Status.ResourceStatus = resourceStatuses
+		st.bundle.Status.ResourceStatuses = resourceStatuses
 		ex := st.setBundleStatus()
 		if processErr == nil {
 			processErr = ex

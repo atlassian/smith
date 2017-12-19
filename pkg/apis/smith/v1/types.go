@@ -170,10 +170,10 @@ type BundleCondition struct {
 }
 
 // +k8s:deepcopy-gen=true
+// BundleStatus represents the latest available observations of a Bundle's current state.
 type BundleStatus struct {
-	// Represents the latest available observations of a Bundle's current state.
-	Conditions     []BundleCondition `json:"conditions,omitempty"`
-	ResourceStatus []ResourceStatus  `json:"resourceStatuses,omitempty"`
+	Conditions       []BundleCondition `json:"conditions,omitempty"`
+	ResourceStatuses []ResourceStatus  `json:"resourceStatuses,omitempty"`
 }
 
 func (bs *BundleStatus) ShortString() string {
@@ -207,8 +207,8 @@ func (bs *BundleStatus) ShortString() string {
 }
 
 func (bs *BundleStatus) GetResourceStatus(resName ResourceName) (int, *ResourceStatus) {
-	for i := range bs.ResourceStatus {
-		resStatus := &bs.ResourceStatus[i]
+	for i := range bs.ResourceStatuses {
+		resStatus := &bs.ResourceStatuses[i]
 		if resStatus.Name == resName {
 			return i, resStatus
 		}
