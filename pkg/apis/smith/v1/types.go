@@ -105,9 +105,10 @@ type Bundle struct {
 }
 
 func (b *Bundle) GetCondition(conditionType BundleConditionType) (int, *BundleCondition) {
-	for i, condition := range b.Status.Conditions {
+	for i := range b.Status.Conditions {
+		condition := &b.Status.Conditions[i]
 		if condition.Type == conditionType {
-			return i, &condition
+			return i, condition
 		}
 	}
 	return -1, nil
