@@ -272,13 +272,14 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		}
 	}
 
-	statusUpdated = st.bundle.UpdateCondition(&inProgressCond) || statusUpdated
-	statusUpdated = st.bundle.UpdateCondition(&readyCond) || statusUpdated
-	statusUpdated = st.bundle.UpdateCondition(&errorCond) || statusUpdated
+	statusUpdated = updateBundleCondition(st.bundle, &inProgressCond) || statusUpdated
+	statusUpdated = updateBundleCondition(st.bundle, &readyCond) || statusUpdated
+	statusUpdated = updateBundleCondition(st.bundle, &errorCond) || statusUpdated
 
 	// Update the bundle status
 	if statusUpdated {
 		st.bundle.Status.ResourceStatuses = resourceStatuses
+		st.bundle.Status.Conditions = []smith_v1.BundleCondition{inProgressCond, readyCond, errorCond}
 		ex := st.setBundleStatus()
 		if processErr == nil {
 			processErr = ex
@@ -296,6 +297,39 @@ func (st *bundleSyncTask) isBundleReady() bool {
 		}
 	}
 	return true
+}
+
+// updateBundleCondition updates passed condition by fetching information from an existing resource condition if present.
+// Sets LastTransitionTime to now if the status has changed.
+// Returns true if resource condition in the bundle does not match and needs to be updated.
+func updateBundleCondition(b *smith_v1.Bundle, condition *smith_v1.BundleCondition) bool {
+	now := meta_v1.Now()
+	condition.LastTransitionTime = now
+
+	// Try to find resource condition
+	_, oldCondition := b.GetCondition(condition.Type)
+
+	if oldCondition == nil {
+		// New resource condition
+		return true
+	}
+
+	// We are updating an existing condition, so we need to check if it has changed.
+	if condition.Status == oldCondition.Status {
+		condition.LastTransitionTime = oldCondition.LastTransitionTime
+	}
+
+	isEqual := condition.Status == oldCondition.Status &&
+		condition.Reason == oldCondition.Reason &&
+		condition.Message == oldCondition.Message &&
+		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
+
+	if !isEqual {
+		condition.LastUpdateTime = now
+	}
+
+	// Return true if one of the fields have changed.
+	return !isEqual
 }
 
 // updateResourceCondition updates passed condition by fetching information from an existing resource condition if present.

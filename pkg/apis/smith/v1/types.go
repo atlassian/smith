@@ -114,40 +114,6 @@ func (b *Bundle) GetCondition(conditionType BundleConditionType) (int, *BundleCo
 	return -1, nil
 }
 
-// Updates existing Bundle condition or creates a new one. Sets LastTransitionTime to now if the
-// status has changed.
-// Returns true if Bundle condition has changed or has been added.
-func (b *Bundle) UpdateCondition(condition *BundleCondition) bool {
-	cond := *condition // copy to avoid mutating the original
-	now := meta_v1.Now()
-	cond.LastTransitionTime = now
-	// Try to find this bundle condition.
-	conditionIndex, oldCondition := b.GetCondition(cond.Type)
-
-	if oldCondition == nil {
-		// We are adding new bundle condition.
-		b.Status.Conditions = append(b.Status.Conditions, cond)
-		return true
-	}
-	// We are updating an existing condition, so we need to check if it has changed.
-	if cond.Status == oldCondition.Status {
-		cond.LastTransitionTime = oldCondition.LastTransitionTime
-	}
-
-	isEqual := cond.Status == oldCondition.Status &&
-		cond.Reason == oldCondition.Reason &&
-		cond.Message == oldCondition.Message &&
-		cond.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
-
-	if !isEqual {
-		cond.LastUpdateTime = now
-	}
-
-	b.Status.Conditions[conditionIndex] = cond
-	// Return true if one of the fields have changed.
-	return !isEqual
-}
-
 // +k8s:deepcopy-gen=true
 type BundleSpec struct {
 	Resources []Resource `json:"resources"`
