@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["utils_for_tests.go"],
+    importpath = "github.com/atlassian/smith/pkg/util/testing",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apis/smith/v1:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+    ],
+)

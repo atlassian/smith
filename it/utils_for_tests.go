@@ -19,6 +19,7 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/util"
+	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 
 	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -71,14 +72,6 @@ func (cfg *Config) AwaitBundleCondition(conditions ...watch.ConditionFunc) *smit
 	event, err := cache.ListWatchUntil(10*time.Second, lw, conditions...)
 	require.NoError(cfg.T, err)
 	return event.Object.(*smith_v1.Bundle)
-}
-
-func AssertCondition(t *testing.T, bundle *smith_v1.Bundle, conditionType smith_v1.BundleConditionType, status smith_v1.ConditionStatus) *smith_v1.BundleCondition {
-	_, condition := bundle.GetCondition(conditionType)
-	if assert.NotNil(t, condition) {
-		assert.Equal(t, status, condition.Status)
-	}
-	return condition
 }
 
 func SleeperScheme() *runtime.Scheme {
@@ -238,9 +231,9 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, resourceVersions ...string) *smith_v1.Bundle {
 	bundleRes := cfg.AwaitBundleCondition(IsBundleNewerCond(cfg.Namespace, bundle.Name, resourceVersions...), IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleReady, smith_v1.ConditionTrue))
 
-	AssertCondition(cfg.T, bundleRes, smith_v1.BundleReady, smith_v1.ConditionTrue)
-	AssertCondition(cfg.T, bundleRes, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
-	AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, smith_v1.ConditionFalse)
+	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleReady, smith_v1.ConditionTrue)
+	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, smith_v1.ConditionFalse)
 	if assert.Len(cfg.T, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
 		for i, res := range bundle.Spec.Resources {
 			spec, err := util.RuntimeToUnstructured(res.Spec.Object)
@@ -252,6 +245,10 @@ func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, re
 				continue
 			}
 			assert.Equal(cfg.T, spec, actual, "%#v", bundleRes)
+			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
+			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceReady, smith_v1.ConditionTrue)
+			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceError, smith_v1.ConditionFalse)
 		}
 	}
 

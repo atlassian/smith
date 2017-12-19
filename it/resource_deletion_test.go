@@ -8,6 +8,7 @@ import (
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestResourceDeletion(t *testing.T) {
+func TestPreExistingResourceDeletion(t *testing.T) {
 	t.Parallel()
 	cm := &core_v1.ConfigMap{
 		TypeMeta: meta_v1.TypeMeta{
@@ -86,7 +87,9 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	})
 
 	cm := args[0].(*core_v1.ConfigMap)
+	resCm := smith_v1.ResourceName(cm.Name)
 	sl := args[1].(*sleeper_v1.Sleeper)
+	resSl := smith_v1.ResourceName(sl.Name)
 
 	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
 	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
@@ -117,13 +120,29 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	// Bundle should be in Error=true state
 	bundleActual = cfg.AwaitBundleCondition(IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleError, smith_v1.ConditionTrue))
 
-	AssertCondition(t, bundleActual, smith_v1.BundleReady, smith_v1.ConditionFalse)
-	AssertCondition(t, bundleActual, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
-	cond := AssertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleReady, smith_v1.ConditionFalse)
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+	cond := smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
 	if cond != nil {
-		assert.Equal(t, "TerminalError", cond.Reason)
-		assert.Equal(t, "error processing resource(s): [\"cm\" \"sleeper2\"]", cond.Message)
+		assert.Equal(t, smith_v1.ResourceReasonTerminalError, cond.Reason)
+		assert.Equal(t, `error processing resource(s): ["cm"]`, cond.Message)
 	}
+	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceReady, smith_v1.ConditionFalse)
+	resCond := smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceError, smith_v1.ConditionTrue)
+	if resCond != nil {
+		assert.Equal(cfg.T, "object is not owned by the Bundle", resCond.Message)
+	}
+
+	resCond = smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
+	if resCond != nil {
+		assert.Equal(cfg.T, "Some other resource is in error state", resCond.Message)
+		assert.Equal(cfg.T, smith_v1.ResourceReasonOtherResourceError, resCond.Reason)
+	}
+	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceReady, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceError, smith_v1.ConditionFalse)
 
 	// Delete conflicting ConfigMap
 	trueVar := true
@@ -143,6 +162,7 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	})
 	require.NoError(t, err)
 
+	// Delete conflicting Sleeper
 	err = sClient.Delete().
 		Context(ctxTest).
 		Namespace(cfg.Namespace).

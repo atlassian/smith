@@ -8,6 +8,7 @@ import (
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
@@ -118,12 +119,12 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	// Bundle should be in Error=true state
 	bundleActual = cfg.AwaitBundleCondition(IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleError, smith_v1.ConditionTrue))
 
-	AssertCondition(t, bundleActual, smith_v1.BundleReady, smith_v1.ConditionFalse)
-	AssertCondition(t, bundleActual, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
-	cond := AssertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleReady, smith_v1.ConditionFalse)
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+	cond := smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
 	if cond != nil {
-		assert.Equal(t, "TerminalError", cond.Reason)
-		assert.Equal(t, "error processing resource(s): [\"cm\" \"sleeper2\"]", cond.Message)
+		assert.Equal(t, smith_v1.ResourceReasonTerminalError, cond.Reason)
+		assert.Equal(t, `error processing resource(s): ["cm"]`, cond.Message)
 	}
 
 	// Point ConfigMap controller reference to Bundle
@@ -139,6 +140,19 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	}
 	_, err = cmClient.Update(cmActual)
 	require.NoError(t, err)
+
+	// Bundle should be in Error=true state
+	bundleActual = cfg.AwaitBundleCondition(
+		IsBundleNewerCond(cfg.Namespace, cfg.Bundle.Name, bundleActual.ResourceVersion),
+		IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleError, smith_v1.ConditionTrue))
+
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleReady, smith_v1.ConditionFalse)
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+	cond = smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
+	if cond != nil {
+		assert.Equal(t, smith_v1.ResourceReasonTerminalError, cond.Reason)
+		assert.Equal(t, `error processing resource(s): ["sleeper2"]`, cond.Message)
+	}
 
 	// Point Sleeper controller reference to Bundle
 	for { // Retry loop to handle conflicts with Sleeper controller
