@@ -162,7 +162,7 @@ docker:
 # Export docker image into local Docker
 .PHONY: docker-export
 docker-export:
-	bazel run --cpu=k8 //cmd/smith:container
+	bazel run --cpu=k8 //cmd/smith:container -- --norun
 
 .PHONY: release
 release: update-bazel
