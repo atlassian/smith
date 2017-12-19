@@ -27,6 +27,28 @@ const (
 	BundleReasonRetriableError = "RetriableError"
 )
 
+type ResourceConditionType string
+
+// These are valid conditions of a resource.
+const (
+	ResourceBlocked    ResourceConditionType = "Blocked"
+	ResourceInProgress ResourceConditionType = "InProgress"
+	ResourceReady      ResourceConditionType = "Ready"
+	ResourceError      ResourceConditionType = "Error"
+)
+
+const (
+	// Blocked condition reasons
+
+	ResourceReasonDependenciesNotReady = "DependenciesNotReady"
+	ResourceReasonOtherResourceError   = "OtherResourceError"
+
+	// Error condition reasons
+
+	ResourceReasonTerminalError  = "TerminalError"
+	ResourceReasonRetriableError = "RetriableError"
+)
+
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition.
@@ -83,9 +105,10 @@ type Bundle struct {
 }
 
 func (b *Bundle) GetCondition(conditionType BundleConditionType) (int, *BundleCondition) {
-	for i, condition := range b.Status.Conditions {
+	for i := range b.Status.Conditions {
+		condition := &b.Status.Conditions[i]
 		if condition.Type == conditionType {
-			return i, &condition
+			return i, condition
 		}
 	}
 	return -1, nil
@@ -148,9 +171,10 @@ type BundleCondition struct {
 }
 
 // +k8s:deepcopy-gen=true
+// BundleStatus represents the latest available observations of a Bundle's current state.
 type BundleStatus struct {
-	// Represents the latest available observations of a Bundle's current state.
-	Conditions []BundleCondition `json:"conditions,omitempty"`
+	Conditions       []BundleCondition `json:"conditions,omitempty"`
+	ResourceStatuses []ResourceStatus  `json:"resourceStatuses,omitempty"`
 }
 
 func (bs *BundleStatus) ShortString() string {
@@ -181,6 +205,16 @@ func (bs *BundleStatus) ShortString() string {
 	}
 	buf.WriteByte(']')
 	return buf.String()
+}
+
+func (bs *BundleStatus) GetResourceStatus(resName ResourceName) (int, *ResourceStatus) {
+	for i := range bs.ResourceStatuses {
+		resStatus := &bs.ResourceStatuses[i]
+		if resStatus.Name == resName {
+			return i, resStatus
+		}
+	}
+	return -1, nil
 }
 
 // ResourceName is a reference to another Resource in the same bundle.
@@ -257,4 +291,37 @@ func (rs *ResourceSpec) IntoTyped(obj runtime.Object) error {
 		return unstructured_conversion.DefaultConverter.FromUnstructured(specUnstr.Object, obj)
 	}
 	return fmt.Errorf("cannot convert %T into typed object %T", rs.Object, obj)
+}
+
+// +k8s:deepcopy-gen=true
+type ResourceStatus struct {
+	Name       ResourceName        `json:"name"`
+	Conditions []ResourceCondition `json:"conditions,omitempty"`
+}
+
+func (rs *ResourceStatus) GetCondition(conditionType ResourceConditionType) (int, *ResourceCondition) {
+	for i := range rs.Conditions {
+		resCond := &rs.Conditions[i]
+		if resCond.Type == conditionType {
+			return i, resCond
+		}
+	}
+	return -1, nil
+}
+
+// +k8s:deepcopy-gen=true
+// ResourceCondition describes the state of a resource at a certain point.
+type ResourceCondition struct {
+	// Type of Resource condition.
+	Type ResourceConditionType `json:"type"`
+	// Status of the condition.
+	Status ConditionStatus `json:"status"`
+	// The last time this condition was updated.
+	LastUpdateTime meta_v1.Time `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime meta_v1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message string `json:"message,omitempty"`
 }

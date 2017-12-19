@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/atlassian/smith"
@@ -25,19 +24,27 @@ import (
 // It is a mechanism to communicate the status of a resource.
 type resourceStatus interface{}
 
+// resourceStatusDependenciesNotReady means resource processing is blocked by dependencies that are not ready.
 type resourceStatusDependenciesNotReady struct {
 	dependencies []smith_v1.ResourceName
 }
 
-type resourceStatusError struct {
-	err              error
-	isRetriableError bool
+// resourceStatusBlockedByError means there was an error, shouldn't do any work.
+type resourceStatusBlockedByError struct {
 }
 
+// resourceStatusInProgress means resource is being processed by its controller.
 type resourceStatusInProgress struct {
 }
 
+// resourceStatusReady means resource is ready.
 type resourceStatusReady struct {
+}
+
+// resourceStatusError means there was an error processing this resource.
+type resourceStatusError struct {
+	err              error
+	isRetriableError bool
 }
 
 type resourceInfo struct {
@@ -66,6 +73,7 @@ type resourceSyncTask struct {
 	processedResources map[smith_v1.ResourceName]*resourceInfo
 	plugins            map[smith_v1.PluginName]plugin.Plugin
 	scheme             *runtime.Scheme
+	blockedOnError     bool
 }
 
 func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo {
@@ -86,6 +94,13 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 			status: resourceStatusError{
 				err: err,
 			},
+		}
+	}
+
+	// There was an error, shouldn't do any work
+	if st.blockedOnError {
+		return resourceInfo{
+			status: resourceStatusBlockedByError{},
 		}
 	}
 
@@ -327,7 +342,7 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 	if api_errors.IsAlreadyExists(err) {
 		// We let the next processKey() iteration, triggered by someone else creating the resource, to finish the work.
 		err = api_errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, spec.GetName(), err)
-		return nil, false, errors.Wrapf(err, "object %q found, but not in Store yet (will re-process)", spec.GetName())
+		return nil, false, errors.Wrap(err, "object found, but not in Store yet (will re-process)")
 	}
 	// Unexpected error, will retry
 	return nil, true, err
@@ -338,12 +353,12 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	actualMeta := actual.(meta_v1.Object)
 	// Check that the object is not marked for deletion
 	if actualMeta.GetDeletionTimestamp() != nil {
-		return nil, false, fmt.Errorf("object %v %q is marked for deletion", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName())
+		return nil, false, errors.New("object is marked for deletion")
 	}
 
 	// Check that this bundle owns the object
 	if !meta_v1.IsControlledBy(actualMeta, st.bundle) {
-		return nil, false, fmt.Errorf("object %v %q is not owned by the Bundle", actual.GetObjectKind().GroupVersionKind(), actualMeta.GetName())
+		return nil, false, errors.New("object is not owned by the Bundle")
 	}
 
 	// Compare spec and existing resource
@@ -360,8 +375,8 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	updated, err = resClient.Update(updated)
 	if err != nil {
 		if api_errors.IsConflict(err) {
-			// We let the next processKey() iteration, triggered by someone else updating the resource, to finish the work.
-			return nil, false, errors.Wrapf(err, "object %q update resulted in conflict (will re-process)", st.bundle.Namespace, st.bundle.Name, spec.GetName())
+			// We let the next processKey() iteration, triggered by someone else updating the resource, finish the work.
+			return nil, false, errors.Wrap(err, "object update resulted in conflict (will re-process)")
 		}
 		// Unexpected error, will retry
 		return nil, true, err

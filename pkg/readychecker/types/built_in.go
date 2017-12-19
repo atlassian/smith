@@ -4,6 +4,7 @@ import (
 	"github.com/atlassian/smith/pkg/readychecker"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
+	"github.com/pkg/errors"
 	apps_v1b2 "k8s.io/api/apps/v1beta2"
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
@@ -54,7 +55,16 @@ func isScServiceBindingReady(obj *unstructured.Unstructured) (isReady, retriable
 		return false, false, err
 	}
 	readyCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionReady)
-	return readyCond != nil && readyCond.Status == sc_v1b1.ConditionTrue, false, nil
+	if readyCond != nil && readyCond.Status == sc_v1b1.ConditionTrue {
+		return true, false, nil
+	}
+	failedCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionFailed)
+	if failedCond != nil && failedCond.Status == sc_v1b1.ConditionTrue {
+		return false, false, errors.Errorf("%s: %s", failedCond.Reason, failedCond.Message)
+	}
+	// TODO support "unknown" and "in progress"
+	return false, false, nil
+
 }
 
 func isScServiceInstanceReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
@@ -63,7 +73,15 @@ func isScServiceInstanceReady(obj *unstructured.Unstructured) (isReady, retriabl
 		return false, false, err
 	}
 	readyCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionReady)
-	return readyCond != nil && readyCond.Status == sc_v1b1.ConditionTrue, false, nil
+	if readyCond != nil && readyCond.Status == sc_v1b1.ConditionTrue {
+		return true, false, nil
+	}
+	failedCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionFailed)
+	if failedCond != nil && failedCond.Status == sc_v1b1.ConditionTrue {
+		return false, false, errors.Errorf("%s: %s", failedCond.Reason, failedCond.Message)
+	}
+	// TODO support "unknown" and "in progress"
+	return false, false, nil
 }
 
 func getServiceInstanceCondition(instance *sc_v1b1.ServiceInstance, conditionType sc_v1b1.ServiceInstanceConditionType) *sc_v1b1.ServiceInstanceCondition {

@@ -25,6 +25,7 @@ import (
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util"
+	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 
 	"github.com/ash2k/stager"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
@@ -47,7 +48,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	mainFake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
-	core "k8s.io/client-go/testing"
+	kube_testing "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -55,7 +56,7 @@ import (
 type reaction struct {
 	verb     string
 	resource string
-	reactor  func(*testing.T) core.ReactionFunc
+	reactor  func(*testing.T) kube_testing.ReactionFunc
 }
 
 type testCase struct {
@@ -75,6 +76,11 @@ type testCase struct {
 	testHandler          fakeActionHandler
 	test                 func(*testing.T, context.Context, *BundleController, *testCase)
 	plugins              map[smith_v1.PluginName]func(*testing.T) plugin.Plugin
+
+	mainFake   *kube_testing.Fake
+	bundleFake *kube_testing.Fake
+	crdFake    *kube_testing.Fake
+	scFake     *kube_testing.Fake
 }
 
 const (
@@ -324,6 +330,165 @@ func TestController(t *testing.T) {
 				"testPlugin": testPlugin,
 			},
 		},
+		"no resource creates/updates/deletes done after error is encountered": &testCase{
+			mainClientObjects: []runtime.Object{
+				&core_v1.ConfigMap{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ConfigMap",
+						APIVersion: core_v1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "map-not-in-the-bundle-anymore-needs-delete",
+						Namespace: testNamespace,
+						UID:       types.UID("map-delete-uid"),
+						Labels: map[string]string{
+							smith.BundleNameLabel: "bundle1",
+						},
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         smith_v1.BundleResourceGroupVersion,
+								Kind:               smith_v1.BundleResourceKind,
+								Name:               "bundle1",
+								UID:                "uid123",
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+				},
+				&core_v1.ConfigMap{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ConfigMap",
+						APIVersion: core_v1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "map-needs-update",
+						Namespace: testNamespace,
+						UID:       types.UID("map-update-uid"),
+						// Labels missing - needs an update
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         smith_v1.BundleResourceGroupVersion,
+								Kind:               smith_v1.BundleResourceKind,
+								Name:               "bundle1",
+								UID:                "uid123",
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+					Data: map[string]string{
+						"delete": "this key",
+					},
+				},
+			},
+			scClientObjects: []runtime.Object{
+				&sc_v1b1.ServiceInstance{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ServiceInstance",
+						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "si1",
+						Namespace: testNamespace,
+						UID:       types.UID("si1-uid"),
+						Labels: map[string]string{
+							smith.BundleNameLabel: "bundle1",
+						},
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         smith_v1.BundleResourceGroupVersion,
+								Kind:               smith_v1.BundleResourceKind,
+								Name:               "bundle1",
+								UID:                "uid123",
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+					Status: sc_v1b1.ServiceInstanceStatus{
+						Conditions: []sc_v1b1.ServiceInstanceCondition{
+							{
+								Type:    sc_v1b1.ServiceInstanceConditionFailed,
+								Status:  sc_v1b1.ConditionTrue,
+								Reason:  "BlaBla",
+								Message: "Oh no!",
+							},
+						},
+					},
+				},
+			},
+			bundle: &smith_v1.Bundle{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "bundle1",
+					Namespace: testNamespace,
+					UID:       "uid123",
+				},
+				Spec: smith_v1.BundleSpec{
+					Resources: []smith_v1.Resource{
+						{
+							Name: "si1",
+							Spec: smith_v1.ResourceSpec{
+								Object: &sc_v1b1.ServiceInstance{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ServiceInstance",
+										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: "si1",
+									},
+								},
+							},
+						},
+						{
+							Name: "map1",
+							Spec: smith_v1.ResourceSpec{
+								Object: &core_v1.ConfigMap{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ConfigMap",
+										APIVersion: core_v1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: "map1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace:            testNamespace,
+			enableServiceCatalog: true,
+			test: func(t *testing.T, ctx context.Context, c *BundleController, tc *testCase) {
+				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
+				require.NoError(t, err)
+				retriable, err := c.processKey(key)
+				require.EqualError(t, err, `error processing resource(s): ["si1"]`)
+				assert.False(t, retriable)
+				actions := tc.bundleFake.Actions()
+				require.Len(t, actions, 3)
+				bundleUpdate := actions[2].(kube_testing.UpdateAction)
+				assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
+				updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleReady, smith_v1.ConditionFalse)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleError, smith_v1.ConditionTrue)
+
+				smith_testing.AssertResourceCondition(t, updateBundle, "si1", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, "si1", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, "si1", smith_v1.ResourceReady, smith_v1.ConditionFalse)
+				resCond := smith_testing.AssertResourceCondition(t, updateBundle, "si1", smith_v1.ResourceError, smith_v1.ConditionTrue)
+				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+				assert.Equal(t, "readiness check failed: BlaBla: Oh no!", resCond.Message)
+
+				resCond = smith_testing.AssertResourceCondition(t, updateBundle, "map1", smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
+				assert.Equal(t, smith_v1.ResourceReasonOtherResourceError, resCond.Reason)
+				assert.Equal(t, "Some other resource is in error state", resCond.Message)
+				smith_testing.AssertResourceCondition(t, updateBundle, "map1", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, "map1", smith_v1.ResourceReady, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, "map1", smith_v1.ResourceError, smith_v1.ConditionFalse)
+			},
+		},
 	}
 	for name, tc := range testcases {
 		tc := tc
@@ -337,6 +502,7 @@ func TestController(t *testing.T) {
 
 func (tc *testCase) run(t *testing.T) {
 	mainClient := mainFake.NewSimpleClientset(tc.mainClientObjects...)
+	tc.mainFake = &mainClient.Fake
 	for _, reactor := range tc.mainReactors {
 		mainClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
@@ -351,17 +517,19 @@ func (tc *testCase) run(t *testing.T) {
 		tc.smithClientObjects = append(tc.smithClientObjects, tc.bundle)
 	}
 	bundleClient := smithFake.NewSimpleClientset(tc.smithClientObjects...)
+	tc.bundleFake = &bundleClient.Fake
 	for _, reactor := range tc.smithReactors {
 		bundleClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
 	crdClient := crdFake.NewSimpleClientset(tc.crdClientObjects...)
+	tc.crdFake = &crdClient.Fake
 	for _, reactor := range tc.crdReactors {
 		crdClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
-	var scClientFake *scFake.Clientset
 	var scClient scClientset.Interface
 	if tc.enableServiceCatalog {
-		scClientFake = scFake.NewSimpleClientset(tc.scClientObjects...)
+		scClientFake := scFake.NewSimpleClientset(tc.scClientObjects...)
+		tc.scFake = &scClientFake.Fake
 		scClient = scClientFake
 		for _, reactor := range tc.scReactors {
 			scClientFake.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
@@ -469,15 +637,18 @@ func (tc *testCase) run(t *testing.T) {
 	require.True(t, cache.WaitForCacheSync(ctx.Done(), infs...))
 
 	if tc.test == nil {
-		// Default test
-		require.NotNil(t, tc.bundle)
-		key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
-		require.NoError(t, err)
-		_, err = c.processKey(key)
-		require.NoError(t, err)
+		tc.defaultTest(t, ctx, c)
 	} else {
 		tc.test(t, ctx, c, tc)
 	}
+}
+
+func (tc *testCase) defaultTest(t *testing.T, ctx context.Context, c *BundleController) {
+	require.NotNil(t, tc.bundle)
+	key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
+	require.NoError(t, err)
+	_, err = c.processKey(key)
+	require.NoError(t, err)
 }
 
 func (tc *testCase) verifyActions(t *testing.T) {
