@@ -22,11 +22,11 @@ func (c *BundleController) worker() {
 }
 
 func (c *BundleController) processNextWorkItem() bool {
-	key, quit := c.queue.Get()
+	key, quit := c.Queue.Get()
 	if quit {
 		return false
 	}
-	defer c.queue.Done(key)
+	defer c.Queue.Done(key)
 
 	retriable, err := c.processKey(key.(string))
 	c.handleErr(retriable, err, key)
@@ -36,17 +36,17 @@ func (c *BundleController) processNextWorkItem() bool {
 
 func (c *BundleController) handleErr(retriable bool, err error, key interface{}) {
 	if err == nil {
-		c.queue.Forget(key)
+		c.Queue.Forget(key)
 		return
 	}
-	if retriable && c.queue.NumRequeues(key) < maxRetries {
+	if retriable && c.Queue.NumRequeues(key) < maxRetries {
 		log.Printf("[WORKER][%s] Error syncing Bundle: %v", key, err)
-		c.queue.AddRateLimited(key)
+		c.Queue.AddRateLimited(key)
 		return
 	}
 
 	log.Printf("[WORKER][%s] Dropping Bundle out of the queue: %v", key, err)
-	c.queue.Forget(key)
+	c.Queue.Forget(key)
 }
 
 func (c *BundleController) processKey(key string) (retriableRet bool, errRet error) {
@@ -60,7 +60,7 @@ func (c *BundleController) processKey(key string) (retriableRet bool, errRet err
 		}
 		log.Printf("[WORKER][%s] Synced Bundle in %v%s", key, time.Since(startTime), msg)
 	}()
-	bundleObj, exists, err := c.bundleInf.GetIndexer().GetByKey(key)
+	bundleObj, exists, err := c.BundleInf.GetIndexer().GetByKey(key)
 	if err != nil {
 		return false, err
 	}
@@ -70,14 +70,14 @@ func (c *BundleController) processKey(key string) (retriableRet bool, errRet err
 	}
 
 	st := bundleSyncTask{
-		bundleClient: c.bundleClient,
-		smartClient:  c.smartClient,
-		rc:           c.rc,
-		store:        c.store,
-		specCheck:    c.specCheck,
+		bundleClient: c.BundleClient,
+		smartClient:  c.SmartClient,
+		rc:           c.Rc,
+		store:        c.Store,
+		specCheck:    c.SpecCheck,
 		bundle:       bundleObj.(*smith_v1.Bundle).DeepCopy(), // Deep-copy otherwise we are mutating our cache.
-		plugins:      c.plugins,
-		scheme:       c.scheme,
+		plugins:      c.Plugins,
+		scheme:       c.Scheme,
 	}
 	retriable, err := st.process()
 	return st.handleProcessResult(retriable, err)

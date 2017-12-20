@@ -43,7 +43,7 @@ func (c *BundleController) onResourceDelete(obj interface{}) {
 	bundleName, namespace := getBundleNameAndNamespace(metaObj)
 	if bundleName == "" { // No controller bundle found
 		runtimeObj := metaObj.(runtime.Object)
-		bundles, err := c.bundleStore.GetBundlesByObject(runtimeObj.GetObjectKind().GroupVersionKind().GroupKind(), namespace, metaObj.GetName())
+		bundles, err := c.BundleStore.GetBundlesByObject(runtimeObj.GetObjectKind().GroupVersionKind().GroupKind(), namespace, metaObj.GetName())
 		if err != nil {
 			log.Printf("[REH] Failed to get bundles by object: %v", err)
 			return
