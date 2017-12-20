@@ -39,48 +39,30 @@ type BundleController struct {
 	wg       wait.Group
 	stopping bool
 
-	bundleInf    cache.SharedIndexInformer
-	crdInf       cache.SharedIndexInformer
-	bundleClient smithClient_v1.BundlesGetter
-	bundleStore  BundleStore
-	smartClient  smith.SmartClient
-	rc           ReadyChecker
-	store        Store
-	specCheck    SpecCheck
+	BundleInf    cache.SharedIndexInformer
+	CrdInf       cache.SharedIndexInformer
+	BundleClient smithClient_v1.BundlesGetter
+	BundleStore  BundleStore
+	SmartClient  smith.SmartClient
+	Rc           ReadyChecker
+	Store        Store
+	SpecCheck    SpecCheck
 	// Bundle objects that need to be synced.
-	queue   workqueue.RateLimitingInterface
-	workers int
+	Queue   workqueue.RateLimitingInterface
+	Workers int
 
 	// CRD
-	crdResyncPeriod time.Duration
+	CrdResyncPeriod time.Duration
 	resourceHandler cache.ResourceEventHandler
-	namespace       string
+	Namespace       string
 
-	plugins map[smith_v1.PluginName]plugin.Plugin
-	scheme  *runtime.Scheme
+	Plugins map[smith_v1.PluginName]plugin.Plugin
+	Scheme  *runtime.Scheme
 }
 
-func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v1.BundlesGetter, bundleStore BundleStore,
-	sc smith.SmartClient, rc ReadyChecker, store Store, specCheck SpecCheck, queue workqueue.RateLimitingInterface,
-	workers int, crdResyncPeriod time.Duration, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer,
-	namespace string, plugins map[smith_v1.PluginName]plugin.Plugin, scheme *runtime.Scheme) *BundleController {
-	c := &BundleController{
-		bundleInf:       bundleInf,
-		crdInf:          crdInf,
-		bundleClient:    bundleClient,
-		bundleStore:     bundleStore,
-		smartClient:     sc,
-		rc:              rc,
-		store:           store,
-		specCheck:       specCheck,
-		queue:           queue,
-		workers:         workers,
-		crdResyncPeriod: crdResyncPeriod,
-		namespace:       namespace,
-		plugins:         plugins,
-		scheme:          scheme,
-	}
-	bundleInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
+// Prepare prepares the controller to be run.
+func (c *BundleController) Prepare(resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
+	c.BundleInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onBundleAdd,
 		UpdateFunc: c.onBundleUpdate,
 		DeleteFunc: c.onBundleDelete,
@@ -93,7 +75,6 @@ func New(bundleInf, crdInf cache.SharedIndexInformer, bundleClient smithClient_v
 	for _, resourceInf := range resourceInfs {
 		resourceInf.AddEventHandler(c.resourceHandler)
 	}
-	return c
 }
 
 // Run begins watching and syncing.
@@ -104,22 +85,22 @@ func (c *BundleController) Run(ctx context.Context) {
 		defer c.wgLock.Unlock()
 		c.stopping = true
 	}()
-	defer c.queue.ShutDown()
+	defer c.Queue.ShutDown()
 
 	log.Print("Starting Bundle controller")
 	defer log.Print("Shutting down Bundle controller")
 
-	c.crdInf.AddEventHandler(&crdEventHandler{
+	c.CrdInf.AddEventHandler(&crdEventHandler{
 		ctx:              ctx,
 		BundleController: c,
 		watchers:         make(map[string]watchState),
 	})
 
-	if !cache.WaitForCacheSync(ctx.Done(), c.bundleInf.HasSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.BundleInf.HasSynced) {
 		return
 	}
 
-	for i := 0; i < c.workers; i++ {
+	for i := 0; i < c.Workers; i++ {
 		c.wg.Start(c.worker)
 	}
 
@@ -136,5 +117,5 @@ func (c *BundleController) enqueue(bundle *smith_v1.Bundle) {
 }
 
 func (c *BundleController) enqueueKey(key string) {
-	c.queue.AddAfter(key, workDeduplicationPeriod)
+	c.Queue.AddAfter(key, workDeduplicationPeriod)
 }

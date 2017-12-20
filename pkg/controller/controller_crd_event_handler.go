@@ -91,7 +91,7 @@ func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition)
 		Kind:    crd.Spec.Names.Kind,
 	}
 	log.Printf("[CRDEH] Configuring watch for CRD %s", crd.Name)
-	res, err := h.smartClient.ForGVK(gvk, h.namespace)
+	res, err := h.SmartClient.ForGVK(gvk, h.Namespace)
 	if err != nil {
 		log.Printf("[CRDEH] Failed to setup informer for CRD %s: %v", crd.Name, err)
 		return false
@@ -103,7 +103,7 @@ func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition)
 		WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
 			return res.Watch(options)
 		},
-	}, &unstructured.Unstructured{}, h.crdResyncPeriod, cache.Indexers{})
+	}, &unstructured.Unstructured{}, h.CrdResyncPeriod, cache.Indexers{})
 	h.wgLock.Lock()
 	defer h.wgLock.Unlock()
 	if h.stopping {
@@ -112,7 +112,7 @@ func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition)
 	crdInf.AddEventHandler(h.resourceHandler)
 	ctx, cancel := context.WithCancel(h.ctx)
 	h.watchers[crd.Name] = watchState{cancel: cancel}
-	h.store.AddInformer(gvk, crdInf)
+	h.Store.AddInformer(gvk, crdInf)
 	h.wg.StartWithChannel(ctx.Done(), crdInf.Run)
 	return true
 }
@@ -131,11 +131,11 @@ func (h *crdEventHandler) unwatch(crd *apiext_v1b1.CustomResourceDefinition) {
 		Version: crd.Spec.Version,
 		Kind:    crd.Spec.Names.Kind,
 	}
-	h.store.RemoveInformer(gvk)
+	h.Store.RemoveInformer(gvk)
 }
 
 func (h *crdEventHandler) rebuildBundles(crd *apiext_v1b1.CustomResourceDefinition, addUpdateDelete string) {
-	bundles, err := h.bundleStore.GetBundlesByCrd(crd)
+	bundles, err := h.BundleStore.GetBundlesByCrd(crd)
 	if err != nil {
 		log.Printf("[CRDEH] Failed to get bundles by CRD name %s: %v", crd.Name, err)
 		return

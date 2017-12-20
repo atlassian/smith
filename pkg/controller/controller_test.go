@@ -459,10 +459,10 @@ func TestController(t *testing.T) {
 			},
 			namespace:            testNamespace,
 			enableServiceCatalog: true,
-			test: func(t *testing.T, ctx context.Context, c *BundleController, tc *testCase) {
+			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase) {
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
-				retriable, err := c.processKey(key)
+				retriable, err := cntrlr.processKey(key)
 				require.EqualError(t, err, `error processing resource(s): ["si1"]`)
 				assert.False(t, retriable)
 				actions := tc.bundleFake.Actions()
@@ -607,22 +607,22 @@ func (tc *testCase) run(t *testing.T) {
 		plugins[name] = factory(t)
 	}
 
-	c := New(
-		bundleInf,
-		crdInf,
-		bundleClient.SmithV1(),
-		bs,
-		sc,
-		rc,
-		multiStore,
-		specCheck,
-		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle"),
-		2,
-		0,
-		resourceInfs,
-		tc.namespace,
-		plugins,
-		scheme)
+	cntrlr := &BundleController{
+		BundleInf:    bundleInf,
+		CrdInf:       crdInf,
+		BundleClient: bundleClient.SmithV1(),
+		BundleStore:  bs,
+		SmartClient:  sc,
+		Rc:           rc,
+		Store:        multiStore,
+		SpecCheck:    specCheck,
+		Queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle"),
+		Workers:      2,
+		Namespace:    tc.namespace,
+		Plugins:      plugins,
+		Scheme:       scheme,
+	}
+	cntrlr.Prepare(resourceInfs)
 
 	crdGVK := apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
 	resourceInfs[crdGVK] = crdInf
@@ -637,17 +637,17 @@ func (tc *testCase) run(t *testing.T) {
 	require.True(t, cache.WaitForCacheSync(ctx.Done(), infs...))
 
 	if tc.test == nil {
-		tc.defaultTest(t, ctx, c)
+		tc.defaultTest(t, ctx, cntrlr)
 	} else {
-		tc.test(t, ctx, c, tc)
+		tc.test(t, ctx, cntrlr, tc)
 	}
 }
 
-func (tc *testCase) defaultTest(t *testing.T, ctx context.Context, c *BundleController) {
+func (tc *testCase) defaultTest(t *testing.T, ctx context.Context, cntrlr *BundleController) {
 	require.NotNil(t, tc.bundle)
 	key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 	require.NoError(t, err)
-	_, err = c.processKey(key)
+	_, err = cntrlr.processKey(key)
 	require.NoError(t, err)
 }
 
