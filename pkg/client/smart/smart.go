@@ -1,10 +1,9 @@
 package smart
 
 import (
-	"fmt"
-
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -63,7 +62,7 @@ func (c *DynamicClient) ForGVK(gvk schema.GroupVersionKind, namespace string) (d
 	var m Mapper
 	if gvk.Group == sc_v1b1.GroupName {
 		if c.ScDynamic == nil {
-			return nil, fmt.Errorf("client for Service Catalog is not configured, cannot work with object %s", gvk)
+			return nil, errors.Errorf("client for Service Catalog is not configured, cannot work with object %s", gvk)
 		}
 		clients = c.ScDynamic
 		m = c.ScMapper
@@ -73,11 +72,11 @@ func (c *DynamicClient) ForGVK(gvk schema.GroupVersionKind, namespace string) (d
 	}
 	client, err := clients.ClientForGroupVersionKind(gvk)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate client for %v: %v", gvk, err)
+		return nil, errors.Wrapf(err, "failed to instantiate client for %s", gvk)
 	}
 	rm, err := m.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get rest mapping for %v: %v", gvk, err)
+		return nil, errors.Wrapf(err, "failed to get rest mapping for %s", gvk)
 	}
 
 	return client.Resource(&meta_v1.APIResource{

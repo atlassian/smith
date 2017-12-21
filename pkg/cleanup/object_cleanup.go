@@ -1,8 +1,7 @@
 package cleanup
 
 import (
-	"fmt"
-
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -20,7 +19,7 @@ func New(kts ...map[schema.GroupKind]SpecCleanup) *SpecCleaner {
 	for _, knownTypes := range kts {
 		for knownGK, f := range knownTypes {
 			if kt[knownGK] != nil {
-				panic(fmt.Errorf("GK specified more than once: %s", knownGK))
+				panic(errors.Errorf("GK specified more than once: %s", knownGK))
 			}
 			kt[knownGK] = f
 		}
@@ -35,7 +34,7 @@ func (oc *SpecCleaner) Cleanup(spec, actual *unstructured.Unstructured) (updated
 	gk := gvk.GroupKind()
 
 	if gk.Kind == "" || gvk.Version == "" { // Group can be empty e.g. built-in objects like ConfigMap
-		return nil, fmt.Errorf("object has empty kind/version: %v", gvk)
+		return nil, errors.Errorf("object has empty kind/version: %s", gvk)
 	}
 
 	if objCleanup, ok := oc.KnownTypes[gk]; ok {

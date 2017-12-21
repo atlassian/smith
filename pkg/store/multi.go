@@ -1,10 +1,10 @@
 package store
 
 import (
-	"fmt"
 	"sync"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/pkg/errors"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +34,7 @@ func (s *Multi) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIn
 	defer s.mx.Unlock()
 	if _, ok := s.informers[gvk]; ok {
 		// It is a programming error hence panic
-		panic(fmt.Errorf("Informer for %v is already registered", gvk))
+		panic(errors.Errorf("Informer for %s is already registered", gvk))
 	}
 	err := informer.AddIndexers(cache.Indexers{
 		ByNamespaceAndBundleNameIndex: byNamespaceAndBundleNameIndex,
@@ -77,7 +77,7 @@ func (s *Multi) Get(gvk schema.GroupVersionKind, namespace, name string) (obj ru
 		informer = s.informers[gvk]
 	}()
 	if informer == nil {
-		return nil, false, fmt.Errorf("no informer for %v is registered", gvk)
+		return nil, false, errors.Errorf("no informer for %s is registered", gvk)
 	}
 	return s.getFromIndexer(informer.GetIndexer(), gvk, namespace, name)
 }
@@ -98,7 +98,7 @@ func (s *Multi) GetObjectsForBundle(namespace, bundleName string) ([]runtime.Obj
 	for gvk, inf := range s.GetInformers() {
 		objs, err := inf.GetIndexer().ByIndex(ByNamespaceAndBundleNameIndex, indexKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get objects for bundle from %s informer: %v", gvk, err)
+			return nil, errors.Wrapf(err, "failed to get objects for bundle from %s informer", gvk)
 		}
 		for _, obj := range objs {
 			ro := obj.(runtime.Object).DeepCopyObject()

@@ -1,8 +1,7 @@
 package store
 
 import (
-	"fmt"
-
+	"github.com/pkg/errors"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -45,7 +44,7 @@ func (s *Crd) Get(resource schema.GroupKind) (*apiext_v1b1.CustomResourceDefinit
 		return crd, nil
 	default:
 		// Must never happen
-		panic(fmt.Errorf("multiple CRDs by group %q and kind %q: %s", resource.Group, resource.Kind, objs))
+		panic(errors.Errorf("multiple CRDs by group %q and kind %q: %s", resource.Group, resource.Kind, objs))
 	}
 }
 

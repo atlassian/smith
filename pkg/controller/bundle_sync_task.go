@@ -183,7 +183,7 @@ func (st *bundleSyncTask) setBundleStatus() error {
 			// It is safe to ignore this conflict because we will reiterate because of the update event.
 			return nil
 		}
-		return fmt.Errorf("failed to set bundle status to %s: %v", st.bundle.Status.ShortString(), err)
+		return errors.Wrapf(err, "failed to set bundle status to %s", st.bundle.Status.ShortString())
 	}
 	log.Printf("[WORKER][%s/%s] Set bundle status to %s", st.bundle.Namespace, st.bundle.Name, bundleUpdated.Status.ShortString())
 	return nil

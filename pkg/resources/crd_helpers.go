@@ -2,12 +2,12 @@ package resources
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util"
+	"github.com/pkg/errors"
 
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -59,7 +59,7 @@ func EnsureCrdExists(ctx context.Context, defaulter runtime.ObjectDefaulter, cli
 				return nil
 			}
 			if !api_errors.IsAlreadyExists(err) {
-				return fmt.Errorf("failed to create %s CustomResourceDefinition: %v", crd.Name, err)
+				return errors.Wrapf(err, "failed to create %s CustomResourceDefinition", crd.Name)
 			}
 			log.Printf("CustomResourceDefinition %s was created concurrently", crd.Name)
 		} else {
@@ -78,7 +78,7 @@ func EnsureCrdExists(ctx context.Context, defaulter runtime.ObjectDefaulter, cli
 				return nil
 			}
 			if !api_errors.IsConflict(err) {
-				return fmt.Errorf("failed to update CustomResourceDefinition %s: %v", crd.Name, err)
+				return errors.Wrapf(err, "failed to update CustomResourceDefinition %s", crd.Name)
 			}
 			log.Printf("Conflict updating CustomResourceDefinition %s, retrying", crd.Name)
 		}
@@ -108,7 +108,7 @@ func WaitForCrdToBecomeEstablished(ctx context.Context, crdLister apiext_lst_v1b
 				}
 			case apiext_v1b1.NamesAccepted:
 				if cond.Status == apiext_v1b1.ConditionFalse {
-					return false, fmt.Errorf("failed to create CRD %s: name conflict: %s", crd.Name, cond.Reason)
+					return false, errors.Errorf("failed to create CRD %s: name conflict: %s", crd.Name, cond.Reason)
 				}
 			}
 		}

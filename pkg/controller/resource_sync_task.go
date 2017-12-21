@@ -237,7 +237,7 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructure
 	}
 	expectedGVK := pluginInstance.Describe().GVK
 	if object.GroupVersionKind() != expectedGVK {
-		return nil, errors.Errorf("unexpected GVK from plugin (wanted %v, got %v)", expectedGVK, object.GroupVersionKind())
+		return nil, errors.Errorf("unexpected GVK from plugin (wanted %s, got %s)", expectedGVK, object.GroupVersionKind())
 	}
 	// We are in charge of naming.
 	object.SetName(res.Spec.Plugin.ObjectName)

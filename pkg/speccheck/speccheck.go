@@ -1,7 +1,6 @@
 package speccheck
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/atlassian/smith/pkg/util"
@@ -24,7 +23,7 @@ func (sc *SpecCheck) CompareActualVsSpec(spec, actual runtime.Object) (*unstruct
 	// Apply defaults to the spec
 	specUnstr, err := sc.applyDefaults(spec)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to apply defaults to object spec %v: %v", spec.GetObjectKind().GroupVersionKind(), err)
+		return nil, false, errors.Wrapf(err, "failed to apply defaults to object spec %s", spec.GetObjectKind().GroupVersionKind())
 	}
 	actualUnstr, err := util.RuntimeToUnstructured(actual)
 	if err != nil {
@@ -37,7 +36,7 @@ func (sc *SpecCheck) CompareActualVsSpec(spec, actual runtime.Object) (*unstruct
 func (sc *SpecCheck) applyDefaults(spec runtime.Object) (*unstructured.Unstructured, error) {
 	gvk := spec.GetObjectKind().GroupVersionKind()
 	if !sc.Scheme.Recognizes(gvk) {
-		log.Printf("Unrecognized object type %v - not applying defaults", gvk)
+		log.Printf("Unrecognized object type %s - not applying defaults", gvk)
 		return util.RuntimeToUnstructured(spec)
 	}
 	var clone runtime.Object

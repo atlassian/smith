@@ -1,12 +1,11 @@
 package types
 
 import (
-	"errors"
-
 	"github.com/atlassian/smith/pkg/cleanup"
 	"github.com/atlassian/smith/pkg/util"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
+	"github.com/pkg/errors"
 	apps_v1b2 "k8s.io/api/apps/v1beta2"
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

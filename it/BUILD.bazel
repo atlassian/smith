@@ -20,6 +20,7 @@ go_library(
         "//pkg/util/testing:go_default_library",
         "//vendor/github.com/ash2k/stager:go_default_library",
         "//vendor/github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

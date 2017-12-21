@@ -1,8 +1,6 @@
 package graph
 
-import (
-	"fmt"
-)
+import "github.com/pkg/errors"
 
 // V is name of the vertex.
 type V interface{}
@@ -45,11 +43,11 @@ func (g *Graph) AddVertex(name V, data D) {
 func (g *Graph) AddEdge(from, to V) error {
 	f, ok := g.Vertices[from]
 	if !ok {
-		return fmt.Errorf("vertex %q not found", from)
+		return errors.Errorf("vertex %q not found", from)
 	}
 	_, ok = g.Vertices[to]
 	if !ok {
-		return fmt.Errorf("vertex %q not found", to)
+		return errors.Errorf("vertex %q not found", to)
 	}
 
 	f.addEdge(to)

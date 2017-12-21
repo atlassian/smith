@@ -2,7 +2,6 @@ package v1
 
 import (
 	"bytes"
-	"fmt"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -256,7 +255,7 @@ func (rs *ResourceSpec) IntoTyped(obj runtime.Object) error {
 	if specUnstr, ok := rs.Object.(*unstructured.Unstructured); ok {
 		return unstructured_conversion.DefaultConverter.FromUnstructured(specUnstr.Object, obj)
 	}
-	return fmt.Errorf("cannot convert %T into typed object %T", rs.Object, obj)
+	return errors.Errorf("cannot convert %T into typed object %T", rs.Object, obj)
 }
 
 // +k8s:deepcopy-gen=true
