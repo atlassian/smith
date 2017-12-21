@@ -85,7 +85,7 @@ A plugin must:
 3. Output an object of the correct Group/Version/Kind - GVK is declared in the plugin resource definition and
 is known in advance.
 
-## Plugin skeleton:
+## Plugin skeleton
 
 ```go
 package main
