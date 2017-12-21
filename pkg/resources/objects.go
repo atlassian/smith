@@ -2,8 +2,8 @@ package resources
 
 import (
 	"bytes"
-	"fmt"
 
+	"github.com/pkg/errors"
 	"k8s.io/client-go/util/jsonpath"
 )
 
@@ -14,12 +14,12 @@ func GetJsonPathString(obj interface{}, path string) (string, error) {
 	j.AllowMissingKeys(true)
 	err := j.Parse(path)
 	if err != nil {
-		return "", fmt.Errorf("JsonPath parse %s error: %v", path, err)
+		return "", errors.Wrapf(err, "JsonPath parse %s error", path)
 	}
 	var buf bytes.Buffer
 	err = j.Execute(&buf, obj)
 	if err != nil {
-		return "", fmt.Errorf("JsonPath execute error: %v", err)
+		return "", errors.Wrap(err, "JsonPath execute error")
 	}
 	return buf.String(), nil
 }
@@ -31,17 +31,17 @@ func GetJsonPathValue(obj interface{}, path string, allowMissingKeys bool) (inte
 	j.AllowMissingKeys(allowMissingKeys)
 	err := j.Parse(path)
 	if err != nil {
-		return nil, fmt.Errorf("JsonPath parse %s error: %v", path, err)
+		return "", errors.Wrapf(err, "JsonPath parse %s error", path)
 	}
 	values, err := j.FindResults(obj)
 	if err != nil {
-		return nil, fmt.Errorf("JsonPath execute error: %v", err)
+		return "", errors.Wrap(err, "JsonPath execute error")
 	}
 	if len(values) == 0 {
 		return nil, nil
 	}
 	if len(values) > 1 {
-		return nil, fmt.Errorf("single result expected, got %d", len(values))
+		return nil, errors.Errorf("single result expected, got %d", len(values))
 	}
 	if values[0] == nil || len(values[0]) == 0 || values[0][0].IsNil() {
 		return nil, nil

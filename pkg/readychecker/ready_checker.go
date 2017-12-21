@@ -1,7 +1,6 @@
 package readychecker
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/atlassian/smith"
@@ -33,7 +32,7 @@ func New(store CrdStore, kts ...map[schema.GroupKind]IsObjectReady) *ReadyChecke
 	for _, knownTypes := range kts {
 		for knownGK, f := range knownTypes {
 			if kt[knownGK] != nil {
-				panic(fmt.Errorf("GK specified more than once: %s", knownGK))
+				panic(errors.Errorf("GK specified more than once: %s", knownGK))
 			}
 			kt[knownGK] = f
 		}
@@ -49,7 +48,7 @@ func (rc *ReadyChecker) IsReady(obj *unstructured.Unstructured) (isReady, retria
 	gk := gvk.GroupKind()
 
 	if gk.Kind == "" || gvk.Version == "" { // Group can be empty e.g. built-in objects like ConfigMap
-		return false, false, errors.Errorf("object has empty kind/version: %v", gvk)
+		return false, false, errors.Errorf("object has empty kind/version: %s", gvk)
 	}
 
 	// 1. Check if it is a known built-in resource

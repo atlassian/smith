@@ -1,8 +1,6 @@
 package graph
 
-import (
-	"fmt"
-)
+import "github.com/pkg/errors"
 
 func (g *Graph) TopologicalSort() ([]V, error) {
 	results := newOrderedSet()
@@ -25,7 +23,7 @@ func (g *Graph) visit(name V, results *orderedset, visited *orderedset) error {
 	if !added {
 		index := visited.index(name)
 		cycle := append(visited.items[index:], name)
-		return fmt.Errorf("cycle error: %v", cycle)
+		return errors.Errorf("cycle error: %v", cycle)
 	}
 
 	n := g.Vertices[name]

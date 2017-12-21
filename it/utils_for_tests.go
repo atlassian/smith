@@ -23,6 +23,7 @@ import (
 
 	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
@@ -95,7 +96,7 @@ func IsBundleStatusCond(namespace, name string, cType smith_v1.BundleConditionTy
 			_, cond := b.GetCondition(cType)
 			return cond != nil && cond.Status == status, nil
 		default:
-			return false, fmt.Errorf("unexpected event type %q: %v", event.Type, event.Object)
+			return false, errors.Errorf("unexpected event type %q: %v", event.Type, event.Object)
 		}
 	}
 }

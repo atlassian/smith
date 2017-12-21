@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -9,6 +8,7 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -101,7 +101,7 @@ func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{
 		}
 	}
 	if err != nil {
-		return nil, fmt.Errorf("invalid reference at %q: %v", strings.Join(path, ReferenceSeparator), err)
+		return nil, errors.Wrapf(err, "invalid reference at %q", strings.Join(path, ReferenceSeparator))
 	}
 	return processed, nil
 }
@@ -109,28 +109,28 @@ func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{
 func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (interface{}, error) {
 	parts := strings.SplitN(selector, ReferenceSeparator, 2)
 	if len(parts) < 2 {
-		return nil, fmt.Errorf("cannot include whole object: %s", selector)
+		return nil, errors.Errorf("cannot include whole object: %s", selector)
 	}
 	objName := smith_v1.ResourceName(parts[0])
 	if objName == sp.selfName {
-		return nil, fmt.Errorf("self references are not allowed: %s", selector)
+		return nil, errors.Errorf("self references are not allowed: %s", selector)
 	}
 	resInfo := sp.resources[objName]
 	if resInfo == nil {
-		return nil, fmt.Errorf("object not found: %s", selector)
+		return nil, errors.Errorf("object not found: %s", selector)
 	}
 	if _, allowed := sp.allowedResources[objName]; !allowed {
-		return nil, fmt.Errorf("references can only point at direct dependencies: %s", selector)
+		return nil, errors.Errorf("references can only point at direct dependencies: %s", selector)
 	}
 	// To avoid overcomplicated format of reference like this: {{{res1#{$.a.string}}}}
 	// And have something like this instead: {{{res1#a.string}}}
 	jsonPath := fmt.Sprintf("{$.%s}", parts[1])
 	fieldValue, err := resources.GetJsonPathValue(resInfo.actual.Object, jsonPath, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to process JsonPath reference %s: %v", selector, err)
+		return nil, errors.Wrapf(err, "failed to process JsonPath reference %s", selector)
 	}
 	if fieldValue == nil {
-		return nil, fmt.Errorf("field not found: %s", selector)
+		return nil, errors.Errorf("field not found: %s", selector)
 	}
 	if primitivesOnly {
 		switch fieldValue.(type) {
@@ -141,11 +141,11 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 		case int8, int16, int32, int64:
 		case complex64, complex128:
 		default:
-			return nil, fmt.Errorf("cannot expand non-primitive field %s of type %T", selector, fieldValue)
+			return nil, errors.Errorf("cannot expand non-primitive field %s of type %T", selector, fieldValue)
 		}
 	} else {
 		if _, ok := fieldValue.(string); ok {
-			return nil, fmt.Errorf("cannot expand field %s of type string as naked reference", selector)
+			return nil, errors.Errorf("cannot expand field %s of type string as naked reference", selector)
 		}
 	}
 	return fieldValue, nil
