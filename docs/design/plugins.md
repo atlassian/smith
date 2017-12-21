@@ -93,6 +93,9 @@ package main
 import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smith_plugin "github.com/atlassian/smith/pkg/plugin"
+	
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // For reference:
@@ -108,11 +111,33 @@ import (
 //	Object runtime.Object
 //}
 
-func Process(resource smith_v1.Resource, dependencies map[smith_v1.ResourceName]smith_plugin.Dependency)  (smith_plugin.ProcessResult, error) {
+const  (
+	PluginName smith_v1.PluginName = "filter"
+)
+
+func New() (smith_plugin.Plugin, error) {
+	return &filterPlugin{}, nil
+}
+
+type filterPlugin struct {
+}
+
+func (p *filterPlugin) Process(spec runtime.RawExtension, *smith_plugin.Context) (*smith_plugin.ProcessResult, error) {
 	// Do the processing
-	return smith_plugin.ProcessResult{
+	return &smith_plugin.ProcessResult{
 		//Object: object literal here
 	}, nil
+}
+
+func (p *filterPlugin) Describe() *smith_plugin.Description {
+	return &smith_plugin.Description{
+		Name: PluginName,
+		GVK: schema.GroupVersionKind{
+			Group: "servicecatalog.k8s.io/v1beta1",
+			Version: "v1beta1",
+			Kind: "ServiceInstance",
+		},
+	}
 }
 ```
 
