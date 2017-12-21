@@ -20,7 +20,6 @@ import (
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
-	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
@@ -30,10 +29,9 @@ import (
 	"github.com/pkg/errors"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -90,55 +88,10 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Stager will perform ordered, graceful shutdown
-	stgr := stager.New()
-	defer stgr.Shutdown()
-
-	// Multi store
-	multiStore := store.NewMulti()
-
 	// Informers
 	bundleInf := client.BundleInformer(bundleClient.SmithV1(), a.Namespace, a.ResyncPeriod)
-	multiStore.AddInformer(smith_v1.BundleGVK, bundleInf)
-
-	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, a.ResyncPeriod)
-	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
+	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, a.ResyncPeriod, cache.Indexers{})
 	crdStore, err := store.NewCrd(crdInf)
-	if err != nil {
-		return err
-	}
-	crdGVK := apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
-	multiStore.AddInformer(crdGVK, crdInf)
-	stage := stgr.NextStage()
-	stage.StartWithChannel(crdInf.Run) // Must be after store.AddInformer()
-
-	// We must wait for crdInf to populate its cache to avoid reading from an empty cache
-	// in Ready Checker and in EnsureCrdExists().
-	log.Printf("Waiting for %s informer to sync", crdGVK)
-	if !cache.WaitForCacheSync(ctx.Done(), crdInf.HasSynced) {
-		return ctx.Err()
-	}
-
-	// Ensure CRD Bundle exists
-	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
-	crdCreationBackoff := wait.Backoff{
-		Duration: 1 * time.Second,
-		Factor:   1.2,
-		Jitter:   0.1,
-		Steps:    7,
-	}
-	crd := resources.BundleCrd()
-	err = wait.ExponentialBackoff(crdCreationBackoff, func() (bool /*done*/, error) {
-		if errEnsure := resources.EnsureCrdExistsAndIsEstablished(ctx, scheme, crdClient, crdLister, crd); errEnsure != nil {
-			// TODO be smarter about what is retried
-			if errEnsure == context.Canceled || errEnsure == context.DeadlineExceeded {
-				return true, errEnsure
-			}
-			log.Printf("Failed to create CRD %s: %v", crd.Name, errEnsure)
-			return false, nil
-		}
-		return true, nil
-	})
 	if err != nil {
 		return err
 	}
@@ -163,6 +116,9 @@ func (a *App) Run(ctx context.Context) error {
 		Cleaner: oc,
 	}
 
+	// Multi store
+	multiStore := store.NewMulti()
+
 	bs, err := store.NewBundle(bundleInf, multiStore, plugins)
 	if err != nil {
 		return err
@@ -172,7 +128,6 @@ func (a *App) Run(ctx context.Context) error {
 	// Controller
 	cntrlr := controller.BundleController{
 		BundleInf:       bundleInf,
-		CrdInf:          crdInf,
 		BundleClient:    bundleClient.SmithV1(),
 		BundleStore:     bs,
 		SmartClient:     sc,
@@ -186,17 +141,23 @@ func (a *App) Run(ctx context.Context) error {
 		Plugins:         plugins,
 		Scheme:          scheme,
 	}
-	cntrlr.Prepare(resourceInfs)
+	cntrlr.Prepare(ctx, crdInf, resourceInfs)
 
-	infs := make([]cache.InformerSynced, 0, len(resourceInfs)+1)
+	resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
+	resourceInfs[smith_v1.BundleGVK] = bundleInf
+
+	// Stager will perform ordered, graceful shutdown
+	stgr := stager.New()
+	defer stgr.Shutdown()
+	stage := stgr.NextStage()
+
+	infs := make([]cache.InformerSynced, 0, len(resourceInfs))
 	// Add all informers to Multi store and start them
 	for gvk, inf := range resourceInfs {
 		multiStore.AddInformer(gvk, inf)
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
 		infs = append(infs, inf.HasSynced)
 	}
-	stage.StartWithChannel(bundleInf.Run)
-	infs = append(infs, bundleInf.HasSynced)
 	log.Print("Waiting for informers to sync")
 	if !cache.WaitForCacheSync(ctx.Done(), infs...) {
 		return ctx.Err()

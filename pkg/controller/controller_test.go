@@ -37,7 +37,7 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
-	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -536,8 +536,7 @@ func (tc *testCase) run(t *testing.T) {
 		}
 	}
 
-	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, 0)
-	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
+	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, 0, cache.Indexers{})
 	bundleInf := client.BundleInformer(bundleClient.SmithV1(), meta_v1.NamespaceAll, 0)
 	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
 
@@ -609,7 +608,6 @@ func (tc *testCase) run(t *testing.T) {
 
 	cntrlr := &BundleController{
 		BundleInf:    bundleInf,
-		CrdInf:       crdInf,
 		BundleClient: bundleClient.SmithV1(),
 		BundleStore:  bs,
 		SmartClient:  sc,
@@ -622,10 +620,9 @@ func (tc *testCase) run(t *testing.T) {
 		Plugins:      plugins,
 		Scheme:       scheme,
 	}
-	cntrlr.Prepare(resourceInfs)
+	cntrlr.Prepare(ctx, crdInf, resourceInfs)
 
-	crdGVK := apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
-	resourceInfs[crdGVK] = crdInf
+	resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
 	resourceInfs[smith_v1.BundleGVK] = bundleInf
 	infs := make([]cache.InformerSynced, 0, len(resourceInfs))
 	stage := stgr.NextStage()

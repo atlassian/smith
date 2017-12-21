@@ -40,7 +40,6 @@ type BundleController struct {
 	stopping bool
 
 	BundleInf    cache.SharedIndexInformer
-	CrdInf       cache.SharedIndexInformer
 	BundleClient smithClient_v1.BundlesGetter
 	BundleStore  BundleStore
 	SmartClient  smith.SmartClient
@@ -61,23 +60,30 @@ type BundleController struct {
 }
 
 // Prepare prepares the controller to be run.
-func (c *BundleController) Prepare(resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
-	c.BundleInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.onBundleAdd,
-		UpdateFunc: c.onBundleUpdate,
-		DeleteFunc: c.onBundleDelete,
-	})
+func (c *BundleController) Prepare(ctx context.Context, crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
 	c.resourceHandler = cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onResourceAdd,
 		UpdateFunc: c.onResourceUpdate,
 		DeleteFunc: c.onResourceDelete,
 	}
+	c.BundleInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.onBundleAdd,
+		UpdateFunc: c.onBundleUpdate,
+		DeleteFunc: c.onBundleDelete,
+	})
+	crdInf.AddEventHandler(&crdEventHandler{
+		ctx:              ctx,
+		BundleController: c,
+		watchers:         make(map[string]watchState),
+	})
+
 	for _, resourceInf := range resourceInfs {
 		resourceInf.AddEventHandler(c.resourceHandler)
 	}
 }
 
 // Run begins watching and syncing.
+// All informers must be synched before this method is invoked.
 func (c *BundleController) Run(ctx context.Context) {
 	defer c.wg.Wait()
 	defer func() {
@@ -89,16 +95,6 @@ func (c *BundleController) Run(ctx context.Context) {
 
 	log.Print("Starting Bundle controller")
 	defer log.Print("Shutting down Bundle controller")
-
-	c.CrdInf.AddEventHandler(&crdEventHandler{
-		ctx:              ctx,
-		BundleController: c,
-		watchers:         make(map[string]watchState),
-	})
-
-	if !cache.WaitForCacheSync(ctx.Done(), c.BundleInf.HasSynced) {
-		return
-	}
 
 	for i := 0; i < c.Workers; i++ {
 		c.wg.Start(c.worker)
