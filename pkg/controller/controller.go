@@ -49,8 +49,8 @@ type BundleController struct {
 	resourceHandler cache.ResourceEventHandler
 	Namespace       string
 
-	Plugins map[smith_v1.PluginName]plugin.Plugin
-	Scheme  *runtime.Scheme
+	PluginContainers map[smith_v1.PluginName]plugin.PluginContainer
+	Scheme           *runtime.Scheme
 }
 
 // Prepare prepares the controller to be run.

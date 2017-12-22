@@ -79,14 +79,14 @@ func (c *BundleController) processKey(key string) (retriableRet bool, errRet err
 	}
 
 	st := bundleSyncTask{
-		bundleClient: c.BundleClient,
-		smartClient:  c.SmartClient,
-		rc:           c.Rc,
-		store:        c.Store,
-		specCheck:    c.SpecCheck,
-		bundle:       bundleObj.(*smith_v1.Bundle).DeepCopy(), // Deep-copy otherwise we are mutating our cache.
-		plugins:      c.Plugins,
-		scheme:       c.Scheme,
+		bundleClient:     c.BundleClient,
+		smartClient:      c.SmartClient,
+		rc:               c.Rc,
+		store:            c.Store,
+		specCheck:        c.SpecCheck,
+		bundle:           bundleObj.(*smith_v1.Bundle).DeepCopy(), // Deep-copy otherwise we are mutating our cache.
+		pluginContainers: c.PluginContainers,
+		scheme:           c.Scheme,
 	}
 	retriable, err := st.process()
 	return st.handleProcessResult(retriable, err)

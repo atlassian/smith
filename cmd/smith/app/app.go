@@ -75,11 +75,11 @@ type App struct {
 
 func (a *App) Run(ctx context.Context) error {
 	// Plugins
-	plugins, err := a.loadPlugins()
+	pluginContainers, err := a.loadPlugins()
 	if err != nil {
 		return err
 	}
-	for pluginName := range plugins {
+	for pluginName := range pluginContainers {
 		log.Printf("Loaded plugin: %q", pluginName)
 	}
 
@@ -140,7 +140,7 @@ func (a *App) Run(ctx context.Context) error {
 	// Multi store
 	multiStore := store.NewMulti()
 
-	bs, err := store.NewBundle(bundleInf, multiStore, plugins)
+	bs, err := store.NewBundle(bundleInf, multiStore, pluginContainers)
 	if err != nil {
 		return err
 	}
@@ -171,19 +171,19 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Controller
 	cntrlr := controller.BundleController{
-		BundleInf:       bundleInf,
-		BundleClient:    bundleClient.SmithV1(),
-		BundleStore:     bs,
-		SmartClient:     sc,
-		Rc:              rc,
-		Store:           multiStore,
-		SpecCheck:       specCheck,
-		Queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle"),
-		Workers:         a.Workers,
-		CrdResyncPeriod: a.ResyncPeriod,
-		Namespace:       a.Namespace,
-		Plugins:         plugins,
-		Scheme:          scheme,
+		BundleInf:        bundleInf,
+		BundleClient:     bundleClient.SmithV1(),
+		BundleStore:      bs,
+		SmartClient:      sc,
+		Rc:               rc,
+		Store:            multiStore,
+		SpecCheck:        specCheck,
+		Queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle"),
+		Workers:          a.Workers,
+		CrdResyncPeriod:  a.ResyncPeriod,
+		Namespace:        a.Namespace,
+		PluginContainers: pluginContainers,
+		Scheme:           scheme,
 	}
 	cntrlr.Prepare(ctx, crdInf, resourceInfs)
 
@@ -252,20 +252,20 @@ func (a *App) startLeaderElection(ctx context.Context, configMapsGetter core_v1c
 	return ctxRet, startedLeading, nil
 }
 
-func (a *App) loadPlugins() (map[smith_v1.PluginName]plugin.Plugin, error) {
-	plugs := make(map[smith_v1.PluginName]plugin.Plugin, len(a.Plugins))
+func (a *App) loadPlugins() (map[smith_v1.PluginName]plugin.PluginContainer, error) {
+	pluginContainers := make(map[smith_v1.PluginName]plugin.PluginContainer, len(a.Plugins))
 	for _, p := range a.Plugins {
-		plug, err := p()
+		pluginContainer, err := plugin.NewPluginContainer(p)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to instantiate plugin %T", p)
+			return nil, err
 		}
-		description := plug.Describe()
-		if _, ok := plugs[description.Name]; ok {
+		description := pluginContainer.Plugin.Describe()
+		if _, ok := pluginContainers[description.Name]; ok {
 			return nil, errors.Wrapf(err, "plugins with same name found %q", description.Name)
 		}
-		plugs[description.Name] = plug
+		pluginContainers[description.Name] = pluginContainer
 	}
-	return plugs, nil
+	return pluginContainers, nil
 }
 
 // CancelOnInterrupt calls f when os.Interrupt or SIGTERM is received.
