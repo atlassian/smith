@@ -83,7 +83,9 @@ A plugin must:
   - no unstable sort algorithms;
   - no timestamps.
 3. Output an object of the correct Group/Version/Kind - GVK is declared in the plugin resource definition and
-is known in advance.
+is known in advance. Smith validates that an object of the correct GVK is returned.
+
+A plugin does not need to set the name of the returned object, it is set by Smith.
 
 ## Plugin skeleton
 
