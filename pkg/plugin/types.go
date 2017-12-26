@@ -20,7 +20,7 @@ type Plugin interface {
 	// Describe returns information about the plugin.
 	Describe() *Description
 	// Process processes a plugin specification and produces an object as the result.
-	Process(runtime.RawExtension, *Context) (*ProcessResult, error)
+	Process(map[string]interface{}, *Context) (*ProcessResult, error)
 }
 
 type Description struct {

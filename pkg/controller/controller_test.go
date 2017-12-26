@@ -85,6 +85,9 @@ type testCase struct {
 
 const (
 	testNamespace = "test-namespace"
+
+	resSb1 = "resSb1"
+	sb1    = "sb1"
 )
 
 func TestController(t *testing.T) {
@@ -158,7 +161,7 @@ func TestController(t *testing.T) {
 							{
 								APIVersion:         sc_v1b1.SchemeGroupVersion.String(),
 								Kind:               "ServiceBinding",
-								Name:               "sb1",
+								Name:               sb1,
 								UID:                types.UID("sb1-uid"),
 								Controller:         &tr,
 								BlockOwnerDeletion: &tr,
@@ -210,7 +213,7 @@ func TestController(t *testing.T) {
 						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "sb1",
+						Name:      sb1,
 						Namespace: testNamespace,
 						UID:       types.UID("sb1-uid"),
 						Labels: map[string]string{
@@ -273,7 +276,7 @@ func TestController(t *testing.T) {
 							},
 						},
 						{
-							Name: "sb1",
+							Name: resSb1,
 							DependsOn: []smith_v1.ResourceName{
 								"si1",
 							},
@@ -284,7 +287,7 @@ func TestController(t *testing.T) {
 										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 									},
 									ObjectMeta: meta_v1.ObjectMeta{
-										Name: "sb1",
+										Name: sb1,
 									},
 									Spec: sc_v1b1.ServiceBindingSpec{
 										ServiceInstanceRef: sc_v1b1.LocalObjectReference{
@@ -298,13 +301,13 @@ func TestController(t *testing.T) {
 						{
 							Name: "p1",
 							DependsOn: []smith_v1.ResourceName{
-								"sb1",
+								resSb1,
 							},
 							Spec: smith_v1.ResourceSpec{
 								Plugin: &smith_v1.PluginSpec{
 									Name: "testPlugin",
-									Spec: runtime.RawExtension{
-										Raw: []byte(`{ "p1": "v1", "p2": "v2" }`),
+									Spec: map[string]interface{}{
+										"p1": "v1", "p2": "{{" + resSb1 + "#metadata.name}}",
 									},
 								},
 							},
@@ -761,16 +764,16 @@ func (p *tp) Describe() *plugin.Description {
 	}
 }
 
-func (p *tp) Process(pluginSpec runtime.RawExtension, context *plugin.Context) (*plugin.ProcessResult, error) {
+func (p *tp) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
 	failed := p.t.Failed()
-	assert.Equal(p.t, `{ "p1": "v1", "p2": "v2" }`, string(pluginSpec.Raw))
+	assert.Equal(p.t, map[string]interface{}{"p1": "v1", "p2": sb1}, pluginSpec)
 	assert.Len(p.t, context.Dependencies, 1)
-	bindingDep, ok := context.Dependencies["sb1"]
+	bindingDep, ok := context.Dependencies[resSb1]
 	if assert.True(p.t, ok) {
 		// Actual
 		if assert.IsType(p.t, &sc_v1b1.ServiceBinding{}, bindingDep.Actual) {
 			b := bindingDep.Actual.(*sc_v1b1.ServiceBinding)
-			assert.Equal(p.t, "sb1", b.Name)
+			assert.Equal(p.t, sb1, b.Name)
 			assert.Equal(p.t, testNamespace, b.Namespace)
 			assert.Equal(p.t, sc_v1b1.SchemeGroupVersion.WithKind("ServiceBinding"), b.GroupVersionKind())
 		}
