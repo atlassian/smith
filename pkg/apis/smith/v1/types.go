@@ -2,6 +2,8 @@ package v1
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -206,17 +208,6 @@ type ResourceSpec struct {
 	Plugin *PluginSpec    `json:"plugin,omitempty"`
 }
 
-// +k8s:deepcopy-gen=true
-// PluginSpec holds the specification for a plugin.
-type PluginSpec struct {
-	Name       PluginName `json:"name"`
-	ObjectName string     `json:"objectName"`
-	// I feel like this should be json.RawMessage, but for reasons I don't properly
-	// understand Service Catalog uses runtime.RawExtension for its Parameters (even
-	// though they never get unpacked into a 'real' object?). So ...
-	Spec runtime.RawExtension `json:"spec,omitempty"`
-}
-
 func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
 	var res struct {
 		Object *unstructured.Unstructured `json:"object,omitempty"`
@@ -258,6 +249,30 @@ func (rs *ResourceSpec) IntoTyped(obj runtime.Object) error {
 	return errors.Errorf("cannot convert %T into typed object %T", rs.Object, obj)
 }
 
+// PluginSpec holds the specification for a plugin.
+type PluginSpec struct {
+	Name       PluginName             `json:"name"`
+	ObjectName string                 `json:"objectName"`
+	Spec       map[string]interface{} `json:"spec,omitempty"`
+}
+
+// DeepCopyInto is an deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PluginSpec) DeepCopyInto(out *PluginSpec) {
+	*out = *in
+	out.Spec = deepCopyJSONValue(in.Spec).(map[string]interface{})
+	return
+}
+
+// DeepCopy is an deepcopy function, copying the receiver, creating a new PluginSpec.
+func (in *PluginSpec) DeepCopy() *PluginSpec {
+	if in == nil {
+		return nil
+	}
+	out := new(PluginSpec)
+	in.DeepCopyInto(out)
+	return out
+}
+
 // +k8s:deepcopy-gen=true
 type ResourceStatus struct {
 	Name       ResourceName        `json:"name"`
@@ -289,4 +304,27 @@ type ResourceCondition struct {
 	Reason string `json:"reason,omitempty"`
 	// A human readable message indicating details about the transition.
 	Message string `json:"message,omitempty"`
+}
+
+// TODO Temporary copy of k/k/staging/src/k8s.io/apimachinery/pkg/runtime/converter.go:449 DeepCopyJSONValue()
+// Remove once on 1.9 api machinery
+func deepCopyJSONValue(x interface{}) interface{} {
+	switch x := x.(type) {
+	case map[string]interface{}:
+		clone := make(map[string]interface{}, len(x))
+		for k, v := range x {
+			clone[k] = deepCopyJSONValue(v)
+		}
+		return clone
+	case []interface{}:
+		clone := make([]interface{}, len(x))
+		for i, v := range x {
+			clone[i] = deepCopyJSONValue(v)
+		}
+		return clone
+	case string, int64, bool, float64, nil, json.Number:
+		return x
+	default:
+		panic(fmt.Errorf("cannot deep copy %T", x))
+	}
 }

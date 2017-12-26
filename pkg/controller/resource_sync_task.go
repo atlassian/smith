@@ -158,28 +158,49 @@ func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource)
 
 // evalSpec evaluates the resource specification and returns the result.
 func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
-	// 1. Process the spec
-	var obj *unstructured.Unstructured
-	var err error
+	// Process the spec
+	var objectOrPluginSpec map[string]interface{}
 	if res.Spec.Object != nil {
-		obj, err = st.evalObjectSpec(res)
+		specUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
+		if err != nil {
+			return nil, err
+		}
+		objectOrPluginSpec = specUnstr.Object
 	} else if res.Spec.Plugin != nil {
-		obj, err = st.evalPluginSpec(res)
+		res = res.DeepCopy() // Spec processor mutates in place
+		objectOrPluginSpec = res.Spec.Plugin.Spec
 	} else {
 		return nil, errors.New("invalid resource")
 	}
 
-	if err != nil {
+	// Process references
+	sp := NewSpec(res.Name, st.processedResources, res.DependsOn)
+	if err := sp.ProcessObject(objectOrPluginSpec); err != nil {
 		return nil, err
 	}
 
-	// 2. Update label to point at the parent bundle
+	var obj *unstructured.Unstructured
+	if res.Spec.Object != nil {
+		obj = &unstructured.Unstructured{
+			Object: objectOrPluginSpec,
+		}
+	} else if res.Spec.Plugin != nil {
+		var err error
+		obj, err = st.evalPluginSpec(res)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		panic(errors.New("unreachable"))
+	}
+
+	// Update label to point at the parent bundle
 	obj.SetLabels(mergeLabels(
 		st.bundle.Labels,
 		obj.GetLabels(),
 		map[string]string{smith.BundleNameLabel: st.bundle.Name}))
 
-	// 3. Update OwnerReferences
+	// Update OwnerReferences
 	trueRef := true
 	refs := obj.GetOwnerReferences()
 	for i, ref := range refs {
@@ -289,24 +310,6 @@ func (st *resourceSyncTask) prepareServiceBindingDependency(dependency *plugin.D
 	}
 	dependency.Auxiliary = append(dependency.Auxiliary, serviceInstance)
 	return nil
-}
-
-// evalObjectSpec evaluates the regular resource specification and returns the result.
-func (st *resourceSyncTask) evalObjectSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
-	// Convert Spec to Unstructured
-	spec, err := util.RuntimeToUnstructured(res.Spec.Object)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// Process references
-	sp := NewSpec(res.Name, st.processedResources, res.DependsOn)
-	if err := sp.ProcessObject(spec.Object); err != nil {
-		return nil, err
-	}
-
-	return spec, nil
 }
 
 // createOrUpdate creates or updates a resources.
