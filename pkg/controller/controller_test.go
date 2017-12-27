@@ -492,6 +492,97 @@ func TestController(t *testing.T) {
 				smith_testing.AssertResourceCondition(t, updateBundle, "map1", smith_v1.ResourceError, smith_v1.ConditionFalse)
 			},
 		},
+		"resources are not deleted if bundle is in progress": &testCase{
+			mainClientObjects: []runtime.Object{
+				&core_v1.ConfigMap{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ConfigMap",
+						APIVersion: core_v1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "map-not-in-the-bundle-anymore-needs-delete",
+						Namespace: testNamespace,
+						UID:       types.UID("map-delete-uid"),
+						Labels: map[string]string{
+							smith.BundleNameLabel: "bundle1",
+						},
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         smith_v1.BundleResourceGroupVersion,
+								Kind:               smith_v1.BundleResourceKind,
+								Name:               "bundle1",
+								UID:                "uid123",
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+				},
+			},
+			scClientObjects: []runtime.Object{
+				&sc_v1b1.ServiceInstance{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ServiceInstance",
+						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "si1",
+						Namespace: testNamespace,
+						UID:       types.UID("si1-uid"),
+						Labels: map[string]string{
+							smith.BundleNameLabel: "bundle1",
+						},
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         smith_v1.BundleResourceGroupVersion,
+								Kind:               smith_v1.BundleResourceKind,
+								Name:               "bundle1",
+								UID:                "uid123",
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+					Status: sc_v1b1.ServiceInstanceStatus{
+						Conditions: []sc_v1b1.ServiceInstanceCondition{
+							{
+								Type:    sc_v1b1.ServiceInstanceConditionReady,
+								Status:  sc_v1b1.ConditionFalse,
+								Reason:  "WorkingOnIt",
+								Message: "Doing something",
+							},
+						},
+					},
+				},
+			},
+			bundle: &smith_v1.Bundle{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "bundle1",
+					Namespace: testNamespace,
+					UID:       "uid123",
+				},
+				Spec: smith_v1.BundleSpec{
+					Resources: []smith_v1.Resource{
+						{
+							Name: "si1",
+							Spec: smith_v1.ResourceSpec{
+								Object: &sc_v1b1.ServiceInstance{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ServiceInstance",
+										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: "si1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace:            testNamespace,
+			enableServiceCatalog: true,
+		},
 	}
 	for name, tc := range testcases {
 		tc := tc
