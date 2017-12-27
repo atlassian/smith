@@ -83,7 +83,7 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 		log.Printf("[WORKER][%s/%s] Resource %q, ready: %t, error: %v", st.bundle.Namespace, st.bundle.Name, resName, resInfo.isReady(), resErr)
 		st.processedResources[resName.(smith_v1.ResourceName)] = &resInfo
 	}
-	if !blockedOnError {
+	if st.isBundleReady() {
 		// Delete objects which were removed from the bundle
 		retriable, err := st.deleteRemovedResources()
 		if err != nil {
