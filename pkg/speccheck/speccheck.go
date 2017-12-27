@@ -9,7 +9,6 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -48,7 +47,7 @@ func (sc *SpecCheck) applyDefaults(spec runtime.Object) (*unstructured.Unstructu
 		if err != nil {
 			return nil, err
 		}
-		if err = unstructured_conversion.DefaultConverter.FromUnstructured(specUnstr.Object, clone); err != nil {
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(specUnstr.Object, clone); err != nil {
 			return nil, err
 		}
 	} else {

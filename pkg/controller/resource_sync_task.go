@@ -14,7 +14,6 @@ import (
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -364,7 +363,7 @@ func (st *resourceSyncTask) prepareDependencies(dependsOn []smith_v1.ResourceNam
 		if err != nil {
 			return nil, err
 		}
-		if err = unstructured_conversion.DefaultConverter.FromUnstructured(unstructuredActual.Object, actual); err != nil {
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredActual.Object, actual); err != nil {
 			return nil, err
 		}
 		dependency.Actual = actual

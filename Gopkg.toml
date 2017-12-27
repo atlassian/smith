@@ -28,7 +28,7 @@ required = [
 ]
 
 [[constraint]]
-  branch = "release-1.8" # correct branch
+  branch = "release-1.9" # correct branch
   name = "k8s.io/code-generator"
 
 [[constraint]]
@@ -36,25 +36,29 @@ required = [
   name = "github.com/bazelbuild/buildtools"
 
 [[override]]
-revision = "75356185a9af8f0464efa792e2e9508d5b4be83c" # workaround https://github.com/kubernetes/code-generator/issues/13
-name = "k8s.io/gengo"
+  revision = "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4" # from 1.9 branch
+  name = "k8s.io/gengo"
 
 [[constraint]]
   branch = "master" # I want the latest commit from this branch, not just the latest tag or the version used by client-go.
   name = "github.com/stretchr/testify"
 
 [[constraint]]
+  branch = "master" # pick up 1.9 migration
+  name = "github.com/kubernetes-incubator/service-catalog"
+
+[[constraint]]
   name = "k8s.io/apiextensions-apiserver"
-  branch = "release-1.8" # correct branch
+  branch = "release-1.9" # correct branch
 
 [[constraint]]
   name = "k8s.io/apimachinery"
-  branch = "release-1.8" # correct branch
+  branch = "release-1.9" # correct branch
 
 [[constraint]]
   name = "k8s.io/client-go"
-  branch = "release-5.0" # correct branch
+  branch = "release-6.0" # correct branch
 
 [[constraint]]
   name = "k8s.io/api"
-  branch = "release-1.8" # correct branch
+  branch = "release-1.9" # correct branch

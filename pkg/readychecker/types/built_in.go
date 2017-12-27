@@ -10,7 +10,7 @@ import (
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	settings_v1a1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -36,7 +36,7 @@ func alwaysReady(_ *unstructured.Unstructured) (isReady, retriableError bool, e 
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
 func isDeploymentReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	var deployment apps_v1b2.Deployment
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &deployment); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &deployment); err != nil {
 		return false, false, err
 	}
 
@@ -51,7 +51,7 @@ func isDeploymentReady(obj *unstructured.Unstructured) (isReady, retriableError 
 
 func isScServiceBindingReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	var sic sc_v1b1.ServiceBinding
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &sic); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &sic); err != nil {
 		return false, false, err
 	}
 	readyCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionReady)
@@ -69,7 +69,7 @@ func isScServiceBindingReady(obj *unstructured.Unstructured) (isReady, retriable
 
 func isScServiceInstanceReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
 	var instance sc_v1b1.ServiceInstance
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(obj.Object, &instance); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &instance); err != nil {
 		return false, false, err
 	}
 	readyCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionReady)

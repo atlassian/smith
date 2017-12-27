@@ -137,7 +137,7 @@ func TestController(t *testing.T) {
 			},
 			expectedActions: sets.NewString(
 				"GET=/apis/"+v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+v1.SleeperResourcePlural+
-					"=resourceVersion=0",
+					"=limit=500&resourceVersion=0",
 				"GET=/apis/"+v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+v1.SleeperResourcePlural+
 					"=watch",
 			),

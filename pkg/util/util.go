@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -21,7 +20,7 @@ func Sleep(ctx context.Context, d time.Duration) error {
 }
 
 func RuntimeToUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
-	u, err := unstructured_conversion.DefaultConverter.ToUnstructured(obj)
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
 		return nil, err
 	}

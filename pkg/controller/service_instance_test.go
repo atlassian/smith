@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -46,7 +45,7 @@ func (f fakeStore) RemoveInformer(schema.GroupVersionKind) bool {
 
 func serviceInstanceUnmarshal(spec *unstructured.Unstructured) *sc_v1b1.ServiceInstance {
 	var instanceSpec sc_v1b1.ServiceInstance
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &instanceSpec); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(spec.Object, &instanceSpec); err != nil {
 		panic(err)
 	}
 	return &instanceSpec
