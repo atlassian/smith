@@ -13,7 +13,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -56,7 +55,7 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 	var previousEncodedChecksum string
 	var updateCount int64
 
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, instanceSpec); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(spec.Object, instanceSpec); err != nil {
 		return nil, errors.Wrap(err, "failure to parse ServiceInstance")
 	}
 

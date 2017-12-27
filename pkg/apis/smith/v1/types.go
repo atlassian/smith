@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8s_json "k8s.io/apimachinery/pkg/util/json"
 )
@@ -247,7 +246,7 @@ func (rs *ResourceSpec) IntoTyped(obj runtime.Object) error {
 		return nil
 	}
 	if specUnstr, ok := rs.Object.(*unstructured.Unstructured); ok {
-		return unstructured_conversion.DefaultConverter.FromUnstructured(specUnstr.Object, obj)
+		return runtime.DefaultUnstructuredConverter.FromUnstructured(specUnstr.Object, obj)
 	}
 	return errors.Errorf("cannot convert %T into typed object %T", rs.Object, obj)
 }
