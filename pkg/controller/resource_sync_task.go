@@ -77,7 +77,7 @@ type resourceSyncTask struct {
 }
 
 func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo {
-	log.Printf("[WORKER][%s/%s] Processing resource %q", st.bundle.Namespace, st.bundle.Name, res.Name)
+	log.Printf("[%s/%s] Processing resource %q", st.bundle.Namespace, st.bundle.Name, res.Name)
 
 	// Check if all resource dependencies are ready (so we can start processing this one)
 	status := st.checkAllDependenciesAreReady(res)
@@ -144,7 +144,7 @@ func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource)
 	var notReadyDependencies []smith_v1.ResourceName
 	for _, dependency := range res.DependsOn {
 		if !st.processedResources[dependency].isReady() {
-			log.Printf("[WORKER][%s/%s] Dependency %q is required by resource %q but it's not ready", st.bundle.Namespace, st.bundle.Name, dependency, res.Name)
+			log.Printf("[%s/%s] Dependency %q is required by resource %q but it's not ready", st.bundle.Namespace, st.bundle.Name, dependency, res.Name)
 			notReadyDependencies = append(notReadyDependencies, dependency)
 		}
 	}
@@ -328,10 +328,10 @@ func (st *resourceSyncTask) createOrUpdate(spec *unstructured.Unstructured) (act
 		return nil, false, errors.Wrap(err, "failed to get object from the Store")
 	}
 	if exists {
-		log.Printf("[WORKER][%s/%s] Object %s %q found, checking spec", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
+		log.Printf("[%s/%s] Object %s %q found, checking spec", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
 		return st.updateResource(resClient, spec, obj)
 	}
-	log.Printf("[WORKER][%s/%s] Object %s %q not found, creating", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
+	log.Printf("[%s/%s] Object %s %q not found, creating", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
 	return st.createResource(resClient, spec)
 }
 
@@ -339,7 +339,7 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 	gvk := spec.GroupVersionKind()
 	response, err := resClient.Create(spec)
 	if err == nil {
-		log.Printf("[WORKER][%s/%s] Object %s %q created", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
+		log.Printf("[%s/%s] Object %s %q created", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
 		return response, false, nil
 	}
 	if api_errors.IsAlreadyExists(err) {
@@ -370,7 +370,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 		return nil, false, errors.Wrap(err, "specification check failed")
 	}
 	if match {
-		log.Printf("[WORKER][%s/%s] Object %q has correct spec", st.bundle.Namespace, st.bundle.Name, spec.GetName())
+		log.Printf("[%s/%s] Object %q has correct spec", st.bundle.Namespace, st.bundle.Name, spec.GetName())
 		return updated, false, nil
 	}
 
@@ -384,7 +384,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 		// Unexpected error, will retry
 		return nil, true, err
 	}
-	log.Printf("[WORKER][%s/%s] Object %q updated", st.bundle.Namespace, st.bundle.Name, spec.GetName())
+	log.Printf("[%s/%s] Object %q updated", st.bundle.Namespace, st.bundle.Name, spec.GetName())
 	return updated, false, nil
 }
 

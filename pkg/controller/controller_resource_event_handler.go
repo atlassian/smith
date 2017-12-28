@@ -31,12 +31,12 @@ func (c *BundleController) onResourceDelete(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			log.Printf("[REH] Delete event with unrecognized object type: %T", obj)
+			log.Printf("Delete event with unrecognized object type: %T", obj)
 			return
 		}
 		metaObj, ok = tombstone.Obj.(meta_v1.Object)
 		if !ok {
-			log.Printf("[REH] Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			log.Printf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
 		}
 	}
@@ -45,7 +45,7 @@ func (c *BundleController) onResourceDelete(obj interface{}) {
 		runtimeObj := metaObj.(runtime.Object)
 		bundles, err := c.BundleStore.GetBundlesByObject(runtimeObj.GetObjectKind().GroupVersionKind().GroupKind(), namespace, metaObj.GetName())
 		if err != nil {
-			log.Printf("[REH] Failed to get bundles by object: %v", err)
+			log.Printf("Failed to get bundles by object: %v", err)
 			return
 		}
 		for _, bundle := range bundles {
@@ -61,7 +61,7 @@ func (c *BundleController) rebuildByName(namespace, bundleName, addUpdateDelete 
 		return
 	}
 	// TODO print GVK
-	log.Printf("[REH][%s/%s] Rebuilding bundle because object %s was %s",
+	log.Printf("[%s/%s] Rebuilding bundle because object %s was %s",
 		namespace, bundleName, obj.(meta_v1.Object).GetName(), addUpdateDelete)
 	c.enqueue(&smith_v1.Bundle{
 		ObjectMeta: meta_v1.ObjectMeta{

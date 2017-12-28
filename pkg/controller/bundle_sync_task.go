@@ -80,7 +80,7 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 		}
 		_, resErr := resInfo.fetchError()
 		blockedOnError = blockedOnError || resErr != nil
-		log.Printf("[WORKER][%s/%s] Resource %q, ready: %t, error: %v", st.bundle.Namespace, st.bundle.Name, resName, resInfo.isReady(), resErr)
+		log.Printf("[%s/%s] Resource %q, ready: %t, error: %v", st.bundle.Namespace, st.bundle.Name, resName, resInfo.isReady(), resErr)
 		st.processedResources[resName.(smith_v1.ResourceName)] = &resInfo
 	}
 	if st.isBundleReady() {
@@ -108,7 +108,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 		}
 		if !meta_v1.IsControlledBy(m, st.bundle) {
 			// Object is not owned by that bundle
-			log.Printf("[WORKER][%s/%s] Object %v %q is not owned by the bundle with UID=%q. Owner references: %v",
+			log.Printf("[%s/%s] Object %v %q is not owned by the bundle with UID=%q. Owner references: %v",
 				st.bundle.Namespace, st.bundle.Name, obj.GetObjectKind().GroupVersionKind(), m.GetName(), st.bundle.GetUID(), m.GetOwnerReferences())
 			continue
 		}
@@ -140,14 +140,14 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 	retriable := true
 	policy := meta_v1.DeletePropagationForeground
 	for ref, uid := range existingObjs {
-		log.Printf("[WORKER][%s/%s] Deleting object %v %q", st.bundle.Namespace, st.bundle.Name, ref.GroupVersionKind, ref.Name)
+		log.Printf("[%s/%s] Deleting object %v %q", st.bundle.Namespace, st.bundle.Name, ref.GroupVersionKind, ref.Name)
 		resClient, err := st.smartClient.ForGVK(ref.GroupVersionKind, st.bundle.Namespace)
 		if err != nil {
 			if firstErr == nil {
 				retriable = false
 				firstErr = err
 			} else {
-				log.Printf("[WORKER][%s/%s] Failed to get client for object %s: %v", st.bundle.Namespace, st.bundle.Name, ref.GroupVersionKind, err)
+				log.Printf("[%s/%s] Failed to get client for object %s: %v", st.bundle.Namespace, st.bundle.Name, ref.GroupVersionKind, err)
 			}
 			continue
 		}
@@ -164,7 +164,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			if firstErr == nil {
 				firstErr = err
 			} else {
-				log.Printf("[WORKER][%s/%s] Failed to delete object %v %q: %v", st.bundle.Namespace, st.bundle.Name, ref.GroupVersionKind, ref.Name, err)
+				log.Printf("[%s/%s] Failed to delete object %v %q: %v", st.bundle.Namespace, st.bundle.Name, ref.GroupVersionKind, ref.Name, err)
 			}
 			continue
 		}
@@ -185,7 +185,7 @@ func (st *bundleSyncTask) setBundleStatus() error {
 		}
 		return errors.Wrapf(err, "failed to set bundle status to %s", st.bundle.Status.ShortString())
 	}
-	log.Printf("[WORKER][%s/%s] Set bundle status to %s", st.bundle.Namespace, st.bundle.Name, bundleUpdated.Status.ShortString())
+	log.Printf("[%s/%s] Set bundle status to %s", st.bundle.Namespace, st.bundle.Name, bundleUpdated.Status.ShortString())
 	return nil
 }
 

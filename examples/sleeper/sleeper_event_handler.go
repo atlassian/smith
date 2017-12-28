@@ -33,10 +33,10 @@ func (h *SleeperEventHandler) OnDelete(obj interface{}) {
 func (h *SleeperEventHandler) handle(obj interface{}) {
 	in := obj.(*sleeper_v1.Sleeper).DeepCopy()
 	msg := in.Spec.WakeupMessage
-	log.Printf("[Sleeper] %s/%s was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Namespace, in.Name, sleeper_v1.Sleeping, in.Spec.SleepFor)
+	log.Printf("%s/%s was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Namespace, in.Name, sleeper_v1.Sleeping, in.Spec.SleepFor)
 	err := h.retryUpdate(in, sleeper_v1.Sleeping, "")
 	if err != nil {
-		log.Printf("[Sleeper] Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
+		log.Printf("Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
 		return
 	}
 	go func() {
@@ -44,10 +44,10 @@ func (h *SleeperEventHandler) handle(obj interface{}) {
 		case <-h.ctx.Done():
 			return
 		case <-time.After(time.Duration(in.Spec.SleepFor) * time.Second):
-			log.Printf("[Sleeper] %s Updating %s/%s Status to %q", in.Spec.WakeupMessage, in.Namespace, in.Name, sleeper_v1.Awake)
+			log.Printf("%s Updating %s/%s Status to %q", in.Spec.WakeupMessage, in.Namespace, in.Name, sleeper_v1.Awake)
 			err = h.retryUpdate(in, sleeper_v1.Awake, msg)
 			if err != nil {
-				log.Printf("[Sleeper] Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
+				log.Printf("Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
 			}
 		}
 	}()

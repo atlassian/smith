@@ -57,12 +57,12 @@ func (h *crdEventHandler) OnDelete(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			log.Printf("[CRDEH] Delete event with unrecognized object type: %T", obj)
+			log.Printf("Delete event with unrecognized object type: %T", obj)
 			return
 		}
 		crd, ok = tombstone.Obj.(*apiext_v1b1.CustomResourceDefinition)
 		if !ok {
-			log.Printf("[CRDEH] Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			log.Printf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
 		}
 	}
@@ -78,11 +78,11 @@ func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition)
 		return true
 	}
 	if !resources.IsCrdConditionTrue(crd, apiext_v1b1.Established) {
-		log.Printf("[CRDEH] Not adding a watch for CRD %s because it hasn't been established", crd.Name)
+		log.Printf("Not adding a watch for CRD %s because it hasn't been established", crd.Name)
 		return false
 	}
 	if !resources.IsCrdConditionTrue(crd, apiext_v1b1.NamesAccepted) {
-		log.Printf("[CRDEH] Not adding a watch for CRD %s because its names haven't been accepted", crd.Name)
+		log.Printf("Not adding a watch for CRD %s because its names haven't been accepted", crd.Name)
 		return false
 	}
 	gvk := schema.GroupVersionKind{
@@ -90,10 +90,10 @@ func (h *crdEventHandler) ensureWatch(crd *apiext_v1b1.CustomResourceDefinition)
 		Version: crd.Spec.Version,
 		Kind:    crd.Spec.Names.Kind,
 	}
-	log.Printf("[CRDEH] Configuring watch for CRD %s", crd.Name)
+	log.Printf("Configuring watch for CRD %s", crd.Name)
 	res, err := h.SmartClient.ForGVK(gvk, h.Namespace)
 	if err != nil {
-		log.Printf("[CRDEH] Failed to setup informer for CRD %s: %v", crd.Name, err)
+		log.Printf("Failed to setup informer for CRD %s: %v", crd.Name, err)
 		return false
 	}
 	crdInf := cache.NewSharedIndexInformer(&cache.ListWatch{
@@ -123,7 +123,7 @@ func (h *crdEventHandler) unwatch(crd *apiext_v1b1.CustomResourceDefinition) {
 		// Nothing to do. This can happen if there was an error adding a watch
 		return
 	}
-	log.Printf("[CRDEH] Removing watch for CRD %s", crd.Name)
+	log.Printf("Removing watch for CRD %s", crd.Name)
 	crdWatch.cancel()
 	delete(h.watchers, crd.Name)
 	gvk := schema.GroupVersionKind{
@@ -137,11 +137,11 @@ func (h *crdEventHandler) unwatch(crd *apiext_v1b1.CustomResourceDefinition) {
 func (h *crdEventHandler) rebuildBundles(crd *apiext_v1b1.CustomResourceDefinition, addUpdateDelete string) {
 	bundles, err := h.BundleStore.GetBundlesByCrd(crd)
 	if err != nil {
-		log.Printf("[CRDEH] Failed to get bundles by CRD name %s: %v", crd.Name, err)
+		log.Printf("Failed to get bundles by CRD name %s: %v", crd.Name, err)
 		return
 	}
 	for _, bundle := range bundles {
-		log.Printf("[CRDEH][%s/%s] Rebuilding bundle because CRD %s was %s", bundle.Namespace, bundle.Name, crd.Name, addUpdateDelete)
+		log.Printf("[%s/%s] Rebuilding bundle because CRD %s was %s", bundle.Namespace, bundle.Name, crd.Name, addUpdateDelete)
 		h.enqueue(bundle)
 	}
 }

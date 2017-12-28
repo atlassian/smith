@@ -49,32 +49,32 @@ func (c *BundleController) handleErr(retriable bool, err error, key interface{})
 		return
 	}
 	if retriable && c.Queue.NumRequeues(key) < maxRetries {
-		log.Printf("[WORKER][%s] Error syncing Bundle: %v", key, err)
+		log.Printf("[%s] Error syncing Bundle: %v", key, err)
 		c.Queue.AddRateLimited(key)
 		return
 	}
 
-	log.Printf("[WORKER][%s] Dropping Bundle out of the queue: %v", key, err)
+	log.Printf("[%s] Dropping Bundle out of the queue: %v", key, err)
 	c.Queue.Forget(key)
 }
 
 func (c *BundleController) processKey(key string) (retriableRet bool, errRet error) {
 	startTime := time.Now()
-	log.Printf("[WORKER][%s] Started syncing Bundle", key)
+	log.Printf("[%s] Started syncing Bundle", key)
 	defer func() {
 		msg := ""
 		if errRet != nil && api_errors.IsConflict(errors.Cause(errRet)) {
 			msg = " (conflict)"
 			errRet = nil
 		}
-		log.Printf("[WORKER][%s] Synced Bundle in %v%s", key, time.Since(startTime), msg)
+		log.Printf("[%s] Synced Bundle in %v%s", key, time.Since(startTime), msg)
 	}()
 	bundleObj, exists, err := c.BundleInf.GetIndexer().GetByKey(key)
 	if err != nil {
 		return false, err
 	}
 	if !exists {
-		log.Printf("[WORKER][%s] Bundle has been deleted", key)
+		log.Printf("[%s] Bundle has been deleted", key)
 		return false, nil
 	}
 

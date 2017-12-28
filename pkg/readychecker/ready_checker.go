@@ -90,9 +90,9 @@ func (rc *ReadyChecker) checkPathValue(gk schema.GroupKind, obj *unstructured.Un
 	}
 	if actualValue != value {
 		// TODO this is for debugging, remove later
-		log.Printf("[IsReady] %q is not equal to expected %q", actualValue, value)
+		log.Printf("%q is not equal to expected %q", actualValue, value)
 		return false, false, nil
 	}
-	log.Printf("[IsReady] %q is equal to expected %q", actualValue, value)
+	log.Printf("%q is equal to expected %q", actualValue, value)
 	return true, false, nil
 }
