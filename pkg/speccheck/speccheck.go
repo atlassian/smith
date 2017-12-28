@@ -110,8 +110,8 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	delete(updated.Object, "status")
 
 	if !equality.Semantic.DeepEqual(updated.Object, actualClone.Object) {
-		log.Printf("Objects are different: %s\nupdated: %v\nactualClone: %v",
-			diff.ObjectReflectDiff(updated.Object, actualClone.Object), updated.Object, actualClone.Object)
+		log.Printf("Objects are different: %s",
+			diff.ObjectReflectDiff(updated.Object, actualClone.Object))
 		return updated, false, nil
 	}
 	return actual, true, nil

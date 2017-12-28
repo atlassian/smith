@@ -17,6 +17,7 @@ import (
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -112,6 +113,25 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 			status: resourceStatusError{
 				err:              err,
 				isRetriableError: retriable,
+			},
+		}
+	}
+
+	// Check if the resource actually matches the spec to detect infinite update cycles
+	updatedSpec, match, err := st.specCheck.CompareActualVsSpec(spec, resUpdated)
+	if err != nil {
+		return resourceInfo{
+			status: resourceStatusError{
+				err: errors.Wrap(err, "specification re-check failed"),
+			},
+		}
+	}
+	if !match {
+		log.Printf("Objects are different after specification re-check:\n%s",
+			diff.ObjectReflectDiff(updatedSpec.Object, resUpdated.Object))
+		return resourceInfo{
+			status: resourceStatusError{
+				err: errors.New("specification of the created/updated object does not match the desired spec"),
 			},
 		}
 	}
