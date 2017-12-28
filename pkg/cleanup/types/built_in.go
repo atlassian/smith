@@ -16,6 +16,7 @@ import (
 var MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
 	{Group: apps_v1b2.GroupName, Kind: "Deployment"}: deploymentCleanup,
 	{Group: core_v1.GroupName, Kind: "Service"}:      serviceCleanup,
+	{Group: core_v1.GroupName, Kind: "Secret"}:       secretCleanup,
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
@@ -61,6 +62,26 @@ func serviceCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unst
 	}
 
 	return util.RuntimeToUnstructured(&serviceSpec)
+}
+
+func secretCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	var secretSpec core_v1.Secret
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &secretSpec); err != nil {
+		return nil, err
+	}
+
+	// StringData overwrites Data
+	if len(secretSpec.StringData) > 0 {
+		if secretSpec.Data == nil {
+			secretSpec.Data = make(map[string][]byte, len(secretSpec.StringData))
+		}
+		for k, v := range secretSpec.StringData {
+			secretSpec.Data[k] = []byte(v)
+		}
+		secretSpec.StringData = nil
+	}
+
+	return util.RuntimeToUnstructured(&secretSpec)
 }
 
 func scServiceBindingCleanup(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, error) {
