@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/atlassian/smith/pkg/apis/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/pkg/errors"
@@ -24,7 +25,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			Name: smith_v1.BundleResourceName,
 		},
 		Spec: apiext_v1b1.CustomResourceDefinitionSpec{
-			Group:   smith_v1.GroupName,
+			Group:   smith.GroupName,
 			Version: smith_v1.BundleResourceVersion,
 			Names: apiext_v1b1.CustomResourceDefinitionNames{
 				Plural:   smith_v1.BundleResourcePlural,

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/atlassian/smith/pkg/apis/smith"
+
 	"github.com/pkg/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -68,9 +70,9 @@ const (
 	BundleResourceVersion  = "v1"
 	BundleResourceKind     = "Bundle"
 
-	BundleResourceGroupVersion = GroupName + "/" + BundleResourceVersion
+	BundleResourceGroupVersion = smith.GroupName + "/" + BundleResourceVersion
 
-	BundleResourceName = BundleResourcePlural + "." + GroupName
+	BundleResourceName = BundleResourcePlural + "." + smith.GroupName
 )
 
 var BundleGVK = SchemeGroupVersion.WithKind(BundleResourceKind)
