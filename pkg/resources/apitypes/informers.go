@@ -11,7 +11,7 @@ import (
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	settings_v1a1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	apps_v1b1inf "k8s.io/client-go/informers/apps/v1beta1"
+	apps_v1b2inf "k8s.io/client-go/informers/apps/v1beta2"
 	core_v1inf "k8s.io/client-go/informers/core/v1"
 	ext_v1b1inf "k8s.io/client-go/informers/extensions/v1beta1"
 	settings_v1a1inf "k8s.io/client-go/informers/settings/v1alpha1"
@@ -26,7 +26,7 @@ func ResourceInformers(mainClient kubernetes.Interface, scClient scClientset.Int
 		core_v1.SchemeGroupVersion.WithKind("Service"):      core_v1inf.NewServiceInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
 		core_v1.SchemeGroupVersion.WithKind("ConfigMap"):    core_v1inf.NewConfigMapInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
 		core_v1.SchemeGroupVersion.WithKind("Secret"):       core_v1inf.NewSecretInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
-		apps_v1b2.SchemeGroupVersion.WithKind("Deployment"): apps_v1b1inf.NewDeploymentInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		apps_v1b2.SchemeGroupVersion.WithKind("Deployment"): apps_v1b2inf.NewDeploymentInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
 	}
 	if enablePodPreset {
 		infs[settings_v1a1.SchemeGroupVersion.WithKind("PodPreset")] = settings_v1a1inf.NewPodPresetInformer(mainClient, namespace, resyncPeriod, cache.Indexers{})
