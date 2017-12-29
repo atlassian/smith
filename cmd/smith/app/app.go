@@ -206,7 +206,7 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
-	pprofAddr := flag.String("pprof-address", "", "Address for pprof to listen on")
+	pprofAddr := flagset.String("pprof-address", "", "Address for pprof to listen on")
 	if err := flagset.Parse(arguments); err != nil {
 		return nil, err
 	}

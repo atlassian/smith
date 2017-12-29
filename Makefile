@@ -43,6 +43,10 @@ build-ci:
 fmt:
 	goimports -w=true -d $(ALL_GO_FILES)
 
+.PHONY: print-bundle-schema
+print-bundle-schema:
+	bazel run //cmd/schema -- -print-bundle-schema=yaml
+
 .PHONY: generate
 generate: generate-client generate-deepcopy
 

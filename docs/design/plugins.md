@@ -84,6 +84,7 @@ A plugin must:
   - no timestamps.
 3. Output an object of the correct Group/Version/Kind - GVK is declared in the plugin resource definition and
 is known in advance. Smith validates that an object of the correct GVK is returned.
+4. Have a name that is a [DNS_SUBDOMAIN](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/architecture/identifiers.md)
 
 A plugin does not need to set the name of the returned object, it is set by Smith.
 

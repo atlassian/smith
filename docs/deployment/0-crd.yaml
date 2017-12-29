@@ -11,3 +11,147 @@ spec:
     singular: bundle
   scope: Namespaced
   version: v1
+  validation:
+    openAPIV3Schema: # generated using make print-bundle-schema
+      definitions:
+        DNS_SUBDOMAIN:
+          maxLength: 253
+          minLength: 1
+          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+          type: string
+        apiVersion:
+          minLength: 1
+          type: string
+        kind:
+          minLength: 1
+          type: string
+        objectMeta:
+          description: Schema for some fields of ObjectMeta
+          properties:
+            annotations:
+              additionalProperties:
+                type: string
+              type: object
+            finalizers:
+              items:
+                minLength: 1
+                type: string
+              type: array
+            initializer:
+              properties:
+                name:
+                  type: string
+              required:
+              - name
+              type: object
+            initializers:
+              properties:
+                pending:
+                  items:
+                    $ref: '#/definitions/initializer'
+                  type: array
+              required:
+              - pending
+              type: object
+            labels:
+              additionalProperties:
+                maxLength: 63
+                pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
+                type: string
+              type: object
+            name:
+              $ref: '#/definitions/DNS_SUBDOMAIN'
+            ownerReference:
+              properties:
+                apiVersion:
+                  $ref: '#/definitions/apiVersion'
+                blockOwnerDeletion:
+                  type: boolean
+                controller:
+                  type: boolean
+                kind:
+                  $ref: '#/definitions/kind'
+                name:
+                  $ref: '#/definitions/DNS_SUBDOMAIN'
+              required:
+              - apiVersion
+              - kind
+              - name
+              type: object
+            ownerReferences:
+              items:
+                $ref: '#/definitions/ownerReference'
+              type: array
+          type: object
+        objectSpec:
+          $ref: '#/definitions/typeMeta'
+          description: Schema for a resource that describes an object
+          properties:
+            metadata:
+              $ref: '#/definitions/objectMeta'
+          required:
+          - metadata
+          type: object
+        pluginSpec:
+          description: Schema for a resource that describes a plugin
+          properties:
+            name:
+              $ref: '#/definitions/DNS_SUBDOMAIN'
+            objectName:
+              $ref: '#/definitions/DNS_SUBDOMAIN'
+            spec:
+              type: object
+          required:
+          - name
+          - objectName
+          type: object
+        resource:
+          description: Resource describes an object that should be provisioned
+          properties:
+            dependsOn:
+              items:
+                $ref: '#/definitions/resourceName'
+              type: array
+            name:
+              $ref: '#/definitions/resourceName'
+            spec:
+              oneOf:
+              - properties:
+                  object:
+                    $ref: '#/definitions/objectSpec'
+                required:
+                - object
+              - properties:
+                  plugin:
+                    $ref: '#/definitions/pluginSpec'
+                required:
+                - plugin
+              type: object
+          required:
+          - name
+          - spec
+          type: object
+        resourceName:
+          $ref: '#/definitions/DNS_SUBDOMAIN'
+          description: ResourceName is a reference to another Resource in the same bundle
+        typeMeta:
+          description: Schema for TypeMeta
+          properties:
+            apiVersion:
+              $ref: '#/definitions/apiVersion'
+            kind:
+              $ref: '#/definitions/kind'
+          required:
+          - kind
+          - apiVersion
+          type: object
+      properties:
+        spec:
+          properties:
+            resources:
+              items:
+                $ref: '#/definitions/resource'
+              type: array
+          required:
+          - resources
+          type: object

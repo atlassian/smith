@@ -193,6 +193,7 @@ type ResourceName string
 type PluginName string
 
 // +k8s:deepcopy-gen=true
+// Resource describes an object that should be provisioned.
 type Resource struct {
 	// Name of the resource for references.
 	Name ResourceName `json:"name"`
