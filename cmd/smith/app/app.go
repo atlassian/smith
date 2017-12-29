@@ -235,6 +235,7 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 		}
 		return nil, context.Canceled
 	case "":
+		// flag not set, continue to execute the normal flow
 	default:
 		return nil, errors.Errorf("unsupported schema output format %q", *printBundleSchema)
 	}
