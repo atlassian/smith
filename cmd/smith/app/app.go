@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
@@ -21,13 +20,11 @@ import (
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
-	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
-	"github.com/ghodss/yaml"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/pkg/errors"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -209,35 +206,9 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
-	pprofAddr := flag.String("pprof-address", "", "Address for pprof to listen on")
-	printBundleSchema := flag.String("print-bundle-schema", "", "Print Bundle schema and exit (specify format: json or yaml)")
+	pprofAddr := flagset.String("pprof-address", "", "Address for pprof to listen on")
 	if err := flagset.Parse(arguments); err != nil {
 		return nil, err
-	}
-
-	switch *printBundleSchema {
-	case "json":
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		err := enc.Encode(resources.BundleCrd().Spec.Validation.OpenAPIV3Schema)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshal Bundle schema")
-		}
-		return nil, context.Canceled
-	case "yaml":
-		data, err := yaml.Marshal(resources.BundleCrd().Spec.Validation.OpenAPIV3Schema)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshal Bundle schema")
-		}
-		_, err = os.Stdout.Write(data)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed write schema YAML to stdout")
-		}
-		return nil, context.Canceled
-	case "":
-		// flag not set, continue to execute the normal flow
-	default:
-		return nil, errors.Errorf("unsupported schema output format %q", *printBundleSchema)
 	}
 
 	config, err := client.ConfigFromEnv()

@@ -12,7 +12,7 @@ spec:
   scope: Namespaced
   version: v1
   validation:
-    openAPIV3Schema: # generated using smith -print-bundle-schema=yaml
+    openAPIV3Schema: # generated using make print-bundle-schema
       definitions:
         DNS_SUBDOMAIN:
           maxLength: 253
