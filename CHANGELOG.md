@@ -1,3 +1,10 @@
+v1.0.0
+------
+- implementation of plugins support
+- lots of internals refactoring
+- per-resource status reporting
+- bugfixes and improvements
+
 v0.2.3
 ------
 - plugin support doc and plugin types

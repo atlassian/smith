@@ -14,6 +14,10 @@
 
 It's functional and under active development.
 
+## News
+
+- 01.01.2018: Milestone [milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0) is complete and v1.0.0 released! 
+
 ## The idea
 
 What if we build a service that allows us to manage Kubernetes' built-in resources and other
