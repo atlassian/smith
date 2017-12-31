@@ -8,11 +8,11 @@
 [![Docker Stars](https://img.shields.io/docker/stars/atlassianlabs/smith.svg)](https://hub.docker.com/r/atlassianlabs/smith/)
 [![MicroBadger Layers Size](https://images.microbadger.com/badges/image/atlassianlabs/smith.svg)](https://microbadger.com/images/atlassianlabs/smith)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atlassian/smith)](https://goreportcard.com/report/github.com/atlassian/smith)
-[![license](https://img.shields.io/github/license/atlassian/smith.svg)](https://github.com/atlassian/smith/blob/master/LICENSE)
+[![license](https://img.shields.io/github/license/atlassian/smith.svg)](LICENSE)
 
-**Smith** is a Kubernetes workflow engine / resource manager **prototype**.
-It's not complete yet, it's still under active development.
-It may or may not fulfil the requirements of https://github.com/kubernetes/kubernetes/issues/1704.
+**Smith** is a Kubernetes workflow engine / resource manager.
+
+It's functional and under active development.
 
 ## The idea
 
@@ -20,8 +20,8 @@ What if we build a service that allows us to manage Kubernetes' built-in resourc
 [Custom Resources](https://kubernetes.io/docs/concepts/api-extension/custom-resources/) (CRs) in a generic way?
 Similar to how AWS CloudFormation (or Google Deployment Manager) allows us to manage any
 AWS/GCE and custom resource. Then we could expose all the resources we need
-to integrate as Third Party Resources and manage them declaratively. This is an open architecture
-with Kubernetes as its core. Other microservices can create/update/watch CRs to co-ordinate their work/lifecycle.
+to integrate as Custom Resources and manage them declaratively. This is an open architecture
+with Kubernetes as its core. Other controllers can create/update/watch CRs to co-ordinate their work/lifecycle.
 
 ## Implementation
 
@@ -84,7 +84,7 @@ spec:
     - db1
     spec:
       object:
-        apiVersion: apps/v1beta2
+        apiVersion: apps/v1
         kind: Deployment
         metadata:
           name: app1
@@ -121,7 +121,7 @@ graph, if a resource is not in the READY state (still being created) it skips pr
 Resources that don't have their dependencies READY are not processed.
 Resources that can be created concurrently are created concurrently.
 Full bundle re-processing is triggered by events about the watched resources.
-Smith is watching all supported resource types and reacts to events to determine which bundle should be re-processed.
+Smith is watching all supported resource kinds and reacts to events to determine which bundle should be re-processed.
 This scales better than watching individual resources and much better than polling individual resources.
 Smith controller is built according to [recommendations](https://github.com/kubernetes/community/blob/master/contributors/devel/controllers.md)
 and following the same behaviour, semantics and code "style" as native Kubernetes controllers as closely as possible.
@@ -130,15 +130,11 @@ and following the same behaviour, semantics and code "style" as native Kubernete
 
 - Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `PodPreset`, `Ingress`;
 - [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `ServiceInstance` and `ServiceBinding`.
-See [an example](https://github.com/atlassian/smith/tree/master/examples/service_catalog) and
+See [an example](examples/service_catalog) and
 [recording of the presentation](https://youtu.be/7fgPgtQh5Es) to [Service Catalog SIG](https://github.com/kubernetes/community/tree/master/sig-service-catalog);
-- Dynamic Custom Resources support via [special annotations](https://github.com/atlassian/smith/blob/master/docs/design/managing-resources.md#defined-annotations);
+- Dynamic Custom Resources support via [special annotations](docs/design/managing-resources.md#defined-annotations);
 - References between objects in the graph to pull parts of objects/fields from dependencies;
 - Smith will delete objects which were removed from a Bundle when Bundle reconciliation is performed (e.g. on a Bundle update).
-
-## Missing features
-
-See [milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0).
 
 ## Notes
 
@@ -152,13 +148,13 @@ Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes
 
 * Graph of dependencies is defined explicitly.
 * It uses polling and blocks while waiting for the resource to become READY.
-* The goal of Smith is to manage instances of CRs. App Controller cannot manage them as of this writing.
+* The goal of Smith is to manage Custom Resources and Service Catalog objects. App Controller cannot manage them as of this writing (?).
 
 ### On [Helm](https://helm.sh/)
 Helm is a package manager for Kubernetes. Smith operates on a lower level, even though it can be used by a human,
-that is not the main usecase. Smith is built to be used as a foundation component with human-friendly tooling built
+that is not the main use case. Smith is built to be used as a foundation component with human-friendly tooling built
 on top of it. E.g. Helm could probably use Smith under the covers to manipulate Kubernetes API objects. Another
-usecase is a PaaS that delegates (some) object manipulations to Smith.
+use case is a PaaS that delegates (some) object manipulations to Smith.
 
 ## Requirements
 
@@ -224,4 +220,4 @@ those contributing as an individual.
       
 ## License
 
-Copyright (c) 2016-2017 Atlassian and others. Apache 2.0 licensed, see LICENSE file.
+Copyright (c) 2016-2018 Atlassian and others. Apache 2.0 licensed, see LICENSE file.
