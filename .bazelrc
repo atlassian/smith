@@ -1,5 +1,4 @@
-common --experimental_repository_cache=/tmp/bazel_experimental_repository_cache
-
+build --experimental_repository_cache=/tmp/bazel_experimental_repository_cache
 build --workspace_status_command build/print-workspace-status.sh
 
 test --test_output=errors
