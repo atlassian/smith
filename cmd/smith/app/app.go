@@ -55,9 +55,9 @@ const (
 // for leader election configuration description.
 type LeaderElectionConfig struct {
 	LeaderElect        bool
-	LeaseDuration      meta_v1.Duration
-	RenewDeadline      meta_v1.Duration
-	RetryPeriod        meta_v1.Duration
+	LeaseDuration      time.Duration
+	RenewDeadline      time.Duration
+	RetryPeriod        time.Duration
 	ConfigMapNamespace string
 	ConfigMapName      string
 }
@@ -230,9 +230,9 @@ func (a *App) startLeaderElection(ctx context.Context, configMapsGetter core_v1c
 				EventRecorder: recorder,
 			},
 		},
-		LeaseDuration: a.LeaseDuration.Duration,
-		RenewDeadline: a.RenewDeadline.Duration,
-		RetryPeriod:   a.RetryPeriod.Duration,
+		LeaseDuration: a.LeaseDuration,
+		RenewDeadline: a.RenewDeadline,
+		RetryPeriod:   a.RetryPeriod,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(stop <-chan struct{}) {
 				log.Print("Started leading")
@@ -296,17 +296,17 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 		"Start a leader election client and gain leadership before "+
 		"executing the main loop. Enable this when running replicated "+
 		"components for high availability")
-	flagset.DurationVar(&a.LeaseDuration.Duration, "leader-elect-lease-duration", defaultLeaseDuration, ""+
+	flagset.DurationVar(&a.LeaseDuration, "leader-elect-lease-duration", defaultLeaseDuration, ""+
 		"The duration that non-leader candidates will wait after observing a leadership "+
 		"renewal until attempting to acquire leadership of a led but unrenewed leader "+
 		"slot. This is effectively the maximum duration that a leader can be stopped "+
 		"before it is replaced by another candidate. This is only applicable if leader "+
 		"election is enabled")
-	flagset.DurationVar(&a.RenewDeadline.Duration, "leader-elect-renew-deadline", defaultRenewDeadline, ""+
+	flagset.DurationVar(&a.RenewDeadline, "leader-elect-renew-deadline", defaultRenewDeadline, ""+
 		"The interval between attempts by the acting master to renew a leadership slot "+
 		"before it stops leading. This must be less than or equal to the lease duration. "+
 		"This is only applicable if leader election is enabled")
-	flagset.DurationVar(&a.RetryPeriod.Duration, "leader-elect-retry-period", defaultRetryPeriod, ""+
+	flagset.DurationVar(&a.RetryPeriod, "leader-elect-retry-period", defaultRetryPeriod, ""+
 		"The duration the clients should wait between attempting acquisition and renewal "+
 		"of a leadership. This is only applicable if leader election is enabled")
 	flagset.StringVar(&a.ConfigMapNamespace, "leader-elect-configmap-namespace", meta_v1.NamespaceDefault,
