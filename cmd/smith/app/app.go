@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -25,7 +26,6 @@ import (
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
-	"github.com/golang/glog"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/pkg/errors"
 	core_v1 "k8s.io/api/core/v1"
@@ -147,7 +147,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Events
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(logInfo)
 	eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: clientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme, core_v1.EventSource{Component: "smith-controller"})
 
@@ -346,4 +346,8 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 		}()
 	}
 	return &a, nil
+}
+
+func logInfo(format string, args ...interface{}) {
+	log.Print(fmt.Sprintf(format, args...))
 }
