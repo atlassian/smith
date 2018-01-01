@@ -70,7 +70,7 @@ type App struct {
 	Plugins              []plugin.NewFunc
 	Workers              int
 	DisablePodPreset     bool
-	LeaderElectionConfig
+	LeaderElectionConfig LeaderElectionConfig
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -152,8 +152,8 @@ func (a *App) Run(ctx context.Context) error {
 	recorder := eventBroadcaster.NewRecorder(scheme, core_v1.EventSource{Component: "smith-controller"})
 
 	// Leader election
-	if a.LeaderElect {
-		log.Printf("Starting leader election in namespace %q", a.ConfigMapNamespace)
+	if a.LeaderElectionConfig.LeaderElect {
+		log.Printf("Starting leader election in namespace %q", a.LeaderElectionConfig.ConfigMapNamespace)
 
 		var startedLeading <-chan struct{}
 		ctx, startedLeading, err = a.startLeaderElection(ctx, clientset.CoreV1(), recorder)
@@ -221,8 +221,8 @@ func (a *App) startLeaderElection(ctx context.Context, configMapsGetter core_v1c
 	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 		Lock: &resourcelock.ConfigMapLock{
 			ConfigMapMeta: meta_v1.ObjectMeta{
-				Namespace: a.ConfigMapNamespace,
-				Name:      a.ConfigMapName,
+				Namespace: a.LeaderElectionConfig.ConfigMapNamespace,
+				Name:      a.LeaderElectionConfig.ConfigMapName,
 			},
 			Client: configMapsGetter,
 			LockConfig: resourcelock.ResourceLockConfig{
@@ -230,9 +230,9 @@ func (a *App) startLeaderElection(ctx context.Context, configMapsGetter core_v1c
 				EventRecorder: recorder,
 			},
 		},
-		LeaseDuration: a.LeaseDuration,
-		RenewDeadline: a.RenewDeadline,
-		RetryPeriod:   a.RetryPeriod,
+		LeaseDuration: a.LeaderElectionConfig.LeaseDuration,
+		RenewDeadline: a.LeaderElectionConfig.RenewDeadline,
+		RetryPeriod:   a.LeaderElectionConfig.RetryPeriod,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(stop <-chan struct{}) {
 				log.Print("Started leading")
@@ -292,27 +292,29 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
 	pprofAddr := flagset.String("pprof-address", "", "Address for pprof to listen on")
-	flagset.BoolVar(&a.LeaderElect, "leader-elect", false, ""+
+
+	// This flag is off by default only because leader election package says it is ALPHA API.
+	flagset.BoolVar(&a.LeaderElectionConfig.LeaderElect, "leader-elect", false, ""+
 		"Start a leader election client and gain leadership before "+
 		"executing the main loop. Enable this when running replicated "+
 		"components for high availability")
-	flagset.DurationVar(&a.LeaseDuration, "leader-elect-lease-duration", defaultLeaseDuration, ""+
+	flagset.DurationVar(&a.LeaderElectionConfig.LeaseDuration, "leader-elect-lease-duration", defaultLeaseDuration, ""+
 		"The duration that non-leader candidates will wait after observing a leadership "+
 		"renewal until attempting to acquire leadership of a led but unrenewed leader "+
 		"slot. This is effectively the maximum duration that a leader can be stopped "+
 		"before it is replaced by another candidate. This is only applicable if leader "+
 		"election is enabled")
-	flagset.DurationVar(&a.RenewDeadline, "leader-elect-renew-deadline", defaultRenewDeadline, ""+
+	flagset.DurationVar(&a.LeaderElectionConfig.RenewDeadline, "leader-elect-renew-deadline", defaultRenewDeadline, ""+
 		"The interval between attempts by the acting master to renew a leadership slot "+
 		"before it stops leading. This must be less than or equal to the lease duration. "+
 		"This is only applicable if leader election is enabled")
-	flagset.DurationVar(&a.RetryPeriod, "leader-elect-retry-period", defaultRetryPeriod, ""+
+	flagset.DurationVar(&a.LeaderElectionConfig.RetryPeriod, "leader-elect-retry-period", defaultRetryPeriod, ""+
 		"The duration the clients should wait between attempting acquisition and renewal "+
 		"of a leadership. This is only applicable if leader election is enabled")
-	flagset.StringVar(&a.ConfigMapNamespace, "leader-elect-configmap-namespace", meta_v1.NamespaceDefault,
+	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapNamespace, "leader-elect-configmap-namespace", meta_v1.NamespaceDefault,
 		"Namespace to use for leader election ConfigMap. This is only applicable if leader election is enabled")
-	flagset.StringVar(&a.ConfigMapName, "leader-elect-configmap-name", "smith-leader-elect",
-		"Namespace to use. All namespaces are used if empty string or omitted")
+	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapName, "leader-elect-configmap-name", "smith-leader-elect",
+		"ConfigMap name to use for leader election. This is only applicable if leader election is enabled")
 
 	if err := flagset.Parse(arguments); err != nil {
 		return nil, err
