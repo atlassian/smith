@@ -16,5 +16,6 @@ go_binary(
     name = "main",
     embed = [":go_default_library"],
     importpath = "github.com/atlassian/smith/examples/sleeper/main",
+    pure = "on",
     visibility = ["//visibility:public"],
 )
