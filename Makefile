@@ -1,7 +1,8 @@
 METALINTER_CONCURRENCY ?= 4
 ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*" -not -path './pkg/client/clientset_generated/*' -not -name 'zz_generated.*')
 OS = $$(uname -s | tr A-Z a-z)
-BINARY_PREFIX_DIRECTORY=$(OS)_amd64_pure_stripped
+BINARY_PREFIX_DIRECTORY=$(OS)_amd64_stripped
+BINARY_PURE_PREFIX_DIRECTORY=$(OS)_amd64_pure_stripped
 #BINARY_RACE_PREFIX_DIRECTORY=$(OS)_amd64_race_stripped
 
 .PHONY: setup
@@ -106,7 +107,7 @@ minikube-run: fmt update-bazel build
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/cmd/smith/$(BINARY_PREFIX_DIRECTORY)/smith -disable-service-catalog -leader-elect
+	bazel-bin/cmd/smith/$(BINARY_PURE_PREFIX_DIRECTORY)/smith -disable-service-catalog -leader-elect
 
 .PHONY: minikube-run-sc
 minikube-run-sc: fmt update-bazel build
@@ -117,7 +118,7 @@ minikube-run-sc: fmt update-bazel build
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/cmd/smith/$(BINARY_PREFIX_DIRECTORY)/smith  \
+	bazel-bin/cmd/smith/$(BINARY_PURE_PREFIX_DIRECTORY)/smith  \
 	-leader-elect \
 	-service-catalog-url="https://$$(minikube ip):30443" \
 	-service-catalog-insecure
@@ -132,7 +133,7 @@ minikube-sleeper-run: fmt update-bazel
 	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
 	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
 	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/examples/sleeper/main/$(BINARY_PREFIX_DIRECTORY)/main
+	bazel-bin/examples/sleeper/main/$(BINARY_PURE_PREFIX_DIRECTORY)/main
 
 .PHONY: test
 test: fmt update-bazel test-ci
