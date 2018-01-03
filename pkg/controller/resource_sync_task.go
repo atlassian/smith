@@ -88,8 +88,16 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 		}
 	}
 
+	// Try to get the resource. We do a read first to avoid generating unnecessary events.
+	actual, status := st.getActualObject(res)
+	if status != nil {
+		return resourceInfo{
+			status: status,
+		}
+	}
+
 	// Eval spec
-	spec, err := st.evalSpec(res)
+	spec, err := st.evalSpec(res, actual)
 	if err != nil {
 		return resourceInfo{
 			status: resourceStatusError{
@@ -106,7 +114,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Create or update resource
-	resUpdated, retriable, err := st.createOrUpdate(spec)
+	resUpdated, retriable, err := st.createOrUpdate(spec, actual)
 	if err != nil {
 		return resourceInfo{
 			actual: resUpdated,
@@ -176,8 +184,47 @@ func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource)
 	return nil
 }
 
+func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Object, resourceStatus) {
+	var gvk schema.GroupVersionKind
+	var name string
+	if res.Spec.Object != nil {
+		gvk = res.Spec.Object.GetObjectKind().GroupVersionKind()
+		name = res.Spec.Object.(meta_v1.Object).GetName()
+	} else if res.Spec.Plugin != nil {
+		gvk = st.pluginContainers[res.Spec.Plugin.Name].Plugin.Describe().GVK
+		name = res.Spec.Plugin.ObjectName
+	} else {
+		panic(errors.New(`neither "object" nor "plugin" field is specified`)) // unreachable
+	}
+	actual, exists, err := st.store.Get(gvk, st.bundle.Namespace, name)
+	if err != nil {
+		return nil, resourceStatusError{
+			err: errors.Wrap(err, "failed to get object from the Store"),
+		}
+	}
+	if !exists {
+		return nil, nil
+	}
+	actualMeta := actual.(meta_v1.Object)
+
+	// Check that the object is not marked for deletion
+	if actualMeta.GetDeletionTimestamp() != nil {
+		return nil, resourceStatusError{
+			err: errors.New("object is marked for deletion"),
+		}
+	}
+
+	// Check that this bundle owns the object
+	if !meta_v1.IsControlledBy(actualMeta, st.bundle) {
+		return nil, resourceStatusError{
+			err: errors.New("object is not owned by the Bundle"),
+		}
+	}
+	return actual, nil
+}
+
 // evalSpec evaluates the resource specification and returns the result.
-func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
+func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Object) (*unstructured.Unstructured, error) {
 	// Process the spec
 	var objectOrPluginSpec map[string]interface{}
 	if res.Spec.Object != nil {
@@ -206,7 +253,7 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unst
 		}
 	} else if res.Spec.Plugin != nil {
 		var err error
-		obj, err = st.evalPluginSpec(res)
+		obj, err = st.evalPluginSpec(res, actual)
 		if err != nil {
 			return nil, err
 		}
@@ -254,7 +301,7 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unst
 }
 
 // evalPluginSpec evaluates the plugin resource specification and returns the result.
-func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
+func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtime.Object) (*unstructured.Unstructured, error) {
 	pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
 	if !ok {
 		return nil, errors.Errorf("no such plugin %q", res.Spec.Plugin.Name)
@@ -271,6 +318,7 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructure
 	}
 
 	result, err := pluginContainer.Plugin.Process(res.Spec.Plugin.Spec, &plugin.Context{
+		Actual:       actual,
 		Dependencies: dependencies,
 	})
 	if err != nil {
@@ -339,23 +387,16 @@ func (st *resourceSyncTask) prepareServiceBindingDependency(dependency *plugin.D
 }
 
 // createOrUpdate creates or updates a resources.
-func (st *resourceSyncTask) createOrUpdate(spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableRet bool, e error) {
+func (st *resourceSyncTask) createOrUpdate(spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableRet bool, e error) {
 	// Prepare client
 	gvk := spec.GroupVersionKind()
 	resClient, err := st.smartClient.ForGVK(gvk, st.bundle.Namespace)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to get the client for %q", gvk)
 	}
-
-	// Try to get the resource. We do read first to avoid generating unnecessary events.
-	obj, exists, err := st.store.Get(gvk, st.bundle.Namespace, spec.GetName())
-	if err != nil {
-		// Unexpected error
-		return nil, false, errors.Wrap(err, "failed to get object from the Store")
-	}
-	if exists {
+	if actual != nil {
 		log.Printf("[%s/%s] Object %s %q found, checking spec", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
-		return st.updateResource(resClient, spec, obj)
+		return st.updateResource(resClient, spec, actual)
 	}
 	log.Printf("[%s/%s] Object %s %q not found, creating", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
 	return st.createResource(resClient, spec)
@@ -379,17 +420,6 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 
 // Mutates spec and actual.
 func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
-	actualMeta := actual.(meta_v1.Object)
-	// Check that the object is not marked for deletion
-	if actualMeta.GetDeletionTimestamp() != nil {
-		return nil, false, errors.New("object is marked for deletion")
-	}
-
-	// Check that this bundle owns the object
-	if !meta_v1.IsControlledBy(actualMeta, st.bundle) {
-		return nil, false, errors.New("object is not owned by the Bundle")
-	}
-
 	// Compare spec and existing resource
 	updated, match, err := st.specCheck.CompareActualVsSpec(spec, actual)
 	if err != nil {

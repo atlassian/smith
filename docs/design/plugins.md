@@ -102,17 +102,29 @@ import (
 )
 
 // For reference:
-//
-//type Dependency struct {
-//	Spec      smith_v1.Resource
-//	Actual    runtime.Object
-//	Outputs   []runtime.Object
-//	Auxiliary []runtime.Object
-//}
-//
-//type ProcessResult struct {
-//	Object runtime.Object
-//}
+/*
+
+// Context contains contextual information for the Process() call.
+type Context struct {
+	// Actual is the actual object that will be updated if it exists already.
+	// nil if the object does not exist.
+	Actual runtime.Object
+	// Dependencies is the map from dependency name to a description of that dependency.
+	Dependencies map[smith_v1.ResourceName]Dependency
+}
+
+// Dependency contains information about a dependency of a resource that a plugin is processing.
+type Dependency struct {
+	// Spec is the specification of the resource as specified in the Bundle.
+	Spec smith_v1.Resource
+	// Actual is the actual dependency object.
+	Actual runtime.Object
+	// Outputs are objects produced by the actual object.
+	Outputs []runtime.Object
+	// Auxiliary are objects that somehow relate to the actual object.
+	Auxiliary []runtime.Object
+}
+*/
 
 const  (
 	PluginName smith_v1.PluginName = "filter"
@@ -125,7 +137,7 @@ func New() (smith_plugin.Plugin, error) {
 type filterPlugin struct {
 }
 
-func (p *filterPlugin) Process(spec runtime.RawExtension, *smith_plugin.Context) (*smith_plugin.ProcessResult, error) {
+func (p *filterPlugin) Process(spec map[string]interface{}, *smith_plugin.Context) (*smith_plugin.ProcessResult, error) {
 	// Do the processing
 	return &smith_plugin.ProcessResult{
 		//Object: object literal here

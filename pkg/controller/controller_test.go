@@ -71,16 +71,18 @@ type testCase struct {
 	bundle             *smith_v1.Bundle
 	namespace          string
 
-	expectedActions      sets.String
-	enableServiceCatalog bool
-	testHandler          fakeActionHandler
-	test                 func(*testing.T, context.Context, *BundleController, *testCase)
-	plugins              map[smith_v1.PluginName]func(*testing.T) plugin.Plugin
+	expectedActions        sets.String
+	enableServiceCatalog   bool
+	testHandler            fakeActionHandler
+	test                   func(*testing.T, context.Context, *BundleController, *testCase)
+	plugins                map[smith_v1.PluginName]func(*testing.T) testingPlugin
+	pluginsShouldBeInvoked sets.String
 
-	mainFake   *kube_testing.Fake
-	bundleFake *kube_testing.Fake
-	crdFake    *kube_testing.Fake
-	scFake     *kube_testing.Fake
+	mainFake           *kube_testing.Fake
+	bundleFake         *kube_testing.Fake
+	crdFake            *kube_testing.Fake
+	scFake             *kube_testing.Fake
+	pluginsConstructed []testingPlugin
 }
 
 const (
@@ -88,6 +90,9 @@ const (
 
 	resSb1 = "resSb1"
 	sb1    = "sb1"
+
+	pluginSimpleConfigMap   = "simpleConfigMap"
+	pluginConfigMapWithDeps = "configMapWithDeps"
 )
 
 func TestController(t *testing.T) {
@@ -151,6 +156,84 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
+		},
+		"actual object is passed to the plugin": &testCase{
+			mainClientObjects: []runtime.Object{
+				&core_v1.ConfigMap{
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      "map1",
+						Namespace: testNamespace,
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         smith_v1.BundleResourceGroupVersion,
+								Kind:               smith_v1.BundleResourceKind,
+								Name:               "bundle1",
+								UID:                "uid123",
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+				},
+			},
+			bundle: &smith_v1.Bundle{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      "bundle1",
+					Namespace: testNamespace,
+					UID:       "uid123",
+				},
+				Spec: smith_v1.BundleSpec{
+					Resources: []smith_v1.Resource{
+						{
+							Name: "p1",
+							Spec: smith_v1.ResourceSpec{
+								Plugin: &smith_v1.PluginSpec{
+									Name:       pluginSimpleConfigMap,
+									ObjectName: "map1",
+									Spec: map[string]interface{}{
+										"actualShouldExist": true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace:       testNamespace,
+			expectedActions: sets.NewString("PUT=/api/v1/namespaces/" + testNamespace + "/configmaps/map1"),
+			testHandler: fakeActionHandler{
+				response: map[path]fakeResponse{
+					{
+						method: "PUT",
+						path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/map1",
+					}: {
+						statusCode: http.StatusOK,
+						content: []byte(`{
+							"apiVersion": "v1",
+							"kind": "ConfigMap",
+							"metadata": {
+								"name": "map1",
+								"namespace": "` + testNamespace + `",
+								"uid": "map-update-uid",
+								"labels": {
+									"` + smith.BundleNameLabel + `": "bundle1"
+								},
+								"ownerReferences": [{
+									"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
+									"kind": "` + smith_v1.BundleResourceKind + `",
+									"name": "bundle1",
+									"uid": "uid123",
+									"controller": true,
+									"blockOwnerDeletion": true
+								}] }
+							}`),
+					},
+				},
+			},
+			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
+				pluginSimpleConfigMap: simpleConfigMapPlugin,
+			},
+			pluginsShouldBeInvoked: sets.NewString(pluginSimpleConfigMap),
 		},
 		"plugin spec is processed": &testCase{
 			mainClientObjects: []runtime.Object{
@@ -306,7 +389,7 @@ func TestController(t *testing.T) {
 							},
 							Spec: smith_v1.ResourceSpec{
 								Plugin: &smith_v1.PluginSpec{
-									Name:       "testPlugin",
+									Name:       pluginConfigMapWithDeps,
 									ObjectName: "m1",
 									Spec: map[string]interface{}{
 										"p1": "v1", "p2": "{{" + resSb1 + "#metadata.name}}",
@@ -358,9 +441,10 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			plugins: map[smith_v1.PluginName]func(*testing.T) plugin.Plugin{
-				"testPlugin": testPlugin,
+			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
+				pluginConfigMapWithDeps: configMapWithDependenciesPlugin,
 			},
+			pluginsShouldBeInvoked: sets.NewString(pluginConfigMapWithDeps),
 		},
 		"plugin not processed if spec invalid according to schema": &testCase{
 			bundle: &smith_v1.Bundle{
@@ -386,8 +470,8 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			plugins: map[smith_v1.PluginName]func(*testing.T) plugin.Plugin{
-				"testPlugin": testPlugin,
+			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
+				pluginConfigMapWithDeps: configMapWithDependenciesPlugin,
 			},
 			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase) {
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
@@ -755,6 +839,7 @@ func TestController(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			defer tc.verifyActions(t)
+			defer tc.verifyPlugins(t)
 			tc.run(t)
 		})
 	}
@@ -863,9 +948,11 @@ func (tc *testCase) run(t *testing.T) {
 
 	pluginContainers := make(map[smith_v1.PluginName]plugin.PluginContainer, len(tc.plugins))
 	for name, factory := range tc.plugins {
+		pluginInstance := factory(t)
 		pluginContainers[name], err = plugin.NewPluginContainer(
-			func() (plugin.Plugin, error) { return factory(t), nil })
+			func() (plugin.Plugin, error) { return pluginInstance, nil })
 		require.NoError(t, err)
+		tc.pluginsConstructed = append(tc.pluginsConstructed, pluginInstance)
 	}
 
 	cntrlr := &BundleController{
@@ -919,6 +1006,19 @@ func (tc *testCase) verifyActions(t *testing.T) {
 	unexpectedActions := actualActions.Difference(tc.expectedActions)
 	assert.Empty(t, missingActions, "expected but was not observed")
 	assert.Empty(t, unexpectedActions, "observed but was not expected")
+}
+
+func (tc *testCase) verifyPlugins(t *testing.T) {
+	invokedPlugins := sets.NewString()
+	for _, constructedPlugin := range tc.pluginsConstructed {
+		if constructedPlugin.WasInvoked() {
+			invokedPlugins.Insert(string(constructedPlugin.Describe().Name))
+		}
+	}
+	missingPlugins := tc.pluginsShouldBeInvoked.Difference(invokedPlugins)
+	unexpectedInvocations := invokedPlugins.Difference(tc.pluginsShouldBeInvoked)
+	assert.Empty(t, missingPlugins, "expected but was not observed")
+	assert.Empty(t, unexpectedInvocations, "observed but was not expected")
 }
 
 // testServerAndClientConfig returns a server that listens and a config that can reference it
@@ -1006,19 +1106,29 @@ func SleeperCrdWithStatus() *apiext_v1b1.CustomResourceDefinition {
 	return crd
 }
 
-func testPlugin(t *testing.T) plugin.Plugin {
-	return &tp{
+type testingPlugin interface {
+	plugin.Plugin
+	WasInvoked() bool
+}
+
+func configMapWithDependenciesPlugin(t *testing.T) testingPlugin {
+	return &configMapWithDeps{
 		t: t,
 	}
 }
 
-type tp struct {
-	t *testing.T
+type configMapWithDeps struct {
+	t          *testing.T
+	wasInvoked bool
 }
 
-func (p *tp) Describe() *plugin.Description {
+func (p *configMapWithDeps) WasInvoked() bool {
+	return p.wasInvoked
+}
+
+func (p *configMapWithDeps) Describe() *plugin.Description {
 	return &plugin.Description{
-		Name: "testPlugin",
+		Name: pluginConfigMapWithDeps,
 		GVK:  core_v1.SchemeGroupVersion.WithKind("ConfigMap"),
 		SpecSchema: []byte(`{
 			"type": "object",
@@ -1034,9 +1144,19 @@ func (p *tp) Describe() *plugin.Description {
 	}
 }
 
-func (p *tp) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
+func (p *configMapWithDeps) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
+	p.wasInvoked = true
 	failed := p.t.Failed()
+	actualShouldExist, _ := pluginSpec["actualShouldExist"].(bool)
+	delete(pluginSpec, "actualShouldExist")
 	assert.Equal(p.t, map[string]interface{}{"p1": "v1", "p2": sb1}, pluginSpec)
+
+	if actualShouldExist {
+		assert.IsType(p.t, &core_v1.ConfigMap{}, context.Actual)
+	} else {
+		assert.Nil(p.t, context.Actual)
+	}
+
 	assert.Len(p.t, context.Dependencies, 1)
 	bindingDep, ok := context.Dependencies[resSb1]
 	if assert.True(p.t, ok) {
@@ -1067,6 +1187,53 @@ func (p *tp) Process(pluginSpec map[string]interface{}, context *plugin.Context)
 				assert.Equal(p.t, sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), inst.GroupVersionKind())
 			}
 		}
+	}
+
+	if !failed && p.t.Failed() { // one of the assertions failed and it was the first failure in the test
+		return nil, errors.New("plugin failed BOOM!")
+	}
+
+	return &plugin.ProcessResult{
+		Object: &core_v1.ConfigMap{
+			TypeMeta: meta_v1.TypeMeta{
+				Kind:       "ConfigMap",
+				APIVersion: core_v1.SchemeGroupVersion.String(),
+			},
+		},
+	}, nil
+}
+
+func simpleConfigMapPlugin(t *testing.T) testingPlugin {
+	return &simpleConfigMap{
+		t: t,
+	}
+}
+
+type simpleConfigMap struct {
+	t          *testing.T
+	wasInvoked bool
+}
+
+func (p *simpleConfigMap) WasInvoked() bool {
+	return p.wasInvoked
+}
+
+func (p *simpleConfigMap) Describe() *plugin.Description {
+	return &plugin.Description{
+		Name: pluginSimpleConfigMap,
+		GVK:  core_v1.SchemeGroupVersion.WithKind("ConfigMap"),
+	}
+}
+
+func (p *simpleConfigMap) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
+	p.wasInvoked = true
+	failed := p.t.Failed()
+	actualShouldExist, _ := pluginSpec["actualShouldExist"].(bool)
+
+	if actualShouldExist {
+		assert.IsType(p.t, &core_v1.ConfigMap{}, context.Actual)
+	} else {
+		assert.Nil(p.t, context.Actual)
 	}
 
 	if !failed && p.t.Failed() { // one of the assertions failed and it was the first failure in the test

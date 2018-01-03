@@ -125,7 +125,7 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	cond := smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
 	if cond != nil {
 		assert.Equal(t, smith_v1.ResourceReasonTerminalError, cond.Reason)
-		assert.Equal(t, `error processing resource(s): ["cm"]`, cond.Message)
+		assert.Equal(t, `error processing resource(s): ["cm" "sleeper2"]`, cond.Message)
 	}
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
@@ -135,14 +135,13 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 		assert.Equal(cfg.T, "object is not owned by the Bundle", resCond.Message)
 	}
 
-	resCond = smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
-	if resCond != nil {
-		assert.Equal(cfg.T, "Some other resource is in error state", resCond.Message)
-		assert.Equal(cfg.T, smith_v1.ResourceReasonOtherResourceError, resCond.Reason)
-	}
+	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceReady, smith_v1.ConditionFalse)
-	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceError, smith_v1.ConditionFalse)
+	resCond = smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceError, smith_v1.ConditionTrue)
+	if resCond != nil {
+		assert.Equal(cfg.T, "object is not owned by the Bundle", resCond.Message)
+	}
 
 	// Delete conflicting ConfigMap
 	trueVar := true
