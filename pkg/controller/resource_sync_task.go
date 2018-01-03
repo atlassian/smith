@@ -10,7 +10,6 @@ import (
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
-	"github.com/xeipuuv/gojsonschema"
 	core_v1 "k8s.io/api/core/v1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -174,16 +173,6 @@ func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource)
 			dependencies: notReadyDependencies,
 		}
 	}
-	return nil
-}
-
-// This 'cache' is bounded in size by the number of plugins we load; we never
-// need to evict. Yes, in some ways it would be nicer to build these schemas
-// when we originally load the plugins, but then we need to have another
-var schemaValidatorCache map[smith_v1.PluginName]*gojsonschema.Schema
-
-func (st *resourceSyncTask) validatePlugin(pluginSpec *smith_v1.PluginSpec) error {
-
 	return nil
 }
 

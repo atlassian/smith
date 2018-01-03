@@ -7,28 +7,29 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-// TODO bad name for this
 type PluginContainer struct {
 	Plugin Plugin
 	schema *gojsonschema.Schema
 }
 
 func NewPluginContainer(newPlugin NewFunc) (PluginContainer, error) {
-	var err error
-	pc := PluginContainer{}
-	pc.Plugin, err = newPlugin()
+	plugin, err := newPlugin()
 	if err != nil {
-		return pc, errors.Wrapf(err, "failed to instantiate plugin %T", pc.Plugin)
+		return PluginContainer{}, errors.Wrap(err, "failed to instantiate plugin")
 	}
-	description := pc.Plugin.Describe()
+	description := plugin.Describe()
+	var schema *gojsonschema.Schema
 	if description.SpecSchema != nil {
-		pc.schema, err = gojsonschema.NewSchema(gojsonschema.NewBytesLoader(description.SpecSchema))
+		schema, err = gojsonschema.NewSchema(gojsonschema.NewBytesLoader(description.SpecSchema))
 		if err != nil {
-			return pc, errors.Wrapf(err, "can't use plugin %q due to invalid schema", description.Name)
+			return PluginContainer{}, errors.Wrapf(err, "can't use plugin %q due to invalid schema", description.Name)
 		}
 	}
 
-	return pc, nil
+	return PluginContainer{
+		Plugin: plugin,
+		schema: schema,
+	}, nil
 }
 
 func (pc *PluginContainer) ValidateSpec(pluginSpec map[string]interface{}) error {
@@ -38,7 +39,7 @@ func (pc *PluginContainer) ValidateSpec(pluginSpec map[string]interface{}) error
 
 	validationResult, err := pc.schema.Validate(gojsonschema.NewGoLoader(pluginSpec))
 	if err != nil {
-		return errors.Wrapf(err, "error validating plugin spec")
+		return errors.Wrap(err, "error validating plugin spec")
 	}
 
 	if !validationResult.Valid() {
