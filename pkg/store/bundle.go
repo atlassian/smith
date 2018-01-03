@@ -20,16 +20,16 @@ const (
 )
 
 type BundleStore struct {
-	store         smith.ByNameStore
-	bundleByIndex func(indexName, indexKey string) ([]interface{}, error)
-	plugins       map[smith_v1.PluginName]plugin.Plugin
+	store            smith.ByNameStore
+	bundleByIndex    func(indexName, indexKey string) ([]interface{}, error)
+	pluginContainers map[smith_v1.PluginName]plugin.PluginContainer
 }
 
-func NewBundle(bundleInf cache.SharedIndexInformer, store smith.ByNameStore, plugins map[smith_v1.PluginName]plugin.Plugin) (*BundleStore, error) {
+func NewBundle(bundleInf cache.SharedIndexInformer, store smith.ByNameStore, pluginContainers map[smith_v1.PluginName]plugin.PluginContainer) (*BundleStore, error) {
 	bs := &BundleStore{
-		store:         store,
-		bundleByIndex: bundleInf.GetIndexer().ByIndex,
-		plugins:       plugins,
+		store:            store,
+		bundleByIndex:    bundleInf.GetIndexer().ByIndex,
+		pluginContainers: pluginContainers,
 	}
 	err := bundleInf.AddIndexers(cache.Indexers{
 		byCrdGroupKindIndexName: bs.byCrdGroupKindIndex,
@@ -81,12 +81,12 @@ func (s *BundleStore) byCrdGroupKindIndex(obj interface{}) ([]string, error) {
 		if resource.Spec.Object != nil {
 			gvk = resource.Spec.Object.GetObjectKind().GroupVersionKind()
 		} else if resource.Spec.Plugin != nil {
-			p, ok := s.plugins[resource.Spec.Plugin.Name]
+			p, ok := s.pluginContainers[resource.Spec.Plugin.Name]
 			if !ok {
 				// Unknown plugin. Do not return error to avoid informer panicking
 				continue
 			}
-			gvk = p.Describe().GVK
+			gvk = p.Plugin.Describe().GVK
 		} else {
 			// Invalid object, ignore
 			continue
@@ -115,12 +115,12 @@ func (s *BundleStore) byObjectIndex(obj interface{}) ([]string, error) {
 			gvk = resource.Spec.Object.GetObjectKind().GroupVersionKind()
 			name = resource.Spec.Object.(meta_v1.Object).GetName()
 		} else if resource.Spec.Plugin != nil {
-			p, ok := s.plugins[resource.Spec.Plugin.Name]
+			p, ok := s.pluginContainers[resource.Spec.Plugin.Name]
 			if !ok {
 				// Unknown plugin. Do not return error to avoid informer panicking
 				continue
 			}
-			gvk = p.Describe().GVK
+			gvk = p.Plugin.Describe().GVK
 			name = resource.Spec.Plugin.ObjectName
 		} else {
 			// Invalid object, ignore

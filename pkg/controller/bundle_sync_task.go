@@ -27,7 +27,7 @@ type bundleSyncTask struct {
 	specCheck          SpecCheck
 	bundle             *smith_v1.Bundle
 	processedResources map[smith_v1.ResourceName]*resourceInfo
-	plugins            map[smith_v1.PluginName]plugin.Plugin
+	pluginContainers   map[smith_v1.PluginName]plugin.PluginContainer
 	scheme             *runtime.Scheme
 }
 
@@ -69,7 +69,7 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 			specCheck:          st.specCheck,
 			bundle:             st.bundle,
 			processedResources: st.processedResources,
-			plugins:            st.plugins,
+			pluginContainers:   st.pluginContainers,
 			scheme:             st.scheme,
 			blockedOnError:     blockedOnError,
 		}
@@ -125,7 +125,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			gvk = res.Spec.Object.GetObjectKind().GroupVersionKind()
 			name = res.Spec.Object.(meta_v1.Object).GetName()
 		} else if res.Spec.Plugin != nil {
-			gvk = st.plugins[res.Spec.Plugin.Name].Describe().GVK
+			gvk = st.pluginContainers[res.Spec.Plugin.Name].Plugin.Describe().GVK
 			name = res.Spec.Plugin.ObjectName
 		} else {
 			panic(errors.New(`neither "object" nor "plugin" field is specified`))

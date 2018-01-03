@@ -72,7 +72,7 @@ type resourceSyncTask struct {
 	specCheck          SpecCheck
 	bundle             *smith_v1.Bundle
 	processedResources map[smith_v1.ResourceName]*resourceInfo
-	plugins            map[smith_v1.PluginName]plugin.Plugin
+	pluginContainers   map[smith_v1.PluginName]plugin.PluginContainer
 	scheme             *runtime.Scheme
 	blockedOnError     bool
 }
@@ -255,16 +255,22 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource) (*unstructured.Unst
 
 // evalPluginSpec evaluates the plugin resource specification and returns the result.
 func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructured.Unstructured, error) {
-	pluginInstance, ok := st.plugins[res.Spec.Plugin.Name]
+	pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
 	if !ok {
 		return nil, errors.Errorf("no such plugin %q", res.Spec.Plugin.Name)
 	}
+	err := pluginContainer.ValidateSpec(res.Spec.Plugin.Spec)
+	if err != nil {
+		return nil, errors.Wrapf(err, "plugin %q has invalid spec", res.Spec.Plugin.Name)
+	}
+
+	// validate above should guarantee that our plugin is there
 	dependencies, err := st.prepareDependencies(res.DependsOn)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := pluginInstance.Process(res.Spec.Plugin.Spec, &plugin.Context{
+	result, err := pluginContainer.Plugin.Process(res.Spec.Plugin.Spec, &plugin.Context{
 		Dependencies: dependencies,
 	})
 	if err != nil {
@@ -276,7 +282,7 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource) (*unstructure
 	if err != nil {
 		return nil, errors.Wrap(err, "plugin output cannot be converted from runtime.Object")
 	}
-	expectedGVK := pluginInstance.Describe().GVK
+	expectedGVK := pluginContainer.Plugin.Describe().GVK
 	if object.GroupVersionKind() != expectedGVK {
 		return nil, errors.Errorf("unexpected GVK from plugin (wanted %s, got %s)", expectedGVK, object.GroupVersionKind())
 	}

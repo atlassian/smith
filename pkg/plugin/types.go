@@ -26,6 +26,8 @@ type Plugin interface {
 type Description struct {
 	Name smith_v1.PluginName
 	GVK  schema.GroupVersionKind
+	// gojsonschema supported schema for the spec (first argument of Process)
+	SpecSchema []byte
 }
 
 // Context contains contextual information for the Process() call.
