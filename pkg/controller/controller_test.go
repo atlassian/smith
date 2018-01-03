@@ -459,7 +459,7 @@ func TestController(t *testing.T) {
 							Name: "p1",
 							Spec: smith_v1.ResourceSpec{
 								Plugin: &smith_v1.PluginSpec{
-									Name:       "testPlugin",
+									Name:       pluginConfigMapWithDeps,
 									ObjectName: "m1",
 									Spec: map[string]interface{}{
 										"p1": nil,
