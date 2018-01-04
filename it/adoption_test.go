@@ -124,8 +124,21 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	cond := smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
 	if cond != nil {
 		assert.Equal(t, smith_v1.ResourceReasonTerminalError, cond.Reason)
-		assert.Equal(t, `error processing resource(s): ["cm"]`, cond.Message)
+		assert.Equal(t, `error processing resource(s): ["cm" "sleeper2"]`, cond.Message)
 	}
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceReady, smith_v1.ConditionFalse)
+	resCond := smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceError, smith_v1.ConditionTrue)
+	assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+	assert.Equal(t, "object is not owned by the Bundle", resCond.Message)
+
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceReady, smith_v1.ConditionFalse)
+	resCond = smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceError, smith_v1.ConditionTrue)
+	assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+	assert.Equal(t, "object is not owned by the Bundle", resCond.Message)
 
 	// Point ConfigMap controller reference to Bundle
 	trueVar := true
@@ -153,6 +166,17 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 		assert.Equal(t, smith_v1.ResourceReasonTerminalError, cond.Reason)
 		assert.Equal(t, `error processing resource(s): ["sleeper2"]`, cond.Message)
 	}
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceReady, smith_v1.ConditionTrue)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceError, smith_v1.ConditionFalse)
+
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceReady, smith_v1.ConditionFalse)
+	resCond = smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceError, smith_v1.ConditionTrue)
+	assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+	assert.Equal(t, "object is not owned by the Bundle", resCond.Message)
 
 	// Point Sleeper controller reference to Bundle
 	for { // Retry loop to handle conflicts with Sleeper controller

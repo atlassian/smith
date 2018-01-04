@@ -11,7 +11,7 @@ import (
 func AssertCondition(t *testing.T, bundle *smith_v1.Bundle, conditionType smith_v1.BundleConditionType, status smith_v1.ConditionStatus) *smith_v1.BundleCondition {
 	_, condition := bundle.GetCondition(conditionType)
 	if assert.NotNil(t, condition) {
-		assert.Equal(t, status, condition.Status)
+		assert.Equal(t, status, condition.Status, "%s: %s: %s", conditionType, condition.Reason, condition.Message)
 	}
 	return condition
 }
@@ -22,9 +22,9 @@ func AssertResourceCondition(t *testing.T, bundle *smith_v1.Bundle, resName smit
 		return nil
 	}
 	_, condition := resStatus.GetCondition(conditionType)
-	if !assert.NotNil(t, resStatus, "%s: %s", resName, conditionType) {
+	if !assert.NotNil(t, condition, "%s: %s", resName, conditionType) {
 		return nil
 	}
-	assert.Equal(t, status, condition.Status, "%s: %s", resName, conditionType)
+	assert.Equal(t, status, condition.Status, "%s: %s: %s: %s", resName, conditionType, condition.Reason, condition.Message)
 	return condition
 }
