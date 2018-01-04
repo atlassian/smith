@@ -86,7 +86,7 @@ A plugin must:
 is known in advance. Smith validates that an object of the correct GVK is returned.
 4. Have a name that is a [DNS_SUBDOMAIN](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/architecture/identifiers.md)
 
-A plugin does not need to set the name of the returned object, it is set by Smith.
+A plugin does not need to set the name or the namespace of the returned object, it is set by Smith.
 
 ## Plugin skeleton
 
@@ -106,6 +106,8 @@ import (
 
 // Context contains contextual information for the Process() call.
 type Context struct {
+	// Namespace is the namespace where the returned object will be created.
+	Namespace string
 	// Actual is the actual object that will be updated if it exists already.
 	// nil if the object does not exist.
 	Actual runtime.Object

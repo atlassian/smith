@@ -1147,6 +1147,9 @@ func (p *configMapWithDeps) Describe() *plugin.Description {
 func (p *configMapWithDeps) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
 	p.wasInvoked = true
 	failed := p.t.Failed()
+
+	assert.Equal(p.t, testNamespace, context.Namespace)
+
 	actualShouldExist, _ := pluginSpec["actualShouldExist"].(bool)
 	delete(pluginSpec, "actualShouldExist")
 	assert.Equal(p.t, map[string]interface{}{"p1": "v1", "p2": sb1}, pluginSpec)
@@ -1228,6 +1231,9 @@ func (p *simpleConfigMap) Describe() *plugin.Description {
 func (p *simpleConfigMap) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
 	p.wasInvoked = true
 	failed := p.t.Failed()
+
+	assert.Equal(p.t, testNamespace, context.Namespace)
+
 	actualShouldExist, _ := pluginSpec["actualShouldExist"].(bool)
 
 	if actualShouldExist {

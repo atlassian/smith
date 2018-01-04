@@ -32,6 +32,8 @@ type Description struct {
 
 // Context contains contextual information for the Process() call.
 type Context struct {
+	// Namespace is the namespace where the returned object will be created.
+	Namespace string
 	// Actual is the actual object that will be updated if it exists already.
 	// nil if the object does not exist.
 	Actual runtime.Object

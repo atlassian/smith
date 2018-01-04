@@ -318,6 +318,7 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtim
 	}
 
 	result, err := pluginContainer.Plugin.Process(res.Spec.Plugin.Spec, &plugin.Context{
+		Namespace:    st.bundle.Namespace,
 		Actual:       actual,
 		Dependencies: dependencies,
 	})
