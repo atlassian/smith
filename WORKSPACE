@@ -15,13 +15,10 @@ git_repository(
 )
 
 load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains")
+load("@io_bazel_rules_docker//go:image.bzl", go_image_repositories = "repositories")
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 
 go_rules_dependencies()
 go_register_toolchains()
-
-load("@io_bazel_rules_docker//go:image.bzl", go_image_repositories = "repositories")
-
 go_image_repositories()
-
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 gazelle_dependencies()
