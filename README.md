@@ -138,7 +138,8 @@ See [an example](examples/service_catalog) and
 [recording of the presentation](https://youtu.be/7fgPgtQh5Es) to [Service Catalog SIG](https://github.com/kubernetes/community/tree/master/sig-service-catalog);
 - Dynamic Custom Resources support via [special annotations](docs/design/managing-resources.md#defined-annotations);
 - References between objects in the graph to pull parts of objects/fields from dependencies;
-- Smith will delete objects which were removed from a Bundle when Bundle reconciliation is performed (e.g. on a Bundle update).
+- Smith will delete objects which were removed from a Bundle when Bundle reconciliation is performed (e.g. on a Bundle update);
+- [Plugins](docs/design/plugins.md) framework for injecting custom behavior when walking the dependency graph;
 
 ## Notes
 
