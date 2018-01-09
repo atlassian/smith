@@ -110,6 +110,10 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	delete(updated.Object, "status")
 
 	if !equality.Semantic.DeepEqual(updated.Object, actualClone.Object) {
+		if (spec.GetKind() == "Secret") {
+			log.Printf("Objects are different: Secret object %s has changed", spec.GetName())
+			return updated, false, nil
+		}
 		log.Printf("Objects are different: %s",
 			diff.ObjectReflectDiff(updated.Object, actualClone.Object))
 		return updated, false, nil
