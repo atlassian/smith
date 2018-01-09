@@ -6,6 +6,7 @@ import (
 	"github.com/atlassian/smith/pkg/util"
 
 	"github.com/pkg/errors"
+	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
@@ -110,11 +111,11 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	delete(updated.Object, "status")
 
 	if !equality.Semantic.DeepEqual(updated.Object, actualClone.Object) {
-		if (spec.GetKind() == "Secret") {
+		if spec.GetKind() == core_v1.GroupName && spec.GetKind() == "Secret" {
 			log.Printf("Objects are different: Secret object %s has changed", spec.GetName())
 			return updated, false, nil
 		}
-		log.Printf("Objects are different: %s",
+		log.Printf("Objects are different: %q",
 			diff.ObjectReflectDiff(updated.Object, actualClone.Object))
 		return updated, false, nil
 	}
