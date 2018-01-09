@@ -113,6 +113,16 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 		}
 	}
 
+	// Force Service Catalog to update service instances when secrets they depend change
+	spec, err = st.forceServiceInstanceUpdates(spec, actual, st.bundle.Namespace)
+	if err != nil {
+		return resourceInfo{
+			status: resourceStatusError{
+				err: err,
+			},
+		}
+	}
+
 	// Create or update resource
 	resUpdated, retriable, err := st.createOrUpdate(spec, actual)
 	if err != nil {
