@@ -112,9 +112,8 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 
 	if !equality.Semantic.DeepEqual(updated.Object, actualClone.Object) {
 		gvk := spec.GroupVersionKind()
-		gk := gvk.GroupKind()
 
-		if gvk.Version != "" && gk.Group == core_v1.GroupName && gk.Kind == "Secret" {
+		if gvk.Group == core_v1.GroupName && gvk.Kind == "Secret" {
 			log.Printf("Objects are different: Secret object %q has changed", spec.GetName())
 			return updated, false, nil
 		}
