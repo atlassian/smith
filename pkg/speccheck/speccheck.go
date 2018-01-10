@@ -126,6 +126,10 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 }
 
 func processAnnotations(spec, actual map[string]string) map[string]string {
+	if actual == nil {
+		actual = make(map[string]string, len(spec))
+	}
+
 	for key, val := range spec {
 		actual[key] = val
 	}
