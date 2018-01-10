@@ -201,6 +201,8 @@ func TestExplicitlyDisabled(t *testing.T) {
 }
 
 func TestUpdateInstanceSecrets(t *testing.T) {
+	t.Parallel()
+
 	instanceSpec := sc_v1b1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
@@ -296,6 +298,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 
 func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 	t.Parallel()
+
 	expectedAnnotationValue := "mashingonthekeyboard"
 	instanceSpec := sc_v1b1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
@@ -327,6 +330,7 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 
 func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	t.Parallel()
+
 	userAnnotationValue := "copy+pasted something"
 
 	instanceSpec := sc_v1b1.ServiceInstance{
