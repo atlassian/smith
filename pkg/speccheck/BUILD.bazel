@@ -22,6 +22,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
+    size = "small",
     srcs = ["speccheck_test.go"],
     embed = [":go_default_library"],
     importpath = "github.com/atlassian/smith/pkg/speccheck",

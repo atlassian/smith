@@ -4,3 +4,4 @@ build --curses=no
 build --show_timestamps
 
 test --test_output=all
+test --test_verbose_timeout_warnings
