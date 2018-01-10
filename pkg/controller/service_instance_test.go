@@ -1,25 +1,23 @@
 package controller
 
 import (
+	"fmt"
 	"testing"
 
-	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
-	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"fmt"
-
+	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/util"
+
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/cache"
-
-	"github.com/atlassian/smith"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -60,7 +58,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 	instanceSpec := sc_v1b1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
-			APIVersion: sc_v1b1.GroupName + "/v1",
+			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		Spec: sc_v1b1.ServiceInstanceSpec{
 			ParametersFrom: []sc_v1b1.ParametersFromSource{
@@ -128,7 +126,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 	instanceCheck := serviceInstance(updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
-	assert.True(t, instanceCheck.Spec.UpdateRequests == 0, "expected UpdateRequests to be 0 for create")
+	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
 	firstCheckSum := instanceCheck.ObjectMeta.Annotations[annotaionKey]
 
 	updateTwice, err := rst.forceServiceInstanceUpdates(spec, instanceCheck, defaultNamespace)
@@ -136,7 +134,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 	secondInstance := serviceInstance(updateTwice)
 
 	assert.Contains(t, secondInstance.Annotations, smith.Domain+"/secretParametersChecksum")
-	assert.True(t, secondInstance.Spec.UpdateRequests == 0, "expected UpdateRequests to be 0 for create")
+	assert.Zero(t, secondInstance.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
 	assert.Equal(t, firstCheckSum, secondInstance.ObjectMeta.Annotations[annotaionKey])
 }
 
@@ -146,7 +144,7 @@ func TestNoAnnotationForEmptyParameretersFrom(t *testing.T) {
 	instanceSpec := sc_v1b1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
-			APIVersion: sc_v1b1.GroupName + "/v1",
+			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		Spec: sc_v1b1.ServiceInstanceSpec{},
 	}
@@ -168,7 +166,7 @@ func TestExplicitlyDisabled(t *testing.T) {
 	instanceSpec := sc_v1b1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
-			APIVersion: sc_v1b1.GroupName + "/v1",
+			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Annotations: map[string]string{
@@ -199,14 +197,14 @@ func TestExplicitlyDisabled(t *testing.T) {
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Equal(t, instanceCheck.Annotations[annotaionKey], "disabled")
-	assert.True(t, instanceCheck.Spec.UpdateRequests == 0, "expected UpdateRequests to be 0 for create")
+	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
 }
 
 func TestUpdateInstanceSecrets(t *testing.T) {
 	instanceSpec := sc_v1b1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
-			APIVersion: sc_v1b1.GroupName + "/v1",
+			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		Spec: sc_v1b1.ServiceInstanceSpec{
 			ParametersFrom: []sc_v1b1.ParametersFromSource{
@@ -276,7 +274,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 	instanceCheck := serviceInstance(updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
-	assert.True(t, instanceCheck.Spec.UpdateRequests == 0, "expected UpdateRequests to be 0 for create")
+	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
 	firstCheckSum := instanceCheck.ObjectMeta.Annotations[annotaionKey]
 
 	allResponses["secret1"] = allResponses["secret2"]
@@ -302,7 +300,7 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 	instanceSpec := sc_v1b1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
-			APIVersion: sc_v1b1.GroupName + "/v1",
+			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Annotations: map[string]string{
@@ -323,7 +321,7 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 	instanceCheck := serviceInstance(updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
-	assert.True(t, instanceCheck.Spec.UpdateRequests == 0, "expected UpdateRequests to be 0 for create")
+	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
 	assert.Equal(t, instanceCheck.ObjectMeta.Annotations[annotaionKey], expectedAnnotationValue)
 }
 
@@ -334,7 +332,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	instanceSpec := sc_v1b1.ServiceInstance{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
-			APIVersion: sc_v1b1.GroupName + "/v1",
+			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Annotations: map[string]string{
@@ -386,7 +384,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	instanceCheck := serviceInstance(updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
-	assert.True(t, instanceCheck.Spec.UpdateRequests == 0, "expected UpdateRequests to be 0 when overriding user the first time")
+	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 when overriding user the first time")
 	assert.NotEqual(t, instanceCheck.ObjectMeta.Annotations[annotaionKey], userAnnotationValue)
 	firstAnnotationValue := instanceCheck.ObjectMeta.Annotations[annotaionKey]
 
@@ -395,7 +393,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	ignoreUserValue := serviceInstance(compareToPreviousUpdate)
 
 	assert.Contains(t, ignoreUserValue.Annotations, annotaionKey)
-	assert.True(t, ignoreUserValue.Spec.UpdateRequests == 0, "expected UpdateRequests to be 0 when overriding user the first time")
+	assert.Zero(t, ignoreUserValue.Spec.UpdateRequests, "expected UpdateRequests to be 0 when overriding user the first time")
 	assert.NotEqual(t, ignoreUserValue.ObjectMeta.Annotations[annotaionKey], userAnnotationValue)
 	assert.Equal(t, ignoreUserValue.ObjectMeta.Annotations[annotaionKey], firstAnnotationValue)
 }

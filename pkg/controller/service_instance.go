@@ -7,6 +7,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/util"
+
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
@@ -28,13 +29,8 @@ const (
 // change to trigger service catalog to send an update request.
 func (st *resourceSyncTask) forceServiceInstanceUpdates(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
 	gvk := spec.GroupVersionKind()
-	gk := spec.GroupVersionKind().GroupKind()
 
-	if gk.Kind == "" || gvk.Version == "" {
-		return spec, nil
-	}
-
-	if gk.Group == sc_v1b1.GroupName && spec.GetKind() == "ServiceInstance" {
+	if gvk.Group == sc_v1b1.GroupName && gvk.Kind == "ServiceInstance" {
 		return st.processServiceInstance(spec, actual, namespace)
 	}
 
@@ -56,12 +52,12 @@ func (st *resourceSyncTask) forceServiceInstanceUpdates(spec *unstructured.Unstr
 //
 // This can be disabled by adding the annotation with the value 'disabled'
 func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
-	var instanceSpec sc_v1b1.ServiceInstance
+	var instanceSpec = &sc_v1b1.ServiceInstance{}
 	var previousEncodedChecksum string
 	var updateCount int64
 
-	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &instanceSpec); err != nil {
-		return nil, errors.Wrapf(err, "Failure to parse ServiceInstance spec %q", spec.GetName())
+	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, instanceSpec); err != nil {
+		return nil, errors.Wrap(err, "failure to parse ServiceInstance")
 	}
 
 	if len(instanceSpec.Spec.ParametersFrom) == 0 {
@@ -75,43 +71,40 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 	if actual != nil {
 		spec, ok := actual.(*sc_v1b1.ServiceInstance)
 		if !ok {
-			return nil, errors.New("Failure retrieving ServiceInstance spec")
+			return nil, errors.New("failure retrieving ServiceInstance spec")
 		}
 		previousEncodedChecksum = spec.ObjectMeta.Annotations[secretParametersChecksumAnnotation]
 		updateCount = spec.Spec.UpdateRequests
 	}
 
-	checkSum, err := st.calculateNewCheckSum(&instanceSpec, namespace, previousEncodedChecksum, updateCount)
+	checkSum, err := st.calculateNewCheckSum(instanceSpec, namespace, previousEncodedChecksum)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to generate new checksum for spec %q", spec.GetName())
+		return nil, errors.Wrap(err, "failed to generate new checksum")
 	}
 
-	if previousEncodedChecksum != "" && checkSum != previousEncodedChecksum {
+	if actual != nil && checkSum != previousEncodedChecksum {
 		instanceSpec.Spec.UpdateRequests = updateCount + 1
 	}
 
-	instanceSpec = setAnnotation(instanceSpec, checkSum)
+	setAnnotation(instanceSpec, checkSum)
 
-	unstructuredSpec, err := util.RuntimeToUnstructured(&instanceSpec)
+	unstructuredSpec, err := util.RuntimeToUnstructured(instanceSpec)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to marshal back into unstructed %q", spec.GetName())
+		return nil, errors.Wrap(err, "failed to marshal back into unstructured")
 	}
 
 	return unstructuredSpec, nil
 }
 
-func (st *resourceSyncTask) calculateNewCheckSum(instanceSpec *sc_v1b1.ServiceInstance, namespace string, previousEncodedChecksum string, updateCount int64) (string, error) {
+func (st *resourceSyncTask) calculateNewCheckSum(instanceSpec *sc_v1b1.ServiceInstance, namespace string, previousEncodedChecksum string) (string, error) {
 	checksumPayload, err := st.generateSecretParametersChecksumPayload(&instanceSpec.Spec, namespace)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to generate checksum")
 	}
 
 	if previousEncodedChecksum != "" {
 		previousCheckSum, err := decodeChecksum(previousEncodedChecksum)
-		if err != nil {
-			return "", errors.Wrapf(err, "Failed to decode checksum for %q", instanceSpec.Name)
-		}
-		if validateChecksum(previousCheckSum, checksumPayload) {
+		if err == nil && validateChecksum(previousCheckSum, checksumPayload) {
 			return previousEncodedChecksum, nil
 		}
 	}
@@ -130,14 +123,14 @@ func (st *resourceSyncTask) generateSecretParametersChecksumPayload(spec *sc_v1b
 		secretKeyRef := parametersFrom.SecretKeyRef
 		secretObj, exists, err := st.store.Get(core_v1.SchemeGroupVersion.WithKind("Secret"), namespace, secretKeyRef.Name)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Failure retrieving secret %q referenced from spec.ParametersFrom", secretKeyRef.Name)
+			return nil, errors.Wrapf(err, "failure retrieving secret %q referenced from spec.ParametersFrom", secretKeyRef.Name)
 		}
 		if !exists {
-			return nil, errors.Errorf("Secret %q referenced from spec.ParametersFrom not found", secretKeyRef.Name)
+			return nil, errors.Errorf("secret %q referenced from spec.ParametersFrom not found", secretKeyRef.Name)
 		}
 		secret, ok := secretObj.(*core_v1.Secret)
 		if !ok {
-			return nil, errors.Errorf("Failure casting secret %q referenced from spec.ParametersFrom", secretKeyRef.Name)
+			return nil, errors.Errorf("failure casting secret %q referenced from spec.ParametersFrom", secretKeyRef.Name)
 		}
 
 		secretData := secret.Data[secretKeyRef.Key]
@@ -154,14 +147,12 @@ func (st *resourceSyncTask) generateSecretParametersChecksumPayload(spec *sc_v1b
 	return buf.Bytes(), nil
 }
 
-func setAnnotation(instanceSpec sc_v1b1.ServiceInstance, checksum string) sc_v1b1.ServiceInstance {
+func setAnnotation(instanceSpec *sc_v1b1.ServiceInstance, checksum string) {
 	if instanceSpec.ObjectMeta.Annotations == nil {
 		instanceSpec.ObjectMeta.Annotations = make(map[string]string, 1)
 	}
 
 	instanceSpec.ObjectMeta.Annotations[secretParametersChecksumAnnotation] = checksum
-
-	return instanceSpec
 }
 
 func generateChecksum(data []byte) ([]byte, error) {
@@ -169,7 +160,7 @@ func generateChecksum(data []byte) ([]byte, error) {
 }
 
 // hashed password with its possible plaintext equivalent, return true if they match
-func validateChecksum(checksum []byte, data []byte) bool {
+func validateChecksum(checksum, data []byte) bool {
 	err := bcrypt.CompareHashAndPassword(checksum, data)
 	return err == nil
 }
