@@ -52,7 +52,7 @@ func (st *resourceSyncTask) forceServiceInstanceUpdates(spec *unstructured.Unstr
 //
 // This can be disabled by adding the annotation with the value 'disabled'
 func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
-	var instanceSpec = &sc_v1b1.ServiceInstance{}
+	instanceSpec := &sc_v1b1.ServiceInstance{}
 	var previousEncodedChecksum string
 	var updateCount int64
 
@@ -69,12 +69,12 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 	}
 
 	if actual != nil {
-		spec, ok := actual.(*sc_v1b1.ServiceInstance)
+		actualInstance, ok := actual.(*sc_v1b1.ServiceInstance)
 		if !ok {
 			return nil, errors.New("failure retrieving ServiceInstance spec")
 		}
-		previousEncodedChecksum = spec.ObjectMeta.Annotations[secretParametersChecksumAnnotation]
-		updateCount = spec.Spec.UpdateRequests
+		previousEncodedChecksum = actualInstance.ObjectMeta.Annotations[secretParametersChecksumAnnotation]
+		updateCount = actualInstance.Spec.UpdateRequests
 	}
 
 	checkSum, err := st.calculateNewCheckSum(instanceSpec, namespace, previousEncodedChecksum)
@@ -123,14 +123,14 @@ func (st *resourceSyncTask) generateSecretParametersChecksumPayload(spec *sc_v1b
 		secretKeyRef := parametersFrom.SecretKeyRef
 		secretObj, exists, err := st.store.Get(core_v1.SchemeGroupVersion.WithKind("Secret"), namespace, secretKeyRef.Name)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failure retrieving secret %q referenced from spec.ParametersFrom", secretKeyRef.Name)
+			return nil, errors.Wrapf(err, "failure retrieving Secret %q referenced from spec.ParametersFrom", secretKeyRef.Name)
 		}
 		if !exists {
-			return nil, errors.Errorf("secret %q referenced from spec.ParametersFrom not found", secretKeyRef.Name)
+			return nil, errors.Errorf("Secret %q referenced from spec.ParametersFrom not found", secretKeyRef.Name)
 		}
 		secret, ok := secretObj.(*core_v1.Secret)
 		if !ok {
-			return nil, errors.Errorf("failure casting secret %q referenced from spec.ParametersFrom", secretKeyRef.Name)
+			return nil, errors.Errorf("failure casting Secret %q referenced from spec.ParametersFrom", secretKeyRef.Name)
 		}
 
 		secretData := secret.Data[secretKeyRef.Key]

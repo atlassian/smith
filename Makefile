@@ -153,7 +153,8 @@ test-ci:
 
 .PHONY: check
 check:
-	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor \
+	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... \
+		--vendor --skip=pkg/client/clientset_generated --exclude=zz_generated \
 		--linter='errcheck:errcheck:-ignore=net:Close' --cyclo-over=20 \
 		--disable=interfacer --disable=golint --dupl-threshold=200
 

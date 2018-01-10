@@ -393,6 +393,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	firstAnnotationValue := instanceCheck.ObjectMeta.Annotations[annotaionKey]
 
 	compareToPreviousUpdate, err := rst.forceServiceInstanceUpdates(spec, instanceCheck, defaultNamespace)
+	require.NoError(t, err)
 
 	ignoreUserValue := serviceInstance(compareToPreviousUpdate)
 
