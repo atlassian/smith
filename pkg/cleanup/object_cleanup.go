@@ -30,12 +30,7 @@ func New(kts ...map[schema.GroupKind]SpecCleanup) *SpecCleaner {
 }
 
 func (oc *SpecCleaner) Cleanup(spec, actual *unstructured.Unstructured) (updatedSpec *unstructured.Unstructured, err error) {
-	gvk := spec.GroupVersionKind()
-	gk := gvk.GroupKind()
-
-	if gk.Kind == "" || gvk.Version == "" { // Group can be empty e.g. built-in objects like ConfigMap
-		return nil, errors.Errorf("object has empty kind/version: %s", gvk)
-	}
+	gk := spec.GroupVersionKind().GroupKind()
 
 	if objCleanup, ok := oc.KnownTypes[gk]; ok {
 		return objCleanup(spec, actual)
