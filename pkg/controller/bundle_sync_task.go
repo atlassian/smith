@@ -128,7 +128,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			gvk = st.pluginContainers[res.Spec.Plugin.Name].Plugin.Describe().GVK
 			name = res.Spec.Plugin.ObjectName
 		} else {
-			panic(errors.New(`neither "object" nor "plugin" field is specified`))
+			return false, errors.New(`neither "object" nor "plugin" field is specified`)
 		}
 		ref := objectRef{
 			GroupVersionKind: gvk,

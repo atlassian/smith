@@ -194,7 +194,10 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 		gvk = st.pluginContainers[res.Spec.Plugin.Name].Plugin.Describe().GVK
 		name = res.Spec.Plugin.ObjectName
 	} else {
-		panic(errors.New(`neither "object" nor "plugin" field is specified`)) // unreachable
+		// unreachable
+		return nil, resourceStatusError{
+			err: errors.New(`neither "object" nor "plugin" field is specified`),
+		}
 	}
 	actual, exists, err := st.store.Get(gvk, st.bundle.Namespace, name)
 	if err != nil {
