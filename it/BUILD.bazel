@@ -38,6 +38,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
+    size = "medium",
     timeout = "short",
     srcs = [
         "adoption_test.go",
