@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	mainFake "k8s.io/client-go/kubernetes/fake"
@@ -90,6 +89,25 @@ const (
 
 	resSb1 = "resSb1"
 	sb1    = "sb1"
+	sb1uid = "sb1-uid"
+
+	resSi1 = "resSi1"
+	si1    = "si1"
+	si1uid = "si1-uid"
+
+	s1 = "s1"
+
+	m1 = "m1"
+
+	bundle1    = "bundle1"
+	bundle1uid = "bundle1-uid"
+
+	resMapNeedsAnUpdate = "res-map-needs-update"
+	mapNeedsAnUpdate    = "map-needs-update"
+	mapNeedsAnUpdateUid = "map-needs-update-uid"
+
+	mapNeedsDelete    = "map-not-in-the-bundle-anymore-needs-delete"
+	mapNeedsDeleteUid = "map-needs-delete-uid"
 
 	pluginSimpleConfigMap   = "simpleConfigMap"
 	pluginConfigMapWithDeps = "configMapWithDeps"
@@ -101,31 +119,16 @@ func TestController(t *testing.T) {
 	testcases := map[string]*testCase{
 		"deletes owned object that is not in bundle": &testCase{
 			mainClientObjects: []runtime.Object{
-				&core_v1.ConfigMap{
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "map1",
-						Namespace: testNamespace,
-						OwnerReferences: []meta_v1.OwnerReference{
-							{
-								APIVersion:         smith_v1.BundleResourceGroupVersion,
-								Kind:               smith_v1.BundleResourceKind,
-								Name:               "bundle1",
-								UID:                "uid123",
-								Controller:         &tr,
-								BlockOwnerDeletion: &tr,
-							},
-						},
-					},
-				},
+				configMapNeedsUpdate(),
 			},
 			bundle: &smith_v1.Bundle{
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name:      "bundle1",
+					Name:      bundle1,
 					Namespace: testNamespace,
-					UID:       "uid123",
+					UID:       bundle1uid,
 				},
 			},
-			expectedActions: sets.NewString("DELETE=/api/v1/namespaces/" + testNamespace + "/configmaps/map1"),
+			expectedActions: sets.NewString("DELETE=/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate),
 			namespace:       meta_v1.NamespaceAll,
 		},
 		"can list crds in another namespace": &testCase{
@@ -159,28 +162,13 @@ func TestController(t *testing.T) {
 		},
 		"actual object is passed to the plugin": &testCase{
 			mainClientObjects: []runtime.Object{
-				&core_v1.ConfigMap{
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "map1",
-						Namespace: testNamespace,
-						OwnerReferences: []meta_v1.OwnerReference{
-							{
-								APIVersion:         smith_v1.BundleResourceGroupVersion,
-								Kind:               smith_v1.BundleResourceKind,
-								Name:               "bundle1",
-								UID:                "uid123",
-								Controller:         &tr,
-								BlockOwnerDeletion: &tr,
-							},
-						},
-					},
-				},
+				configMapNeedsUpdate(),
 			},
 			bundle: &smith_v1.Bundle{
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name:      "bundle1",
+					Name:      bundle1,
 					Namespace: testNamespace,
-					UID:       "uid123",
+					UID:       bundle1uid,
 				},
 				Spec: smith_v1.BundleSpec{
 					Resources: []smith_v1.Resource{
@@ -189,7 +177,7 @@ func TestController(t *testing.T) {
 							Spec: smith_v1.ResourceSpec{
 								Plugin: &smith_v1.PluginSpec{
 									Name:       pluginSimpleConfigMap,
-									ObjectName: "map1",
+									ObjectName: mapNeedsAnUpdate,
 									Spec: map[string]interface{}{
 										"actualShouldExist": true,
 									},
@@ -200,29 +188,29 @@ func TestController(t *testing.T) {
 				},
 			},
 			namespace:       testNamespace,
-			expectedActions: sets.NewString("PUT=/api/v1/namespaces/" + testNamespace + "/configmaps/map1"),
+			expectedActions: sets.NewString("PUT=/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate),
 			testHandler: fakeActionHandler{
 				response: map[path]fakeResponse{
 					{
 						method: "PUT",
-						path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/map1",
+						path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate,
 					}: {
 						statusCode: http.StatusOK,
 						content: []byte(`{
 							"apiVersion": "v1",
 							"kind": "ConfigMap",
 							"metadata": {
-								"name": "map1",
+								"name": "` + mapNeedsAnUpdate + `",
 								"namespace": "` + testNamespace + `",
-								"uid": "map-update-uid",
+								"uid": "` + mapNeedsAnUpdateUid + `",
 								"labels": {
-									"` + smith.BundleNameLabel + `": "bundle1"
+									"` + smith.BundleNameLabel + `": "` + bundle1 + `"
 								},
 								"ownerReferences": [{
 									"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
 									"kind": "` + smith_v1.BundleResourceKind + `",
-									"name": "bundle1",
-									"uid": "uid123",
+									"name": "` + bundle1 + `",
+									"uid": "` + bundle1uid + `",
 									"controller": true,
 									"blockOwnerDeletion": true
 								}] }
@@ -239,14 +227,14 @@ func TestController(t *testing.T) {
 			mainClientObjects: []runtime.Object{
 				&core_v1.Secret{
 					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "s1",
+						Name:      s1,
 						Namespace: testNamespace,
 						OwnerReferences: []meta_v1.OwnerReference{
 							{
 								APIVersion:         sc_v1b1.SchemeGroupVersion.String(),
 								Kind:               "ServiceBinding",
 								Name:               sb1,
-								UID:                types.UID("sb1-uid"),
+								UID:                sb1uid,
 								Controller:         &tr,
 								BlockOwnerDeletion: &tr,
 							},
@@ -259,94 +247,19 @@ func TestController(t *testing.T) {
 				},
 			},
 			scClientObjects: []runtime.Object{
-				&sc_v1b1.ServiceInstance{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "ServiceInstance",
-						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "si1",
-						Namespace: testNamespace,
-						UID:       types.UID("si1-uid"),
-						Labels: map[string]string{
-							smith.BundleNameLabel: "bundle1",
-						},
-						OwnerReferences: []meta_v1.OwnerReference{
-							{
-								APIVersion:         smith_v1.BundleResourceGroupVersion,
-								Kind:               smith_v1.BundleResourceKind,
-								Name:               "bundle1",
-								UID:                "uid123",
-								Controller:         &tr,
-								BlockOwnerDeletion: &tr,
-							},
-						},
-					},
-					Status: sc_v1b1.ServiceInstanceStatus{
-						Conditions: []sc_v1b1.ServiceInstanceCondition{
-							{
-								Type:   sc_v1b1.ServiceInstanceConditionReady,
-								Status: sc_v1b1.ConditionTrue,
-							},
-						},
-					},
-				},
-				&sc_v1b1.ServiceBinding{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "ServiceBinding",
-						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      sb1,
-						Namespace: testNamespace,
-						UID:       types.UID("sb1-uid"),
-						Labels: map[string]string{
-							smith.BundleNameLabel: "bundle1",
-						},
-						OwnerReferences: []meta_v1.OwnerReference{
-							{
-								APIVersion:         smith_v1.BundleResourceGroupVersion,
-								Kind:               smith_v1.BundleResourceKind,
-								Name:               "bundle1",
-								UID:                "uid123",
-								Controller:         &tr,
-								BlockOwnerDeletion: &tr,
-							},
-							{
-								APIVersion:         sc_v1b1.SchemeGroupVersion.String(),
-								Kind:               "ServiceInstance",
-								Name:               "si1",
-								UID:                "si1-uid",
-								BlockOwnerDeletion: &tr,
-							},
-						},
-					},
-					Spec: sc_v1b1.ServiceBindingSpec{
-						ServiceInstanceRef: sc_v1b1.LocalObjectReference{
-							Name: "si1",
-						},
-						SecretName: "s1",
-					},
-					Status: sc_v1b1.ServiceBindingStatus{
-						Conditions: []sc_v1b1.ServiceBindingCondition{
-							{
-								Type:   sc_v1b1.ServiceBindingConditionReady,
-								Status: sc_v1b1.ConditionTrue,
-							},
-						},
-					},
-				},
+				serviceInstance(true, false, false),
+				serviceBinding(true, false, false),
 			},
 			bundle: &smith_v1.Bundle{
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name:      "bundle1",
+					Name:      bundle1,
 					Namespace: testNamespace,
-					UID:       "uid123",
+					UID:       bundle1uid,
 				},
 				Spec: smith_v1.BundleSpec{
 					Resources: []smith_v1.Resource{
 						{
-							Name: "si1",
+							Name: resSi1,
 							Spec: smith_v1.ResourceSpec{
 								Object: &sc_v1b1.ServiceInstance{
 									TypeMeta: meta_v1.TypeMeta{
@@ -354,7 +267,7 @@ func TestController(t *testing.T) {
 										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 									},
 									ObjectMeta: meta_v1.ObjectMeta{
-										Name: "si1",
+										Name: si1,
 									},
 								},
 							},
@@ -362,7 +275,7 @@ func TestController(t *testing.T) {
 						{
 							Name: resSb1,
 							DependsOn: []smith_v1.ResourceName{
-								"si1",
+								resSi1,
 							},
 							Spec: smith_v1.ResourceSpec{
 								Object: &sc_v1b1.ServiceBinding{
@@ -375,9 +288,9 @@ func TestController(t *testing.T) {
 									},
 									Spec: sc_v1b1.ServiceBindingSpec{
 										ServiceInstanceRef: sc_v1b1.LocalObjectReference{
-											Name: "si1",
+											Name: si1,
 										},
-										SecretName: "s1",
+										SecretName: s1,
 									},
 								},
 							},
@@ -390,7 +303,7 @@ func TestController(t *testing.T) {
 							Spec: smith_v1.ResourceSpec{
 								Plugin: &smith_v1.PluginSpec{
 									Name:       pluginConfigMapWithDeps,
-									ObjectName: "m1",
+									ObjectName: m1,
 									Spec: map[string]interface{}{
 										"p1": "v1", "p2": "{{" + resSb1 + "#metadata.name}}",
 									},
@@ -414,26 +327,26 @@ func TestController(t *testing.T) {
 							"apiVersion": "v1",
 							"kind": "ConfigMap",
 							"metadata": {
-								"name": "m1",
+								"name": "` + m1 + `",
 								"namespace": "` + testNamespace + `",
-								"uid": "map-update-uid",
+								"uid": "` + mapNeedsAnUpdateUid + `",
 								"labels": {
-									"` + smith.BundleNameLabel + `": "bundle1"
+									"` + smith.BundleNameLabel + `": "` + bundle1 + `"
 								},
 								"ownerReferences": [
 									{
 										"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
 										"kind": "` + smith_v1.BundleResourceKind + `",
-										"name": "bundle1",
-										"uid": "uid123",
+										"name": "` + bundle1 + `",
+										"uid": "` + bundle1uid + `",
 										"controller": true,
 										"blockOwnerDeletion": true
 									},
 									{
 										"apiVersion": "` + sc_v1b1.SchemeGroupVersion.String() + `",
 										"kind": "ServiceBinding",
-										"name": "sb1",
-										"uid": "sb1-uid",
+										"name": "` + sb1 + `",
+										"uid": "` + sb1uid + `",
 										"blockOwnerDeletion": true
 									}
 								] }
@@ -449,9 +362,9 @@ func TestController(t *testing.T) {
 		"plugin not processed if spec invalid according to schema": &testCase{
 			bundle: &smith_v1.Bundle{
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name:      "bundle1",
+					Name:      bundle1,
 					Namespace: testNamespace,
-					UID:       "uid123",
+					UID:       bundle1uid,
 				},
 				Spec: smith_v1.BundleSpec{
 					Resources: []smith_v1.Resource{
@@ -460,7 +373,7 @@ func TestController(t *testing.T) {
 							Spec: smith_v1.ResourceSpec{
 								Plugin: &smith_v1.PluginSpec{
 									Name:       pluginConfigMapWithDeps,
-									ObjectName: "m1",
+									ObjectName: m1,
 									Spec: map[string]interface{}{
 										"p1": nil,
 									},
@@ -484,102 +397,22 @@ func TestController(t *testing.T) {
 		},
 		"no resource creates/updates/deletes done after error is encountered": &testCase{
 			mainClientObjects: []runtime.Object{
-				&core_v1.ConfigMap{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "ConfigMap",
-						APIVersion: core_v1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "map-not-in-the-bundle-anymore-needs-delete",
-						Namespace: testNamespace,
-						UID:       types.UID("map-delete-uid"),
-						Labels: map[string]string{
-							smith.BundleNameLabel: "bundle1",
-						},
-						OwnerReferences: []meta_v1.OwnerReference{
-							{
-								APIVersion:         smith_v1.BundleResourceGroupVersion,
-								Kind:               smith_v1.BundleResourceKind,
-								Name:               "bundle1",
-								UID:                "uid123",
-								Controller:         &tr,
-								BlockOwnerDeletion: &tr,
-							},
-						},
-					},
-				},
-				&core_v1.ConfigMap{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "ConfigMap",
-						APIVersion: core_v1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "map-needs-update",
-						Namespace: testNamespace,
-						UID:       types.UID("map-update-uid"),
-						// Labels missing - needs an update
-						OwnerReferences: []meta_v1.OwnerReference{
-							{
-								APIVersion:         smith_v1.BundleResourceGroupVersion,
-								Kind:               smith_v1.BundleResourceKind,
-								Name:               "bundle1",
-								UID:                "uid123",
-								Controller:         &tr,
-								BlockOwnerDeletion: &tr,
-							},
-						},
-					},
-					Data: map[string]string{
-						"delete": "this key",
-					},
-				},
+				configMapNeedsDelete(),
+				configMapNeedsUpdate(),
 			},
 			scClientObjects: []runtime.Object{
-				&sc_v1b1.ServiceInstance{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "ServiceInstance",
-						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "si1",
-						Namespace: testNamespace,
-						UID:       types.UID("si1-uid"),
-						Labels: map[string]string{
-							smith.BundleNameLabel: "bundle1",
-						},
-						OwnerReferences: []meta_v1.OwnerReference{
-							{
-								APIVersion:         smith_v1.BundleResourceGroupVersion,
-								Kind:               smith_v1.BundleResourceKind,
-								Name:               "bundle1",
-								UID:                "uid123",
-								Controller:         &tr,
-								BlockOwnerDeletion: &tr,
-							},
-						},
-					},
-					Status: sc_v1b1.ServiceInstanceStatus{
-						Conditions: []sc_v1b1.ServiceInstanceCondition{
-							{
-								Type:    sc_v1b1.ServiceInstanceConditionFailed,
-								Status:  sc_v1b1.ConditionTrue,
-								Reason:  "BlaBla",
-								Message: "Oh no!",
-							},
-						},
-					},
-				},
+				serviceInstance(false, false, true),
 			},
 			bundle: &smith_v1.Bundle{
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name:      "bundle1",
+					Name:      bundle1,
 					Namespace: testNamespace,
-					UID:       "uid123",
+					UID:       bundle1uid,
 				},
 				Spec: smith_v1.BundleSpec{
 					Resources: []smith_v1.Resource{
 						{
-							Name: "si1",
+							Name: resSi1,
 							Spec: smith_v1.ResourceSpec{
 								Object: &sc_v1b1.ServiceInstance{
 									TypeMeta: meta_v1.TypeMeta{
@@ -587,13 +420,13 @@ func TestController(t *testing.T) {
 										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 									},
 									ObjectMeta: meta_v1.ObjectMeta{
-										Name: "si1",
+										Name: si1,
 									},
 								},
 							},
 						},
 						{
-							Name: "map1",
+							Name: resMapNeedsAnUpdate,
 							Spec: smith_v1.ResourceSpec{
 								Object: &core_v1.ConfigMap{
 									TypeMeta: meta_v1.TypeMeta{
@@ -601,7 +434,7 @@ func TestController(t *testing.T) {
 										APIVersion: core_v1.SchemeGroupVersion.String(),
 									},
 									ObjectMeta: meta_v1.ObjectMeta{
-										Name: "map1",
+										Name: mapNeedsAnUpdate,
 									},
 								},
 							},
@@ -615,7 +448,7 @@ func TestController(t *testing.T) {
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
 				retriable, err := cntrlr.processKey(key)
-				require.EqualError(t, err, `error processing resource(s): ["si1"]`)
+				require.EqualError(t, err, `error processing resource(s): ["`+resSi1+`"]`)
 				assert.False(t, retriable)
 				actions := tc.bundleFake.Actions()
 				require.Len(t, actions, 3)
@@ -626,94 +459,38 @@ func TestController(t *testing.T) {
 				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
 				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleError, smith_v1.ConditionTrue)
 
-				smith_testing.AssertResourceCondition(t, updateBundle, "si1", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
-				smith_testing.AssertResourceCondition(t, updateBundle, "si1", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
-				smith_testing.AssertResourceCondition(t, updateBundle, "si1", smith_v1.ResourceReady, smith_v1.ConditionFalse)
-				resCond := smith_testing.AssertResourceCondition(t, updateBundle, "si1", smith_v1.ResourceError, smith_v1.ConditionTrue)
+				smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceReady, smith_v1.ConditionFalse)
+				resCond := smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceError, smith_v1.ConditionTrue)
 				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
 				assert.Equal(t, "readiness check failed: BlaBla: Oh no!", resCond.Message)
 
-				resCond = smith_testing.AssertResourceCondition(t, updateBundle, "map1", smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
+				resCond = smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
 				assert.Equal(t, smith_v1.ResourceReasonOtherResourceError, resCond.Reason)
 				assert.Equal(t, "Some other resource is in error state", resCond.Message)
-				smith_testing.AssertResourceCondition(t, updateBundle, "map1", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
-				smith_testing.AssertResourceCondition(t, updateBundle, "map1", smith_v1.ResourceReady, smith_v1.ConditionFalse)
-				smith_testing.AssertResourceCondition(t, updateBundle, "map1", smith_v1.ResourceError, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceReady, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceError, smith_v1.ConditionFalse)
 			},
 		},
 		"resources are not deleted if bundle is in progress": &testCase{
 			mainClientObjects: []runtime.Object{
-				&core_v1.ConfigMap{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "ConfigMap",
-						APIVersion: core_v1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "map-not-in-the-bundle-anymore-needs-delete",
-						Namespace: testNamespace,
-						UID:       types.UID("map-delete-uid"),
-						Labels: map[string]string{
-							smith.BundleNameLabel: "bundle1",
-						},
-						OwnerReferences: []meta_v1.OwnerReference{
-							{
-								APIVersion:         smith_v1.BundleResourceGroupVersion,
-								Kind:               smith_v1.BundleResourceKind,
-								Name:               "bundle1",
-								UID:                "uid123",
-								Controller:         &tr,
-								BlockOwnerDeletion: &tr,
-							},
-						},
-					},
-				},
+				configMapNeedsDelete(),
 			},
 			scClientObjects: []runtime.Object{
-				&sc_v1b1.ServiceInstance{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "ServiceInstance",
-						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "si1",
-						Namespace: testNamespace,
-						UID:       types.UID("si1-uid"),
-						Labels: map[string]string{
-							smith.BundleNameLabel: "bundle1",
-						},
-						OwnerReferences: []meta_v1.OwnerReference{
-							{
-								APIVersion:         smith_v1.BundleResourceGroupVersion,
-								Kind:               smith_v1.BundleResourceKind,
-								Name:               "bundle1",
-								UID:                "uid123",
-								Controller:         &tr,
-								BlockOwnerDeletion: &tr,
-							},
-						},
-					},
-					Status: sc_v1b1.ServiceInstanceStatus{
-						Conditions: []sc_v1b1.ServiceInstanceCondition{
-							{
-								Type:    sc_v1b1.ServiceInstanceConditionReady,
-								Status:  sc_v1b1.ConditionFalse,
-								Reason:  "WorkingOnIt",
-								Message: "Doing something",
-							},
-						},
-					},
-				},
+				serviceInstance(false, true, false),
 			},
 			bundle: &smith_v1.Bundle{
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name:      "bundle1",
+					Name:      bundle1,
 					Namespace: testNamespace,
-					UID:       "uid123",
+					UID:       bundle1uid,
 				},
 				Spec: smith_v1.BundleSpec{
 					Resources: []smith_v1.Resource{
 						{
-							Name: "si1",
+							Name: resSi1,
 							Spec: smith_v1.ResourceSpec{
 								Object: &sc_v1b1.ServiceInstance{
 									TypeMeta: meta_v1.TypeMeta{
@@ -721,7 +498,7 @@ func TestController(t *testing.T) {
 										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 									},
 									ObjectMeta: meta_v1.ObjectMeta{
-										Name: "si1",
+										Name: si1,
 									},
 								},
 							},
@@ -734,34 +511,13 @@ func TestController(t *testing.T) {
 		},
 		"detect infinite update cycles": &testCase{
 			mainClientObjects: []runtime.Object{
-				&core_v1.ConfigMap{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "ConfigMap",
-						APIVersion: core_v1.SchemeGroupVersion.String(),
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name:      "map-needs-update",
-						Namespace: testNamespace,
-						UID:       types.UID("map-update-uid"),
-						// Labels missing - needs an update
-						OwnerReferences: []meta_v1.OwnerReference{
-							{
-								APIVersion:         smith_v1.BundleResourceGroupVersion,
-								Kind:               smith_v1.BundleResourceKind,
-								Name:               "bundle1",
-								UID:                "uid123",
-								Controller:         &tr,
-								BlockOwnerDeletion: &tr,
-							},
-						},
-					},
-				},
+				configMapNeedsUpdate(),
 			},
 			bundle: &smith_v1.Bundle{
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name:      "bundle1",
+					Name:      bundle1,
 					Namespace: testNamespace,
-					UID:       "uid123",
+					UID:       bundle1uid,
 				},
 				Spec: smith_v1.BundleSpec{
 					Resources: []smith_v1.Resource{
@@ -774,7 +530,7 @@ func TestController(t *testing.T) {
 										APIVersion: core_v1.SchemeGroupVersion.String(),
 									},
 									ObjectMeta: meta_v1.ObjectMeta{
-										Name: "map-needs-update",
+										Name: mapNeedsAnUpdate,
 									},
 								},
 							},
@@ -783,26 +539,26 @@ func TestController(t *testing.T) {
 				},
 			},
 			namespace:       testNamespace,
-			expectedActions: sets.NewString("PUT=/api/v1/namespaces/" + testNamespace + "/configmaps/map-needs-update"),
+			expectedActions: sets.NewString("PUT=/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate),
 			testHandler: fakeActionHandler{
 				response: map[path]fakeResponse{
 					{
 						method: "PUT",
-						path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/map-needs-update",
+						path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate,
 					}: {
 						statusCode: http.StatusOK,
 						content: []byte(`{
 							"apiVersion": "v1",
 							"kind": "ConfigMap",
 							"metadata": {
-								"name": "map1",
+								"name": "` + mapNeedsAnUpdate + `",
 								"namespace": "` + testNamespace + `",
-								"uid": "map-update-uid",
+								"uid": "` + mapNeedsAnUpdateUid + `",
 								"ownerReferences": [{
 									"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
 									"kind": "` + smith_v1.BundleResourceKind + `",
-									"name": "bundle1",
-									"uid": "uid123",
+									"name": "` + bundle1 + `",
+									"uid": "` + bundle1uid + `",
 									"controller": true,
 									"blockOwnerDeletion": true
 								}] }
@@ -1175,7 +931,7 @@ func (p *configMapWithDeps) Process(pluginSpec map[string]interface{}, context *
 			secret := bindingDep.Outputs[0]
 			if assert.IsType(p.t, &core_v1.Secret{}, secret) {
 				s := secret.(*core_v1.Secret)
-				assert.Equal(p.t, "s1", s.Name)
+				assert.Equal(p.t, s1, s.Name)
 				assert.Equal(p.t, testNamespace, s.Namespace)
 				assert.Equal(p.t, core_v1.SchemeGroupVersion.WithKind("Secret"), s.GroupVersionKind())
 			}
@@ -1185,7 +941,7 @@ func (p *configMapWithDeps) Process(pluginSpec map[string]interface{}, context *
 			svcInst := bindingDep.Auxiliary[0]
 			if assert.IsType(p.t, &sc_v1b1.ServiceInstance{}, svcInst) {
 				inst := svcInst.(*sc_v1b1.ServiceInstance)
-				assert.Equal(p.t, "si1", inst.Name)
+				assert.Equal(p.t, si1, inst.Name)
 				assert.Equal(p.t, testNamespace, inst.Namespace)
 				assert.Equal(p.t, sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), inst.GroupVersionKind())
 			}
@@ -1254,4 +1010,177 @@ func (p *simpleConfigMap) Process(pluginSpec map[string]interface{}, context *pl
 			},
 		},
 	}, nil
+}
+
+func serviceInstance(ready, inProgress, error bool) *sc_v1b1.ServiceInstance {
+	tr := true
+	var status sc_v1b1.ServiceInstanceStatus
+	if ready {
+		status.Conditions = append(status.Conditions, sc_v1b1.ServiceInstanceCondition{
+			Type:   sc_v1b1.ServiceInstanceConditionReady,
+			Status: sc_v1b1.ConditionTrue,
+		})
+	}
+	if inProgress {
+		status.Conditions = append(status.Conditions, sc_v1b1.ServiceInstanceCondition{
+			Type:    sc_v1b1.ServiceInstanceConditionReady,
+			Status:  sc_v1b1.ConditionFalse,
+			Reason:  "WorkingOnIt",
+			Message: "Doing something",
+		})
+	}
+	if error {
+		status.Conditions = append(status.Conditions, sc_v1b1.ServiceInstanceCondition{
+			Type:    sc_v1b1.ServiceInstanceConditionFailed,
+			Status:  sc_v1b1.ConditionTrue,
+			Reason:  "BlaBla",
+			Message: "Oh no!",
+		})
+	}
+	return &sc_v1b1.ServiceInstance{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "ServiceInstance",
+			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name:      si1,
+			Namespace: testNamespace,
+			UID:       si1uid,
+			Labels: map[string]string{
+				smith.BundleNameLabel: bundle1,
+			},
+			OwnerReferences: []meta_v1.OwnerReference{
+				{
+					APIVersion:         smith_v1.BundleResourceGroupVersion,
+					Kind:               smith_v1.BundleResourceKind,
+					Name:               bundle1,
+					UID:                bundle1uid,
+					Controller:         &tr,
+					BlockOwnerDeletion: &tr,
+				},
+			},
+		},
+		Status: status,
+	}
+}
+
+func serviceBinding(ready, inProgress, error bool) *sc_v1b1.ServiceBinding {
+	tr := true
+	var status sc_v1b1.ServiceBindingStatus
+	if ready {
+		status.Conditions = append(status.Conditions, sc_v1b1.ServiceBindingCondition{
+			Type:   sc_v1b1.ServiceBindingConditionReady,
+			Status: sc_v1b1.ConditionTrue,
+		})
+	}
+	if inProgress {
+		status.Conditions = append(status.Conditions, sc_v1b1.ServiceBindingCondition{
+			Type:    sc_v1b1.ServiceBindingConditionReady,
+			Status:  sc_v1b1.ConditionFalse,
+			Reason:  "WorkingOnIt",
+			Message: "Doing something",
+		})
+	}
+	if error {
+		status.Conditions = append(status.Conditions, sc_v1b1.ServiceBindingCondition{
+			Type:    sc_v1b1.ServiceBindingConditionFailed,
+			Status:  sc_v1b1.ConditionTrue,
+			Reason:  "BlaBla",
+			Message: "Oh no!",
+		})
+	}
+	return &sc_v1b1.ServiceBinding{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "ServiceBinding",
+			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name:      sb1,
+			Namespace: testNamespace,
+			UID:       sb1uid,
+			Labels: map[string]string{
+				smith.BundleNameLabel: bundle1,
+			},
+			OwnerReferences: []meta_v1.OwnerReference{
+				{
+					APIVersion:         smith_v1.BundleResourceGroupVersion,
+					Kind:               smith_v1.BundleResourceKind,
+					Name:               bundle1,
+					UID:                bundle1uid,
+					Controller:         &tr,
+					BlockOwnerDeletion: &tr,
+				},
+				{
+					APIVersion:         sc_v1b1.SchemeGroupVersion.String(),
+					Kind:               "ServiceInstance",
+					Name:               si1,
+					UID:                si1uid,
+					BlockOwnerDeletion: &tr,
+				},
+			},
+		},
+		Spec: sc_v1b1.ServiceBindingSpec{
+			ServiceInstanceRef: sc_v1b1.LocalObjectReference{
+				Name: si1,
+			},
+			SecretName: s1,
+		},
+		Status: status,
+	}
+}
+
+func configMapNeedsUpdate() *core_v1.ConfigMap {
+	tr := true
+	return &core_v1.ConfigMap{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: core_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name:      mapNeedsAnUpdate,
+			Namespace: testNamespace,
+			UID:       mapNeedsAnUpdateUid,
+			// Labels missing - needs an update
+			OwnerReferences: []meta_v1.OwnerReference{
+				{
+					APIVersion:         smith_v1.BundleResourceGroupVersion,
+					Kind:               smith_v1.BundleResourceKind,
+					Name:               bundle1,
+					UID:                bundle1uid,
+					Controller:         &tr,
+					BlockOwnerDeletion: &tr,
+				},
+			},
+		},
+		Data: map[string]string{
+			"delete": "this key",
+		},
+	}
+}
+func configMapNeedsDelete() *core_v1.ConfigMap {
+	tr := true
+	return &core_v1.ConfigMap{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: core_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name:      mapNeedsDelete,
+			Namespace: testNamespace,
+			UID:       mapNeedsDeleteUid,
+			Labels: map[string]string{
+				smith.BundleNameLabel: bundle1,
+			},
+			OwnerReferences: []meta_v1.OwnerReference{
+				{
+					APIVersion:         smith_v1.BundleResourceGroupVersion,
+					Kind:               smith_v1.BundleResourceKind,
+					Name:               bundle1,
+					UID:                bundle1uid,
+					Controller:         &tr,
+					BlockOwnerDeletion: &tr,
+				},
+			},
+		},
+	}
 }
