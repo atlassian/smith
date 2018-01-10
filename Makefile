@@ -155,13 +155,14 @@ test-ci:
 check:
 	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... \
 		--vendor --skip=pkg/client/clientset_generated --exclude=zz_generated \
-		--linter='errcheck:errcheck:-ignore=net:Close' --cyclo-over=20 \
+		--linter='errcheck:errcheck:-ignore=net:Close' --cyclo-over=30 \
 		--disable=interfacer --disable=golint --dupl-threshold=200
 
 .PHONY: check-all
 check-all:
-	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... --vendor --cyclo-over=20 \
-		--dupl-threshold=65
+	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... \
+		--vendor --skip=pkg/client/clientset_generated --exclude=zz_generated \
+		--cyclo-over=30 --dupl-threshold=65
 
 .PHONY: docker
 docker:

@@ -103,8 +103,8 @@ func (st *resourceSyncTask) calculateNewCheckSum(instanceSpec *sc_v1b1.ServiceIn
 	}
 
 	if previousEncodedChecksum != "" {
-		previousCheckSum, err := decodeChecksum(previousEncodedChecksum)
-		if err == nil && validateChecksum(previousCheckSum, checksumPayload) {
+		previousCheckSum, checkSumErr := decodeChecksum(previousEncodedChecksum)
+		if checkSumErr == nil && validateChecksum(previousCheckSum, checksumPayload) {
 			return previousEncodedChecksum, nil
 		}
 	}

@@ -299,12 +299,12 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 		BlockOwnerDeletion: &trueRef,
 	})
 	for _, dep := range res.DependsOn {
-		obj := st.processedResources[dep].actual // this is ok because we've checked earlier that resources contains all dependencies
+		proceedObj := st.processedResources[dep].actual // this is ok because we've checked earlier that resources contains all dependencies
 		refs = append(refs, meta_v1.OwnerReference{
-			APIVersion:         obj.GetAPIVersion(),
-			Kind:               obj.GetKind(),
-			Name:               obj.GetName(),
-			UID:                obj.GetUID(),
+			APIVersion:         proceedObj.GetAPIVersion(),
+			Kind:               proceedObj.GetKind(),
+			Name:               proceedObj.GetName(),
+			UID:                proceedObj.GetUID(),
 			BlockOwnerDeletion: &trueRef,
 		})
 	}

@@ -640,6 +640,7 @@ func (tc *testCase) run(t *testing.T) {
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, 0, cache.Indexers{})
 	bundleInf := client.BundleInformer(bundleClient.SmithV1(), meta_v1.NamespaceAll, 0)
 	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
+	require.NoError(t, err)
 
 	for _, object := range tc.crdClientObjects {
 		crd := object.(*apiext_v1b1.CustomResourceDefinition)
