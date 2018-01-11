@@ -27,11 +27,11 @@ spec:
   resources:
 
   - name: extra-ref
-    type: reference
-    referenceSpec:
-      apiVersion: rbac.authorization.k8s.io/v1
-      kind: RoleBinding
-      name: binding1
+    spec:
+      reference:
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        name: binding1
 ```
 
 ### Cluster references
@@ -48,9 +48,9 @@ spec:
   resources:
 
   - name: cluster-extra-ref
-    type: clusterReference
-    clusterReferenceSpec:
-      apiVersion: rbac.authorization.k8s.io/v1
-      kind: ClusterRoleBinding
-      name: binding2
+    spec:
+      clusterReference:
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        name: binding2
 ```
