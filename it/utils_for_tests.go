@@ -121,7 +121,11 @@ func IsBundleNewerCond(namespace, name string, resourceVersions ...string) watch
 }
 
 func TestSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClientset.Clientset) {
-	config, err := client.ConfigFromEnv()
+	configFileFrom := os.Getenv("KUBERNETES_CONFIG_FROM")
+	configFileName := os.Getenv("KUBERNETES_CONFIG_FILENAME")
+	configContext := os.Getenv("KUBERNETES_CONFIG_CONTEXT")
+
+	config, err := client.LoadConfig(configFileFrom, configFileName, configContext)
 	require.NoError(t, err)
 
 	clientset, err := kubernetes.NewForConfig(config)

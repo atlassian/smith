@@ -15,7 +15,6 @@ import (
 )
 
 func main() {
-	flag.Parse()
 	if err := run(); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 		log.Fatalln(err)
 	}
@@ -30,12 +29,18 @@ func run() error {
 }
 
 func runWithContext(ctx context.Context) error {
-	config, err := client.ConfigFromEnv()
+	configFileFrom := flag.String("client-config-from", "in-cluster",
+		"Source of REST client configuration. 'in-cluster' (default), 'environment' and 'file' are valid options.")
+	configFileName := flag.String("client-config-file-name", "",
+		"Load REST client configuration from the specified Kubernetes config file. This is only applicable if --client-config-from=file is set.")
+	configContext := flag.String("client-config-context", "",
+		"Context to use for REST client configuration. This is only applicable if --client-config-from=file is set.")
+
+	flag.Parse()
+
+	config, err := client.LoadConfig(*configFileFrom, *configFileName, *configContext)
 	if err != nil {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return err
-		}
+		return err
 	}
 	config.UserAgent = "sleeper-controller"
 
