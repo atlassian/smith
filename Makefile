@@ -4,6 +4,7 @@ OS = $$(uname -s | tr A-Z a-z)
 BINARY_PREFIX_DIRECTORY=$(OS)_amd64_stripped
 BINARY_PURE_PREFIX_DIRECTORY=$(OS)_amd64_pure_stripped
 #BINARY_RACE_PREFIX_DIRECTORY=$(OS)_amd64_race_stripped
+KUBE_CONTEXT ?= minikube
 
 .PHONY: setup
 setup: setup-ci
@@ -73,16 +74,14 @@ generate-deepcopy:
 	--bounding-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \
 	--output-file-base zz_generated.deepcopy
 
-.PHONY: minikube-test
-minikube-test: fmt update-bazel
+.PHONY: integration-test
+integration-test: fmt update-bazel
 	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
-		--test_env=KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
-		--test_env=KUBERNETES_SERVICE_PORT=8443 \
-		--test_env=KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
-		--test_env=KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
-		--test_env=KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
+		--test_env=KUBERNETES_CONFIG_FROM=file \
+		--test_env=KUBERNETES_CONFIG_FILENAME=$$HOME/.kube/config \
+		--test_env=KUBERNETES_CONFIG_CONTEXT=$(KUBE_CONTEXT) \
 		//it:go_default_test
 
 .PHONY: minikube-test-sc
@@ -90,50 +89,44 @@ minikube-test-sc: fmt update-bazel
 	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
-		--test_env=KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
-		--test_env=KUBERNETES_SERVICE_PORT=8443 \
-		--test_env=KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
-		--test_env=KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
-		--test_env=KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
+		--test_env=KUBERNETES_CONFIG_FROM=file \
+		--test_env=KUBERNETES_CONFIG_FILENAME="$$HOME/.kube/config" \
+		--test_env=KUBERNETES_CONFIG_CONTEXT=minikube \
 		--test_env=SERVICE_CATALOG_URL="http://$$(minikube ip):30080" \
 		//it/sc:go_default_test
 
-.PHONY: minikube-run
-minikube-run: fmt update-bazel build
+.PHONY: run
+run: fmt update-bazel build
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
-	KUBERNETES_SERVICE_PORT=8443 \
-	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
-	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
-	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/cmd/smith/$(BINARY_PURE_PREFIX_DIRECTORY)/smith -disable-service-catalog -leader-elect
+	bazel-bin/cmd/smith/$(BINARY_PURE_PREFIX_DIRECTORY)/smith \
+		-service-catalog=false \
+		-leader-elect \
+		-client-config-from=file \
+		-client-config-file-name="$$HOME/.kube/config" \
+		-client-config-context=$(KUBE_CONTEXT)
 
 .PHONY: minikube-run-sc
 minikube-run-sc: fmt update-bazel build
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
-	KUBERNETES_SERVICE_PORT=8443 \
-	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
-	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
-	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
 	bazel-bin/cmd/smith/$(BINARY_PURE_PREFIX_DIRECTORY)/smith  \
-	-leader-elect \
-	-service-catalog-url="https://$$(minikube ip):30443" \
-	-service-catalog-insecure
+		-leader-elect \
+		-service-catalog-url="https://$$(minikube ip):30443" \
+		-service-catalog-insecure \
+		-client-config-from=file \
+		-client-config-file-name="$$HOME/.kube/config" \
+		-client-config-context=minikube
 
-.PHONY: minikube-sleeper-run
-minikube-sleeper-run: fmt update-bazel
+.PHONY: sleeper-run
+sleeper-run: fmt update-bazel
 	bazel build //examples/sleeper/main
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	KUBERNETES_SERVICE_HOST="$$(minikube ip)" \
-	KUBERNETES_SERVICE_PORT=8443 \
-	KUBERNETES_CA_PATH="$$HOME/.minikube/ca.crt" \
-	KUBERNETES_CLIENT_CERT="$$HOME/.minikube/apiserver.crt" \
-	KUBERNETES_CLIENT_KEY="$$HOME/.minikube/apiserver.key" \
-	bazel-bin/examples/sleeper/main/$(BINARY_PURE_PREFIX_DIRECTORY)/main
+	bazel-bin/examples/sleeper/main/$(BINARY_PURE_PREFIX_DIRECTORY)/main \
+		-client-config-from=file \
+		-client-config-file-name="$$HOME/.kube/config" \
+		-client-config-context=$(KUBE_CONTEXT)
 
 .PHONY: test
 test: fmt update-bazel test-ci

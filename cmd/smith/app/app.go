@@ -69,7 +69,7 @@ type App struct {
 	Namespace            string
 	Plugins              []plugin.NewFunc
 	Workers              int
-	DisablePodPreset     bool
+	PodPresetSupport     bool
 	LeaderElectionConfig LeaderElectionConfig
 }
 
@@ -167,7 +167,7 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	}
 
-	resourceInfs := apitypes.ResourceInformers(clientset, scClient, a.Namespace, a.ResyncPeriod, !a.DisablePodPreset)
+	resourceInfs := apitypes.ResourceInformers(clientset, scClient, a.Namespace, a.ResyncPeriod, a.PodPresetSupport)
 
 	// Controller
 	cntrlr := controller.BundleController{
@@ -284,8 +284,8 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 
 func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	a := App{}
-	flagset.BoolVar(&a.DisablePodPreset, "disable-pod-preset", false, "Disable PodPreset support")
-	scDisable := flagset.Bool("disable-service-catalog", false, "Disable Service Catalog support")
+	flagset.BoolVar(&a.PodPresetSupport, "pod-preset", false, "PodPreset support. Disabled by default.")
+	scEnabled := flagset.Bool("service-catalog", true, "Service Catalog support. Enabled by default.")
 	scUrl := flagset.String("service-catalog-url", "", "Service Catalog API server URL")
 	scInsecure := flagset.Bool("service-catalog-insecure", false, "Disable TLS validation for Service Catalog")
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
@@ -315,21 +315,25 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 		"Namespace to use for leader election ConfigMap. This is only applicable if leader election is enabled")
 	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapName, "leader-elect-configmap-name", "smith-leader-elect",
 		"ConfigMap name to use for leader election. This is only applicable if leader election is enabled")
+	configFileFrom := flagset.String("client-config-from", "in-cluster",
+		"Source of REST client configuration. 'in-cluster' (default), 'environment' and 'file' are valid options.")
+	configFileName := flagset.String("client-config-file-name", "",
+		"Load REST client configuration from the specified Kubernetes config file. This is only applicable if --client-config-from=file is set.")
+	configContext := flagset.String("client-config-context", "",
+		"Context to use for REST client configuration. This is only applicable if --client-config-from=file is set.")
 
 	if err := flagset.Parse(arguments); err != nil {
 		return nil, err
 	}
 
-	config, err := client.ConfigFromEnv()
+	config, err := client.LoadConfig(*configFileFrom, *configFileName, *configContext)
 	if err != nil {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
+
 	config.UserAgent = "smith"
 	a.RestConfig = config
-	if !*scDisable {
+	if *scEnabled {
 		scConfig := *config // shallow copy
 		if *scInsecure {
 			scConfig.TLSClientConfig.Insecure = true
