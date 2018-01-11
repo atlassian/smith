@@ -16,7 +16,7 @@ It's functional and under active development.
 
 ## News
 
-- 01.01.2018: Milestone [milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0) is complete and v1.0.0 released! 
+- 01.01.2018: [Milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0) is complete and v1.0.0 released! 
 
 ## The idea
 
