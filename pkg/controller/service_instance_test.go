@@ -44,7 +44,7 @@ func (f fakeStore) RemoveInformer(schema.GroupVersionKind) bool {
 	return false
 }
 
-func serviceInstance(spec *unstructured.Unstructured) *sc_v1b1.ServiceInstance {
+func serviceInstanceUnmarshal(spec *unstructured.Unstructured) *sc_v1b1.ServiceInstance {
 	var instanceSpec sc_v1b1.ServiceInstance
 	if err := unstructured_conversion.DefaultConverter.FromUnstructured(spec.Object, &instanceSpec); err != nil {
 		panic(err)
@@ -123,7 +123,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
 
-	instanceCheck := serviceInstance(updatedSpec)
+	instanceCheck := serviceInstanceUnmarshal(updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
@@ -131,7 +131,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 
 	updateTwice, err := rst.forceServiceInstanceUpdates(spec, instanceCheck, defaultNamespace)
 	require.NoError(t, err)
-	secondInstance := serviceInstance(updateTwice)
+	secondInstance := serviceInstanceUnmarshal(updateTwice)
 
 	assert.Contains(t, secondInstance.Annotations, smith.Domain+"/secretParametersChecksum")
 	assert.Zero(t, secondInstance.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
@@ -193,7 +193,7 @@ func TestExplicitlyDisabled(t *testing.T) {
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
 
-	instanceCheck := serviceInstance(updatedSpec)
+	instanceCheck := serviceInstanceUnmarshal(updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Equal(t, instanceCheck.Annotations[annotaionKey], "disabled")
@@ -273,7 +273,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
 
-	instanceCheck := serviceInstance(updatedSpec)
+	instanceCheck := serviceInstanceUnmarshal(updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
@@ -289,7 +289,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 
 	updateTwice, err := rstUpdatedMocks.forceServiceInstanceUpdates(spec, instanceCheck, defaultNamespace)
 	require.NoError(t, err)
-	secondInstance := serviceInstance(updateTwice)
+	secondInstance := serviceInstanceUnmarshal(updateTwice)
 
 	assert.Contains(t, secondInstance.Annotations, smith.Domain+"/secretParametersChecksum")
 	assert.True(t, secondInstance.Spec.UpdateRequests == 1, "expected UpdateRequests to be 1 for updated data")
@@ -321,7 +321,7 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
 
-	instanceCheck := serviceInstance(updatedSpec)
+	instanceCheck := serviceInstanceUnmarshal(updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
@@ -385,7 +385,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
 
-	instanceCheck := serviceInstance(updatedSpec)
+	instanceCheck := serviceInstanceUnmarshal(updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 when overriding user the first time")
@@ -395,7 +395,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	compareToPreviousUpdate, err := rst.forceServiceInstanceUpdates(spec, instanceCheck, defaultNamespace)
 	require.NoError(t, err)
 
-	ignoreUserValue := serviceInstance(compareToPreviousUpdate)
+	ignoreUserValue := serviceInstanceUnmarshal(compareToPreviousUpdate)
 
 	assert.Contains(t, ignoreUserValue.Annotations, annotaionKey)
 	assert.Zero(t, ignoreUserValue.Spec.UpdateRequests, "expected UpdateRequests to be 0 when overriding user the first time")
