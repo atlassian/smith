@@ -263,7 +263,6 @@ type PluginSpec struct {
 func (in *PluginSpec) DeepCopyInto(out *PluginSpec) {
 	*out = *in
 	out.Spec = deepCopyJSONValue(in.Spec).(map[string]interface{})
-	return
 }
 
 // DeepCopy is an deepcopy function, copying the receiver, creating a new PluginSpec.

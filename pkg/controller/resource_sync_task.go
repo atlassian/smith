@@ -113,6 +113,16 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 		}
 	}
 
+	// Force Service Catalog to update service instances when secrets they depend change
+	spec, err = st.forceServiceInstanceUpdates(spec, actual, st.bundle.Namespace)
+	if err != nil {
+		return resourceInfo{
+			status: resourceStatusError{
+				err: err,
+			},
+		}
+	}
+
 	// Create or update resource
 	resUpdated, retriable, err := st.createOrUpdate(spec, actual)
 	if err != nil {
@@ -289,12 +299,12 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 		BlockOwnerDeletion: &trueRef,
 	})
 	for _, dep := range res.DependsOn {
-		obj := st.processedResources[dep].actual // this is ok because we've checked earlier that resources contains all dependencies
+		processedObj := st.processedResources[dep].actual // this is ok because we've checked earlier that resources contains all dependencies
 		refs = append(refs, meta_v1.OwnerReference{
-			APIVersion:         obj.GetAPIVersion(),
-			Kind:               obj.GetKind(),
-			Name:               obj.GetName(),
-			UID:                obj.GetUID(),
+			APIVersion:         processedObj.GetAPIVersion(),
+			Kind:               processedObj.GetKind(),
+			Name:               processedObj.GetName(),
+			UID:                processedObj.GetUID(),
 			BlockOwnerDeletion: &trueRef,
 		})
 	}
