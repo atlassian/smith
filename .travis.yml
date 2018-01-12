@@ -28,7 +28,7 @@ before_install:
     mv .bazelrc.travis .bazelrc
 
 install:
-  - make setup-ci
+  - make setup-base
 
 script:
   - make verify
