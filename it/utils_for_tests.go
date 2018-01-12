@@ -38,10 +38,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const (
-	serviceCatalogUrlEnvParam = "SERVICE_CATALOG_URL"
-)
-
 type TestFunc func(context.Context, *testing.T, *Config, ...interface{})
 
 type Config struct {
@@ -150,10 +146,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	var scConfig *rest.Config
 	var scClient scClientset.Interface
 	if serviceCatalog {
-		scConfigTmp := *config // shallow copy
-		scConfigTmp.Host = os.Getenv(serviceCatalogUrlEnvParam)
-		require.NotEmpty(t, scConfigTmp.Host, "required environment variable %s is not set", serviceCatalogUrlEnvParam)
-		scConfig = &scConfigTmp
+		scConfig = config
 		var err error
 		scClient, err = scClientset.NewForConfig(scConfig)
 		require.NoError(t, err)

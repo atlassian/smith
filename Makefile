@@ -84,15 +84,14 @@ integration-test: fmt update-bazel
 		--test_env=KUBERNETES_CONFIG_CONTEXT=$(KUBE_CONTEXT) \
 		//it:go_default_test
 
-.PHONY: minikube-test-sc
-minikube-test-sc: fmt update-bazel
+.PHONY: integration-test-sc
+integration-test-sc: fmt update-bazel
 	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
 		--test_env=KUBERNETES_CONFIG_FROM=file \
 		--test_env=KUBERNETES_CONFIG_FILENAME="$$HOME/.kube/config" \
-		--test_env=KUBERNETES_CONFIG_CONTEXT=minikube \
-		--test_env=SERVICE_CATALOG_URL="http://$$(minikube ip):30080" \
+		--test_env=KUBERNETES_CONFIG_CONTEXT=$(KUBE_CONTEXT) \
 		//it/sc:go_default_test
 
 .PHONY: run
@@ -106,17 +105,15 @@ run: fmt update-bazel build
 		-client-config-file-name="$$HOME/.kube/config" \
 		-client-config-context=$(KUBE_CONTEXT)
 
-.PHONY: minikube-run-sc
-minikube-run-sc: fmt update-bazel build
+.PHONY: run-sc
+run-sc: fmt update-bazel build
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	bazel-bin/cmd/smith/$(BINARY_PURE_PREFIX_DIRECTORY)/smith  \
 		-leader-elect \
-		-service-catalog-url="https://$$(minikube ip):30443" \
-		-service-catalog-insecure \
 		-client-config-from=file \
 		-client-config-file-name="$$HOME/.kube/config" \
-		-client-config-context=minikube
+		-client-config-context=$(KUBE_CONTEXT)
 
 .PHONY: sleeper-run
 sleeper-run: fmt update-bazel

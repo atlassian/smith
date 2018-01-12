@@ -6,6 +6,7 @@ import (
 
 	"github.com/atlassian/smith/it"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +26,13 @@ func TestServiceCatalog(t *testing.T) {
 			PlanReference: sc_v1b1.PlanReference{
 				ClusterServiceClassExternalName: "user-provided-service",
 				ClusterServicePlanExternalName:  "default",
+			},
+			Parameters: &runtime.RawExtension{
+				Raw: []byte(`{
+	"credentials": {
+		"token": "token"
+	}
+}`),
 			},
 		},
 	}
