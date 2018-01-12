@@ -12,6 +12,7 @@ import (
 	unstructured_conversion "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type SpecCheck struct {
@@ -100,7 +101,10 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	updated.SetLabels(spec.GetLabels())
 	updated.SetAnnotations(processAnnotations(spec.GetAnnotations(), updated.GetAnnotations()))
 	updated.SetOwnerReferences(spec.GetOwnerReferences()) // TODO Is this ok? Check that there is only one controller and it is THIS bundle
-	updated.SetFinalizers(spec.GetFinalizers())           // TODO Is this ok?
+
+	finalizers := sets.NewString(updated.GetFinalizers()...)
+	finalizers.Insert(spec.GetFinalizers()...)
+	updated.SetFinalizers(finalizers.List()) // Sorted list of all finalizers
 
 	// Remove status to make sure ready checker will only detect readiness after resource controller has seen
 	// the object.
