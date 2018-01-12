@@ -18,6 +18,14 @@ go_binary(
     visibility = ["//visibility:public"],
 )
 
+go_binary(
+    name = "smith_race",
+    embed = [":go_default_library"],
+    importpath = "github.com/atlassian/smith/cmd/smith",
+    race = "on",
+    visibility = ["//visibility:public"],
+)
+
 go_image(
     name = "container",
     binary = ":smith",

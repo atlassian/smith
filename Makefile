@@ -3,23 +3,33 @@ ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "
 OS = $$(uname -s | tr A-Z a-z)
 BINARY_PREFIX_DIRECTORY=$(OS)_amd64_stripped
 BINARY_PURE_PREFIX_DIRECTORY=$(OS)_amd64_pure_stripped
-#BINARY_RACE_PREFIX_DIRECTORY=$(OS)_amd64_race_stripped
+BINARY_RACE_PREFIX_DIRECTORY=$(OS)_amd64_race_stripped
 KUBE_CONTEXT ?= minikube
 
-.PHONY: setup
-setup: setup-ci
+.PHONY: setup-dev
+setup-dev: setup-base
 	go get -u golang.org/x/tools/cmd/goimports
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
 
-.PHONY: setup-ci
-setup-ci:
+.PHONY: setup-base
+setup-base:
 	dep ensure
 	# workaround https://github.com/kubernetes/kubernetes/issues/50975
 	cp fixed_BUILD_for_sets.bazel vendor/k8s.io/apimachinery/pkg/util/sets/BUILD
 	go build -o build/bin/buildozer vendor/github.com/bazelbuild/buildtools/buildozer/*.go
+	go build -o build/bin/buildifier vendor/github.com/bazelbuild/buildtools/buildifier/*.go
 	rm -rf vendor/github.com/bazelbuild
 	bazel run //:gazelle_fix
+
+.PHONY: fmt-bazel
+fmt-bazel:
+	-build/bin/buildozer 'set race "on"' \
+		//cmd/...:%go_test \
+		//examples/...:%go_test \
+		//it/...:%go_test \
+		//pkg/...:%go_test
+	find .  -not -path "./vendor/*" -and \( -name '*.bzl' -or -name 'BUILD.bazel' -or -name 'WORKSPACE' \) -exec build/bin/buildifier  {} +
 
 .PHONY: update-bazel
 update-bazel:
@@ -33,10 +43,9 @@ update-bazel:
 .PHONY: build
 build: fmt update-bazel build-ci
 
-# Commented out for now. --features=race creates undesired side effects in the build
-#.PHONY: build-race
-#build-race: fmt update-bazel
-#	bazel build --features=race //cmd/smith
+.PHONY: build-race
+build-race: fmt update-bazel
+	bazel build //cmd/smith:smith_race
 
 .PHONY: build-ci
 build-ci:
@@ -95,10 +104,10 @@ integration-test-sc: fmt update-bazel
 		//it/sc:go_default_test
 
 .PHONY: run
-run: fmt update-bazel build
+run: fmt update-bazel build-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	bazel-bin/cmd/smith/$(BINARY_PURE_PREFIX_DIRECTORY)/smith \
+	bazel-bin/cmd/smith/$(BINARY_RACE_PREFIX_DIRECTORY)/smith_race \
 		-service-catalog=false \
 		-leader-elect \
 		-client-config-from=file \
@@ -106,10 +115,10 @@ run: fmt update-bazel build
 		-client-config-context=$(KUBE_CONTEXT)
 
 .PHONY: run-sc
-run-sc: fmt update-bazel build
+run-sc: fmt update-bazel build-race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	bazel-bin/cmd/smith/$(BINARY_PURE_PREFIX_DIRECTORY)/smith  \
+	bazel-bin/cmd/smith/$(BINARY_RACE_PREFIX_DIRECTORY)/smith_race  \
 		-leader-elect \
 		-client-config-from=file \
 		-client-config-file-name="$$HOME/.kube/config" \
@@ -117,10 +126,10 @@ run-sc: fmt update-bazel build
 
 .PHONY: sleeper-run
 sleeper-run: fmt update-bazel
-	bazel build //examples/sleeper/main
+	bazel build //examples/sleeper/main:main_race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	bazel-bin/examples/sleeper/main/$(BINARY_PURE_PREFIX_DIRECTORY)/main \
+	bazel-bin/examples/sleeper/main/$(BINARY_RACE_PREFIX_DIRECTORY)/main/main_race \
 		-client-config-from=file \
 		-client-config-file-name="$$HOME/.kube/config" \
 		-client-config-context=$(KUBE_CONTEXT)
