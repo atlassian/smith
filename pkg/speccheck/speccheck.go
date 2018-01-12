@@ -41,6 +41,7 @@ func (sc *SpecCheck) applyDefaults(spec runtime.Object) (*unstructured.Unstructu
 		return util.RuntimeToUnstructured(spec)
 	}
 	var clone runtime.Object
+	// TODO try direct conversion
 	if specUnstr, ok := spec.(*unstructured.Unstructured); ok {
 		var err error
 		clone, err = sc.Scheme.New(gvk)
@@ -79,19 +80,19 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	updated.SetKind(spec.GetKind())
 	updated.SetAPIVersion(spec.GetAPIVersion())
 
-	// 2. Copy data from the spec
+	// 2. Ignore fields managed by server, pre-process spec, etc
+	spec, err := sc.Cleaner.Cleanup(spec, actualClone)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "cleanup failed")
+	}
+
+	// 3. Copy data from the spec
 	for field, specValue := range spec.Object {
 		switch field {
 		case "kind", "apiVersion", "metadata", "status":
 			continue
 		}
 		updated.Object[field] = specValue // using the value directly - we've made a copy up the stack so it's ok
-	}
-
-	// 3. Ignore fields managed by server
-	updated, err := sc.Cleaner.Cleanup(updated, actualClone)
-	if err != nil {
-		return nil, false, errors.Wrapf(err, "cleanup failed")
 	}
 
 	// 4. Some stuff from ObjectMeta

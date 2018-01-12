@@ -16,6 +16,7 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestUpdate(t *testing.T) {
@@ -50,6 +51,36 @@ func TestUpdate(t *testing.T) {
 		},
 		Data: map[string]string{
 			"x": "y",
+		},
+	}
+	s1 := &core_v1.Secret{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: "secret1",
+		},
+		Data: map[string][]byte{
+			"a1": []byte("b1"),
+			"a2": []byte("b2"),
+		},
+		StringData: map[string]string{
+			"a2": "b3",
+			"x":  "y",
+		},
+	}
+	s2 := &core_v1.Secret{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: s1.Name,
+		},
+		StringData: map[string]string{
+			"a1": "a2",
+			"c1": "c2",
 		},
 	}
 	sleeper1 := &sleeper_v1.Sleeper{
@@ -113,6 +144,12 @@ func TestUpdate(t *testing.T) {
 						Object: sleeper1,
 					},
 				},
+				{
+					Name: smith_v1.ResourceName(s1.Name),
+					Spec: smith_v1.ResourceSpec{
+						Object: s1,
+					},
+				},
 			},
 		},
 	}
@@ -143,10 +180,16 @@ func TestUpdate(t *testing.T) {
 						Object: sleeper2,
 					},
 				},
+				{
+					Name: smith_v1.ResourceName(s2.Name),
+					Spec: smith_v1.ResourceSpec{
+						Object: s2,
+					},
+				},
 			},
 		},
 	}
-	SetupApp(t, bundle1, false, true, testUpdate, cm2, sleeper1, sleeper2, bundle2)
+	SetupApp(t, bundle1, false, true, testUpdate, cm2, s1, s2, sleeper1, sleeper2, bundle2)
 }
 
 func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...interface{}) {
@@ -164,11 +207,14 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	})
 
 	cm2 := args[0].(*core_v1.ConfigMap)
-	sleeper1 := args[1].(*sleeper_v1.Sleeper)
-	sleeper2 := args[2].(*sleeper_v1.Sleeper)
-	bundle2 := args[3].(*smith_v1.Bundle)
+	s1 := args[1].(*core_v1.Secret)
+	s2 := args[2].(*core_v1.Secret)
+	sleeper1 := args[3].(*sleeper_v1.Sleeper)
+	sleeper2 := args[4].(*sleeper_v1.Sleeper)
+	bundle2 := args[5].(*smith_v1.Bundle)
 
 	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
+	secretClient := cfg.Clientset.CoreV1().Secrets(cfg.Namespace)
 	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
 	require.NoError(t, err)
 
@@ -176,6 +222,11 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	defer cancel()
 
 	bundleRes1 := cfg.AssertBundle(ctxTimeout, cfg.Bundle, cfg.CreatedBundle.ResourceVersion)
+
+	secret, err := secretClient.Get(s1.Name, meta_v1.GetOptions{})
+	require.NoError(t, err)
+
+	assertSecretData(t, s1, secret)
 
 	bundle2.ResourceVersion = bundleRes1.ResourceVersion
 	res, err := cfg.BundleClient.SmithV1().Bundles(cfg.Namespace).Update(bundle2)
@@ -192,6 +243,11 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 		smith.BundleNameLabel: cfg.Bundle.Name,
 	}, cfMap.Labels)
 	assert.Equal(t, cm2.Data, cfMap.Data)
+
+	secret, err = secretClient.Get(s2.Name, meta_v1.GetOptions{})
+	require.NoError(t, err)
+
+	assertSecretData(t, s2, secret)
 
 	var sleeperObj sleeper_v1.Sleeper
 	err = sClient.Get().
@@ -220,11 +276,11 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	cfg.AssertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
 
 	cfMap, err = cmClient.Get(cm2.Name, meta_v1.GetOptions{})
-	if err == nil {
-		assert.NotNil(t, cfMap.DeletionTimestamp) // Still in api but marked for deletion
-	} else {
-		assert.True(t, api_errors.IsNotFound(err)) // Has been removed from api already
-	}
+	isOrWillBeDeleted(t, cfMap, err)
+
+	secret, err = secretClient.Get(s2.Name, meta_v1.GetOptions{})
+	isOrWillBeDeleted(t, secret, err)
+
 	err = sClient.Get().
 		Context(ctxTest).
 		Namespace(cfg.Namespace).
@@ -232,9 +288,24 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 		Name(sleeper2.Name).
 		Do().
 		Into(&sleeperObj)
+	isOrWillBeDeleted(t, &sleeperObj, err)
+}
+
+func isOrWillBeDeleted(t *testing.T, obj runtime.Object, err error) {
 	if err == nil {
-		assert.NotNil(t, sleeperObj.DeletionTimestamp) // Still in api but marked for deletion
+		assert.NotNil(t, obj.(meta_v1.Object).GetDeletionTimestamp()) // Still in api but marked for deletion
 	} else {
 		assert.True(t, api_errors.IsNotFound(err)) // Has been removed from api already
 	}
+}
+
+func assertSecretData(t *testing.T, expected, actual *core_v1.Secret) bool {
+	expectedResultData := map[string][]byte{}
+	for k, v := range expected.Data {
+		expectedResultData[k] = []byte(v)
+	}
+	for k, v := range expected.StringData {
+		expectedResultData[k] = []byte(v)
+	}
+	return assert.Equal(t, expectedResultData, actual.Data)
 }

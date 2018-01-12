@@ -25,6 +25,7 @@ go_test(
     size = "small",
     srcs = ["discovery_test.go"],
     embed = [":go_default_library"],
+    importpath = "github.com/atlassian/smith/pkg/client/smart",
     race = "on",
     deps = ["//vendor/k8s.io/client-go/discovery:go_default_library"],
 )
