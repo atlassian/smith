@@ -4,10 +4,10 @@ http_archive(
     url = "https://github.com/bazelbuild/bazel-gazelle/releases/download/0.8/bazel-gazelle-0.8.tar.gz",
 )
 
-git_repository(
+http_archive(
     name = "io_bazel_rules_go",
-    commit = "329d8f4ad28265e73c98c4475d49fc9eff57286b",
-    remote = "https://github.com/bazelbuild/rules_go.git",
+    sha256 = "4d8d6244320dd751590f9100cf39fd7a4b75cd901e1f3ffdfd6f048328883695",
+    url = "https://github.com/bazelbuild/rules_go/releases/download/0.9.0/rules_go-0.9.0.tar.gz",
 )
 
 git_repository(
