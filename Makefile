@@ -33,11 +33,6 @@ fmt-bazel:
 
 .PHONY: update-bazel
 update-bazel:
-	-build/bin/buildozer 'set race "on"' \
-		//cmd/...:%go_test \
-		//examples/...:%go_test \
-		//it/...:%go_test \
-		//pkg/...:%go_test
 	bazel run //:gazelle
 
 .PHONY: build
