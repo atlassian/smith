@@ -84,7 +84,10 @@ generate-deepcopy:
 	--output-file-base zz_generated.deepcopy
 
 .PHONY: integration-test
-integration-test: fmt update-bazel
+integration-test: fmt update-bazel integration-test-ci
+
+.PHONY: integration-test-ci
+integration-test-ci:
 	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
@@ -94,7 +97,10 @@ integration-test: fmt update-bazel
 		//it:go_default_test
 
 .PHONY: integration-test-sc
-integration-test-sc: fmt update-bazel
+integration-test-sc: fmt update-bazel integration-test-sc-ci
+
+.PHONY: integration-test-sc-ci
+integration-test-sc-ci:
 	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
