@@ -29,7 +29,7 @@ fmt-bazel:
 		//examples/...:%go_test \
 		//it/...:%go_test \
 		//pkg/...:%go_test
-	find .  -not -path "./vendor/*" -and \( -name '*.bzl' -or -name 'BUILD.bazel' -or -name 'WORKSPACE' \) -exec build/bin/buildifier  {} +
+	find . -not -path "./vendor/*" -and \( -name '*.bzl' -or -name 'BUILD.bazel' -or -name 'WORKSPACE' \) -exec build/bin/buildifier {} +
 
 .PHONY: update-bazel
 update-bazel:
@@ -140,6 +140,7 @@ test: fmt update-bazel test-ci
 
 .PHONY: verify
 verify:
+	find . -not -path "./vendor/*" -and \( -name '*.bzl' -or -name 'BUILD.bazel' -or -name 'WORKSPACE' \) -exec build/bin/buildifier -showlog -mode=check {} +
 	VERIFY_CODE=--verify-only make generate
 	# TODO verify BUILD.bazel files are up to date
 

@@ -23,7 +23,8 @@
 required = [
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",
-    "github.com/bazelbuild/buildtools/buildozer"
+    "github.com/bazelbuild/buildtools/buildozer",
+    "github.com/bazelbuild/buildtools/buildifier"
 ]
 
 [[constraint]]

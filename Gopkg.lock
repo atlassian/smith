@@ -22,7 +22,7 @@
 [[projects]]
   branch = "master"
   name = "github.com/bazelbuild/buildtools"
-  packages = ["api_proto","build","build_proto","buildozer","edit","file","lang","tables","wspace"]
+  packages = ["api_proto","build","build_proto","buildifier","buildozer","differ","edit","file","lang","tables","wspace"]
   revision = "1109504869e067d5424514fac4d6d94cddfe98e8"
 
 [[projects]]
@@ -303,6 +303,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3c48e7bd99d81750bc658a37e53a900c3f668eb3bfa56e6fef06927f869c9773"
+  inputs-digest = "c6eb67e82cfb08d29c1fc343c09d4e86d3ee3cf0ba9d918d967995d3887d5070"
   solver-name = "gps-cdcl"
   solver-version = 1
