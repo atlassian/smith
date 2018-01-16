@@ -23,6 +23,7 @@ setup-base:
 .PHONY: fmt-bazel
 fmt-bazel:
 	-build/bin/buildozer 'set race "on"' \
+		//:%go_test \
 		//cmd/...:%go_test \
 		//examples/...:%go_test \
 		//it/...:%go_test \
