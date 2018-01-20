@@ -73,7 +73,7 @@ type testCase struct {
 	expectedActions        sets.String
 	enableServiceCatalog   bool
 	testHandler            fakeActionHandler
-	test                   func(*testing.T, context.Context, *BundleController, *testCase)
+	test                   func(*testing.T, context.Context, *BundleController, *testCase, func(context.Context))
 	plugins                map[smith_v1.PluginName]func(*testing.T) testingPlugin
 	pluginsShouldBeInvoked sets.String
 
@@ -142,10 +142,11 @@ func TestController(t *testing.T) {
 					"=watch",
 			),
 			namespace: testNamespace,
-			test: func(t *testing.T, ctx context.Context, bundleController *BundleController, testcase *testCase) {
-				// TODO Test is broken (timeouts, and passes without Run ... ?)
-				//subContext, _ := context.WithTimeout(ctx, 1000*time.Millisecond)
-				//bundleController.Run(subContext)
+			test: func(t *testing.T, ctx context.Context, bundleController *BundleController, testcase *testCase, prepare func(ctx context.Context)) {
+				subContext, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+				defer cancel()
+				prepare(subContext)
+				bundleController.Run(subContext)
 			},
 			testHandler: fakeActionHandler{
 				response: map[path]fakeResponse{
@@ -386,7 +387,8 @@ func TestController(t *testing.T) {
 			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
 				pluginConfigMapWithDeps: configMapWithDependenciesPlugin,
 			},
-			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase) {
+			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
+				prepare(ctx)
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
 				retriable, err := cntrlr.processKey(key)
@@ -444,7 +446,8 @@ func TestController(t *testing.T) {
 			},
 			namespace:            testNamespace,
 			enableServiceCatalog: true,
-			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase) {
+			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
+				prepare(ctx)
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
 				retriable, err := cntrlr.processKey(key)
@@ -566,7 +569,8 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase) {
+			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
+				prepare(ctx)
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
 				retriable, err := cntrlr.processKey(key)
@@ -726,23 +730,26 @@ func (tc *testCase) run(t *testing.T) {
 		PluginContainers: pluginContainers,
 		Scheme:           scheme,
 	}
-	cntrlr.Prepare(ctx, crdInf, resourceInfs)
+	prepare := func(ctx context.Context) {
+		cntrlr.Prepare(ctx, crdInf, resourceInfs)
 
-	resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
-	resourceInfs[smith_v1.BundleGVK] = bundleInf
-	infs := make([]cache.InformerSynced, 0, len(resourceInfs))
-	stage := stgr.NextStage()
-	for gvk, inf := range resourceInfs {
-		multiStore.AddInformer(gvk, inf)
-		stage.StartWithChannel(inf.Run)
-		infs = append(infs, inf.HasSynced)
+		resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
+		resourceInfs[smith_v1.BundleGVK] = bundleInf
+		infs := make([]cache.InformerSynced, 0, len(resourceInfs))
+		stage := stgr.NextStage()
+		for gvk, inf := range resourceInfs {
+			multiStore.AddInformer(gvk, inf)
+			stage.StartWithChannel(inf.Run)
+			infs = append(infs, inf.HasSynced)
+		}
+		require.True(t, cache.WaitForCacheSync(ctx.Done(), infs...))
 	}
-	require.True(t, cache.WaitForCacheSync(ctx.Done(), infs...))
 
 	if tc.test == nil {
+		prepare(ctx)
 		tc.defaultTest(t, ctx, cntrlr)
 	} else {
-		tc.test(t, ctx, cntrlr, tc)
+		tc.test(t, ctx, cntrlr, tc, prepare)
 	}
 }
 

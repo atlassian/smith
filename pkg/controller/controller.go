@@ -54,6 +54,7 @@ type BundleController struct {
 }
 
 // Prepare prepares the controller to be run.
+// ctx must be the same context as the one passed to Run() method.
 func (c *BundleController) Prepare(ctx context.Context, crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
 	c.resourceHandler = cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onResourceAdd,
