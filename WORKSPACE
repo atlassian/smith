@@ -1,18 +1,18 @@
-http_archive(
+git_repository(
     name = "bazel_gazelle",
-    sha256 = "e3dadf036c769d1f40603b86ae1f0f90d11837116022d9b06e4cd88cae786676",
-    url = "https://github.com/bazelbuild/bazel-gazelle/releases/download/0.8/bazel-gazelle-0.8.tar.gz",
+    commit = "eaa1e87d2a3ca716780ca6650ef5b9b9663b8773",
+    remote = "https://github.com/bazelbuild/bazel-gazelle.git",
 )
 
-http_archive(
+git_repository(
     name = "io_bazel_rules_go",
-    sha256 = "4d8d6244320dd751590f9100cf39fd7a4b75cd901e1f3ffdfd6f048328883695",
-    url = "https://github.com/bazelbuild/rules_go/releases/download/0.9.0/rules_go-0.9.0.tar.gz",
+    commit = "74d8ad8f9f59a1d9a7cf066d0980f9e394acccd7",
+    remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
 git_repository(
     name = "io_bazel_rules_docker",
-    commit = "3caf72f166f8b6b0e529442477a74871ad4d35e9",
+    commit = "3fba9684ec665145028670117a6fe40a1047b97e",
     remote = "https://github.com/bazelbuild/rules_docker.git",
 )
 

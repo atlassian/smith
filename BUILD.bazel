@@ -1,6 +1,3 @@
-# workaround https://github.com/bazelbuild/rules_go/issues/900
-# gazelle:proto disable
-
 # Disable build files generation for this directories
 # gazelle:exclude vendor/github.com/kubernetes-incubator/service-catalog/cmd/svcat/testdata
 
