@@ -144,11 +144,10 @@ verify:
 
 .PHONY: test-ci
 test-ci:
-	# TODO: why does it build binaries and docker in cmd?
 	bazel test \
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
-		-- //... -//cmd/... -//vendor/...
+		-- //... -//vendor/...
 
 .PHONY: check
 check:
