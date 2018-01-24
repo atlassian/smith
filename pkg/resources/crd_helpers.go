@@ -26,6 +26,157 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
 	// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/architecture/namespaces.md
 	// https://github.com/kubernetes/kubernetes/tree/master/api/openapi-spec
+
+	// definitions are not supported, do what we can :)
+
+	DNS_SUBDOMAIN := apiext_v1b1.JSONSchemaProps{
+		Type:      "string",
+		MinLength: int64ptr(1),
+		MaxLength: int64ptr(253),
+		Pattern:   `^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`,
+	}
+	resourceName := DNS_SUBDOMAIN
+	resourceName.Description = "ResourceName is a reference to another Resource in the same bundle"
+	apiVersion := apiext_v1b1.JSONSchemaProps{
+		Type:      "string",
+		MinLength: int64ptr(1),
+	}
+	kind := apiext_v1b1.JSONSchemaProps{
+		Type:      "string",
+		MinLength: int64ptr(1),
+	}
+	ownerReference := apiext_v1b1.JSONSchemaProps{
+		Type:     "object",
+		Required: []string{"apiVersion", "kind", "name"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"kind":       kind,
+			"apiVersion": apiVersion,
+			"name":       DNS_SUBDOMAIN,
+			"blockOwnerDeletion": {
+				Type: "boolean",
+			},
+			"controller": {
+				Type: "boolean",
+			},
+		},
+	}
+	initializer := apiext_v1b1.JSONSchemaProps{
+		Type:     "object",
+		Required: []string{"name"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"name": {
+				Type: "string",
+			},
+		},
+	}
+	objectMeta := apiext_v1b1.JSONSchemaProps{
+		Description: "Schema for some fields of ObjectMeta",
+		Type:        "object",
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"name": DNS_SUBDOMAIN,
+			"labels": {
+				Type: "object",
+				// TODO there is a bug in marshling/unmarshaling of AdditionalProperties
+				//AdditionalProperties: &apiext_v1b1.JSONSchemaPropsOrBool{
+				//	Schema: &apiext_v1b1.JSONSchemaProps{
+				//		Type:      "string",
+				//		MaxLength: int64ptr(63),
+				//		Pattern:   "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
+				//	},
+				//},
+			},
+			"annotations": {
+				Type: "object",
+				// TODO there is a bug in marshling/unmarshaling of AdditionalProperties
+				//AdditionalProperties: &apiext_v1b1.JSONSchemaPropsOrBool{
+				//	Schema: &apiext_v1b1.JSONSchemaProps{
+				//		Type: "string",
+				//	},
+				//},
+			},
+			"ownerReferences": {
+				Type: "array",
+				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
+					Schema: &ownerReference,
+				},
+			},
+			"initializers": {
+				Type:     "object",
+				Required: []string{"pending"},
+				Properties: map[string]apiext_v1b1.JSONSchemaProps{
+					"pending": {
+						Type: "array",
+						Items: &apiext_v1b1.JSONSchemaPropsOrArray{
+							Schema: &initializer,
+						},
+					},
+				},
+			},
+			"finalizers": {
+				Type: "array",
+				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
+					Schema: &apiext_v1b1.JSONSchemaProps{
+						Type:      "string",
+						MinLength: int64ptr(1),
+					},
+				},
+			},
+		},
+	}
+	objectSpec := apiext_v1b1.JSONSchemaProps{
+		Description: "Schema for a resource that describes an object",
+		Type:        "object",
+		Required:    []string{"apiVersion", "kind", "metadata"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"kind":       kind,
+			"apiVersion": apiVersion,
+			"metadata":   objectMeta,
+		},
+	}
+	pluginSpec := apiext_v1b1.JSONSchemaProps{
+		Description: "Schema for a resource that describes a plugin",
+		Type:        "object",
+		Required:    []string{"name", "objectName"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"name":       DNS_SUBDOMAIN,
+			"objectName": DNS_SUBDOMAIN,
+			"spec": {
+				Type: "object",
+			},
+		},
+	}
+	resource := apiext_v1b1.JSONSchemaProps{
+		Description: "Resource describes an object that should be provisioned",
+		Type:        "object",
+		Required:    []string{"name", "spec"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"name": resourceName,
+			"dependsOn": {
+				Type: "array",
+				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
+					Schema: &resourceName,
+				},
+			},
+			"spec": {
+				Type: "object",
+				OneOf: []apiext_v1b1.JSONSchemaProps{
+					{
+						Required: []string{"object"},
+						Properties: map[string]apiext_v1b1.JSONSchemaProps{
+							"object": objectSpec,
+						},
+					},
+					{
+						Required: []string{"plugin"},
+						Properties: map[string]apiext_v1b1.JSONSchemaProps{
+							"plugin": pluginSpec,
+						},
+					},
+				},
+			},
+		},
+	}
+
 	return &apiext_v1b1.CustomResourceDefinition{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: smith_v1.BundleResourceName,
@@ -48,196 +199,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 								"resources": {
 									Type: "array",
 									Items: &apiext_v1b1.JSONSchemaPropsOrArray{
-										Schema: &apiext_v1b1.JSONSchemaProps{
-											Ref: strPtr("#/definitions/resource"),
-										},
-									},
-								},
-							},
-						},
-					},
-					Definitions: apiext_v1b1.JSONSchemaDefinitions{
-						"DNS_SUBDOMAIN": {
-							Type:      "string",
-							MinLength: int64ptr(1),
-							MaxLength: int64ptr(253),
-							Pattern:   `^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`,
-						},
-						"resourceName": {
-							Ref:         strPtr("#/definitions/DNS_SUBDOMAIN"),
-							Description: "ResourceName is a reference to another Resource in the same bundle",
-						},
-						"resource": {
-							Description: "Resource describes an object that should be provisioned",
-							Type:        "object",
-							Required:    []string{"name", "spec"},
-							Properties: map[string]apiext_v1b1.JSONSchemaProps{
-								"name": {
-									Ref: strPtr("#/definitions/resourceName"),
-								},
-								"dependsOn": {
-									Type: "array",
-									Items: &apiext_v1b1.JSONSchemaPropsOrArray{
-										Schema: &apiext_v1b1.JSONSchemaProps{
-											Ref: strPtr("#/definitions/resourceName"),
-										},
-									},
-								},
-								"spec": {
-									Type: "object",
-									OneOf: []apiext_v1b1.JSONSchemaProps{
-										{
-											Required: []string{"object"},
-											Properties: map[string]apiext_v1b1.JSONSchemaProps{
-												"object": {
-													Ref: strPtr("#/definitions/objectSpec"),
-												},
-											},
-										},
-										{
-											Required: []string{"plugin"},
-											Properties: map[string]apiext_v1b1.JSONSchemaProps{
-												"plugin": {
-													Ref: strPtr("#/definitions/pluginSpec"),
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						"objectSpec": {
-							Ref:         strPtr("#/definitions/typeMeta"),
-							Description: "Schema for a resource that describes an object",
-							Type:        "object",
-							Required:    []string{"metadata"},
-							Properties: map[string]apiext_v1b1.JSONSchemaProps{
-								"metadata": {
-									Ref: strPtr("#/definitions/objectMeta"),
-								},
-							},
-						},
-						"pluginSpec": {
-							Description: "Schema for a resource that describes a plugin",
-							Type:        "object",
-							Required:    []string{"name", "objectName"},
-							Properties: map[string]apiext_v1b1.JSONSchemaProps{
-								"name": {
-									Ref: strPtr("#/definitions/DNS_SUBDOMAIN"),
-								},
-								"objectName": {
-									Ref: strPtr("#/definitions/DNS_SUBDOMAIN"),
-								},
-								"spec": {
-									Type: "object",
-								},
-							},
-						},
-						"apiVersion": {
-							Type:      "string",
-							MinLength: int64ptr(1),
-						},
-						"kind": {
-							Type:      "string",
-							MinLength: int64ptr(1),
-						},
-						"typeMeta": {
-							Description: "Schema for TypeMeta",
-							Type:        "object",
-							Required:    []string{"kind", "apiVersion"},
-							Properties: map[string]apiext_v1b1.JSONSchemaProps{
-								"kind": {
-									Ref: strPtr("#/definitions/kind"),
-								},
-								"apiVersion": {
-									Ref: strPtr("#/definitions/apiVersion"),
-								},
-							},
-						},
-						"objectMeta": {
-							Description: "Schema for some fields of ObjectMeta",
-							Type:        "object",
-							Properties: map[string]apiext_v1b1.JSONSchemaProps{
-								"name": {
-									Ref: strPtr("#/definitions/DNS_SUBDOMAIN"),
-								},
-								"labels": {
-									Type: "object",
-									AdditionalProperties: &apiext_v1b1.JSONSchemaPropsOrBool{
-										Schema: &apiext_v1b1.JSONSchemaProps{
-											Type:      "string",
-											MaxLength: int64ptr(63),
-											Pattern:   "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
-										},
-									},
-								},
-								"annotations": {
-									Type: "object",
-									AdditionalProperties: &apiext_v1b1.JSONSchemaPropsOrBool{
-										Schema: &apiext_v1b1.JSONSchemaProps{
-											Type: "string",
-										},
-									},
-								},
-								"ownerReference": {
-									Type:     "object",
-									Required: []string{"apiVersion", "kind", "name"},
-									Properties: map[string]apiext_v1b1.JSONSchemaProps{
-										"kind": {
-											Ref: strPtr("#/definitions/kind"),
-										},
-										"apiVersion": {
-											Ref: strPtr("#/definitions/apiVersion"),
-										},
-										"name": {
-											Ref: strPtr("#/definitions/DNS_SUBDOMAIN"),
-										},
-										"blockOwnerDeletion": {
-											Type: "boolean",
-										},
-										"controller": {
-											Type: "boolean",
-										},
-									},
-								},
-								"ownerReferences": {
-									Type: "array",
-									Items: &apiext_v1b1.JSONSchemaPropsOrArray{
-										Schema: &apiext_v1b1.JSONSchemaProps{
-											Ref: strPtr("#/definitions/ownerReference"),
-										},
-									},
-								},
-								"initializer": {
-									Type:     "object",
-									Required: []string{"name"},
-									Properties: map[string]apiext_v1b1.JSONSchemaProps{
-										"name": {
-											Type: "string",
-										},
-									},
-								},
-								"initializers": {
-									Type:     "object",
-									Required: []string{"pending"},
-									Properties: map[string]apiext_v1b1.JSONSchemaProps{
-										"pending": {
-											Type: "array",
-											Items: &apiext_v1b1.JSONSchemaPropsOrArray{
-												Schema: &apiext_v1b1.JSONSchemaProps{
-													Ref: strPtr("#/definitions/initializer"),
-												},
-											},
-										},
-									},
-								},
-								"finalizers": {
-									Type: "array",
-									Items: &apiext_v1b1.JSONSchemaPropsOrArray{
-										Schema: &apiext_v1b1.JSONSchemaProps{
-											Type:      "string",
-											MinLength: int64ptr(1),
-										},
+										Schema: &resource,
 									},
 								},
 							},
