@@ -12,7 +12,7 @@ setup-dev: setup-base
 
 .PHONY: setup-base
 setup-base:
-	dep ensure
+	dep ensure -vendor-only
 	# workaround https://github.com/kubernetes/kubernetes/issues/50975
 	cp fixed_BUILD_for_sets.bazel vendor/k8s.io/apimachinery/pkg/util/sets/BUILD
 	go build -i -o build/bin/buildozer vendor/github.com/bazelbuild/buildtools/buildozer/*.go
