@@ -12,7 +12,7 @@ spec:
   scope: Namespaced
   version: v1
   validation:
-    openAPIV3Schema: # generated using make print-bundle-schema
+    openAPIV3Schema: # generated using make print-bundle-crd
       properties:
         spec:
           properties:

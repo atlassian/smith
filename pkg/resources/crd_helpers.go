@@ -188,6 +188,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 				Singular: smith_v1.BundleResourceSingular,
 				Kind:     smith_v1.BundleResourceKind,
 			},
+			Scope: apiext_v1b1.NamespaceScoped,
 			Validation: &apiext_v1b1.CustomResourceValidation{
 				OpenAPIV3Schema: &apiext_v1b1.JSONSchemaProps{
 					Properties: map[string]apiext_v1b1.JSONSchemaProps{
