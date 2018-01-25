@@ -36,7 +36,6 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 		Pattern:   `^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`,
 	}
 	resourceName := DNS_SUBDOMAIN
-	resourceName.Description = "ResourceName is a reference to another Resource in the same bundle"
 	apiVersion := apiext_v1b1.JSONSchemaProps{
 		Type:      "string",
 		MinLength: int64ptr(1),
@@ -209,10 +208,6 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			},
 		},
 	}
-}
-
-func strPtr(str string) *string {
-	return &str
 }
 
 func int64ptr(val int64) *int64 {

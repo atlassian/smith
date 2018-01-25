@@ -22,16 +22,12 @@ spec:
                 properties:
                   dependsOn:
                     items:
-                      description: ResourceName is a reference to another Resource in the
-                        same bundle
                       maxLength: 253
                       minLength: 1
                       pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                       type: string
                     type: array
                   name:
-                    description: ResourceName is a reference to another Resource in the
-                      same bundle
                     maxLength: 253
                     minLength: 1
                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
