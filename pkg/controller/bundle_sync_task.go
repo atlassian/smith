@@ -80,7 +80,11 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 		}
 		_, resErr := resInfo.fetchError()
 		blockedOnError = blockedOnError || resErr != nil
-		log.Printf("[%s/%s] Resource %q, ready: %t, error: %v", st.bundle.Namespace, st.bundle.Name, resName, resInfo.isReady(), resErr)
+		if resErr != nil {
+			log.Printf("ERROR [%s/%s] Resource %q, ready: %t, error: %v", st.bundle.Namespace, st.bundle.Name, resName, resInfo.isReady(), resErr)
+		} else {
+			log.Printf("[%s/%s] Resource %q, ready: %t", st.bundle.Namespace, st.bundle.Name, resName, resInfo.isReady())
+		}
 		st.processedResources[resName.(smith_v1.ResourceName)] = &resInfo
 	}
 	if st.isBundleReady() {
