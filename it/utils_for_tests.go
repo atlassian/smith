@@ -8,14 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
-	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/util"
@@ -28,10 +26,14 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -46,7 +48,7 @@ type Config struct {
 	CreatedBundle *smith_v1.Bundle
 	Config        *rest.Config
 	Clientset     kubernetes.Interface
-	Sc            smith.SmartClient
+	Sc            *client.SmartClient
 	BundleClient  smithClientset.Interface
 }
 
@@ -142,8 +144,15 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 		}
 	}
 	config, clientset, bundleClient := TestSetup(t)
-
-	sc := smart.NewClient(config, clientset)
+	rm := discovery.NewDeferredDiscoveryRESTMapper(
+		cached.NewMemCacheClient(clientset.Discovery()),
+		meta.InterfacesForUnstructured,
+	)
+	rm.Reset()
+	sc := &client.SmartClient{
+		ClientPool: dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc),
+		Mapper:     rm,
+	}
 
 	scheme, err := apitypes.FullScheme(serviceCatalog)
 	require.NoError(t, err)

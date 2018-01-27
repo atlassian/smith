@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -33,4 +34,8 @@ type BundleStore interface {
 	GetBundlesByCrd(*apiext_v1b1.CustomResourceDefinition) ([]*smith_v1.Bundle, error)
 	// GetBundlesByObject returns Bundles which have a resource of a particular group/kind with a name in a namespace.
 	GetBundlesByObject(gk schema.GroupKind, namespace, name string) ([]*smith_v1.Bundle, error)
+}
+
+type SmartClient interface {
+	ForGVK(gvk schema.GroupVersionKind, namespace string) (dynamic.ResourceInterface, error)
 }

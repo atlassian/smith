@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
@@ -36,7 +35,7 @@ type BundleController struct {
 	BundleInf    cache.SharedIndexInformer
 	BundleClient smithClient_v1.BundlesGetter
 	BundleStore  BundleStore
-	SmartClient  smith.SmartClient
+	SmartClient  SmartClient
 	Rc           ReadyChecker
 	Store        Store
 	SpecCheck    SpecCheck

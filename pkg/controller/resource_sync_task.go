@@ -65,7 +65,7 @@ func (ri *resourceInfo) fetchError() (bool, error) {
 }
 
 type resourceSyncTask struct {
-	smartClient        smith.SmartClient
+	smartClient        SmartClient
 	rc                 ReadyChecker
 	store              Store
 	specCheck          SpecCheck

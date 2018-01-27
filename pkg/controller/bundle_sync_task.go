@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
@@ -21,7 +20,7 @@ import (
 
 type bundleSyncTask struct {
 	bundleClient       smithClient_v1.BundlesGetter
-	smartClient        smith.SmartClient
+	smartClient        SmartClient
 	rc                 ReadyChecker
 	store              Store
 	specCheck          SpecCheck

@@ -17,7 +17,6 @@ import (
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
 	"github.com/atlassian/smith/pkg/client"
 	smithFake "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/fake"
-	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
@@ -692,7 +691,7 @@ func (tc *testCase) run(t *testing.T) {
 
 	restMapper := restMapperFromScheme(scheme)
 
-	sc := &smart.DynamicClient{
+	sc := &client.SmartClient{
 		ClientPool: dynamic.NewClientPool(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc),
 		Mapper:     restMapper,
 	}

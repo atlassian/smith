@@ -16,7 +16,6 @@ import (
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
-	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
@@ -32,8 +31,12 @@ import (
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	core_v1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -103,7 +106,6 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	sc := smart.NewClient(a.RestConfig, clientset)
 	scheme, err := apitypes.FullScheme(a.ServiceCatalogSupport)
 	if err != nil {
 		return err
@@ -168,6 +170,15 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	resourceInfs := apitypes.ResourceInformers(clientset, scClient, a.Namespace, a.ResyncPeriod, a.PodPresetSupport)
+	rm := discovery.NewDeferredDiscoveryRESTMapper(
+		cached.NewMemCacheClient(clientset.Discovery()),
+		meta.InterfacesForUnstructured,
+	)
+	rm.Reset()
+	sc := &client.SmartClient{
+		ClientPool: dynamic.NewClientPool(a.RestConfig, rm, dynamic.LegacyAPIPathResolverFunc),
+		Mapper:     rm,
+	}
 
 	// Controller
 	cntrlr := controller.BundleController{

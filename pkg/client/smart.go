@@ -1,14 +1,11 @@
-package smart
+package client
 
 import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 type Mapper interface {
@@ -23,25 +20,12 @@ type ClientPool interface {
 	ClientForGroupVersionKind(schema.GroupVersionKind) (dynamic.Interface, error)
 }
 
-type DynamicClient struct {
+type SmartClient struct {
 	ClientPool ClientPool
 	Mapper     Mapper
 }
 
-func NewClient(config *rest.Config, clientset kubernetes.Interface) *DynamicClient {
-	rm := discovery.NewDeferredDiscoveryRESTMapper(
-		&CachedDiscoveryClient{
-			DiscoveryInterface: clientset.Discovery(),
-		},
-		meta.InterfacesForUnstructured,
-	)
-	return &DynamicClient{
-		ClientPool: dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc),
-		Mapper:     rm,
-	}
-}
-
-func (c *DynamicClient) ForGVK(gvk schema.GroupVersionKind, namespace string) (dynamic.ResourceInterface, error) {
+func (c *SmartClient) ForGVK(gvk schema.GroupVersionKind, namespace string) (dynamic.ResourceInterface, error) {
 	client, err := c.ClientPool.ClientForGroupVersionKind(gvk)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to instantiate client for %s", gvk)
