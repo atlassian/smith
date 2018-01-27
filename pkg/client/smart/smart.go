@@ -1,8 +1,6 @@
 package smart
 
 import (
-	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
-	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,55 +24,29 @@ type ClientPool interface {
 }
 
 type DynamicClient struct {
-	CoreDynamic, ScDynamic ClientPool
-	Mapper, ScMapper       Mapper
+	ClientPool ClientPool
+	Mapper     Mapper
 }
 
-func NewClient(config, scConfig *rest.Config, clientset kubernetes.Interface, scClient scClientset.Interface) *DynamicClient {
+func NewClient(config *rest.Config, clientset kubernetes.Interface) *DynamicClient {
 	rm := discovery.NewDeferredDiscoveryRESTMapper(
 		&CachedDiscoveryClient{
 			DiscoveryInterface: clientset.Discovery(),
 		},
 		meta.InterfacesForUnstructured,
 	)
-	var scRm meta.RESTMapper
-	var scDynamic dynamic.ClientPool
-	if scClient != nil {
-		scRm = discovery.NewDeferredDiscoveryRESTMapper(
-			&CachedDiscoveryClient{
-				DiscoveryInterface: scClient.Discovery(),
-			},
-			meta.InterfacesForUnstructured,
-		)
-		scDynamic = dynamic.NewClientPool(scConfig, scRm, dynamic.LegacyAPIPathResolverFunc)
-	}
-
 	return &DynamicClient{
-		CoreDynamic: dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc),
-		ScDynamic:   scDynamic,
-		Mapper:      rm,
-		ScMapper:    scRm,
+		ClientPool: dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc),
+		Mapper:     rm,
 	}
 }
 
 func (c *DynamicClient) ForGVK(gvk schema.GroupVersionKind, namespace string) (dynamic.ResourceInterface, error) {
-	var clients ClientPool
-	var m Mapper
-	if gvk.Group == sc_v1b1.GroupName {
-		if c.ScDynamic == nil {
-			return nil, errors.Errorf("client for Service Catalog is not configured, cannot work with object %s", gvk)
-		}
-		clients = c.ScDynamic
-		m = c.ScMapper
-	} else {
-		clients = c.CoreDynamic
-		m = c.Mapper
-	}
-	client, err := clients.ClientForGroupVersionKind(gvk)
+	client, err := c.ClientPool.ClientForGroupVersionKind(gvk)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to instantiate client for %s", gvk)
 	}
-	rm, err := m.RESTMapping(gvk.GroupKind(), gvk.Version)
+	rm, err := c.Mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get rest mapping for %s", gvk)
 	}

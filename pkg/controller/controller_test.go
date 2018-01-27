@@ -693,12 +693,8 @@ func (tc *testCase) run(t *testing.T) {
 	restMapper := restMapperFromScheme(scheme)
 
 	sc := &smart.DynamicClient{
-		CoreDynamic: dynamic.NewClientPool(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc),
-		Mapper:      restMapper,
-	}
-	if tc.enableServiceCatalog {
-		sc.ScDynamic = sc.CoreDynamic
-		sc.ScMapper = restMapper
+		ClientPool: dynamic.NewClientPool(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc),
+		Mapper:     restMapper,
 	}
 
 	stgr := stager.New()

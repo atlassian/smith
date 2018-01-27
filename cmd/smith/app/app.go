@@ -63,14 +63,14 @@ type LeaderElectionConfig struct {
 }
 
 type App struct {
-	RestConfig           *rest.Config
-	ServiceCatalogConfig *rest.Config
-	ResyncPeriod         time.Duration
-	Namespace            string
-	Plugins              []plugin.NewFunc
-	Workers              int
-	PodPresetSupport     bool
-	LeaderElectionConfig LeaderElectionConfig
+	RestConfig            *rest.Config
+	ResyncPeriod          time.Duration
+	Namespace             string
+	Plugins               []plugin.NewFunc
+	Workers               int
+	PodPresetSupport      bool
+	ServiceCatalogSupport bool
+	LeaderElectionConfig  LeaderElectionConfig
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -93,8 +93,8 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 	var scClient scClientset.Interface
-	if a.ServiceCatalogConfig != nil {
-		scClient, err = scClientset.NewForConfig(a.ServiceCatalogConfig)
+	if a.ServiceCatalogSupport {
+		scClient, err = scClientset.NewForConfig(a.RestConfig)
 		if err != nil {
 			return err
 		}
@@ -103,8 +103,8 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	sc := smart.NewClient(a.RestConfig, a.ServiceCatalogConfig, clientset, scClient)
-	scheme, err := apitypes.FullScheme(a.ServiceCatalogConfig != nil)
+	sc := smart.NewClient(a.RestConfig, clientset)
+	scheme, err := apitypes.FullScheme(a.ServiceCatalogSupport)
 	if err != nil {
 		return err
 	}
@@ -119,14 +119,14 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Ready Checker
 	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
-	if a.ServiceCatalogConfig != nil {
+	if a.ServiceCatalogSupport {
 		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
 	}
 	rc := readychecker.New(crdStore, readyTypes...)
 
 	// Object cleanup
 	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}
-	if a.ServiceCatalogConfig != nil {
+	if a.ServiceCatalogSupport {
 		cleanupTypes = append(cleanupTypes, clean_types.ServiceCatalogKnownTypes)
 	}
 	oc := cleanup.New(cleanupTypes...)
@@ -285,9 +285,7 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	a := App{}
 	flagset.BoolVar(&a.PodPresetSupport, "pod-preset", false, "PodPreset support. Disabled by default.")
-	scEnabled := flagset.Bool("service-catalog", true, "Service Catalog support. Enabled by default.")
-	scUrl := flagset.String("service-catalog-url", "", "Service Catalog API server URL")
-	scInsecure := flagset.Bool("service-catalog-insecure", false, "Disable TLS validation for Service Catalog")
+	flagset.BoolVar(&a.ServiceCatalogSupport, "service-catalog", true, "Service Catalog support. Enabled by default.")
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
@@ -333,18 +331,6 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 
 	config.UserAgent = "smith"
 	a.RestConfig = config
-	if *scEnabled {
-		scConfig := *config // shallow copy
-		if *scInsecure {
-			scConfig.TLSClientConfig.Insecure = true
-			scConfig.TLSClientConfig.CAFile = ""
-			scConfig.TLSClientConfig.CAData = nil
-		}
-		if *scUrl != "" {
-			scConfig.Host = *scUrl
-		}
-		a.ServiceCatalogConfig = &scConfig
-	}
 
 	if *pprofAddr != "" {
 		go func() {
