@@ -22,7 +22,6 @@ import (
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 
 	"github.com/ash2k/stager"
-	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -143,16 +142,8 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 		}
 	}
 	config, clientset, bundleClient := TestSetup(t)
-	var scConfig *rest.Config
-	var scClient scClientset.Interface
-	if serviceCatalog {
-		scConfig = config
-		var err error
-		scClient, err = scClientset.NewForConfig(scConfig)
-		require.NoError(t, err)
-	}
 
-	sc := smart.NewClient(config, scConfig, clientset, scClient)
+	sc := smart.NewClient(config, clientset)
 
 	scheme, err := apitypes.FullScheme(serviceCatalog)
 	require.NoError(t, err)
@@ -206,10 +197,10 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := app.App{
-			RestConfig:           config,
-			ServiceCatalogConfig: scConfig,
-			Namespace:            cfg.Namespace,
-			Workers:              2,
+			RestConfig:            config,
+			ServiceCatalogSupport: serviceCatalog,
+			Namespace:             cfg.Namespace,
+			Workers:               2,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
