@@ -22,7 +22,9 @@ go_library(
 
 go_test(
     name = "go_default_test",
+    size = "small",
     srcs = ["discovery_test.go"],
     embed = [":go_default_library"],
+    race = "on",
     deps = ["//vendor/k8s.io/client-go/discovery:go_default_library"],
 )
