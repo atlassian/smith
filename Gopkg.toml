@@ -27,7 +27,11 @@ required = [
     "github.com/bazelbuild/buildtools/buildifier"
 ]
 
-[[constraint]]
+[prune]
+  non-go = true
+  go-tests = true
+
+[[override]]
   branch = "release-1.9" # correct branch
   name = "k8s.io/code-generator"
 
@@ -47,18 +51,18 @@ required = [
   branch = "master" # pick up 1.9 migration
   name = "github.com/kubernetes-incubator/service-catalog"
 
-[[constraint]]
+[[override]]
   name = "k8s.io/apiextensions-apiserver"
   branch = "release-1.9" # correct branch
 
-[[constraint]]
+[[override]]
   name = "k8s.io/apimachinery"
   branch = "release-1.9" # correct branch
 
-[[constraint]]
+[[override]]
   name = "k8s.io/client-go"
   branch = "release-6.0" # correct branch
 
-[[constraint]]
+[[override]]
   name = "k8s.io/api"
   branch = "release-1.9" # correct branch
