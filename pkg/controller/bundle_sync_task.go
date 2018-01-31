@@ -212,33 +212,48 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		readyCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceReady, Status: smith_v1.ConditionFalse}
 		errorCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceError, Status: smith_v1.ConditionFalse}
 
-		resInfo := st.processedResources[res.Name]
-		switch resStatus := resInfo.status.(type) {
-		case resourceStatusDependenciesNotReady:
-			blockedCond.Status = smith_v1.ConditionTrue
-			blockedCond.Reason = smith_v1.ResourceReasonDependenciesNotReady
-			blockedCond.Message = fmt.Sprintf("Not ready: %q", resStatus.dependencies)
-		case resourceStatusBlockedByError:
-			blockedCond.Status = smith_v1.ConditionTrue
-			blockedCond.Reason = smith_v1.ResourceReasonOtherResourceError
-			blockedCond.Message = "Some other resource is in error state"
-		case resourceStatusInProgress:
-			inProgressCond.Status = smith_v1.ConditionTrue
-		case resourceStatusReady:
-			readyCond.Status = smith_v1.ConditionTrue
-		case resourceStatusError:
-			errorCond.Status = smith_v1.ConditionTrue
-			errorCond.Message = resStatus.err.Error()
-			if resStatus.isRetriableError {
-				errorCond.Reason = smith_v1.ResourceReasonRetriableError
+		if resInfo, ok := st.processedResources[res.Name]; ok {
+			// Resource was processed
+			switch resStatus := resInfo.status.(type) {
+			case resourceStatusDependenciesNotReady:
+				blockedCond.Status = smith_v1.ConditionTrue
+				blockedCond.Reason = smith_v1.ResourceReasonDependenciesNotReady
+				blockedCond.Message = fmt.Sprintf("Not ready: %q", resStatus.dependencies)
+			case resourceStatusBlockedByError:
+				blockedCond.Status = smith_v1.ConditionTrue
+				blockedCond.Reason = smith_v1.ResourceReasonOtherResourceError
+				blockedCond.Message = "Some other resource is in error state"
+			case resourceStatusInProgress:
 				inProgressCond.Status = smith_v1.ConditionTrue
-			} else {
+			case resourceStatusReady:
+				readyCond.Status = smith_v1.ConditionTrue
+			case resourceStatusError:
+				errorCond.Status = smith_v1.ConditionTrue
+				errorCond.Message = resStatus.err.Error()
+				if resStatus.isRetriableError {
+					errorCond.Reason = smith_v1.ResourceReasonRetriableError
+					inProgressCond.Status = smith_v1.ConditionTrue
+				} else {
+					errorCond.Reason = smith_v1.ResourceReasonTerminalError
+				}
+				failedResources = append(failedResources, res.Name)
+				retriableResourceErr = retriableResourceErr && resStatus.isRetriableError // Must not continue if at least one error is not retriable
+			default:
+				blockedCond.Status = smith_v1.ConditionUnknown
+				inProgressCond.Status = smith_v1.ConditionUnknown
+				readyCond.Status = smith_v1.ConditionUnknown
+				errorCond.Status = smith_v1.ConditionTrue
 				errorCond.Reason = smith_v1.ResourceReasonTerminalError
+				errorCond.Message = fmt.Sprintf("internal error - unknown resource status type %T", resInfo.status)
+				failedResources = append(failedResources, res.Name)
+				retriableResourceErr = false
 			}
-			failedResources = append(failedResources, res.Name)
-			retriableResourceErr = retriableResourceErr && resStatus.isRetriableError // Must not continue if at least one error is not retriable
-		default:
-			panic(errors.Errorf("unknown resource status type %T", resInfo.status))
+		} else {
+			// Resource was not processed
+			blockedCond.Status = smith_v1.ConditionUnknown
+			inProgressCond.Status = smith_v1.ConditionUnknown
+			readyCond.Status = smith_v1.ConditionUnknown
+			errorCond.Status = smith_v1.ConditionUnknown
 		}
 		statusUpdated = updateResourceCondition(st.bundle, res.Name, &blockedCond) || statusUpdated
 		statusUpdated = updateResourceCondition(st.bundle, res.Name, &inProgressCond) || statusUpdated

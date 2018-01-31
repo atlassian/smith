@@ -99,6 +99,8 @@ const (
 
 	m1 = "m1"
 
+	resP1 = "resP1"
+
 	bundle1    = "bundle1"
 	bundle1uid = "bundle1-uid"
 
@@ -117,6 +119,112 @@ func TestController(t *testing.T) {
 	t.Parallel()
 	tr := true
 	testcases := map[string]*testCase{
+		"detects two resources with the same name": &testCase{
+			bundle: &smith_v1.Bundle{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      bundle1,
+					Namespace: testNamespace,
+					UID:       bundle1uid,
+				},
+				Spec: smith_v1.BundleSpec{
+					Resources: []smith_v1.Resource{
+						{
+							Name: resP1,
+							Spec: smith_v1.ResourceSpec{
+								Plugin: &smith_v1.PluginSpec{
+									Name:       pluginConfigMapWithDeps,
+									ObjectName: m1,
+								},
+							},
+						},
+						{
+							Name: resP1,
+							Spec: smith_v1.ResourceSpec{
+								Plugin: &smith_v1.PluginSpec{
+									Name:       pluginConfigMapWithDeps,
+									ObjectName: m1,
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace: testNamespace,
+			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
+				pluginConfigMapWithDeps: configMapWithDependenciesPlugin,
+			},
+			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
+				prepare(ctx)
+				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
+				require.NoError(t, err)
+				retriable, err := cntrlr.processKey(key)
+				require.EqualError(t, err, `bundle contains two resources with the same name "`+resP1+`"`)
+				assert.False(t, retriable)
+
+				actions := tc.bundleFake.Actions()
+				require.Len(t, actions, 3)
+				bundleUpdate := actions[2].(kube_testing.UpdateAction)
+				assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
+				updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleReady, smith_v1.ConditionFalse)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleError, smith_v1.ConditionTrue)
+
+				smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceBlocked, smith_v1.ConditionUnknown)
+				smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceInProgress, smith_v1.ConditionUnknown)
+				smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceReady, smith_v1.ConditionUnknown)
+				smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceError, smith_v1.ConditionUnknown)
+			},
+		},
+		"detects invalid depends on": &testCase{
+			bundle: &smith_v1.Bundle{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      bundle1,
+					Namespace: testNamespace,
+					UID:       bundle1uid,
+				},
+				Spec: smith_v1.BundleSpec{
+					Resources: []smith_v1.Resource{
+						{
+							Name:      resP1,
+							DependsOn: []smith_v1.ResourceName{"bla"},
+							Spec: smith_v1.ResourceSpec{
+								Plugin: &smith_v1.PluginSpec{
+									Name:       pluginConfigMapWithDeps,
+									ObjectName: m1,
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace: testNamespace,
+			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
+				pluginConfigMapWithDeps: configMapWithDependenciesPlugin,
+			},
+			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
+				prepare(ctx)
+				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
+				require.NoError(t, err)
+				retriable, err := cntrlr.processKey(key)
+				require.EqualError(t, err, `topological sort of resources failed: vertex "bla" not found`)
+				assert.False(t, retriable)
+
+				actions := tc.bundleFake.Actions()
+				require.Len(t, actions, 3)
+				bundleUpdate := actions[2].(kube_testing.UpdateAction)
+				assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
+				updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleReady, smith_v1.ConditionFalse)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleError, smith_v1.ConditionTrue)
+
+				smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceBlocked, smith_v1.ConditionUnknown)
+				smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceInProgress, smith_v1.ConditionUnknown)
+				smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceReady, smith_v1.ConditionUnknown)
+				smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceError, smith_v1.ConditionUnknown)
+			},
+		},
 		"deletes owned object that is not in bundle": &testCase{
 			mainClientObjects: []runtime.Object{
 				configMapNeedsUpdate(),
@@ -174,7 +282,7 @@ func TestController(t *testing.T) {
 				Spec: smith_v1.BundleSpec{
 					Resources: []smith_v1.Resource{
 						{
-							Name: "p1",
+							Name: resP1,
 							Spec: smith_v1.ResourceSpec{
 								Plugin: &smith_v1.PluginSpec{
 									Name:       pluginSimpleConfigMap,
@@ -297,7 +405,7 @@ func TestController(t *testing.T) {
 							},
 						},
 						{
-							Name: "p1",
+							Name: resP1,
 							DependsOn: []smith_v1.ResourceName{
 								resSb1,
 							},
@@ -370,7 +478,7 @@ func TestController(t *testing.T) {
 				Spec: smith_v1.BundleSpec{
 					Resources: []smith_v1.Resource{
 						{
-							Name: "p1",
+							Name: resP1,
 							Spec: smith_v1.ResourceSpec{
 								Plugin: &smith_v1.PluginSpec{
 									Name:       pluginConfigMapWithDeps,
@@ -393,7 +501,7 @@ func TestController(t *testing.T) {
 				require.NoError(t, err)
 				retriable, err := cntrlr.processKey(key)
 				// Sadly, the actual error is not current propagated
-				require.EqualError(t, err, `error processing resource(s): ["p1"]`)
+				require.EqualError(t, err, `error processing resource(s): ["`+resP1+`"]`)
 				assert.False(t, retriable)
 			},
 		},
