@@ -6,8 +6,10 @@ go_library(
     importpath = "github.com/atlassian/smith/pkg/cleanup",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/util:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
