@@ -22,40 +22,34 @@ type SpecCheck struct {
 
 func (sc *SpecCheck) CompareActualVsSpec(spec, actual runtime.Object) (*unstructured.Unstructured, bool /*match*/, error) {
 	// Apply defaults to the spec
-	specUnstr, err := sc.applyDefaults(spec)
+	specWithDefaults, err := sc.applyDefaults(spec)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to apply defaults to object spec %s", spec.GetObjectKind().GroupVersionKind())
 	}
-	actualUnstr, err := util.RuntimeToUnstructured(actual)
+	specWithDefaultsUnstr, err := util.RuntimeToUnstructured(sc.Scheme, specWithDefaults)
+	if err != nil {
+		return nil, false, err
+	}
+	actualUnstr, err := util.RuntimeToUnstructured(sc.Scheme, actual)
 	if err != nil {
 		return nil, false, err
 	}
 	// Compare spec and existing resource
-	return sc.compareActualVsSpec(specUnstr, actualUnstr)
+	return sc.compareActualVsSpec(specWithDefaultsUnstr, actualUnstr)
 }
 
-func (sc *SpecCheck) applyDefaults(spec runtime.Object) (*unstructured.Unstructured, error) {
+func (sc *SpecCheck) applyDefaults(spec runtime.Object) (runtime.Object, error) {
 	gvk := spec.GetObjectKind().GroupVersionKind()
 	if !sc.Scheme.Recognizes(gvk) {
 		log.Printf("Unrecognized object type %s - not applying defaults", gvk)
-		return util.RuntimeToUnstructured(spec)
+		return spec, nil
 	}
-	var clone runtime.Object
-	// TODO try direct conversion
-	if specUnstr, ok := spec.(*unstructured.Unstructured); ok {
-		var err error
-		clone, err = sc.Scheme.New(gvk)
-		if err != nil {
-			return nil, err
-		}
-		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(specUnstr.Object, clone); err != nil {
-			return nil, err
-		}
-	} else {
-		clone = spec.DeepCopyObject()
+	clone, err := sc.Scheme.ConvertToVersion(spec, gvk.GroupVersion())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert to typed object")
 	}
 	sc.Scheme.Default(clone)
-	return util.RuntimeToUnstructured(clone)
+	return clone, nil
 }
 
 // compareActualVsSpec checks if actual resource satisfies the desired spec.

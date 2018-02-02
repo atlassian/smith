@@ -19,12 +19,25 @@ func Sleep(ctx context.Context, d time.Duration) error {
 	}
 }
 
-func RuntimeToUnstructured(obj runtime.Object) (*unstructured.Unstructured, error) {
-	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+func ConvertType(scheme *runtime.Scheme, in, out runtime.Object) error {
+	in = in.DeepCopyObject()
+	if err := scheme.Convert(in, out, nil); err != nil {
+		return err
+	}
+	// API machinery discards TypeMeta for typed objects. This is annoying.
+	gvks, _, err := scheme.ObjectKinds(in)
 	if err != nil {
+		return err
+	}
+	out.GetObjectKind().SetGroupVersionKind(gvks[0])
+	return nil
+}
+
+func RuntimeToUnstructured(scheme *runtime.Scheme, obj runtime.Object) (*unstructured.Unstructured, error) {
+	out := &unstructured.Unstructured{}
+	// TODO use scheme.Convert() when https://github.com/kubernetes/kubernetes/pull/59264 is fixed
+	if err := ConvertType(scheme, obj, out); err != nil {
 		return nil, err
 	}
-	return &unstructured.Unstructured{
-		Object: u,
-	}, nil
+	return out, nil
 }

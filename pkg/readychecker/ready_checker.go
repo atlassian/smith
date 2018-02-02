@@ -9,12 +9,13 @@ import (
 	"github.com/pkg/errors"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // IsObjectReady checks if an object is Ready.
 // Each function is responsible for handling different versions of objects itself.
-type IsObjectReady func(*unstructured.Unstructured) (isReady, retriableError bool, e error)
+type IsObjectReady func(*runtime.Scheme, runtime.Object) (isReady, retriableError bool, e error)
 
 // CrdStore gets a CRD definition for a Group and Kind of the resource (CRD instance).
 // Returns nil if CRD definition was not found.
@@ -23,11 +24,12 @@ type CrdStore interface {
 }
 
 type ReadyChecker struct {
+	Scheme     *runtime.Scheme
 	Store      CrdStore
 	KnownTypes map[schema.GroupKind]IsObjectReady
 }
 
-func New(store CrdStore, kts ...map[schema.GroupKind]IsObjectReady) *ReadyChecker {
+func New(scheme *runtime.Scheme, store CrdStore, kts ...map[schema.GroupKind]IsObjectReady) *ReadyChecker {
 	kt := make(map[schema.GroupKind]IsObjectReady)
 	for _, knownTypes := range kts {
 		for knownGK, f := range knownTypes {
@@ -38,6 +40,7 @@ func New(store CrdStore, kts ...map[schema.GroupKind]IsObjectReady) *ReadyChecke
 		}
 	}
 	return &ReadyChecker{
+		Scheme:     scheme,
 		Store:      store,
 		KnownTypes: kt,
 	}
@@ -53,7 +56,7 @@ func (rc *ReadyChecker) IsReady(obj *unstructured.Unstructured) (isReady, retria
 
 	// 1. Check if it is a known built-in resource
 	if isObjectReady, ok := rc.KnownTypes[gk]; ok {
-		return isObjectReady(obj)
+		return isObjectReady(rc.Scheme, obj)
 	}
 
 	// 2. Check if it is a CRD with path/value annotation

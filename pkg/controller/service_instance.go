@@ -55,7 +55,7 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 	var previousEncodedChecksum string
 	var updateCount int64
 
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(spec.Object, instanceSpec); err != nil {
+	if err := util.ConvertType(st.scheme, spec, instanceSpec); err != nil {
 		return nil, errors.Wrap(err, "failure to parse ServiceInstance")
 	}
 
@@ -87,7 +87,7 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 
 	setAnnotation(instanceSpec, checkSum)
 
-	unstructuredSpec, err := util.RuntimeToUnstructured(instanceSpec)
+	unstructuredSpec, err := util.RuntimeToUnstructured(st.scheme, instanceSpec)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal back into unstructured")
 	}

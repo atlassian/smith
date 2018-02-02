@@ -809,6 +809,8 @@ func TestController(t *testing.T) {
 }
 
 func (tc *testCase) run(t *testing.T) {
+	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
+	require.NoError(t, err)
 	mainClient := mainFake.NewSimpleClientset(tc.mainClientObjects...)
 	tc.mainFake = &mainClient.Fake
 	for _, reactor := range tc.mainReactors {
@@ -817,7 +819,7 @@ func (tc *testCase) run(t *testing.T) {
 	if tc.bundle != nil {
 		for i, res := range tc.bundle.Spec.Resources {
 			if res.Spec.Object != nil {
-				resUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
+				resUnstr, err := util.RuntimeToUnstructured(scheme, res.Spec.Object)
 				require.NoError(t, err)
 				tc.bundle.Spec.Resources[i].Spec.Object = resUnstr
 			}
@@ -846,8 +848,6 @@ func (tc *testCase) run(t *testing.T) {
 
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, 0, cache.Indexers{})
 	bundleInf := client.BundleInformer(bundleClient.SmithV1(), meta_v1.NamespaceAll, 0)
-	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
-	require.NoError(t, err)
 
 	for _, object := range tc.crdClientObjects {
 		crd := object.(*apiext_v1b1.CustomResourceDefinition)
@@ -874,14 +874,14 @@ func (tc *testCase) run(t *testing.T) {
 	if tc.enableServiceCatalog {
 		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
 	}
-	rc := readychecker.New(crdStore, readyTypes...)
+	rc := readychecker.New(scheme, crdStore, readyTypes...)
 
 	// Object cleanup
 	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}
 	if tc.enableServiceCatalog {
 		cleanupTypes = append(cleanupTypes, clean_types.ServiceCatalogKnownTypes)
 	}
-	oc := cleanup.New(cleanupTypes...)
+	oc := cleanup.New(scheme, cleanupTypes...)
 
 	// Spec check
 	specCheck := &speccheck.SpecCheck{
