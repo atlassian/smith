@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"github.com/atlassian/smith/pkg/apis/smith"
 
-	"github.com/pkg/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -227,28 +225,6 @@ func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
 
 	rs.Plugin = res.Plugin
 	return nil
-}
-
-// IntoTyped tries to convert resource spec into a typed object passed as obj.
-// It supports objects of the same type and Unstructured.
-// Note that it does not perform a deep copy in case of typed API object.
-// Note that this method may fail if references are used where a non-string value is expected.
-func (rs *ResourceSpec) IntoTyped(obj runtime.Object) error {
-	if rs.Object == nil {
-		return errors.New("cannot convert non-Object into typed")
-	}
-	objT := reflect.TypeOf(rs.Object)
-	if objT == reflect.TypeOf(obj) && objT.Kind() == reflect.Ptr {
-		objV := reflect.ValueOf(obj)
-		specV := reflect.ValueOf(rs.Object)
-
-		objV.Elem().Set(specV.Elem()) // types are the same, dereference and assign value
-		return nil
-	}
-	if specUnstr, ok := rs.Object.(*unstructured.Unstructured); ok {
-		return runtime.DefaultUnstructuredConverter.FromUnstructured(specUnstr.Object, obj)
-	}
-	return errors.Errorf("cannot convert %T into typed object %T", rs.Object, obj)
 }
 
 // PluginSpec holds the specification for a plugin.

@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/atlassian/smith/pkg/readychecker"
+	"github.com/atlassian/smith/pkg/util"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
@@ -9,7 +10,6 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	settings_v1a1 "k8s.io/api/settings/v1alpha1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -28,15 +28,15 @@ var ServiceCatalogKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
 	{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: isScServiceInstanceReady,
 }
 
-func alwaysReady(_ *unstructured.Unstructured) (isReady, retriableError bool, e error) {
+func alwaysReady(_ *runtime.Scheme, _ runtime.Object) (isReady, retriableError bool, e error) {
 	return true, false, nil
 }
 
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
-func isDeploymentReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
+func isDeploymentReady(scheme *runtime.Scheme, obj runtime.Object) (isReady, retriableError bool, e error) {
 	var deployment apps_v1b2.Deployment
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &deployment); err != nil {
+	if err := util.ConvertType(scheme, obj, &deployment); err != nil {
 		return false, false, err
 	}
 
@@ -49,9 +49,9 @@ func isDeploymentReady(obj *unstructured.Unstructured) (isReady, retriableError 
 		deployment.Status.UpdatedReplicas == replicas, false, nil
 }
 
-func isScServiceBindingReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
+func isScServiceBindingReady(scheme *runtime.Scheme, obj runtime.Object) (isReady, retriableError bool, e error) {
 	var sic sc_v1b1.ServiceBinding
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &sic); err != nil {
+	if err := util.ConvertType(scheme, obj, &sic); err != nil {
 		return false, false, err
 	}
 	readyCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionReady)
@@ -67,9 +67,9 @@ func isScServiceBindingReady(obj *unstructured.Unstructured) (isReady, retriable
 
 }
 
-func isScServiceInstanceReady(obj *unstructured.Unstructured) (isReady, retriableError bool, e error) {
+func isScServiceInstanceReady(scheme *runtime.Scheme, obj runtime.Object) (isReady, retriableError bool, e error) {
 	var instance sc_v1b1.ServiceInstance
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &instance); err != nil {
+	if err := util.ConvertType(scheme, obj, &instance); err != nil {
 		return false, false, err
 	}
 	readyCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionReady)

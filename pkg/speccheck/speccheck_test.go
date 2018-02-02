@@ -28,9 +28,10 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 			spec := input2()
 			t.Run(fmt.Sprintf("%s actual, %s spec", kind1, kind2), func(t *testing.T) {
 				t.Parallel()
+				scheme := runtime.NewScheme()
 				sc := SpecCheck{
-					Scheme:  runtime.NewScheme(),
-					Cleaner: cleanup.New(),
+					Scheme:  scheme,
+					Cleaner: cleanup.New(scheme),
 				}
 				updated, match, err := sc.CompareActualVsSpec(spec, actual)
 				require.NoError(t, err)

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/util"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
@@ -43,11 +44,10 @@ func (f fakeStore) RemoveInformer(schema.GroupVersionKind) bool {
 	return false
 }
 
-func serviceInstanceUnmarshal(spec *unstructured.Unstructured) *sc_v1b1.ServiceInstance {
+func serviceInstanceUnmarshal(t *testing.T, spec *unstructured.Unstructured) *sc_v1b1.ServiceInstance {
 	var instanceSpec sc_v1b1.ServiceInstance
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(spec.Object, &instanceSpec); err != nil {
-		panic(err)
-	}
+	err := util.ConvertType(scheme(t), spec, &instanceSpec)
+	require.NoError(t, err)
 	return &instanceSpec
 }
 
@@ -77,8 +77,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 		},
 	}
 
-	spec, err := util.RuntimeToUnstructured(&instanceSpec)
-	require.NoError(t, err)
+	spec := runtimeToUnstructured(t, &instanceSpec)
 
 	rst := resourceSyncTask{
 		store: fakeStore{
@@ -117,12 +116,13 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 				},
 			},
 		},
+		scheme: scheme(t),
 	}
 
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
 
-	instanceCheck := serviceInstanceUnmarshal(updatedSpec)
+	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
@@ -130,7 +130,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 
 	updateTwice, err := rst.forceServiceInstanceUpdates(spec, instanceCheck, defaultNamespace)
 	require.NoError(t, err)
-	secondInstance := serviceInstanceUnmarshal(updateTwice)
+	secondInstance := serviceInstanceUnmarshal(t, updateTwice)
 
 	assert.Contains(t, secondInstance.Annotations, smith.Domain+"/secretParametersChecksum")
 	assert.Zero(t, secondInstance.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
@@ -148,10 +148,11 @@ func TestNoAnnotationForEmptyParameretersFrom(t *testing.T) {
 		Spec: sc_v1b1.ServiceInstanceSpec{},
 	}
 
-	spec, err := util.RuntimeToUnstructured(&instanceSpec)
-	require.NoError(t, err)
+	spec := runtimeToUnstructured(t, &instanceSpec)
 
-	rst := resourceSyncTask{}
+	rst := resourceSyncTask{
+		scheme: scheme(t),
+	}
 
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
@@ -184,15 +185,16 @@ func TestExplicitlyDisabled(t *testing.T) {
 		},
 	}
 
-	spec, err := util.RuntimeToUnstructured(&instanceSpec)
-	require.NoError(t, err)
+	spec := runtimeToUnstructured(t, &instanceSpec)
 
-	rst := resourceSyncTask{}
+	rst := resourceSyncTask{
+		scheme: scheme(t),
+	}
 
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
 
-	instanceCheck := serviceInstanceUnmarshal(updatedSpec)
+	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Equal(t, instanceCheck.Annotations[annotaionKey], "disabled")
@@ -225,8 +227,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 		},
 	}
 
-	spec, err := util.RuntimeToUnstructured(&instanceSpec)
-	require.NoError(t, err)
+	spec := runtimeToUnstructured(t, &instanceSpec)
 
 	allResponses := map[string]runtime.Object{
 		"secret1": &core_v1.Secret{
@@ -267,12 +268,13 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 		store: fakeStore{
 			responses: allResponses,
 		},
+		scheme: scheme(t),
 	}
 
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
 
-	instanceCheck := serviceInstanceUnmarshal(updatedSpec)
+	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
@@ -284,11 +286,12 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 		store: fakeStore{
 			responses: allResponses,
 		},
+		scheme: scheme(t),
 	}
 
 	updateTwice, err := rstUpdatedMocks.forceServiceInstanceUpdates(spec, instanceCheck, defaultNamespace)
 	require.NoError(t, err)
-	secondInstance := serviceInstanceUnmarshal(updateTwice)
+	secondInstance := serviceInstanceUnmarshal(t, updateTwice)
 
 	assert.Contains(t, secondInstance.Annotations, smith.Domain+"/secretParametersChecksum")
 	assert.True(t, secondInstance.Spec.UpdateRequests == 1, "expected UpdateRequests to be 1 for updated data")
@@ -312,15 +315,16 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 		Spec: sc_v1b1.ServiceInstanceSpec{},
 	}
 
-	spec, err := util.RuntimeToUnstructured(&instanceSpec)
-	require.NoError(t, err)
+	spec := runtimeToUnstructured(t, &instanceSpec)
 
-	rst := resourceSyncTask{}
+	rst := resourceSyncTask{
+		scheme: scheme(t),
+	}
 
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
 
-	instanceCheck := serviceInstanceUnmarshal(updatedSpec)
+	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
@@ -354,8 +358,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 		},
 	}
 
-	spec, err := util.RuntimeToUnstructured(&instanceSpec)
-	require.NoError(t, err)
+	spec := runtimeToUnstructured(t, &instanceSpec)
 
 	rst := resourceSyncTask{
 		store: fakeStore{
@@ -379,12 +382,13 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 				},
 			},
 		},
+		scheme: scheme(t),
 	}
 
 	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, defaultNamespace)
 	require.NoError(t, err)
 
-	instanceCheck := serviceInstanceUnmarshal(updatedSpec)
+	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
 
 	assert.Contains(t, instanceCheck.Annotations, annotaionKey)
 	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 when overriding user the first time")
@@ -394,10 +398,22 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	compareToPreviousUpdate, err := rst.forceServiceInstanceUpdates(spec, instanceCheck, defaultNamespace)
 	require.NoError(t, err)
 
-	ignoreUserValue := serviceInstanceUnmarshal(compareToPreviousUpdate)
+	ignoreUserValue := serviceInstanceUnmarshal(t, compareToPreviousUpdate)
 
 	assert.Contains(t, ignoreUserValue.Annotations, annotaionKey)
 	assert.Zero(t, ignoreUserValue.Spec.UpdateRequests, "expected UpdateRequests to be 0 when overriding user the first time")
 	assert.NotEqual(t, ignoreUserValue.ObjectMeta.Annotations[annotaionKey], userAnnotationValue)
 	assert.Equal(t, ignoreUserValue.ObjectMeta.Annotations[annotaionKey], firstAnnotationValue)
+}
+
+func scheme(t *testing.T) *runtime.Scheme {
+	scheme, err := apitypes.FullScheme(true)
+	require.NoError(t, err)
+	return scheme
+}
+
+func runtimeToUnstructured(t *testing.T, obj runtime.Object) *unstructured.Unstructured {
+	out, err := util.RuntimeToUnstructured(scheme(t), obj)
+	require.NoError(t, err)
+	return out
 }

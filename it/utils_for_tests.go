@@ -48,6 +48,7 @@ type Config struct {
 	Clientset     kubernetes.Interface
 	Sc            smith.SmartClient
 	BundleClient  smithClientset.Interface
+	Scheme        *runtime.Scheme
 }
 
 func (cfg *Config) CreateObject(ctxTest context.Context, obj, res runtime.Object, resourcePath string, client rest.Interface) {
@@ -133,10 +134,15 @@ func TestSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClients
 }
 
 func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundle bool, test TestFunc, args ...interface{}) {
+	scheme, err := apitypes.FullScheme(serviceCatalog)
+	require.NoError(t, err)
+	err = sleeper_v1.AddToScheme(scheme)
+	require.NoError(t, err)
+
 	// Convert all typed objects into unstructured ones
 	for i, res := range bundle.Spec.Resources {
 		if res.Spec.Object != nil {
-			resUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
+			resUnstr, err := util.RuntimeToUnstructured(scheme, res.Spec.Object)
 			require.NoError(t, err)
 			bundle.Spec.Resources[i].Spec.Object = resUnstr
 		}
@@ -144,9 +150,6 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	config, clientset, bundleClient := TestSetup(t)
 
 	sc := smart.NewClient(config, clientset)
-
-	scheme, err := apitypes.FullScheme(serviceCatalog)
-	require.NoError(t, err)
 
 	cfg := &Config{
 		T:            t,
@@ -156,6 +159,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 		Clientset:    clientset,
 		Sc:           sc,
 		BundleClient: bundleClient,
+		Scheme:       scheme,
 	}
 
 	t.Logf("Creating namespace %q", cfg.Namespace)
@@ -225,11 +229,11 @@ func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, re
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, smith_v1.ConditionFalse)
 	if assert.Len(cfg.T, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
 		for i, res := range bundle.Spec.Resources {
-			spec, err := util.RuntimeToUnstructured(res.Spec.Object)
+			spec, err := util.RuntimeToUnstructured(cfg.Scheme, res.Spec.Object)
 			if !assert.NoError(cfg.T, err) {
 				continue
 			}
-			actual, err := util.RuntimeToUnstructured(bundleRes.Spec.Resources[i].Spec.Object)
+			actual, err := util.RuntimeToUnstructured(cfg.Scheme, bundleRes.Spec.Resources[i].Spec.Object)
 			if !assert.NoError(cfg.T, err) {
 				continue
 			}

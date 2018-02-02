@@ -240,7 +240,7 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 	// Process the spec
 	var objectOrPluginSpec map[string]interface{}
 	if res.Spec.Object != nil {
-		specUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
+		specUnstr, err := util.RuntimeToUnstructured(st.scheme, res.Spec.Object)
 		if err != nil {
 			return nil, err
 		}
@@ -339,7 +339,7 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtim
 	}
 
 	// Make sure plugin is returning us something that obeys the PluginSpec.
-	object, err := util.RuntimeToUnstructured(result.Object)
+	object, err := util.RuntimeToUnstructured(st.scheme, result.Object)
 	if err != nil {
 		return nil, errors.Wrap(err, "plugin output cannot be converted from runtime.Object")
 	}
@@ -356,17 +356,14 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtim
 func (st *resourceSyncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[smith_v1.ResourceName]plugin.Dependency, error) {
 	dependencies := make(map[smith_v1.ResourceName]plugin.Dependency, len(dependsOn))
 	for _, name := range dependsOn {
-		var dependency plugin.Dependency
 		unstructuredActual := st.processedResources[name].actual
-		gvk := unstructuredActual.GroupVersionKind()
-		actual, err := st.scheme.New(gvk)
+		actual, err := st.scheme.ConvertToVersion(unstructuredActual, unstructuredActual.GroupVersionKind().GroupVersion())
 		if err != nil {
 			return nil, err
 		}
-		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredActual.Object, actual); err != nil {
-			return nil, err
+		dependency := plugin.Dependency{
+			Actual: actual,
 		}
-		dependency.Actual = actual
 		switch obj := actual.(type) {
 		case *sc_v1b1.ServiceBinding:
 			if err = st.prepareServiceBindingDependency(&dependency, obj); err != nil {
