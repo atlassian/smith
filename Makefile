@@ -164,13 +164,21 @@ check-all:
 
 .PHONY: docker
 docker:
-	bazel build --cpu=k8 //cmd/smith:container
+	bazel build \
+		--platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 \
+		//cmd/smith:container
 
 # Export docker image into local Docker
 .PHONY: docker-export
 docker-export:
-	bazel run --cpu=k8 //cmd/smith:container -- --norun
+	bazel run \
+		--platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 \
+		//cmd/smith:container \
+		-- \
+		--norun
 
 .PHONY: release
 release: update-bazel
-	bazel run --cpu=k8 //cmd/smith:push_docker
+	bazel run \
+		--platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 \
+		//cmd/smith:push_docker
