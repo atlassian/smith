@@ -48,7 +48,6 @@ go_test(
         "workflow_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "github.com/atlassian/smith/it",
     race = "on",
     tags = [
         "external",

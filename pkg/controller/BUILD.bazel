@@ -54,7 +54,6 @@ go_test(
         "spec_processor_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "github.com/atlassian/smith/pkg/controller",
     race = "on",
     deps = [
         "//:go_default_library",
