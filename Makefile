@@ -13,22 +13,20 @@ setup-dev: setup-base
 .PHONY: setup-base
 setup-base:
 	dep ensure -vendor-only
-	# workaround https://github.com/kubernetes/kubernetes/issues/50975
-	cp fixed_BUILD_for_sets.bazel vendor/k8s.io/apimachinery/pkg/util/sets/BUILD
-	go build -i -o build/bin/buildozer vendor/github.com/bazelbuild/buildtools/buildozer/*.go
-	go build -i -o build/bin/buildifier vendor/github.com/bazelbuild/buildtools/buildifier/*.go
-	rm -rf vendor/github.com/bazelbuild
 	bazel run //:gazelle_fix
 
 .PHONY: fmt-bazel
 fmt-bazel:
-	-build/bin/buildozer 'set race "on"' \
+	bazel build //vendor/github.com/bazelbuild/buildtools/buildifier //vendor/github.com/bazelbuild/buildtools/buildozer
+	-bazel-bin/vendor/github.com/bazelbuild/buildtools/buildifier/$(BINARY_PREFIX_DIRECTORY)/buildozer \
+		'set race "on"' \
 		//:%go_test \
 		//cmd/...:%go_test \
 		//examples/...:%go_test \
 		//it/...:%go_test \
 		//pkg/...:%go_test
-	find . -not -path "./vendor/*" -and \( -name '*.bzl' -or -name 'BUILD.bazel' -or -name 'WORKSPACE' \) -exec build/bin/buildifier {} +
+	find . -not -path "./vendor/*" -and \( -name '*.bzl' -or -name 'BUILD.bazel' -or -name 'WORKSPACE' \) -exec \
+		bazel-bin/vendor/github.com/bazelbuild/buildtools/buildifier/$(BINARY_PREFIX_DIRECTORY)/buildifier {} +
 
 .PHONY: update-bazel
 update-bazel:
@@ -138,7 +136,9 @@ test: fmt update-bazel test-ci
 
 .PHONY: verify
 verify:
-	find . -not -path "./vendor/*" -and \( -name '*.bzl' -or -name 'BUILD.bazel' -or -name 'WORKSPACE' \) -exec build/bin/buildifier -showlog -mode=check {} +
+	bazel build //vendor/github.com/bazelbuild/buildtools/buildifier
+	find . -not -path "./vendor/*" -and \( -name '*.bzl' -or -name 'BUILD.bazel' -or -name 'WORKSPACE' \) -exec \
+		bazel-bin/vendor/github.com/bazelbuild/buildtools/buildifier/$(BINARY_PREFIX_DIRECTORY)/buildifier -showlog -mode=check {} +
 	VERIFY_CODE=--verify-only make generate
 	# TODO verify BUILD.bazel files are up to date
 
