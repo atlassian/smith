@@ -15,7 +15,6 @@ go_library(
 go_binary(
     name = "main",
     embed = [":go_default_library"],
-    importpath = "github.com/atlassian/smith/examples/sleeper/main",
     pure = "on",
     visibility = ["//visibility:public"],
 )
@@ -23,7 +22,6 @@ go_binary(
 go_binary(
     name = "main_race",
     embed = [":go_default_library"],
-    importpath = "github.com/atlassian/smith/examples/sleeper/main",
     race = "on",
     visibility = ["//visibility:public"],
 )

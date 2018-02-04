@@ -29,7 +29,6 @@ go_test(
     size = "small",
     srcs = ["objects_test.go"],
     embed = [":go_default_library"],
-    importpath = "github.com/atlassian/smith/pkg/resources",
     race = "on",
     deps = [
         "//pkg/apis/smith/v1:go_default_library",

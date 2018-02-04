@@ -13,7 +13,6 @@ go_library(
 go_binary(
     name = "smith",
     embed = [":go_default_library"],
-    importpath = "github.com/atlassian/smith/cmd/smith",
     pure = "on",
     visibility = ["//visibility:public"],
 )
@@ -21,7 +20,6 @@ go_binary(
 go_binary(
     name = "smith_race",
     embed = [":go_default_library"],
-    importpath = "github.com/atlassian/smith/cmd/smith",
     race = "on",
     visibility = ["//visibility:public"],
 )

@@ -25,7 +25,6 @@ go_test(
     size = "small",
     srcs = ["speccheck_test.go"],
     embed = [":go_default_library"],
-    importpath = "github.com/atlassian/smith/pkg/speccheck",
     race = "on",
     deps = [
         "//pkg/cleanup:go_default_library",
