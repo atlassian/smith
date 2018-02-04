@@ -3,15 +3,16 @@ package controller
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/util/graph"
+	"github.com/atlassian/smith/pkg/util/logz"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,6 +21,7 @@ import (
 )
 
 type bundleSyncTask struct {
+	logger             *zap.Logger
 	bundleClient       smithClient_v1.BundlesGetter
 	smartClient        smith.SmartClient
 	rc                 ReadyChecker
@@ -61,8 +63,11 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 	// Visit vertices in sorted order
 	for _, resName := range sorted {
 		// Process the resource
-		res := resourceMap[resName.(smith_v1.ResourceName)]
+		resourceName := resName.(smith_v1.ResourceName)
+		logger := st.logger.With(logz.Resource(resourceName))
+		res := resourceMap[resourceName]
 		rst := resourceSyncTask{
+			logger:             logger,
 			smartClient:        st.smartClient,
 			rc:                 st.rc,
 			store:              st.store,
@@ -81,11 +86,11 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 		_, resErr := resInfo.fetchError()
 		blockedOnError = blockedOnError || resErr != nil
 		if resErr != nil {
-			log.Printf("ERROR [%s/%s] Resource %q, ready: %t, error: %v", st.bundle.Namespace, st.bundle.Name, resName, resInfo.isReady(), resErr)
+			logger.Error("Done processing resource", zap.Bool("ready", resInfo.isReady()), zap.Error(resErr))
 		} else {
-			log.Printf("[%s/%s] Resource %q, ready: %t", st.bundle.Namespace, st.bundle.Name, resName, resInfo.isReady())
+			logger.Info("Done processing resource", zap.Bool("ready", resInfo.isReady()))
 		}
-		st.processedResources[resName.(smith_v1.ResourceName)] = &resInfo
+		st.processedResources[resourceName] = &resInfo
 	}
 	if st.isBundleReady() {
 		// Delete objects which were removed from the bundle
@@ -112,8 +117,9 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 		}
 		if !meta_v1.IsControlledBy(m, st.bundle) {
 			// Object is not owned by that bundle
-			log.Printf("[%s/%s] Object %v %q is not owned by the bundle with UID=%q. Owner references: %v",
-				st.bundle.Namespace, st.bundle.Name, obj.GetObjectKind().GroupVersionKind(), m.GetName(), st.bundle.GetUID(), m.GetOwnerReferences())
+			st.logger.
+				With(logz.Gvk(obj.GetObjectKind().GroupVersionKind()), logz.Object(m)).
+				Sugar().Infof("Object is not owned by the Bundle with UID=%q. Owner references: %v", st.bundle.GetUID(), m.GetOwnerReferences())
 			continue
 		}
 		ref := objectRef{
@@ -144,14 +150,14 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 	retriable := true
 	policy := meta_v1.DeletePropagationForeground
 	for ref, uid := range existingObjs {
-		log.Printf("[%s/%s] Deleting object %v %q", st.bundle.Namespace, st.bundle.Name, ref.GroupVersionKind, ref.Name)
+		st.logger.Info("Deleting object", logz.Gvk(ref.GroupVersionKind), logz.ObjectName(ref.Name))
 		resClient, err := st.smartClient.ForGVK(ref.GroupVersionKind, st.bundle.Namespace)
 		if err != nil {
 			if firstErr == nil {
 				retriable = false
 				firstErr = err
 			} else {
-				log.Printf("[%s/%s] Failed to get client for object %s: %v", st.bundle.Namespace, st.bundle.Name, ref.GroupVersionKind, err)
+				st.logger.Error("Failed to get client for object", logz.Gvk(ref.GroupVersionKind), zap.Error(err))
 			}
 			continue
 		}
@@ -168,7 +174,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			if firstErr == nil {
 				firstErr = err
 			} else {
-				log.Printf("[%s/%s] Failed to delete object %v %q: %v", st.bundle.Namespace, st.bundle.Name, ref.GroupVersionKind, ref.Name, err)
+				st.logger.Warn("Failed to delete object", logz.Gvk(ref.GroupVersionKind), logz.ObjectName(ref.Name), zap.Error(err))
 			}
 			continue
 		}
@@ -187,9 +193,9 @@ func (st *bundleSyncTask) setBundleStatus() error {
 			// It is safe to ignore this conflict because we will reiterate because of the update event.
 			return nil
 		}
-		return errors.Wrapf(err, "failed to set bundle status to %s", st.bundle.Status.ShortString())
+		return errors.Wrap(err, "failed to set bundle status")
 	}
-	log.Printf("[%s/%s] Set bundle status to %s", st.bundle.Namespace, st.bundle.Name, bundleUpdated.Status.ShortString())
+	st.logger.Sugar().Debugf("Set bundle status to %s", &bundleUpdated.Status)
 	return nil
 }
 

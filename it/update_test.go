@@ -198,6 +198,7 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	stage := stgr.NextStage()
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := sleeper.App{
+			Logger:     cfg.Logger,
 			RestConfig: cfg.Config,
 			Namespace:  cfg.Namespace,
 		}

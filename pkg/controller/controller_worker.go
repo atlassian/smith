@@ -1,14 +1,18 @@
 package controller
 
 import (
-	"log"
 	"time"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/util/logz"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -37,48 +41,62 @@ func (c *BundleController) processNextWorkItem() bool {
 	}
 	defer c.Queue.Done(key)
 
-	retriable, err := c.processKey(key.(string))
-	c.handleErr(retriable, err, key)
+	k := key.(string)
+
+	namespace, name, err := cache.SplitMetaNamespaceKey(k)
+	if err != nil {
+		c.Logger.
+			With(zap.Error(err)).
+			Sugar().Errorf("Failed to split key %q", key)
+		c.Queue.Forget(key)
+		return true
+	}
+
+	logger := c.Logger.With(logz.NamespaceName(namespace), logz.BundleName(name))
+
+	retriable, err := c.processKey(logger, k)
+	c.handleErr(logger, retriable, err, k)
 
 	return true
 }
 
-func (c *BundleController) handleErr(retriable bool, err error, key interface{}) {
+func (c *BundleController) handleErr(logger *zap.Logger, retriable bool, err error, key string) {
 	if err == nil {
 		c.Queue.Forget(key)
 		return
 	}
 	if retriable && c.Queue.NumRequeues(key) < maxRetries {
-		log.Printf("[%s] Error syncing Bundle: %v", key, err)
+		logger.Info("Error syncing Bundle", zap.Error(err))
 		c.Queue.AddRateLimited(key)
 		return
 	}
 
-	log.Printf("[%s] Dropping Bundle out of the queue: %v", key, err)
+	logger.Info("Dropping Bundle out of the queue", zap.Error(err))
 	c.Queue.Forget(key)
 }
 
-func (c *BundleController) processKey(key string) (retriableRet bool, errRet error) {
+func (c *BundleController) processKey(logger *zap.Logger, key string) (retriableRet bool, errRet error) {
 	startTime := time.Now()
-	log.Printf("[%s] Started syncing Bundle", key)
+	logger.Info("Started syncing Bundle")
 	defer func() {
 		msg := ""
 		if errRet != nil && api_errors.IsConflict(errors.Cause(errRet)) {
 			msg = " (conflict)"
 			errRet = nil
 		}
-		log.Printf("[%s] Synced Bundle in %v%s", key, time.Since(startTime), msg)
+		logger.Sugar().Infof("Synced Bundle in %v%s", time.Since(startTime), msg)
 	}()
 	bundleObj, exists, err := c.BundleInf.GetIndexer().GetByKey(key)
 	if err != nil {
-		return false, err
+		return false, errors.Wrapf(err, "failed to get Bundle by key %q", key)
 	}
 	if !exists {
-		log.Printf("[%s] Bundle has been deleted", key)
+		logger.Info("Bundle not in cache. Was deleted?")
 		return false, nil
 	}
 
 	st := bundleSyncTask{
+		logger:           logger,
 		bundleClient:     c.BundleClient,
 		smartClient:      c.SmartClient,
 		rc:               c.Rc,
@@ -90,4 +108,18 @@ func (c *BundleController) processKey(key string) (retriableRet bool, errRet err
 	}
 	retriable, err := st.process()
 	return st.handleProcessResult(retriable, err)
+}
+
+func (c *BundleController) loggerForObj(obj interface{}) *zap.Logger {
+	logger := c.Logger
+	metaObj, ok := obj.(meta_v1.Object)
+	if ok {
+		logger = logger.With(logz.Namespace(metaObj), logz.Object(metaObj))
+	}
+	runtimeObj, ok := metaObj.(runtime.Object)
+	if ok {
+		gvk := runtimeObj.GetObjectKind().GroupVersionKind() // TODO does this work for typed objects?
+		logger = logger.With(logz.Gvk(gvk))
+	}
+	return logger
 }

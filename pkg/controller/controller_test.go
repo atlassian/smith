@@ -34,6 +34,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
@@ -59,6 +60,7 @@ type reaction struct {
 }
 
 type testCase struct {
+	logger             *zap.Logger
 	mainClientObjects  []runtime.Object
 	mainReactors       []reaction
 	smithClientObjects []runtime.Object
@@ -158,7 +160,7 @@ func TestController(t *testing.T) {
 				prepare(ctx)
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
-				retriable, err := cntrlr.processKey(key)
+				retriable, err := cntrlr.processKey(tc.logger, key)
 				require.EqualError(t, err, `bundle contains two resources with the same name "`+resP1+`"`)
 				assert.False(t, retriable)
 
@@ -207,7 +209,7 @@ func TestController(t *testing.T) {
 				prepare(ctx)
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
-				retriable, err := cntrlr.processKey(key)
+				retriable, err := cntrlr.processKey(tc.logger, key)
 				require.EqualError(t, err, `topological sort of resources failed: vertex "bla" not found`)
 				assert.False(t, retriable)
 
@@ -501,7 +503,7 @@ func TestController(t *testing.T) {
 				prepare(ctx)
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
-				retriable, err := cntrlr.processKey(key)
+				retriable, err := cntrlr.processKey(tc.logger, key)
 				// Sadly, the actual error is not current propagated
 				require.EqualError(t, err, `error processing resource(s): ["`+resP1+`"]`)
 				assert.False(t, retriable)
@@ -560,7 +562,7 @@ func TestController(t *testing.T) {
 				prepare(ctx)
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
-				retriable, err := cntrlr.processKey(key)
+				retriable, err := cntrlr.processKey(tc.logger, key)
 				require.EqualError(t, err, `error processing resource(s): ["`+resSi1+`"]`)
 				assert.False(t, retriable)
 				actions := tc.bundleFake.Actions()
@@ -683,7 +685,7 @@ func TestController(t *testing.T) {
 				prepare(ctx)
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
-				retriable, err := cntrlr.processKey(key)
+				retriable, err := cntrlr.processKey(tc.logger, key)
 				require.EqualError(t, err, `error processing resource(s): ["map-needs-update"]`)
 				assert.False(t, retriable)
 				actions := tc.bundleFake.Actions()
@@ -869,6 +871,10 @@ func (tc *testCase) run(t *testing.T) {
 	crdStore, err := store.NewCrd(crdInf)
 	require.NoError(t, err)
 
+	tc.logger, err = zap.NewDevelopment()
+	require.NoError(t, err)
+	defer tc.logger.Sync()
+
 	// Ready Checker
 	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
 	if tc.enableServiceCatalog {
@@ -885,6 +891,7 @@ func (tc *testCase) run(t *testing.T) {
 
 	// Spec check
 	specCheck := &speccheck.SpecCheck{
+		Logger:  tc.logger,
 		Scheme:  scheme,
 		Cleaner: oc,
 	}
@@ -916,6 +923,7 @@ func (tc *testCase) run(t *testing.T) {
 	}
 
 	cntrlr := &BundleController{
+		Logger:           tc.logger,
 		BundleInf:        bundleInf,
 		BundleClient:     bundleClient.SmithV1(),
 		BundleStore:      bs,
@@ -956,7 +964,7 @@ func (tc *testCase) defaultTest(t *testing.T, ctx context.Context, cntrlr *Bundl
 	require.NotNil(t, tc.bundle)
 	key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 	require.NoError(t, err)
-	_, err = cntrlr.processKey(key)
+	_, err = cntrlr.processKey(tc.logger, key)
 	require.NoError(t, err)
 }
 

@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -10,8 +9,10 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/util/logz"
 
 	"github.com/ash2k/stager/wait"
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -32,6 +33,8 @@ type BundleController struct {
 	wgLock   sync.Mutex
 	wg       wait.Group
 	stopping bool
+
+	Logger *zap.Logger
 
 	BundleInf    cache.SharedIndexInformer
 	BundleClient smithClient_v1.BundlesGetter
@@ -88,8 +91,8 @@ func (c *BundleController) Run(ctx context.Context) {
 	}()
 	defer c.Queue.ShutDown()
 
-	log.Print("Starting Bundle controller")
-	defer log.Print("Shutting down Bundle controller")
+	c.Logger.Info("Starting Bundle controller")
+	defer c.Logger.Info("Shutting down Bundle controller")
 
 	for i := 0; i < c.Workers; i++ {
 		c.wg.Start(c.worker)
@@ -101,7 +104,7 @@ func (c *BundleController) Run(ctx context.Context) {
 func (c *BundleController) enqueue(bundle *smith_v1.Bundle) {
 	key, err := cache.MetaNamespaceKeyFunc(bundle)
 	if err != nil {
-		log.Printf("Couldn't get key for Bundle %+v: %v", bundle, err)
+		c.Logger.Error("Couldn't get key for Bundle", logz.Namespace(bundle), logz.Bundle(bundle), zap.Error(err))
 		return
 	}
 	c.enqueueKey(key)

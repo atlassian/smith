@@ -1,23 +1,22 @@
 package controller
 
 import (
-	"log"
-
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/util/logz"
 
+	"go.uber.org/zap"
 	"k8s.io/client-go/tools/cache"
 )
 
 func (c *BundleController) onBundleAdd(obj interface{}) {
 	bundle := obj.(*smith_v1.Bundle)
-	log.Printf("[%s/%s] Rebuilding bundle because it was added", bundle.Namespace, bundle.Name)
+	c.Logger.Info("Rebuilding Bundle because it was added", logz.Namespace(bundle), logz.Bundle(bundle))
 	c.enqueue(bundle)
-
 }
 
 func (c *BundleController) onBundleUpdate(oldObj, newObj interface{}) {
 	bundle := newObj.(*smith_v1.Bundle)
-	log.Printf("[%s/%s] Rebuilding bundle because it was updated", bundle.Namespace, bundle.Name)
+	c.Logger.Info("Rebuilding Bundle because it was updated", logz.Namespace(bundle), logz.Bundle(bundle))
 	c.enqueue(bundle)
 }
 
@@ -26,13 +25,21 @@ func (c *BundleController) onBundleDelete(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			log.Printf("Delete event with unrecognized object type: %T", obj)
+			c.Logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
 			return
 		}
-		log.Printf("[%s] Rebuilding deleted bundle (tombstone)", tombstone.Key)
+		namespace, name, err := cache.SplitMetaNamespaceKey(tombstone.Key)
+		if err != nil {
+			c.Logger.
+				With(zap.Error(err)).
+				Sugar().Errorf("Failed to split key %q", tombstone.Key)
+			c.Logger.Sugar().Infof("Rebuilding deleted Bundle (tombstone) with key=%q", tombstone.Key)
+		} else {
+			c.Logger.Info("Rebuilding deleted Bundle (tombstone)", logz.NamespaceName(namespace), logz.BundleName(name))
+		}
 		c.enqueueKey(tombstone.Key)
 		return
 	}
-	log.Printf("[%s/%s] Rebuilding bundle because it was deleted", bundle.Namespace, bundle.Name)
+	c.Logger.Info("Rebuilding Bundle because it was deleted", logz.Namespace(bundle), logz.Bundle(bundle))
 	c.enqueue(bundle)
 }

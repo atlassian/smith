@@ -12,7 +12,7 @@ setup-dev: setup-base
 
 .PHONY: setup-base
 setup-base:
-	dep ensure -vendor-only
+	dep ensure
 	bazel run //:gazelle_fix
 
 .PHONY: fmt-bazel
@@ -103,6 +103,7 @@ run: fmt update-bazel
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	build/bazel-run.sh //cmd/smith:smith_race \
 		-- \
+		-log-encoding=console \
 		-service-catalog=false \
 		-leader-elect \
 		-client-config-from=file \
@@ -115,6 +116,7 @@ run-sc: fmt update-bazel
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	build/bazel-run.sh //cmd/smith:smith_race \
 		-- \
+		-log-encoding=console \
 		-leader-elect \
 		-client-config-from=file \
 		-client-config-file-name="$$HOME/.kube/config" \

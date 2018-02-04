@@ -79,6 +79,7 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	stage := stgr.NextStage()
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := sleeper.App{
+			Logger:     cfg.Logger,
 			RestConfig: cfg.Config,
 			Namespace:  cfg.Namespace,
 		}

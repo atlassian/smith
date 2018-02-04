@@ -143,7 +143,7 @@ type BundleStatus struct {
 	ResourceStatuses []ResourceStatus  `json:"resourceStatuses,omitempty"`
 }
 
-func (bs *BundleStatus) ShortString() string {
+func (bs *BundleStatus) String() string {
 	first := true
 	var buf bytes.Buffer
 	buf.WriteByte('[')

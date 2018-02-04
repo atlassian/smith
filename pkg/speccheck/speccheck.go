@@ -1,11 +1,11 @@
 package speccheck
 
 import (
-	"log"
-
 	"github.com/atlassian/smith/pkg/util"
+	"github.com/atlassian/smith/pkg/util/logz"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -15,6 +15,7 @@ import (
 )
 
 type SpecCheck struct {
+	Logger *zap.Logger
 	Scheme *runtime.Scheme
 	// Server fields cleanup
 	Cleaner SpecCleaner
@@ -41,7 +42,7 @@ func (sc *SpecCheck) CompareActualVsSpec(spec, actual runtime.Object) (*unstruct
 func (sc *SpecCheck) applyDefaults(spec runtime.Object) (runtime.Object, error) {
 	gvk := spec.GetObjectKind().GroupVersionKind()
 	if !sc.Scheme.Recognizes(gvk) {
-		log.Printf("Unrecognized object type %s - not applying defaults", gvk)
+		sc.Logger.Debug("Unrecognized object type - not applying defaults", logz.Gvk(gvk))
 		return spec, nil
 	}
 	clone, err := sc.Scheme.ConvertToVersion(spec, gvk.GroupVersion())
@@ -112,11 +113,11 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 		gvk := spec.GroupVersionKind()
 
 		if gvk.Group == core_v1.GroupName && gvk.Kind == "Secret" {
-			log.Printf("Objects are different: Secret object %q has changed", spec.GetName())
+			sc.Logger.Info("Objects are different: Secret object has changed", logz.Object(spec))
 			return updated, false, nil
 		}
 
-		log.Printf("Objects are different: %s",
+		sc.Logger.Sugar().Infof("Objects are different: %s",
 			diff.ObjectReflectDiff(updated.Object, actualClone.Object))
 		return updated, false, nil
 	}

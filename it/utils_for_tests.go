@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
@@ -41,6 +42,7 @@ type TestFunc func(context.Context, *testing.T, *Config, ...interface{})
 
 type Config struct {
 	T             *testing.T
+	Logger        *zap.Logger
 	Namespace     string
 	Bundle        *smith_v1.Bundle
 	CreatedBundle *smith_v1.Bundle
@@ -151,8 +153,13 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	sc := smart.NewClient(config, clientset)
 
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	defer logger.Sync()
+
 	cfg := &Config{
 		T:            t,
+		Logger:       logger,
 		Namespace:    fmt.Sprintf("smith-it-%d", rand.Uint32()),
 		Bundle:       bundle,
 		Config:       config,
@@ -196,11 +203,12 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	}
 
 	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
-	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, scheme, crdClient, crdLister, sleeper.SleeperCrd()))
-	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, scheme, crdClient, crdLister, resources.BundleCrd()))
+	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, scheme, crdClient, crdLister, sleeper.SleeperCrd()))
+	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, scheme, crdClient, crdLister, resources.BundleCrd()))
 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := app.App{
+			Logger:                logger,
 			RestConfig:            config,
 			ServiceCatalogSupport: serviceCatalog,
 			Namespace:             cfg.Namespace,

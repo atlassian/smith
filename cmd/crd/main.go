@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"log"
+	"fmt"
 	"os"
 
 	"github.com/atlassian/smith/pkg/resources"
@@ -14,7 +14,8 @@ import (
 
 func main() {
 	if err := innerMain(); err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stderr, "%#v", err)
+		os.Exit(1)
 	}
 }
 

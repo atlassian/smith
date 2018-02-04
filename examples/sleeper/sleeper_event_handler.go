@@ -2,17 +2,19 @@ package sleeper
 
 import (
 	"context"
-	"log"
 	"time"
 
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
+	"github.com/atlassian/smith/pkg/util/logz"
 
+	"go.uber.org/zap"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
 )
 
 type SleeperEventHandler struct {
 	ctx    context.Context
+	logger *zap.Logger
 	client rest.Interface
 }
 
@@ -33,10 +35,11 @@ func (h *SleeperEventHandler) OnDelete(obj interface{}) {
 func (h *SleeperEventHandler) handle(obj interface{}) {
 	in := obj.(*sleeper_v1.Sleeper).DeepCopy()
 	msg := in.Spec.WakeupMessage
-	log.Printf("%s/%s was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", in.Namespace, in.Name, sleeper_v1.Sleeping, in.Spec.SleepFor)
+	logger := h.logger.With(logz.Namespace(in), logz.Object(in))
+	logger.Sugar().Infof("Sleeper was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", sleeper_v1.Sleeping, in.Spec.SleepFor)
 	err := h.retryUpdate(in, sleeper_v1.Sleeping, "")
 	if err != nil {
-		log.Printf("Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
+		logger.Error("Status update failed", zap.Error(err))
 		return
 	}
 	go func() {
@@ -44,10 +47,10 @@ func (h *SleeperEventHandler) handle(obj interface{}) {
 		case <-h.ctx.Done():
 			return
 		case <-time.After(time.Duration(in.Spec.SleepFor) * time.Second):
-			log.Printf("%s Updating %s/%s Status to %q", in.Spec.WakeupMessage, in.Namespace, in.Name, sleeper_v1.Awake)
+			logger.Sugar().Infof("%s Updating Sleeper Status to %q", in.Spec.WakeupMessage, sleeper_v1.Awake)
 			err = h.retryUpdate(in, sleeper_v1.Awake, msg)
 			if err != nil {
-				log.Printf("Status update for %s/%s failed: %v", in.Namespace, in.Name, err)
+				logger.Error("Status update failed", zap.Error(err))
 			}
 		}
 	}()
