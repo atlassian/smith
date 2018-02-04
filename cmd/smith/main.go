@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"fmt"
 	_ "net/http/pprof" // This is here to avoid adding pprof handler in app package. It may not be always desired.
 	"os"
 
@@ -12,7 +12,8 @@ import (
 
 func main() {
 	if err := run(); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-		log.Fatalln(err)
+		fmt.Fprintf(os.Stderr, "%#v", err)
+		os.Exit(1)
 	}
 }
 

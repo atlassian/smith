@@ -7,6 +7,7 @@ import (
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/store"
+	"go.uber.org/zap"
 
 	"github.com/ash2k/stager"
 	"github.com/pkg/errors"
@@ -26,6 +27,7 @@ const (
 )
 
 type App struct {
+	Logger     *zap.Logger
 	RestConfig *rest.Config
 	Namespace  string
 }
@@ -69,7 +71,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
-	if err = resources.EnsureCrdExistsAndIsEstablished(ctx, scheme, crdClient, crdLister, SleeperCrd()); err != nil {
+	if err = resources.EnsureCrdExistsAndIsEstablished(ctx, a.Logger, scheme, crdClient, crdLister, SleeperCrd()); err != nil {
 		return err
 	}
 
@@ -88,6 +90,7 @@ func (a *App) sleeperInformer(ctx context.Context, sClient rest.Interface) cache
 
 	seh := &SleeperEventHandler{
 		ctx:    ctx,
+		logger: a.Logger,
 		client: sClient,
 	}
 

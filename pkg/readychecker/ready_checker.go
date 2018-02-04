@@ -1,8 +1,6 @@
 package readychecker
 
 import (
-	"log"
-
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
 
@@ -92,10 +90,7 @@ func (rc *ReadyChecker) checkPathValue(gk schema.GroupKind, obj *unstructured.Un
 		return false, false, err
 	}
 	if actualValue != value {
-		// TODO this is for debugging, remove later
-		log.Printf("%q is not equal to expected %q", actualValue, value)
 		return false, false, nil
 	}
-	log.Printf("%q is equal to expected %q", actualValue, value)
 	return true, false, nil
 }

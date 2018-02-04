@@ -2,15 +2,16 @@ package resources
 
 import (
 	"context"
-	"log"
 	"reflect"
 	"time"
 
 	"github.com/atlassian/smith/pkg/apis/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util"
-	"github.com/pkg/errors"
+	"github.com/atlassian/smith/pkg/util/logz"
 
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_lst_v1b1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
@@ -215,16 +216,16 @@ func int64ptr(val int64) *int64 {
 	return &val
 }
 
-func EnsureCrdExistsAndIsEstablished(ctx context.Context, defaulter runtime.ObjectDefaulter, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
-	err := EnsureCrdExists(ctx, defaulter, clientset, crdLister, crd)
+func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, defaulter runtime.ObjectDefaulter, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+	err := EnsureCrdExists(ctx, logger, defaulter, clientset, crdLister, crd)
 	if err != nil {
 		return err
 	}
-	log.Printf("Waiting for CustomResourceDefinition %s to become established", crd.Name)
+	logger.Info("Waiting for CustomResourceDefinition to become established", logz.Object(crd))
 	return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
 }
 
-func EnsureCrdExists(ctx context.Context, defaulter runtime.ObjectDefaulter, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+func EnsureCrdExists(ctx context.Context, logger *zap.Logger, defaulter runtime.ObjectDefaulter, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
 	for {
 		obj, err := crdLister.Get(crd.Name)
 		notFound := api_errors.IsNotFound(err)
@@ -232,21 +233,21 @@ func EnsureCrdExists(ctx context.Context, defaulter runtime.ObjectDefaulter, cli
 			return err
 		}
 		if notFound {
-			log.Printf("Creating CustomResourceDefinition %s", crd.Name)
+			logger.Info("Creating CustomResourceDefinition", logz.Object(crd))
 			_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 			if err == nil {
-				log.Printf("CustomResourceDefinition %s created", crd.Name)
+				logger.Info("CustomResourceDefinition created", logz.Object(crd))
 				return nil
 			}
 			if !api_errors.IsAlreadyExists(err) {
 				return errors.Wrapf(err, "failed to create %s CustomResourceDefinition", crd.Name)
 			}
-			log.Printf("CustomResourceDefinition %s was created concurrently", crd.Name)
+			logger.Info("CustomResourceDefinition was created concurrently", logz.Object(crd))
 		} else {
 			if IsEqualCrd(crd, obj, defaulter) {
 				return nil
 			}
-			log.Printf("Updating CustomResourceDefinition %s", crd.Name)
+			logger.Info("Updating CustomResourceDefinition", logz.Object(crd))
 			obj = obj.DeepCopy()
 			obj.Spec = crd.Spec
 			obj.Annotations = crd.Annotations
@@ -255,13 +256,13 @@ func EnsureCrdExists(ctx context.Context, defaulter runtime.ObjectDefaulter, cli
 			obj.Status = apiext_v1b1.CustomResourceDefinitionStatus{}
 			_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Update(obj) // This is a CAS
 			if err == nil {
-				log.Printf("CustomResourceDefinition %s updated", crd.Name)
+				logger.Info("CustomResourceDefinition updated", logz.Object(crd))
 				return nil
 			}
 			if !api_errors.IsConflict(err) {
 				return errors.Wrapf(err, "failed to update CustomResourceDefinition %s", crd.Name)
 			}
-			log.Printf("Conflict updating CustomResourceDefinition %s, retrying", crd.Name)
+			logger.Info("Conflict updating CustomResourceDefinition, retrying", logz.Object(crd))
 		}
 		// wait for store to pick up the object and re-iterate
 		if err = util.Sleep(ctx, time.Second); err != nil {

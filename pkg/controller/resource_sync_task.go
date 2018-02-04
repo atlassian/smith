@@ -1,15 +1,15 @@
 package controller
 
 import (
-	"log"
-
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/util"
+	"github.com/atlassian/smith/pkg/util/logz"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +65,7 @@ func (ri *resourceInfo) fetchError() (bool, error) {
 }
 
 type resourceSyncTask struct {
+	logger             *zap.Logger
 	smartClient        smith.SmartClient
 	rc                 ReadyChecker
 	store              Store
@@ -77,7 +78,7 @@ type resourceSyncTask struct {
 }
 
 func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo {
-	log.Printf("[%s/%s] Processing resource %q", st.bundle.Namespace, st.bundle.Name, res.Name)
+	st.logger.Debug("Processing resource")
 
 	// Check if all resource dependencies are ready (so we can start processing this one)
 	status := st.checkAllDependenciesAreReady(res)
@@ -144,7 +145,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 		}
 	}
 	if !match {
-		log.Printf("Objects are different after specification re-check:\n%s",
+		st.logger.Sugar().Warnf("Objects are different after specification re-check:\n%s",
 			diff.ObjectReflectDiff(updatedSpec.Object, resUpdated.Object))
 		return resourceInfo{
 			status: resourceStatusError{
@@ -181,7 +182,7 @@ func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource)
 	var notReadyDependencies []smith_v1.ResourceName
 	for _, dependency := range res.DependsOn {
 		if !st.processedResources[dependency].isReady() {
-			log.Printf("[%s/%s] Dependency %q is required by resource %q but it's not ready", st.bundle.Namespace, st.bundle.Name, dependency, res.Name)
+			st.logger.Sugar().Infof("Dependency %q is required by resource but it's not ready", dependency)
 			notReadyDependencies = append(notReadyDependencies, dependency)
 		}
 	}
@@ -405,10 +406,10 @@ func (st *resourceSyncTask) createOrUpdate(spec *unstructured.Unstructured, actu
 		return nil, false, errors.Wrapf(err, "failed to get the client for %q", gvk)
 	}
 	if actual != nil {
-		log.Printf("[%s/%s] Object %s %q found, checking spec", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
+		st.logger.Info("Object found, checking spec", logz.Gvk(gvk), logz.Object(spec))
 		return st.updateResource(resClient, spec, actual)
 	}
-	log.Printf("[%s/%s] Object %s %q not found, creating", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
+	st.logger.Info("Object not found, creating", logz.Gvk(gvk), logz.Object(spec))
 	return st.createResource(resClient, spec)
 }
 
@@ -416,7 +417,7 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 	gvk := spec.GroupVersionKind()
 	response, err := resClient.Create(spec)
 	if err == nil {
-		log.Printf("[%s/%s] Object %s %q created", st.bundle.Namespace, st.bundle.Name, gvk, spec.GetName())
+		st.logger.Info("Object created", logz.Gvk(gvk), logz.Object(spec))
 		return response, false, nil
 	}
 	if api_errors.IsAlreadyExists(err) {
@@ -436,7 +437,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 		return nil, false, errors.Wrap(err, "specification check failed")
 	}
 	if match {
-		log.Printf("[%s/%s] Object %q has correct spec", st.bundle.Namespace, st.bundle.Name, spec.GetName())
+		st.logger.Info("Object has correct spec", logz.Object(spec))
 		return updated, false, nil
 	}
 
@@ -450,7 +451,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 		// Unexpected error, will retry
 		return nil, true, err
 	}
-	log.Printf("[%s/%s] Object %q updated", st.bundle.Namespace, st.bundle.Name, spec.GetName())
+	st.logger.Info("Object updated", logz.Object(spec))
 	return updated, false, nil
 }
 

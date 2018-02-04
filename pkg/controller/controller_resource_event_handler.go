@@ -1,10 +1,10 @@
 package controller
 
 import (
-	"log"
-
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/util/logz"
 
+	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -12,7 +12,8 @@ import (
 
 func (c *BundleController) onResourceAdd(obj interface{}) {
 	bundleName, namespace := getBundleNameAndNamespace(obj)
-	c.rebuildByName(namespace, bundleName, "added", obj)
+	logger := c.loggerForObj(obj)
+	c.rebuildByName(logger, namespace, bundleName, "added", obj)
 }
 
 func (c *BundleController) onResourceUpdate(oldObj, newObj interface{}) {
@@ -21,48 +22,53 @@ func (c *BundleController) onResourceUpdate(oldObj, newObj interface{}) {
 	newBundleName, newNamespace := getBundleNameAndNamespace(newObj)
 
 	if oldBundleName != newBundleName { // changed controller of the object
-		c.rebuildByName(oldNamespace, oldBundleName, "updated", oldObj)
+		logger := c.loggerForObj(oldObj)
+		c.rebuildByName(logger, oldNamespace, oldBundleName, "updated", oldObj)
 	}
-	c.rebuildByName(newNamespace, newBundleName, "updated", newObj)
+	logger := c.loggerForObj(newObj)
+	c.rebuildByName(logger, newNamespace, newBundleName, "updated", newObj)
 }
 
 func (c *BundleController) onResourceDelete(obj interface{}) {
+	logger := c.loggerForObj(obj)
 	metaObj, ok := obj.(meta_v1.Object)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			log.Printf("Delete event with unrecognized object type: %T", obj)
+			logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
 			return
 		}
 		metaObj, ok = tombstone.Obj.(meta_v1.Object)
 		if !ok {
-			log.Printf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
 		}
+		logger = c.loggerForObj(metaObj)
 	}
 	bundleName, namespace := getBundleNameAndNamespace(metaObj)
 	if bundleName == "" { // No controller bundle found
 		runtimeObj := metaObj.(runtime.Object)
 		bundles, err := c.BundleStore.GetBundlesByObject(runtimeObj.GetObjectKind().GroupVersionKind().GroupKind(), namespace, metaObj.GetName())
 		if err != nil {
-			log.Printf("Failed to get bundles by object: %v", err)
+			logger.Error("Failed to get Bundles by object", zap.Error(err))
 			return
 		}
 		for _, bundle := range bundles {
-			c.rebuildByName(namespace, bundle.Name, "deleted", metaObj)
+			c.rebuildByName(logger, namespace, bundle.Name, "deleted", metaObj)
 		}
 	} else {
-		c.rebuildByName(namespace, bundleName, "deleted", metaObj)
+		c.rebuildByName(logger, namespace, bundleName, "deleted", metaObj)
 	}
 }
 
-func (c *BundleController) rebuildByName(namespace, bundleName, addUpdateDelete string, obj interface{}) {
-	if len(bundleName) == 0 {
+// This method may be called with empty bundleName.
+func (c *BundleController) rebuildByName(logger *zap.Logger, namespace, bundleName, addUpdateDelete string, obj interface{}) {
+	if bundleName == "" {
 		return
 	}
-	// TODO print GVK
-	log.Printf("[%s/%s] Rebuilding bundle because object %s was %s",
-		namespace, bundleName, obj.(meta_v1.Object).GetName(), addUpdateDelete)
+	logger.
+		With(logz.BundleName(bundleName)).
+		Sugar().Infof("Rebuilding Bundle because object was %s", addUpdateDelete)
 	c.enqueue(&smith_v1.Bundle{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      bundleName,

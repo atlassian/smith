@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith/pkg/cleanup"
+	"go.uber.org/zap"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,9 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 		"missing": missingMap,
 		"nil":     nilMap,
 	}
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	defer logger.Sync()
 
 	for kind1, input1 := range inputs {
 		for kind2, input2 := range inputs {
@@ -30,6 +34,7 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 				t.Parallel()
 				scheme := runtime.NewScheme()
 				sc := SpecCheck{
+					Logger:  logger,
 					Scheme:  scheme,
 					Cleaner: cleanup.New(scheme),
 				}

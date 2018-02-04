@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,12 +11,14 @@ import (
 	"github.com/atlassian/smith/examples/sleeper"
 	"github.com/atlassian/smith/pkg/client"
 
+	"go.uber.org/zap"
 	"k8s.io/client-go/rest"
 )
 
 func main() {
 	if err := run(); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-		log.Fatalln(err)
+		fmt.Fprintf(os.Stderr, "%#v", err)
+		os.Exit(1)
 	}
 }
 
@@ -48,7 +50,12 @@ func runWithContext(ctx context.Context) error {
 }
 
 func runWithConfig(ctx context.Context, config *rest.Config) error {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		return err
+	}
 	a := sleeper.App{
+		Logger:     logger,
 		RestConfig: config,
 	}
 	return a.Run(ctx)

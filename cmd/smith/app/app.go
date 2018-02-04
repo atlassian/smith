@@ -3,8 +3,6 @@ package app
 import (
 	"context"
 	"flag"
-	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,6 +26,7 @@ import (
 	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -63,6 +62,7 @@ type LeaderElectionConfig struct {
 }
 
 type App struct {
+	Logger                *zap.Logger
 	RestConfig            *rest.Config
 	ResyncPeriod          time.Duration
 	Namespace             string
@@ -74,13 +74,14 @@ type App struct {
 }
 
 func (a *App) Run(ctx context.Context) error {
+	defer a.Logger.Sync()
 	// Plugins
 	pluginContainers, err := a.loadPlugins()
 	if err != nil {
 		return err
 	}
 	for pluginName := range pluginContainers {
-		log.Printf("Loaded plugin: %q", pluginName)
+		a.Logger.Sugar().Infof("Loaded plugin: %q", pluginName)
 	}
 
 	// Clients
@@ -133,6 +134,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Spec check
 	specCheck := &speccheck.SpecCheck{
+		Logger:  a.Logger,
 		Scheme:  scheme,
 		Cleaner: oc,
 	}
@@ -147,13 +149,13 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Events
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(logInfo)
+	eventBroadcaster.StartLogging(a.Logger.Sugar().Infof)
 	eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: clientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme, core_v1.EventSource{Component: "smith-controller"})
 
 	// Leader election
 	if a.LeaderElectionConfig.LeaderElect {
-		log.Printf("Starting leader election in namespace %q", a.LeaderElectionConfig.ConfigMapNamespace)
+		a.Logger.Info("Starting leader election", zap.String("namespace", a.LeaderElectionConfig.ConfigMapNamespace))
 
 		var startedLeading <-chan struct{}
 		ctx, startedLeading, err = a.startLeaderElection(ctx, clientset.CoreV1(), recorder)
@@ -171,6 +173,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Controller
 	cntrlr := controller.BundleController{
+		Logger:           a.Logger,
 		BundleInf:        bundleInf,
 		BundleClient:     bundleClient.SmithV1(),
 		BundleStore:      bs,
@@ -202,7 +205,7 @@ func (a *App) Run(ctx context.Context) error {
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
 		infs = append(infs, inf.HasSynced)
 	}
-	log.Print("Waiting for informers to sync")
+	a.Logger.Info("Waiting for informers to sync")
 	if !cache.WaitForCacheSync(ctx.Done(), infs...) {
 		return ctx.Err()
 	}
@@ -235,11 +238,11 @@ func (a *App) startLeaderElection(ctx context.Context, configMapsGetter core_v1c
 		RetryPeriod:   a.LeaderElectionConfig.RetryPeriod,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(stop <-chan struct{}) {
-				log.Print("Started leading")
+				a.Logger.Info("Started leading")
 				close(startedLeading)
 			},
 			OnStoppedLeading: func() {
-				log.Print("Leader status lost")
+				a.Logger.Info("Leader status lost")
 				cancel()
 			},
 		},
@@ -284,6 +287,7 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 
 func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	a := App{}
+	zapConfig := zap.NewProductionConfig()
 	flagset.BoolVar(&a.PodPresetSupport, "pod-preset", false, "PodPreset support. Disabled by default.")
 	flagset.BoolVar(&a.ServiceCatalogSupport, "service-catalog", true, "Service Catalog support. Enabled by default.")
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
@@ -319,6 +323,10 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 		"Load REST client configuration from the specified Kubernetes config file. This is only applicable if --client-config-from=file is set.")
 	configContext := flagset.String("client-config-context", "",
 		"Context to use for REST client configuration. This is only applicable if --client-config-from=file is set.")
+	flagset.StringVar(&zapConfig.Encoding, "log-encoding", "json", `Sets the logger's encoding. Valid values are "json" and "console".`)
+	flagset.BoolVar(&zapConfig.DisableCaller, "log-disable-caller", false, `Stops annotating logs with the calling function's file name and line number.`)
+	flagset.BoolVar(&zapConfig.DisableStacktrace, "log-disable-stacktrace", false, `Completely disables automatic stacktrace capturing. `+
+		`By default, stacktraces are captured for ErrorLevel and above.`)
 
 	if err := flagset.Parse(arguments); err != nil {
 		return nil, err
@@ -332,14 +340,17 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	config.UserAgent = "smith"
 	a.RestConfig = config
 
+	logger, err := zapConfig.Build()
+	if err != nil {
+		return nil, err
+	}
+	a.Logger = logger
+
 	if *pprofAddr != "" {
 		go func() {
-			log.Fatalf("pprof server failed: %v", http.ListenAndServe(*pprofAddr, nil))
+			err := http.ListenAndServe(*pprofAddr, nil)
+			a.Logger.Fatal("pprof server failed", zap.Error(err))
 		}()
 	}
 	return &a, nil
-}
-
-func logInfo(format string, args ...interface{}) {
-	log.Print(fmt.Sprintf(format, args...))
 }
