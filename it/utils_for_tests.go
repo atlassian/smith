@@ -220,7 +220,6 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	})
 
 	if createBundle {
-		time.Sleep(500 * time.Millisecond) // Wait until the app starts and creates the Bundle CRD
 		res := &smith_v1.Bundle{}
 		cfg.CreateObject(ctxTest, bundle, res, smith_v1.BundleResourcePlural, bundleClient.SmithV1().RESTClient())
 		cfg.CreatedBundle = res
