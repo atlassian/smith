@@ -7,14 +7,15 @@ import (
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/store"
-	"go.uber.org/zap"
 
 	"github.com/ash2k/stager"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	apiext_v1b1list "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -56,8 +57,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	multiStore := store.NewMulti()
 
-	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, ResyncPeriod)
-	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
+	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, ResyncPeriod, cache.Indexers{})
 	multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
 	stage := stgr.NextStage()
 	stage.StartWithChannel(crdInf.Run) // Must be after multiStore.AddInformer()
@@ -70,7 +70,7 @@ func (a *App) Run(ctx context.Context) error {
 		return errors.New("wait for CRD informer was cancelled")
 	}
 
-	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
+	crdLister := apiext_v1b1list.NewCustomResourceDefinitionLister(crdInf.GetIndexer())
 	if err = resources.EnsureCrdExistsAndIsEstablished(ctx, a.Logger, scheme, crdClient, crdLister, SleeperCrd()); err != nil {
 		return err
 	}
