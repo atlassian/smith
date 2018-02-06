@@ -28,7 +28,8 @@ import (
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	crdInformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	apiext_v1b1list "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -191,8 +192,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	crdClient, err := crdClientset.NewForConfig(config)
 	require.NoError(t, err)
 
-	informerFactory := crdInformers.NewSharedInformerFactory(crdClient, 0)
-	crdInf := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Informer()
+	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, 0, cache.Indexers{})
 	stage := stgr.NextStage()
 	stage.StartWithChannel(crdInf.Run)
 
@@ -202,7 +202,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 		t.Fatal("wait for CRD Informer was cancelled")
 	}
 
-	crdLister := informerFactory.Apiextensions().V1beta1().CustomResourceDefinitions().Lister()
+	crdLister := apiext_v1b1list.NewCustomResourceDefinitionLister(crdInf.GetIndexer())
 	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, scheme, crdClient, crdLister, sleeper.SleeperCrd()))
 	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, scheme, crdClient, crdLister, resources.BundleCrd()))
 
