@@ -2,6 +2,7 @@ package v1
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/atlassian/smith/pkg/apis/smith"
 
@@ -134,6 +135,20 @@ type BundleCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
+func (bc *BundleCondition) String() string {
+	var buf bytes.Buffer
+	buf.WriteString(string(bc.Type))
+	buf.WriteByte(' ')
+	buf.WriteString(string(bc.Status))
+	if bc.Reason != "" {
+		fmt.Fprintf(&buf, " %q", bc.Reason)
+	}
+	if bc.Message != "" {
+		fmt.Fprintf(&buf, " %q", bc.Message)
+	}
+	return buf.String()
+}
+
 // +k8s:deepcopy-gen=true
 // BundleStatus represents the latest available observations of a Bundle's current state.
 type BundleStatus struct {
@@ -151,21 +166,7 @@ func (bs *BundleStatus) String() string {
 		} else {
 			buf.WriteByte('|')
 		}
-		buf.WriteString(string(cond.Type))
-		buf.WriteByte(' ')
-		buf.WriteString(string(cond.Status))
-		if cond.Reason != "" {
-			buf.WriteByte(' ')
-			buf.WriteByte('"')
-			buf.WriteString(cond.Reason)
-			buf.WriteByte('"')
-		}
-		if cond.Message != "" {
-			buf.WriteByte(' ')
-			buf.WriteByte('"')
-			buf.WriteString(cond.Message)
-			buf.WriteByte('"')
-		}
+		buf.WriteString(cond.String())
 	}
 	buf.WriteByte(']')
 	return buf.String()
