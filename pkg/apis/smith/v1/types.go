@@ -2,8 +2,6 @@ package v1
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
 
 	"github.com/atlassian/smith/pkg/apis/smith"
 
@@ -237,7 +235,7 @@ type PluginSpec struct {
 // DeepCopyInto is an deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *PluginSpec) DeepCopyInto(out *PluginSpec) {
 	*out = *in
-	out.Spec = deepCopyJSONValue(in.Spec).(map[string]interface{})
+	out.Spec = runtime.DeepCopyJSON(in.Spec)
 }
 
 // DeepCopy is an deepcopy function, copying the receiver, creating a new PluginSpec.
@@ -281,27 +279,4 @@ type ResourceCondition struct {
 	Reason string `json:"reason,omitempty"`
 	// A human readable message indicating details about the transition.
 	Message string `json:"message,omitempty"`
-}
-
-// TODO Temporary copy of k/k/staging/src/k8s.io/apimachinery/pkg/runtime/converter.go:449 DeepCopyJSONValue()
-// Remove once on 1.9 api machinery
-func deepCopyJSONValue(x interface{}) interface{} {
-	switch x := x.(type) {
-	case map[string]interface{}:
-		clone := make(map[string]interface{}, len(x))
-		for k, v := range x {
-			clone[k] = deepCopyJSONValue(v)
-		}
-		return clone
-	case []interface{}:
-		clone := make([]interface{}, len(x))
-		for i, v := range x {
-			clone[i] = deepCopyJSONValue(v)
-		}
-		return clone
-	case string, int64, bool, float64, nil, json.Number:
-		return x
-	default:
-		panic(fmt.Errorf("cannot deep copy %T", x))
-	}
 }
