@@ -96,6 +96,9 @@ const (
 	resSi1 = "resSi1"
 	si1    = "si1"
 	si1uid = "si1-uid"
+	resSi2 = "resSi2"
+	si2    = "si2"
+	si2uid = "si2-uid"
 
 	s1    = "s1"
 	s1uid = "s1-uid"
@@ -802,6 +805,147 @@ func TestController(t *testing.T) {
 				assert.Equal(t, "specification of the created/updated object does not match the desired spec", resCond.Message)
 			},
 		},
+		"binding secret references are resolved": &testCase{
+			mainClientObjects: []runtime.Object{
+				&core_v1.Secret{
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      s1,
+						Namespace: testNamespace,
+						UID:       s1uid,
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         sc_v1b1.SchemeGroupVersion.String(),
+								Kind:               "ServiceBinding",
+								Name:               sb1,
+								UID:                sb1uid,
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+					Data: map[string][]byte{
+						"mysecret": []byte("bla"),
+					},
+					Type: core_v1.SecretTypeOpaque,
+				},
+			},
+			scClientObjects: []runtime.Object{
+				serviceInstance(true, false, false),
+				serviceBinding(true, false, false),
+				&sc_v1b1.ServiceInstance{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ServiceInstance",
+						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name:      si2,
+						Namespace: testNamespace,
+						UID:       si2uid,
+						Labels: map[string]string{
+							smith.BundleNameLabel: bundle1,
+						},
+						Annotations: map[string]string{
+							"Secret": "bla",
+						},
+						OwnerReferences: []meta_v1.OwnerReference{
+							{
+								APIVersion:         smith_v1.BundleResourceGroupVersion,
+								Kind:               smith_v1.BundleResourceKind,
+								Name:               bundle1,
+								UID:                bundle1uid,
+								Controller:         &tr,
+								BlockOwnerDeletion: &tr,
+							},
+							{
+								APIVersion:         sc_v1b1.SchemeGroupVersion.String(),
+								Kind:               "ServiceBinding",
+								Name:               sb1,
+								UID:                sb1uid,
+								BlockOwnerDeletion: &tr,
+							},
+						},
+					},
+					Status: sc_v1b1.ServiceInstanceStatus{
+						Conditions: []sc_v1b1.ServiceInstanceCondition{
+							{
+								Type:   sc_v1b1.ServiceInstanceConditionReady,
+								Status: sc_v1b1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			bundle: &smith_v1.Bundle{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      bundle1,
+					Namespace: testNamespace,
+					UID:       bundle1uid,
+				},
+				Spec: smith_v1.BundleSpec{
+					Resources: []smith_v1.Resource{
+						{
+							Name: resSi1,
+							Spec: smith_v1.ResourceSpec{
+								Object: &sc_v1b1.ServiceInstance{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ServiceInstance",
+										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: si1,
+									},
+								},
+							},
+						},
+						{
+							Name: resSb1,
+							DependsOn: []smith_v1.ResourceName{
+								resSi1,
+							},
+							Spec: smith_v1.ResourceSpec{
+								Object: &sc_v1b1.ServiceBinding{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ServiceBinding",
+										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: sb1,
+									},
+									Spec: sc_v1b1.ServiceBindingSpec{
+										ServiceInstanceRef: sc_v1b1.LocalObjectReference{
+											Name: si1,
+										},
+										SecretName: s1,
+									},
+								},
+							},
+						},
+						{
+							Name: resSi2,
+							DependsOn: []smith_v1.ResourceName{
+								resSb1,
+							},
+							Spec: smith_v1.ResourceSpec{
+								Object: &sc_v1b1.ServiceInstance{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ServiceInstance",
+										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: si2,
+										Annotations: map[string]string{
+											"Secret": "{{" + resSb1 + ":bindsecret#Data.mysecret}}",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace:            testNamespace,
+			enableServiceCatalog: true,
+		},
 		"Secret's keys should not be merged": &testCase{
 			mainClientObjects: []runtime.Object{
 				&core_v1.Secret{
@@ -896,6 +1040,7 @@ func TestController(t *testing.T) {
 			},
 		},
 	}
+
 	for name, tc := range testcases {
 		tc := tc
 		t.Run(name, func(t *testing.T) {

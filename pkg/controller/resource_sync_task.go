@@ -50,6 +50,9 @@ type resourceStatusError struct {
 type resourceInfo struct {
 	actual *unstructured.Unstructured
 	status resourceStatus
+
+	// if actual is a ServiceBinding, we resolve the secret once it's been processed.
+	serviceBindingSecret *core_v1.Secret
 }
 
 func (ri *resourceInfo) isReady() bool {
@@ -155,8 +158,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Check if resource is ready
-	ready, retriable, err := st.rc.IsReady(resUpdated)
-	if err != nil {
+	if ready, retriable, err := st.rc.IsReady(resUpdated); err != nil {
 		return resourceInfo{
 			actual: resUpdated,
 			status: resourceStatusError{
@@ -164,18 +166,48 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 				isRetriableError: retriable,
 			},
 		}
-	}
-	if ready {
-		return resourceInfo{
-			actual: resUpdated,
-			status: resourceStatusReady{},
-		}
-	} else {
+	} else if !ready {
 		return resourceInfo{
 			actual: resUpdated,
 			status: resourceStatusInProgress{},
 		}
 	}
+
+	// Augment with binding output (used for references)
+	bindingSecret, err := st.maybeExtractBindingSecret(resUpdated)
+	if err != nil {
+		return resourceInfo{
+			actual: resUpdated,
+			status: resourceStatusError{
+				err: err,
+			},
+		}
+	}
+
+	return resourceInfo{
+		actual:               resUpdated,
+		status:               resourceStatusReady{},
+		serviceBindingSecret: bindingSecret,
+	}
+}
+
+func (st *resourceSyncTask) maybeExtractBindingSecret(obj *unstructured.Unstructured) (*core_v1.Secret, error) {
+	if obj.GroupVersionKind() != sc_v1b1.SchemeGroupVersion.WithKind("ServiceBinding") {
+		return nil, nil
+	}
+	actual, err := st.scheme.ConvertToVersion(obj, sc_v1b1.SchemeGroupVersion)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	serviceBinding := actual.(*sc_v1b1.ServiceBinding)
+	secret, exists, err := st.store.Get(core_v1.SchemeGroupVersion.WithKind("Secret"), serviceBinding.Namespace, serviceBinding.Spec.SecretName)
+	if err != nil {
+		return nil, errors.Wrap(err, "error finding output Secret")
+	}
+	if !exists {
+		return nil, errors.New("cannot find output Secret")
+	}
+	return secret.(*core_v1.Secret), nil
 }
 
 func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource) resourceStatus {
@@ -375,7 +407,7 @@ func (st *resourceSyncTask) prepareDependencies(dependsOn []smith_v1.ResourceNam
 			var err error
 			actual, err = st.scheme.ConvertToVersion(unstructuredActual, gvk.GroupVersion())
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			actual.GetObjectKind().SetGroupVersionKind(gvk)
 		} else {
