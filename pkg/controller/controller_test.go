@@ -871,7 +871,9 @@ func (tc *testCase) run(t *testing.T) {
 	crdStore, err := store.NewCrd(crdInf)
 	require.NoError(t, err)
 
-	tc.logger, err = zap.NewDevelopment()
+	loggerConfig := zap.NewDevelopmentConfig()
+	loggerConfig.DisableCaller = true
+	tc.logger, err = loggerConfig.Build()
 	require.NoError(t, err)
 	defer tc.logger.Sync()
 

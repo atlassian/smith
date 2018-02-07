@@ -50,7 +50,9 @@ func runWithContext(ctx context.Context) error {
 }
 
 func runWithConfig(ctx context.Context, config *rest.Config) error {
-	logger, err := zap.NewDevelopment()
+	loggerConfig := zap.NewDevelopmentConfig()
+	loggerConfig.DisableCaller = true
+	logger, err := loggerConfig.Build()
 	if err != nil {
 		return err
 	}
