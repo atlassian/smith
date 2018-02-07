@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -116,6 +117,33 @@ func TestSpecProcessor(t *testing.T) {
 	assert.Equal(t, expected, obj)
 }
 
+func TestSpecProcessorBindSecret(t *testing.T) {
+	t.Parallel()
+	sp := SpecProcessor{
+		selfName:  "abc",
+		resources: processedResources(),
+		allowedResources: map[smith_v1.ResourceName]struct{}{
+			"res1":       {},
+			"resbinding": {},
+		},
+	}
+	obj := map[string]interface{}{
+		"ref": map[string]interface{}{
+			"int":    "{{{res1#a.int}}}",
+			"secret": "{{resbinding:bindsecret#Data.password}}",
+		},
+	}
+	expected := map[string]interface{}{
+		"ref": map[string]interface{}{
+			"int":    42,
+			"secret": "secret",
+		},
+	}
+
+	require.NoError(t, sp.ProcessObject(obj))
+	assert.Equal(t, expected, obj)
+}
+
 func TestSpecProcessorErrors(t *testing.T) {
 	t.Parallel()
 	inputs := []struct {
@@ -194,6 +222,24 @@ func TestSpecProcessorErrors(t *testing.T) {
 			},
 			err: `invalid reference at "invalid#[0]": references can only point at direct dependencies: resX#a.string`,
 		},
+		{
+			obj: map[string]interface{}{
+				"invalid": "{{res1:bindsecret#Data.password}}",
+			},
+			err: `invalid reference at "invalid": "bindsecret" requested, but "res1" is not a ServiceBinding`,
+		},
+		{
+			obj: map[string]interface{}{
+				"invalid": "{{resbinding:someotherthing#notthere}}",
+			},
+			err: `invalid reference at "invalid": resource output name "someotherthing" not understood for "resbinding"`,
+		},
+		{
+			obj: map[string]interface{}{
+				"invalid": "{{resbinding:bindsecret#Data.nonutf8}}",
+			},
+			err: `invalid reference at "invalid": cannot expand non-UTF8 byte array field "resbinding:bindsecret#Data.nonutf8"`,
+		},
 	}
 	for i, input := range inputs {
 		input := input
@@ -203,7 +249,8 @@ func TestSpecProcessorErrors(t *testing.T) {
 				selfName:  "self1",
 				resources: processedResources(),
 				allowedResources: map[smith_v1.ResourceName]struct{}{
-					"res1": {},
+					"res1":       {},
+					"resbinding": {},
 				},
 			}
 			assert.EqualError(t, sp.ProcessObject(input.obj), input.err)
@@ -239,6 +286,16 @@ func processedResources() map[smith_v1.ResourceName]*resourceInfo {
 				},
 			},
 			status: resourceStatusReady{},
+		},
+		"resbinding": {
+			actual: &unstructured.Unstructured{},
+			status: resourceStatusReady{},
+			serviceBindingSecret: &core_v1.Secret{
+				Data: map[string][]byte{
+					"password": []byte("secret"),
+					"nonutf8":  {255, 254, 255},
+				},
+			},
 		},
 		"resX": {
 			actual: &unstructured.Unstructured{

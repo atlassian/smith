@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
@@ -14,6 +15,10 @@ import (
 const (
 	// Separator between reference to a resource by name and JsonPath within a resource
 	ReferenceSeparator = "#"
+	// Separator between dependency and type of output (i.e. resolve a dependency
+	// to some produced object)
+	ResourceOutputSeparator      = ":"
+	ResourceOutputNameBindSecret = "bindsecret"
 )
 
 var (
@@ -111,7 +116,12 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	if len(parts) < 2 {
 		return nil, errors.Errorf("cannot include whole object: %s", selector)
 	}
-	objName := smith_v1.ResourceName(parts[0])
+	objNameParts := strings.SplitN(parts[0], ResourceOutputSeparator, 2)
+	objName := smith_v1.ResourceName(objNameParts[0])
+	resourceOutputName := ""
+	if len(objNameParts) == 2 {
+		resourceOutputName = objNameParts[1]
+	}
 	if objName == sp.selfName {
 		return nil, errors.Errorf("self references are not allowed: %s", selector)
 	}
@@ -122,18 +132,40 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	if _, allowed := sp.allowedResources[objName]; !allowed {
 		return nil, errors.Errorf("references can only point at direct dependencies: %s", selector)
 	}
+
+	var objToTraverse interface{}
+	switch resourceOutputName {
+	case "":
+		objToTraverse = resInfo.actual.Object
+	case ResourceOutputNameBindSecret:
+		if resInfo.serviceBindingSecret == nil {
+			return nil, errors.Errorf("%q requested, but %q is not a ServiceBinding", resourceOutputName, objName)
+		}
+		objToTraverse = resInfo.serviceBindingSecret
+	default:
+		return nil, errors.Errorf("resource output name %q not understood for %q", resourceOutputName, objName)
+	}
+
 	// To avoid overcomplicated format of reference like this: {{{res1#{$.a.string}}}}
 	// And have something like this instead: {{{res1#a.string}}}
 	jsonPath := fmt.Sprintf("{$.%s}", parts[1])
-	fieldValue, err := resources.GetJsonPathValue(resInfo.actual.Object, jsonPath, false)
+	fieldValue, err := resources.GetJsonPathValue(objToTraverse, jsonPath, false)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to process JsonPath reference %s", selector)
 	}
 	if fieldValue == nil {
 		return nil, errors.Errorf("field not found: %s", selector)
 	}
+
 	if primitivesOnly {
-		switch fieldValue.(type) {
+		switch typedFieldValue := fieldValue.(type) {
+		case []byte:
+			// Secrets are in bytes. We wildly cast them to a string and hope for the best
+			// so we can put them in the JSON in a 'nice' way.
+			if !utf8.Valid(typedFieldValue) {
+				return nil, errors.Errorf("cannot expand non-UTF8 byte array field %q", selector)
+			}
+			fieldValue = string(typedFieldValue)
 		case int, uint:
 		case string, bool:
 		case float32, float64:
