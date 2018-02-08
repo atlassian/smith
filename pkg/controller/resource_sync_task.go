@@ -245,7 +245,7 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 	// Process the spec
 	var objectOrPluginSpec map[string]interface{}
 	if res.Spec.Object != nil {
-		specUnstr, err := util.RuntimeToUnstructured(st.scheme, res.Spec.Object)
+		specUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
 		if err != nil {
 			return nil, err
 		}
@@ -344,7 +344,7 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtim
 	}
 
 	// Make sure plugin is returning us something that obeys the PluginSpec.
-	object, err := util.RuntimeToUnstructured(st.scheme, result.Object)
+	object, err := util.RuntimeToUnstructured(result.Object)
 	if err != nil {
 		return nil, errors.Wrap(err, "plugin output cannot be converted from runtime.Object")
 	}

@@ -27,11 +27,11 @@ func (sc *SpecCheck) CompareActualVsSpec(spec, actual runtime.Object) (*unstruct
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failed to apply defaults to object spec %s", spec.GetObjectKind().GroupVersionKind())
 	}
-	specWithDefaultsUnstr, err := util.RuntimeToUnstructured(sc.Scheme, specWithDefaults)
+	specWithDefaultsUnstr, err := util.RuntimeToUnstructured(specWithDefaults)
 	if err != nil {
 		return nil, false, err
 	}
-	actualUnstr, err := util.RuntimeToUnstructured(sc.Scheme, actual)
+	actualUnstr, err := util.RuntimeToUnstructured(actual)
 	if err != nil {
 		return nil, false, err
 	}

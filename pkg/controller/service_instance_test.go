@@ -413,7 +413,7 @@ func scheme(t *testing.T) *runtime.Scheme {
 }
 
 func runtimeToUnstructured(t *testing.T, obj runtime.Object) *unstructured.Unstructured {
-	out, err := util.RuntimeToUnstructured(scheme(t), obj)
+	out, err := util.RuntimeToUnstructured(obj)
 	require.NoError(t, err)
 	return out
 }

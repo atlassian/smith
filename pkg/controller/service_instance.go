@@ -87,7 +87,7 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 
 	setAnnotation(instanceSpec, checkSum)
 
-	unstructuredSpec, err := util.RuntimeToUnstructured(st.scheme, instanceSpec)
+	unstructuredSpec, err := util.RuntimeToUnstructured(instanceSpec)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal back into unstructured")
 	}

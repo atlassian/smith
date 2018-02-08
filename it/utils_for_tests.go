@@ -137,7 +137,7 @@ func TestSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClients
 }
 
 func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundle bool, test TestFunc, args ...interface{}) {
-	convertBundleResourcesToUnstrucutred(t, bundle, serviceCatalog)
+	convertBundleResourcesToUnstrucutred(t, bundle)
 	config, clientset, bundleClient := TestSetup(t)
 
 	sc := smart.NewClient(config, clientset)
@@ -229,11 +229,11 @@ func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, re
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, smith_v1.ConditionFalse)
 	if assert.Len(cfg.T, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
 		for i, res := range bundle.Spec.Resources {
-			spec, err := util.RuntimeToUnstructured(cfg.Scheme, res.Spec.Object)
+			spec, err := util.RuntimeToUnstructured(res.Spec.Object)
 			if !assert.NoError(cfg.T, err) {
 				continue
 			}
-			actual, err := util.RuntimeToUnstructured(cfg.Scheme, bundleRes.Spec.Resources[i].Spec.Object)
+			actual, err := util.RuntimeToUnstructured(bundleRes.Spec.Resources[i].Spec.Object)
 			if !assert.NoError(cfg.T, err) {
 				continue
 			}
@@ -254,18 +254,11 @@ func (cfg *Config) AssertBundleTimeout(ctx context.Context, bundle *smith_v1.Bun
 	return cfg.AssertBundle(ctxTimeout, bundle, resourceVersion...)
 }
 
-func convertBundleResourcesToUnstrucutred(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog bool) {
-	scheme, err := apitypes.FullScheme(serviceCatalog)
-	require.NoError(t, err)
-	// We only add Sleeper here temporarily, it must not be in the main scheme.
-	// This enables us to use typed Sleeper object in test definitions.
-	err = sleeper_v1.AddToScheme(scheme)
-	require.NoError(t, err)
-
+func convertBundleResourcesToUnstrucutred(t *testing.T, bundle *smith_v1.Bundle) {
 	// Convert all typed objects into unstructured ones
 	for i, res := range bundle.Spec.Resources {
 		if res.Spec.Object != nil {
-			resUnstr, err := util.RuntimeToUnstructured(scheme, res.Spec.Object)
+			resUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
 			require.NoError(t, err)
 			bundle.Spec.Resources[i].Spec.Object = resUnstr
 		}
