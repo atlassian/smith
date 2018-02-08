@@ -18,7 +18,7 @@ setup-base:
 .PHONY: fmt-bazel
 fmt-bazel:
 	bazel build //vendor/github.com/bazelbuild/buildtools/buildifier //vendor/github.com/bazelbuild/buildtools/buildozer
-	-bazel-bin/vendor/github.com/bazelbuild/buildtools/buildifier/$(BINARY_PREFIX_DIRECTORY)/buildozer \
+	-bazel-bin/vendor/github.com/bazelbuild/buildtools/buildozer/$(BINARY_PREFIX_DIRECTORY)/buildozer \
 		'set race "on"' \
 		//:%go_test \
 		//cmd/...:%go_test \
