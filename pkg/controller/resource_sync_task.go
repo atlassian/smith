@@ -201,7 +201,11 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 		gvk = res.Spec.Object.GetObjectKind().GroupVersionKind()
 		name = res.Spec.Object.(meta_v1.Object).GetName()
 	} else if res.Spec.Plugin != nil {
-		gvk = st.pluginContainers[res.Spec.Plugin.Name].Plugin.Describe().GVK
+		pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
+		if !ok {
+			return nil, errors.Errorf("no such plugin %q", res.Spec.Plugin.Name)
+		}
+		gvk = pluginContainer.Plugin.Describe().GVK
 		name = res.Spec.Plugin.ObjectName
 	} else {
 		// unreachable
