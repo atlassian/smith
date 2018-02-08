@@ -11,7 +11,7 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/sleeper"
-	"github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
+	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/cleanup"
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
@@ -104,6 +104,10 @@ const (
 
 	resP1 = "resP1"
 
+	resSleeper1 = "resSleeper1"
+	sleeper1    = "sleeper1"
+	sleeper1uid = "sleeper1-uid"
+
 	bundle1    = "bundle1"
 	bundle1uid = "bundle1-uid"
 
@@ -154,7 +158,7 @@ func TestController(t *testing.T) {
 			},
 			namespace: testNamespace,
 			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
-				pluginConfigMapWithDeps: configMapWithDependenciesPlugin,
+				pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
 			},
 			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
 				prepare(ctx)
@@ -203,7 +207,7 @@ func TestController(t *testing.T) {
 			},
 			namespace: testNamespace,
 			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
-				pluginConfigMapWithDeps: configMapWithDependenciesPlugin,
+				pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
 			},
 			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
 				prepare(ctx)
@@ -241,15 +245,25 @@ func TestController(t *testing.T) {
 			},
 			expectedActions: sets.NewString("DELETE=/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate),
 			namespace:       meta_v1.NamespaceAll,
+			testHandler: fakeActionHandler{
+				response: map[path]fakeResponse{
+					{
+						method: "DELETE",
+						path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate,
+					}: {
+						statusCode: http.StatusOK,
+					},
+				},
+			},
 		},
 		"can list crds in another namespace": &testCase{
 			crdClientObjects: []runtime.Object{
 				SleeperCrdWithStatus(),
 			},
 			expectedActions: sets.NewString(
-				"GET=/apis/"+v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+v1.SleeperResourcePlural+
+				"GET=/apis/"+sleeper_v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+sleeper_v1.SleeperResourcePlural+
 					"=limit=500&resourceVersion=0",
-				"GET=/apis/"+v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+v1.SleeperResourcePlural+
+				"GET=/apis/"+sleeper_v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+sleeper_v1.SleeperResourcePlural+
 					"=watch",
 			),
 			namespace: testNamespace,
@@ -263,8 +277,15 @@ func TestController(t *testing.T) {
 				response: map[path]fakeResponse{
 					{
 						method: "GET",
+						path:   "/apis/" + sleeper_v1.SleeperResourceGroupVersion + "/namespaces/" + testNamespace + "/" + sleeper_v1.SleeperResourcePlural,
+					}: {
+						statusCode: http.StatusOK,
+						content:    []byte(`{"kind": "List", "items": []}`),
+					},
+					{
+						method: "GET",
 						watch:  true,
-						path:   "/apis/" + v1.SleeperResourceGroupVersion + "/namespaces/" + testNamespace + "/" + v1.SleeperResourcePlural,
+						path:   "/apis/" + sleeper_v1.SleeperResourceGroupVersion + "/namespaces/" + testNamespace + "/" + sleeper_v1.SleeperResourcePlural,
 					}: {
 						statusCode: http.StatusOK,
 						content:    []byte(`{"type": "ADDED", "object": { "kind": "Unknown" } }`),
@@ -336,6 +357,9 @@ func TestController(t *testing.T) {
 			pluginsShouldBeInvoked: sets.NewString(pluginSimpleConfigMap),
 		},
 		"plugin spec is processed": &testCase{
+			crdClientObjects: []runtime.Object{
+				SleeperCrdWithStatus(),
+			},
 			mainClientObjects: []runtime.Object{
 				&core_v1.Secret{
 					ObjectMeta: meta_v1.ObjectMeta{
@@ -386,10 +410,8 @@ func TestController(t *testing.T) {
 							},
 						},
 						{
-							Name: resSb1,
-							DependsOn: []smith_v1.ResourceName{
-								resSi1,
-							},
+							Name:      resSb1,
+							DependsOn: []smith_v1.ResourceName{resSi1},
 							Spec: smith_v1.ResourceSpec{
 								Object: &sc_v1b1.ServiceBinding{
 									TypeMeta: meta_v1.TypeMeta{
@@ -409,10 +431,21 @@ func TestController(t *testing.T) {
 							},
 						},
 						{
-							Name: resP1,
-							DependsOn: []smith_v1.ResourceName{
-								resSb1,
-							},
+							Name: resSleeper1,
+							Spec: smith_v1.ResourceSpec{
+								Object: &sleeper_v1.Sleeper{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       sleeper_v1.SleeperResourceKind,
+										APIVersion: sleeper_v1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: sleeper1,
+									},
+								}},
+						},
+						{
+							Name:      resP1,
+							DependsOn: []smith_v1.ResourceName{resSb1, resSleeper1},
 							Spec: smith_v1.ResourceSpec{
 								Plugin: &smith_v1.PluginSpec{
 									Name:       pluginConfigMapWithDeps,
@@ -426,8 +459,15 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			namespace:            testNamespace,
-			expectedActions:      sets.NewString("POST=/api/v1/namespaces/" + testNamespace + "/configmaps"),
+			namespace: testNamespace,
+			expectedActions: sets.NewString(
+				"POST=/api/v1/namespaces/"+testNamespace+"/configmaps",
+				"GET=/apis/"+sleeper_v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+sleeper_v1.SleeperResourcePlural+
+					"=limit=500&resourceVersion=0",
+				"GET=/apis/"+sleeper_v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+sleeper_v1.SleeperResourcePlural+
+					"=watch",
+				"POST=/apis/"+sleeper_v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+sleeper_v1.SleeperResourcePlural,
+			),
 			enableServiceCatalog: true,
 			testHandler: fakeActionHandler{
 				response: map[path]fakeResponse{
@@ -461,14 +501,71 @@ func TestController(t *testing.T) {
 										"name": "` + sb1 + `",
 										"uid": "` + sb1uid + `",
 										"blockOwnerDeletion": true
+									},
+									{
+										"apiVersion": "` + sleeper_v1.SleeperResourceGroupVersion + `",
+										"kind": "` + sleeper_v1.SleeperResourceKind + `",
+										"name": "` + sleeper1 + `",
+										"uid": "` + sleeper1uid + `",
+										"blockOwnerDeletion": true
 									}
 								] }
 							}`),
 					},
+					{
+						method: "GET",
+						path:   "/apis/" + sleeper_v1.SleeperResourceGroupVersion + "/namespaces/" + testNamespace + "/" + sleeper_v1.SleeperResourcePlural,
+					}: {
+						statusCode: http.StatusOK,
+						content:    []byte(`{"kind": "List", "items": []}`),
+					},
+					{
+						method: "GET",
+						path:   "/apis/" + sleeper_v1.SleeperResourceGroupVersion + "/namespaces/" + testNamespace + "/" + sleeper_v1.SleeperResourcePlural,
+						watch:  true,
+					}: {
+						statusCode: http.StatusOK,
+						content:    []byte(`{"type": "ADDED", "object": { "kind": "Sleeper" } }`),
+					},
+					{
+						method: "POST",
+						path:   "/apis/crd.atlassian.com/v1/namespaces/" + testNamespace + "/" + sleeper_v1.SleeperResourcePlural,
+					}: {
+						statusCode: http.StatusCreated,
+						content: []byte(`{
+							"apiVersion": "crd.atlassian.com/v1",
+							"kind": "Sleeper",
+							"metadata": {
+								"name": "` + sleeper1 + `",
+								"namespace": "` + testNamespace + `",
+								"uid": "` + sleeper1uid + `",
+								"labels": {
+									"` + smith.BundleNameLabel + `": "` + bundle1 + `"
+								},
+								"ownerReferences": [
+									{
+										"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
+										"kind": "` + smith_v1.BundleResourceKind + `",
+										"name": "` + bundle1 + `",
+										"uid": "` + bundle1uid + `",
+										"controller": true,
+										"blockOwnerDeletion": true
+									}
+								]
+							},
+							"spec": {
+								"sleepFor":0,
+								"wakeupMessage":""
+							},
+							"status": {
+								"state": "Awake!"
+							}
+						}`),
+					},
 				},
 			},
 			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
-				pluginConfigMapWithDeps: configMapWithDependenciesPlugin,
+				pluginConfigMapWithDeps: configMapWithDependenciesPlugin(true, true),
 			},
 			pluginsShouldBeInvoked: sets.NewString(pluginConfigMapWithDeps),
 		},
@@ -497,7 +594,7 @@ func TestController(t *testing.T) {
 				},
 			},
 			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
-				pluginConfigMapWithDeps: configMapWithDependenciesPlugin,
+				pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
 			},
 			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
 				prepare(ctx)
@@ -819,13 +916,7 @@ func (tc *testCase) run(t *testing.T) {
 		mainClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
 	if tc.bundle != nil {
-		for i, res := range tc.bundle.Spec.Resources {
-			if res.Spec.Object != nil {
-				resUnstr, err := util.RuntimeToUnstructured(scheme, res.Spec.Object)
-				require.NoError(t, err)
-				tc.bundle.Spec.Resources[i].Spec.Object = resUnstr
-			}
-		}
+		convertBundleResourcesToUnstrucutred(t, tc.bundle, tc.enableServiceCatalog)
 		tc.smithClientObjects = append(tc.smithClientObjects, tc.bundle)
 	}
 	bundleClient := smithFake.NewSimpleClientset(tc.smithClientObjects...)
@@ -967,12 +1058,12 @@ func (tc *testCase) defaultTest(t *testing.T, ctx context.Context, cntrlr *Bundl
 	key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 	require.NoError(t, err)
 	_, err = cntrlr.processKey(tc.logger, key)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func (tc *testCase) verifyActions(t *testing.T) {
 	actualActions := sets.NewString()
-	for _, actualAction := range tc.testHandler.actions {
+	for _, actualAction := range tc.testHandler.getActions() {
 		actualActions.Insert(actualAction.String())
 	}
 	missingActions := tc.expectedActions.Difference(actualActions)
@@ -990,8 +1081,8 @@ func (tc *testCase) verifyPlugins(t *testing.T) {
 	}
 	missingPlugins := tc.pluginsShouldBeInvoked.Difference(invokedPlugins)
 	unexpectedInvocations := invokedPlugins.Difference(tc.pluginsShouldBeInvoked)
-	assert.Empty(t, missingPlugins, "expected but was not observed")
-	assert.Empty(t, unexpectedInvocations, "observed but was not expected")
+	assert.Empty(t, missingPlugins, "expected plugin invocations that were not observed")
+	assert.Empty(t, unexpectedInvocations, "observed plugin invocations that were not expected")
 }
 
 // testServerAndClientConfig returns a server that listens and a config that can reference it
@@ -1049,6 +1140,14 @@ type fakeActionHandler struct {
 	actions []fakeAction
 }
 
+func (f *fakeActionHandler) getActions() []fakeAction {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	result := make([]fakeAction, len(f.actions))
+	copy(result, f.actions)
+	return result
+}
+
 // ServeHTTP logs the action that occurred and always returns the associated status code
 func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
 	f.lock.Lock()
@@ -1059,11 +1158,11 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	fakeResp, ok := f.response[key]
 	if !ok {
 		fakeResp = fakeResponse{
-			statusCode: http.StatusOK,
-			content:    []byte(`{"kind": "List", "items": []}`),
+			statusCode: http.StatusInternalServerError,
 		}
+	} else {
+		response.Header().Set("Content-Type", "application/json")
 	}
-	response.Header().Set("Content-Type", "application/json")
 	response.WriteHeader(fakeResp.statusCode)
 	response.Write(fakeResp.content)
 }
@@ -1079,20 +1178,44 @@ func SleeperCrdWithStatus() *apiext_v1b1.CustomResourceDefinition {
 	return crd
 }
 
+func convertBundleResourcesToUnstrucutred(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog bool) {
+	scheme, err := apitypes.FullScheme(serviceCatalog)
+	require.NoError(t, err)
+	// We only add Sleeper here temporarily, it must not be in the main scheme.
+	// This enables us to use typed Sleeper object in test definitions.
+	err = sleeper_v1.AddToScheme(scheme)
+	require.NoError(t, err)
+
+	// Convert all typed objects into unstructured ones
+	for i, res := range bundle.Spec.Resources {
+		if res.Spec.Object != nil {
+			resUnstr, err := util.RuntimeToUnstructured(scheme, res.Spec.Object)
+			require.NoError(t, err)
+			bundle.Spec.Resources[i].Spec.Object = resUnstr
+		}
+	}
+}
+
 type testingPlugin interface {
 	plugin.Plugin
 	WasInvoked() bool
 }
 
-func configMapWithDependenciesPlugin(t *testing.T) testingPlugin {
-	return &configMapWithDeps{
-		t: t,
+func configMapWithDependenciesPlugin(expectBinding, expectSleeper bool) func(t *testing.T) testingPlugin {
+	return func(t *testing.T) testingPlugin {
+		return &configMapWithDeps{
+			t:             t,
+			expectBinding: expectBinding,
+			expectSleeper: expectSleeper,
+		}
 	}
 }
 
 type configMapWithDeps struct {
-	t          *testing.T
-	wasInvoked bool
+	t             *testing.T
+	expectBinding bool
+	expectSleeper bool
+	wasInvoked    bool
 }
 
 func (p *configMapWithDeps) WasInvoked() bool {
@@ -1133,9 +1256,8 @@ func (p *configMapWithDeps) Process(pluginSpec map[string]interface{}, context *
 		assert.Nil(p.t, context.Actual)
 	}
 
-	assert.Len(p.t, context.Dependencies, 1)
 	bindingDep, ok := context.Dependencies[resSb1]
-	if assert.True(p.t, ok) {
+	if p.expectBinding && assert.True(p.t, ok) {
 		// Actual
 		if assert.IsType(p.t, &sc_v1b1.ServiceBinding{}, bindingDep.Actual) {
 			b := bindingDep.Actual.(*sc_v1b1.ServiceBinding)
@@ -1163,6 +1285,20 @@ func (p *configMapWithDeps) Process(pluginSpec map[string]interface{}, context *
 				assert.Equal(p.t, sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), inst.GroupVersionKind())
 			}
 		}
+	}
+	sleeperDep, ok := context.Dependencies[resSleeper1]
+	if p.expectSleeper && assert.True(p.t, ok) {
+		// Actual
+		if assert.IsType(p.t, &unstructured.Unstructured{}, sleeperDep.Actual) {
+			s := sleeperDep.Actual.(*unstructured.Unstructured)
+			assert.Equal(p.t, sleeper1, s.GetName())
+			assert.Equal(p.t, testNamespace, s.GetNamespace())
+			assert.Equal(p.t, sleeper_v1.SleeperGVK, s.GroupVersionKind())
+		}
+		// Outputs
+		assert.Empty(p.t, sleeperDep.Outputs)
+		// Aux
+		assert.Empty(p.t, sleeperDep.Auxiliary)
 	}
 
 	if !failed && p.t.Failed() { // one of the assertions failed and it was the first failure in the test

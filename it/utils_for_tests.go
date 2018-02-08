@@ -137,19 +137,7 @@ func TestSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClients
 }
 
 func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundle bool, test TestFunc, args ...interface{}) {
-	scheme, err := apitypes.FullScheme(serviceCatalog)
-	require.NoError(t, err)
-	err = sleeper_v1.AddToScheme(scheme)
-	require.NoError(t, err)
-
-	// Convert all typed objects into unstructured ones
-	for i, res := range bundle.Spec.Resources {
-		if res.Spec.Object != nil {
-			resUnstr, err := util.RuntimeToUnstructured(scheme, res.Spec.Object)
-			require.NoError(t, err)
-			bundle.Spec.Resources[i].Spec.Object = resUnstr
-		}
-	}
+	convertBundleResourcesToUnstrucutred(t, bundle, serviceCatalog)
 	config, clientset, bundleClient := TestSetup(t)
 
 	sc := smart.NewClient(config, clientset)
@@ -159,6 +147,9 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	logger, err := loggerConfig.Build()
 	require.NoError(t, err)
 	defer logger.Sync()
+
+	scheme, err := apitypes.FullScheme(serviceCatalog)
+	require.NoError(t, err)
 
 	cfg := &Config{
 		T:            t,
@@ -261,4 +252,22 @@ func (cfg *Config) AssertBundleTimeout(ctx context.Context, bundle *smith_v1.Bun
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return cfg.AssertBundle(ctxTimeout, bundle, resourceVersion...)
+}
+
+func convertBundleResourcesToUnstrucutred(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog bool) {
+	scheme, err := apitypes.FullScheme(serviceCatalog)
+	require.NoError(t, err)
+	// We only add Sleeper here temporarily, it must not be in the main scheme.
+	// This enables us to use typed Sleeper object in test definitions.
+	err = sleeper_v1.AddToScheme(scheme)
+	require.NoError(t, err)
+
+	// Convert all typed objects into unstructured ones
+	for i, res := range bundle.Spec.Resources {
+		if res.Spec.Object != nil {
+			resUnstr, err := util.RuntimeToUnstructured(scheme, res.Spec.Object)
+			require.NoError(t, err)
+			bundle.Spec.Resources[i].Spec.Object = resUnstr
+		}
+	}
 }
