@@ -357,17 +357,26 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtim
 func (st *resourceSyncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[smith_v1.ResourceName]plugin.Dependency, error) {
 	dependencies := make(map[smith_v1.ResourceName]plugin.Dependency, len(dependsOn))
 	for _, name := range dependsOn {
-		unstructuredActual := st.processedResources[name].actual
-		actual, err := st.scheme.ConvertToVersion(unstructuredActual, unstructuredActual.GroupVersionKind().GroupVersion())
-		if err != nil {
-			return nil, err
+		unstructuredActual := st.processedResources[name].actual.DeepCopy() // Pass a copy to the plugin to insulate from it
+		gvk := unstructuredActual.GroupVersionKind()
+		var actual runtime.Object
+		if st.scheme.Recognizes(gvk) {
+			// Convert to typed object if we recognize the type
+			var err error
+			actual, err = st.scheme.ConvertToVersion(unstructuredActual, gvk.GroupVersion())
+			if err != nil {
+				return nil, err
+			}
+			actual.GetObjectKind().SetGroupVersionKind(gvk)
+		} else {
+			actual = unstructuredActual
 		}
 		dependency := plugin.Dependency{
 			Actual: actual,
 		}
 		switch obj := actual.(type) {
 		case *sc_v1b1.ServiceBinding:
-			if err = st.prepareServiceBindingDependency(&dependency, obj); err != nil {
+			if err := st.prepareServiceBindingDependency(&dependency, obj); err != nil {
 				return nil, errors.Wrapf(err, "error processing ServiceBinding %q", obj.Name)
 			}
 		}

@@ -213,6 +213,7 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	sleeper1 := args[3].(*sleeper_v1.Sleeper)
 	sleeper2 := args[4].(*sleeper_v1.Sleeper)
 	bundle2 := args[5].(*smith_v1.Bundle)
+	convertBundleResourcesToUnstrucutred(t, bundle2, false)
 
 	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
 	secretClient := cfg.Clientset.CoreV1().Secrets(cfg.Namespace)

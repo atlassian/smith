@@ -50,6 +50,7 @@ func (sc *SpecCheck) applyDefaults(spec runtime.Object) (runtime.Object, error) 
 		return nil, errors.Wrap(err, "failed to convert to typed object")
 	}
 	sc.Scheme.Default(clone)
+	clone.GetObjectKind().SetGroupVersionKind(gvk)
 	return clone, nil
 }
 
