@@ -1160,7 +1160,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 		fakeResp = fakeResponse{
 			statusCode: http.StatusInternalServerError,
 		}
-	} else {
+	} else if len(fakeResp.content) != 0 {
 		response.Header().Set("Content-Type", "application/json")
 	}
 	response.WriteHeader(fakeResp.statusCode)
