@@ -42,7 +42,7 @@ func (sc *SpecCleaner) Cleanup(spec, actual *unstructured.Unstructured) (updated
 		if err != nil {
 			return nil, errors.Wrap(err, "object cleanup failed")
 		}
-		return util.RuntimeToUnstructured(sc.Scheme, updated)
+		return util.RuntimeToUnstructured(updated)
 	}
 
 	return spec, nil

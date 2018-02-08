@@ -1189,7 +1189,7 @@ func convertBundleResourcesToUnstrucutred(t *testing.T, bundle *smith_v1.Bundle,
 	// Convert all typed objects into unstructured ones
 	for i, res := range bundle.Spec.Resources {
 		if res.Spec.Object != nil {
-			resUnstr, err := util.RuntimeToUnstructured(scheme, res.Spec.Object)
+			resUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
 			require.NoError(t, err)
 			bundle.Spec.Resources[i].Spec.Object = resUnstr
 		}
