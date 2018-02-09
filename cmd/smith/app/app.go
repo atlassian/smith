@@ -10,6 +10,7 @@ import (
 	"time"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/catalog"
 	"github.com/atlassian/smith/pkg/cleanup"
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
 	"github.com/atlassian/smith/pkg/client"
@@ -117,6 +118,10 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	var catalogger *catalog.Catalog
+	if a.ServiceCatalogSupport {
+		catalogger = catalog.NewCatalog(scClient, a.ResyncPeriod)
+	}
 
 	// Ready Checker
 	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
@@ -187,6 +192,7 @@ func (a *App) Run(ctx context.Context) error {
 		Namespace:        a.Namespace,
 		PluginContainers: pluginContainers,
 		Scheme:           scheme,
+		Catalog:          catalogger,
 	}
 	cntrlr.Prepare(ctx, crdInf, resourceInfs)
 
@@ -198,12 +204,18 @@ func (a *App) Run(ctx context.Context) error {
 	defer stgr.Shutdown()
 	stage := stgr.NextStage()
 
-	infs := make([]cache.InformerSynced, 0, len(resourceInfs))
+	infs := make([]cache.InformerSynced, 0)
 	// Add all informers to Multi store and start them
 	for gvk, inf := range resourceInfs {
 		multiStore.AddInformer(gvk, inf)
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
 		infs = append(infs, inf.HasSynced)
+	}
+	if catalogger != nil {
+		for _, inf := range catalogger.InformersToRegister() {
+			stage.StartWithChannel(inf.Run)
+			infs = append(infs, inf.HasSynced)
+		}
 	}
 	a.Logger.Info("Waiting for informers to sync")
 	if !cache.WaitForCacheSync(ctx.Done(), infs...) {

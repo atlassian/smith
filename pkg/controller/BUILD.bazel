@@ -19,6 +19,7 @@ go_library(
     deps = [
         "//:go_default_library",
         "//pkg/apis/smith/v1:go_default_library",
+        "//pkg/catalog:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/smith/v1:go_default_library",
         "//pkg/plugin:go_default_library",
         "//pkg/resources:go_default_library",

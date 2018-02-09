@@ -6,6 +6,7 @@ import (
 	"time"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/catalog"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/util/logz"
@@ -53,6 +54,8 @@ type BundleController struct {
 
 	PluginContainers map[smith_v1.PluginName]plugin.PluginContainer
 	Scheme           *runtime.Scheme
+
+	Catalog *catalog.Catalog
 }
 
 // Prepare prepares the controller to be run.

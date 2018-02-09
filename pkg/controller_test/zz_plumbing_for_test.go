@@ -13,6 +13,7 @@ import (
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/catalog"
 	"github.com/atlassian/smith/pkg/cleanup"
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
 	"github.com/atlassian/smith/pkg/client"
@@ -123,6 +124,20 @@ const (
 
 	pluginSimpleConfigMap   = "simpleConfigMap"
 	pluginConfigMapWithDeps = "configMapWithDeps"
+
+	serviceClassName         = "uid-1"
+	serviceClassExternalName = "database"
+	servicePlanName          = "uid-2"
+	servicePlanExternalName  = "default"
+)
+
+var (
+	serviceInstanceSpec = sc_v1b1.ServiceInstanceSpec{
+		PlanReference: sc_v1b1.PlanReference{
+			ClusterServiceClassExternalName: serviceClassExternalName,
+			ClusterServicePlanExternalName:  servicePlanExternalName,
+		},
+	}
 )
 
 func (tc *testCase) run(t *testing.T) {
@@ -148,13 +163,49 @@ func (tc *testCase) run(t *testing.T) {
 		crdClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
 	var scClient scClientset.Interface
+	var catalogger *catalog.Catalog
 	if tc.enableServiceCatalog {
-		scClientFake := scFake.NewSimpleClientset(tc.scClientObjects...)
+		scClientFake := scFake.NewSimpleClientset(append(
+			tc.scClientObjects,
+			[]runtime.Object{
+				&sc_v1b1.ClusterServiceClass{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ClusterServiceClass",
+						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name: serviceClassName,
+					},
+					Spec: sc_v1b1.ClusterServiceClassSpec{
+						ExternalName: serviceClassExternalName,
+						ExternalID:   serviceClassName,
+					},
+				},
+				&sc_v1b1.ClusterServicePlan{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ClusterServicePlan",
+						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name: servicePlanName,
+					},
+					Spec: sc_v1b1.ClusterServicePlanSpec{
+						ClusterServiceClassRef: sc_v1b1.ClusterObjectReference{
+							Name: serviceClassName,
+						},
+						ExternalName: servicePlanExternalName,
+						ExternalID:   servicePlanName,
+					},
+				},
+			}...)...,
+		)
+
 		tc.scFake = &scClientFake.Fake
 		scClient = scClientFake
 		for _, reactor := range tc.scReactors {
 			scClientFake.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 		}
+		catalogger = catalog.NewCatalog(scClient, 0)
 	}
 
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, 0, cache.Indexers{})
@@ -247,6 +298,7 @@ func (tc *testCase) run(t *testing.T) {
 		Namespace:        tc.namespace,
 		PluginContainers: pluginContainers,
 		Scheme:           scheme,
+		Catalog:          catalogger,
 	}
 	prepare := func(ctx context.Context) {
 		cntrlr.Prepare(ctx, crdInf, resourceInfs)
@@ -259,6 +311,12 @@ func (tc *testCase) run(t *testing.T) {
 			multiStore.AddInformer(gvk, inf)
 			stage.StartWithChannel(inf.Run)
 			infs = append(infs, inf.HasSynced)
+		}
+		if catalogger != nil {
+			for _, inf := range catalogger.InformersToRegister() {
+				stage.StartWithChannel(inf.Run)
+				infs = append(infs, inf.HasSynced)
+			}
 		}
 		require.True(t, cache.WaitForCacheSync(ctx.Done(), infs...))
 	}
@@ -635,6 +693,7 @@ func serviceInstance(ready, inProgress, error bool) *sc_v1b1.ServiceInstance {
 			},
 		},
 		Status: status,
+		Spec:   serviceInstanceSpec,
 	}
 }
 

@@ -25,6 +25,7 @@ go_test(
         "//examples/sleeper:go_default_library",
         "//examples/sleeper/pkg/apis/sleeper/v1:go_default_library",
         "//pkg/apis/smith/v1:go_default_library",
+        "//pkg/catalog:go_default_library",
         "//pkg/cleanup:go_default_library",
         "//pkg/cleanup/types:go_default_library",
         "//pkg/client:go_default_library",

@@ -3,6 +3,7 @@ package controller
 import (
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/catalog"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/atlassian/smith/pkg/util/logz"
@@ -73,10 +74,21 @@ type resourceSyncTask struct {
 	processedResources map[smith_v1.ResourceName]*resourceInfo
 	pluginContainers   map[smith_v1.PluginName]plugin.PluginContainer
 	scheme             *runtime.Scheme
+	catalog            *catalog.Catalog
 }
 
 func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo {
 	st.logger.Debug("Processing resource")
+
+	// Do as much prevalidation of the spec as we can before dependencies are resolved.
+	// (e.g. plugin/service instance/service binding schemas)
+	if err := st.prevalidate(res); err != nil {
+		return resourceInfo{
+			status: resourceStatusError{
+				err: err,
+			},
+		}
+	}
 
 	// Check if all resource dependencies are ready (so we can start processing this one)
 	notReadyDependencies := st.checkAllDependenciesAreReady(res)
@@ -261,6 +273,39 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 		return nil, resourceStatusError{err: err}
 	}
 	return actual, nil
+}
+
+// prevalidate does as much validation as possible before doing any real work.
+func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
+	serviceInstanceGvk := sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance")
+	if res.Spec.Object != nil {
+		if res.Spec.Object.GetObjectKind().GroupVersionKind() == serviceInstanceGvk {
+			if st.catalog == nil {
+				// can't do anything, since service catalog wasn't enabled.
+				return nil
+			}
+			actual, err := st.scheme.ConvertToVersion(res.Spec.Object, serviceInstanceGvk.GroupVersion())
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			serviceInstance := actual.(*sc_v1b1.ServiceInstance)
+			servicePlan, err := st.catalog.GetPlanOf(&serviceInstance.Spec)
+			if err != nil {
+				return err
+			}
+
+			// TODO preprocess and actually validate
+			// performance implications of this may be horrifying...
+			_ = servicePlan.Spec.ServiceInstanceCreateParameterSchema
+		}
+		// TODO validate service binding parameters
+		return nil
+	} else if res.Spec.Plugin != nil {
+		// TODO validate plugin against schema
+		return nil
+	} else {
+		return nil
+	}
 }
 
 // evalSpec evaluates the resource specification and returns the result.
