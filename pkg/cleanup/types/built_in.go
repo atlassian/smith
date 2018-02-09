@@ -30,9 +30,9 @@ func deploymentCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstru
 		return nil, err
 	}
 
-	// TODO: implement cleanup
+	deployment.Spec.Template.Spec.DeprecatedServiceAccount = deployment.Spec.Template.Spec.ServiceAccountName
 
-	return &deploymentSpec, nil
+	return util.RuntimeToUnstructured(&deploymentSpec)
 }
 
 func serviceCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
