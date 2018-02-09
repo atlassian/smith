@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +37,7 @@ func (f fakeStore) Get(gvk schema.GroupVersionKind, namespace, name string) (obj
 	}
 	return v, ok, nil
 }
-func (f fakeStore) GetObjectsForBundle(namespace, bundleName string) ([]runtime.Object, error) {
+func (f fakeStore) ObjectsControlledBy(namespace string, uid types.UID) ([]runtime.Object, error) {
 	return nil, nil
 }
 func (f fakeStore) AddInformer(schema.GroupVersionKind, cache.SharedIndexInformer) {}

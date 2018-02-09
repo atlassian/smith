@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -21,7 +22,7 @@ type ReadyChecker interface {
 
 type Store interface {
 	smith.ByNameStore
-	GetObjectsForBundle(namespace, bundleName string) ([]runtime.Object, error)
+	ObjectsControlledBy(namespace string, uid types.UID) ([]runtime.Object, error)
 	AddInformer(schema.GroupVersionKind, cache.SharedIndexInformer)
 	RemoveInformer(schema.GroupVersionKind) bool
 }
