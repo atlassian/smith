@@ -104,7 +104,7 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 }
 
 func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error) {
-	objs, err := st.store.GetObjectsForBundle(st.bundle.Namespace, st.bundle.Name)
+	objs, err := st.store.ObjectsControlledBy(st.bundle.Namespace, st.bundle.UID)
 	if err != nil {
 		return false, err
 	}
@@ -113,13 +113,6 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 		m := obj.(meta_v1.Object)
 		if m.GetDeletionTimestamp() != nil {
 			// Object is marked for deletion already
-			continue
-		}
-		if !meta_v1.IsControlledBy(m, st.bundle) {
-			// Object is not owned by that bundle
-			st.logger.
-				With(logz.Gvk(obj.GetObjectKind().GroupVersionKind()), logz.Object(m)).
-				Sugar().Infof("Object is not owned by the Bundle with UID=%q. Owner references: %v", st.bundle.GetUID(), m.GetOwnerReferences())
 			continue
 		}
 		ref := objectRef{

@@ -133,7 +133,7 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceReady, smith_v1.ConditionFalse)
 	resCond := smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceError, smith_v1.ConditionTrue)
 	if resCond != nil {
-		assert.Equal(cfg.T, "object is not owned by the Bundle", resCond.Message)
+		assert.Equal(cfg.T, "object is not controlled by the Bundle and does not have a controller at all", resCond.Message)
 	}
 
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
@@ -141,7 +141,7 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceReady, smith_v1.ConditionFalse)
 	resCond = smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceError, smith_v1.ConditionTrue)
 	if resCond != nil {
-		assert.Equal(cfg.T, "object is not owned by the Bundle", resCond.Message)
+		assert.Equal(cfg.T, "object is not controlled by the Bundle and does not have a controller at all", resCond.Message)
 	}
 
 	// Delete conflicting ConfigMap

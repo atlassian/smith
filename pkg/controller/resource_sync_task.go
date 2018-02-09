@@ -231,11 +231,17 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 		}
 	}
 
-	// Check that this bundle owns the object
+	// Check that this bundle controls the object
 	if !meta_v1.IsControlledBy(actualMeta, st.bundle) {
-		return nil, resourceStatusError{
-			err: errors.New("object is not owned by the Bundle"),
+		ref := meta_v1.GetControllerOf(actualMeta)
+		var err error
+		if ref == nil {
+			err = errors.New("object is not controlled by the Bundle and does not have a controller at all")
+		} else {
+			err = errors.Errorf("object is controlled by apiVersion=%s, kind=%s, name=%s, uid=%s, not by the Bundle (uid=%s)",
+				ref.APIVersion, ref.Kind, ref.Name, ref.UID, st.bundle.UID)
 		}
+		return nil, resourceStatusError{err: err}
 	}
 	return actual, nil
 }

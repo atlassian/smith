@@ -132,14 +132,14 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceReady, smith_v1.ConditionFalse)
 	resCond := smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceError, smith_v1.ConditionTrue)
 	assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-	assert.Equal(t, "object is not owned by the Bundle", resCond.Message)
+	assert.Equal(t, "object is not controlled by the Bundle and does not have a controller at all", resCond.Message)
 
 	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
 	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
 	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceReady, smith_v1.ConditionFalse)
 	resCond = smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceError, smith_v1.ConditionTrue)
 	assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-	assert.Equal(t, "object is not owned by the Bundle", resCond.Message)
+	assert.Equal(t, "object is not controlled by the Bundle and does not have a controller at all", resCond.Message)
 
 	// Point ConfigMap controller reference to Bundle
 	trueVar := true
@@ -177,7 +177,7 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceReady, smith_v1.ConditionFalse)
 	resCond = smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceError, smith_v1.ConditionTrue)
 	assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-	assert.Equal(t, "object is not owned by the Bundle", resCond.Message)
+	assert.Equal(t, "object is not controlled by the Bundle and does not have a controller at all", resCond.Message)
 
 	// Point Sleeper controller reference to Bundle
 	for { // Retry loop to handle conflicts with Sleeper controller
