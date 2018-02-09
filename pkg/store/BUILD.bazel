@@ -10,7 +10,6 @@ go_library(
     importpath = "github.com/atlassian/smith/pkg/store",
     visibility = ["//visibility:public"],
     deps = [
-        "//:go_default_library",
         "//pkg/apis/smith/v1:go_default_library",
         "//pkg/plugin:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",

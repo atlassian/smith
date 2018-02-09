@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
@@ -49,7 +48,7 @@ type Config struct {
 	CreatedBundle *smith_v1.Bundle
 	Config        *rest.Config
 	Clientset     kubernetes.Interface
-	Sc            smith.SmartClient
+	Sc            *smart.DynamicClient
 	BundleClient  smithClientset.Interface
 	Scheme        *runtime.Scheme
 }

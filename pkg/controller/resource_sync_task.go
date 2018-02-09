@@ -66,7 +66,7 @@ func (ri *resourceInfo) fetchError() (bool, error) {
 
 type resourceSyncTask struct {
 	logger             *zap.Logger
-	smartClient        smith.SmartClient
+	smartClient        SmartClient
 	rc                 ReadyChecker
 	store              Store
 	specCheck          SpecCheck

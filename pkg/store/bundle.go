@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
@@ -19,13 +19,17 @@ const (
 	byObjectIndexName       = "ByObject"
 )
 
+type ByNameStore interface {
+	Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error)
+}
+
 type BundleStore struct {
-	store            smith.ByNameStore
+	store            ByNameStore
 	bundleByIndex    func(indexName, indexKey string) ([]interface{}, error)
 	pluginContainers map[smith_v1.PluginName]plugin.PluginContainer
 }
 
-func NewBundle(bundleInf cache.SharedIndexInformer, store smith.ByNameStore, pluginContainers map[smith_v1.PluginName]plugin.PluginContainer) (*BundleStore, error) {
+func NewBundle(bundleInf cache.SharedIndexInformer, store ByNameStore, pluginContainers map[smith_v1.PluginName]plugin.PluginContainer) (*BundleStore, error) {
 	bs := &BundleStore{
 		store:            store,
 		bundleByIndex:    bundleInf.GetIndexer().ByIndex,
