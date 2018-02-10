@@ -54,7 +54,7 @@ func (c *BundleController) processNextWorkItem() bool {
 
 	logger := c.Logger.With(logz.NamespaceName(namespace), logz.BundleName(name))
 
-	retriable, err := c.processKey(logger, k)
+	retriable, err := c.ProcessKey(logger, k)
 	c.handleErr(logger, retriable, err, k)
 
 	return true
@@ -75,7 +75,8 @@ func (c *BundleController) handleErr(logger *zap.Logger, retriable bool, err err
 	c.Queue.Forget(key)
 }
 
-func (c *BundleController) processKey(logger *zap.Logger, key string) (retriableRet bool, errRet error) {
+// ProcessKey is only visible for testing purposes. Should not be called directly.
+func (c *BundleController) ProcessKey(logger *zap.Logger, key string) (retriableRet bool, errRet error) {
 	startTime := time.Now()
 	logger.Info("Started syncing Bundle")
 	defer func() {

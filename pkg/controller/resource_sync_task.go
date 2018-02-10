@@ -457,7 +457,7 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 		return response, false, nil
 	}
 	if api_errors.IsAlreadyExists(err) {
-		// We let the next processKey() iteration, triggered by someone else creating the resource, to finish the work.
+		// We let the next ProcessKey() iteration, triggered by someone else creating the resource, to finish the work.
 		err = api_errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, spec.GetName(), err)
 		return nil, false, errors.Wrap(err, "object found, but not in Store yet (will re-process)")
 	}
@@ -481,7 +481,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	updated, err = resClient.Update(updated)
 	if err != nil {
 		if api_errors.IsConflict(err) {
-			// We let the next processKey() iteration, triggered by someone else updating the resource, finish the work.
+			// We let the next ProcessKey() iteration, triggered by someone else updating the resource, finish the work.
 			return nil, false, errors.Wrap(err, "object update resulted in conflict (will re-process)")
 		}
 		// Unexpected error, will retry
