@@ -40,7 +40,6 @@ const (
 	// Blocked condition reasons
 
 	ResourceReasonDependenciesNotReady = "DependenciesNotReady"
-	ResourceReasonOtherResourceError   = "OtherResourceError"
 
 	// Error condition reasons
 
