@@ -49,7 +49,7 @@ func RuntimeToUnstructured(obj runtime.Object) (*unstructured.Unstructured, erro
 	}
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj.DeepCopyObject())
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return &unstructured.Unstructured{
 		Object: u,

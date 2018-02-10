@@ -58,7 +58,6 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 
 	st.processedResources = make(map[smith_v1.ResourceName]*resourceInfo, len(st.bundle.Spec.Resources))
 
-	blockedOnError := false
 	// Visit vertices in sorted order
 	for _, resName := range sorted {
 		// Process the resource
@@ -75,7 +74,6 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 			processedResources: st.processedResources,
 			pluginContainers:   st.pluginContainers,
 			scheme:             st.scheme,
-			blockedOnError:     blockedOnError,
 		}
 		resInfo := rst.processResource(&res)
 		if retriable, err := resInfo.fetchError(); err != nil && api_errors.IsConflict(errors.Cause(err)) {
@@ -83,7 +81,6 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 			return retriable, err
 		}
 		_, resErr := resInfo.fetchError()
-		blockedOnError = blockedOnError || resErr != nil
 		if resErr != nil {
 			logger.Error("Done processing resource", zap.Bool("ready", resInfo.isReady()), zap.Error(resErr))
 		} else {
@@ -217,10 +214,6 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 				blockedCond.Status = smith_v1.ConditionTrue
 				blockedCond.Reason = smith_v1.ResourceReasonDependenciesNotReady
 				blockedCond.Message = fmt.Sprintf("Not ready: %q", resStatus.dependencies)
-			case resourceStatusBlockedByError:
-				blockedCond.Status = smith_v1.ConditionTrue
-				blockedCond.Reason = smith_v1.ResourceReasonOtherResourceError
-				blockedCond.Message = "Some other resource is in error state"
 			case resourceStatusInProgress:
 				inProgressCond.Status = smith_v1.ConditionTrue
 			case resourceStatusReady:

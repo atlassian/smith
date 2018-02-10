@@ -168,7 +168,7 @@ func TestController(t *testing.T) {
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
 				retriable, err := cntrlr.processKey(tc.logger, key)
-				require.EqualError(t, err, `bundle contains two resources with the same name "`+resP1+`"`)
+				assert.EqualError(t, err, `bundle contains two resources with the same name "`+resP1+`"`)
 				assert.False(t, retriable)
 
 				actions := tc.bundleFake.Actions()
@@ -217,7 +217,7 @@ func TestController(t *testing.T) {
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
 				retriable, err := cntrlr.processKey(tc.logger, key)
-				require.EqualError(t, err, `topological sort of resources failed: vertex "bla" not found`)
+				assert.EqualError(t, err, `topological sort of resources failed: vertex "bla" not found`)
 				assert.False(t, retriable)
 
 				actions := tc.bundleFake.Actions()
@@ -330,28 +330,7 @@ func TestController(t *testing.T) {
 					{
 						method: "PUT",
 						path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate,
-					}: {
-						statusCode: http.StatusOK,
-						content: []byte(`{
-							"apiVersion": "v1",
-							"kind": "ConfigMap",
-							"metadata": {
-								"name": "` + mapNeedsAnUpdate + `",
-								"namespace": "` + testNamespace + `",
-								"uid": "` + mapNeedsAnUpdateUid + `",
-								"labels": {
-									"` + smith.BundleNameLabel + `": "` + bundle1 + `"
-								},
-								"ownerReferences": [{
-									"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
-									"kind": "` + smith_v1.BundleResourceKind + `",
-									"name": "` + bundle1 + `",
-									"uid": "` + bundle1uid + `",
-									"controller": true,
-									"blockOwnerDeletion": true
-								}] }
-							}`),
-					},
+					}: configMapNeedsUpdateResponse(bundle1, bundle1uid),
 				},
 			},
 			plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
@@ -605,11 +584,120 @@ func TestController(t *testing.T) {
 				require.NoError(t, err)
 				retriable, err := cntrlr.processKey(tc.logger, key)
 				// Sadly, the actual error is not current propagated
-				require.EqualError(t, err, `error processing resource(s): ["`+resP1+`"]`)
+				assert.EqualError(t, err, `error processing resource(s): ["`+resP1+`"]`)
 				assert.False(t, retriable)
 			},
 		},
-		"no resource creates/updates/deletes done after error is encountered": &testCase{
+		"no blocked resources creates/updates/deletes done after error is encountered": &testCase{
+			mainClientObjects: []runtime.Object{
+				configMapNeedsDelete(),
+				configMapNeedsUpdate(),
+			},
+			scClientObjects: []runtime.Object{
+				serviceInstance(false, false, true),
+			},
+			bundle: &smith_v1.Bundle{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      bundle1,
+					Namespace: testNamespace,
+					UID:       bundle1uid,
+				},
+				Spec: smith_v1.BundleSpec{
+					Resources: []smith_v1.Resource{
+						{
+							Name: resSi1,
+							Spec: smith_v1.ResourceSpec{
+								Object: &sc_v1b1.ServiceInstance{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ServiceInstance",
+										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: si1,
+									},
+								},
+							},
+						},
+						{
+							Name:      resSb1,
+							DependsOn: []smith_v1.ResourceName{resSi1},
+							Spec: smith_v1.ResourceSpec{
+								Object: &sc_v1b1.ServiceBinding{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ServiceBinding",
+										APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: sb1,
+									},
+									Spec: sc_v1b1.ServiceBindingSpec{
+										ServiceInstanceRef: sc_v1b1.LocalObjectReference{
+											Name: si1,
+										},
+										SecretName: s1,
+									},
+								},
+							},
+						},
+						{
+							Name:      resMapNeedsAnUpdate,
+							DependsOn: []smith_v1.ResourceName{resSb1},
+							Spec: smith_v1.ResourceSpec{
+								Object: &core_v1.ConfigMap{
+									TypeMeta: meta_v1.TypeMeta{
+										Kind:       "ConfigMap",
+										APIVersion: core_v1.SchemeGroupVersion.String(),
+									},
+									ObjectMeta: meta_v1.ObjectMeta{
+										Name: mapNeedsAnUpdate,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			namespace:            testNamespace,
+			enableServiceCatalog: true,
+			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
+				prepare(ctx)
+				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
+				require.NoError(t, err)
+				retriable, err := cntrlr.processKey(tc.logger, key)
+				assert.EqualError(t, err, `error processing resource(s): ["`+resSi1+`"]`)
+				assert.False(t, retriable)
+				actions := tc.bundleFake.Actions()
+				require.Len(t, actions, 3)
+				bundleUpdate := actions[2].(kube_testing.UpdateAction)
+				assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
+				updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleReady, smith_v1.ConditionFalse)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleError, smith_v1.ConditionTrue)
+
+				smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceReady, smith_v1.ConditionFalse)
+				resCond := smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceError, smith_v1.ConditionTrue)
+				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+				assert.Equal(t, "readiness check failed: BlaBla: Oh no!", resCond.Message)
+
+				resCond = smith_testing.AssertResourceCondition(t, updateBundle, resSb1, smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
+				assert.Equal(t, smith_v1.ResourceReasonDependenciesNotReady, resCond.Reason)
+				assert.Equal(t, `Not ready: ["`+resSi1+`"]`, resCond.Message)
+				smith_testing.AssertResourceCondition(t, updateBundle, resSb1, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resSb1, smith_v1.ResourceReady, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resSb1, smith_v1.ResourceError, smith_v1.ConditionFalse)
+
+				resCond = smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
+				assert.Equal(t, smith_v1.ResourceReasonDependenciesNotReady, resCond.Reason)
+				assert.Equal(t, `Not ready: ["`+resSb1+`"]`, resCond.Message)
+				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceReady, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceError, smith_v1.ConditionFalse)
+			},
+		},
+		"resources are processed after non-blocking error is encountered": &testCase{
 			mainClientObjects: []runtime.Object{
 				configMapNeedsDelete(),
 				configMapNeedsUpdate(),
@@ -657,13 +745,22 @@ func TestController(t *testing.T) {
 				},
 			},
 			namespace:            testNamespace,
+			expectedActions:      sets.NewString("PUT=/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate),
 			enableServiceCatalog: true,
+			testHandler: fakeActionHandler{
+				response: map[path]fakeResponse{
+					{
+						method: "PUT",
+						path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate,
+					}: configMapNeedsUpdateResponse(bundle1, bundle1uid),
+				},
+			},
 			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
 				prepare(ctx)
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
 				retriable, err := cntrlr.processKey(tc.logger, key)
-				require.EqualError(t, err, `error processing resource(s): ["`+resSi1+`"]`)
+				assert.EqualError(t, err, `error processing resource(s): ["`+resSi1+`"]`)
 				assert.False(t, retriable)
 				actions := tc.bundleFake.Actions()
 				require.Len(t, actions, 3)
@@ -681,11 +778,9 @@ func TestController(t *testing.T) {
 				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
 				assert.Equal(t, "readiness check failed: BlaBla: Oh no!", resCond.Message)
 
-				resCond = smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
-				assert.Equal(t, smith_v1.ResourceReasonOtherResourceError, resCond.Reason)
-				assert.Equal(t, "Some other resource is in error state", resCond.Message)
+				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
 				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
-				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceReady, smith_v1.ConditionFalse)
+				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceReady, smith_v1.ConditionTrue)
 				smith_testing.AssertResourceCondition(t, updateBundle, resMapNeedsAnUpdate, smith_v1.ResourceError, smith_v1.ConditionFalse)
 			},
 		},
@@ -760,25 +855,7 @@ func TestController(t *testing.T) {
 					{
 						method: "PUT",
 						path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate,
-					}: {
-						statusCode: http.StatusOK,
-						content: []byte(`{
-							"apiVersion": "v1",
-							"kind": "ConfigMap",
-							"metadata": {
-								"name": "` + mapNeedsAnUpdate + `",
-								"namespace": "` + testNamespace + `",
-								"uid": "` + mapNeedsAnUpdateUid + `",
-								"ownerReferences": [{
-									"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
-									"kind": "` + smith_v1.BundleResourceKind + `",
-									"name": "` + bundle1 + `",
-									"uid": "` + bundle1uid + `",
-									"controller": true,
-									"blockOwnerDeletion": true
-								}] }
-							}`),
-					},
+					}: configMapNeedsUpdateResponse("invalidBundle", "invalidUid"),
 				},
 			},
 			test: func(t *testing.T, ctx context.Context, cntrlr *BundleController, tc *testCase, prepare func(ctx context.Context)) {
@@ -786,7 +863,7 @@ func TestController(t *testing.T) {
 				key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 				require.NoError(t, err)
 				retriable, err := cntrlr.processKey(tc.logger, key)
-				require.EqualError(t, err, `error processing resource(s): ["map-needs-update"]`)
+				assert.EqualError(t, err, `error processing resource(s): ["`+mapNeedsAnUpdate+`"]`)
 				assert.False(t, retriable)
 				actions := tc.bundleFake.Actions()
 				require.Len(t, actions, 3)
@@ -1655,6 +1732,32 @@ func configMapNeedsUpdate() *core_v1.ConfigMap {
 		},
 	}
 }
+
+func configMapNeedsUpdateResponse(bundleName, bundleUid string) fakeResponse {
+	return fakeResponse{
+		statusCode: http.StatusOK,
+		content: []byte(`{
+							"apiVersion": "v1",
+							"kind": "ConfigMap",
+							"metadata": {
+								"name": "` + mapNeedsAnUpdate + `",
+								"namespace": "` + testNamespace + `",
+								"uid": "` + mapNeedsAnUpdateUid + `",
+								"labels": {
+									"` + smith.BundleNameLabel + `": "` + bundleName + `"
+								},
+								"ownerReferences": [{
+									"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
+									"kind": "` + smith_v1.BundleResourceKind + `",
+									"name": "` + bundleName + `",
+									"uid": "` + bundleUid + `",
+									"controller": true,
+									"blockOwnerDeletion": true
+								}] }
+							}`),
+	}
+}
+
 func configMapNeedsDelete() *core_v1.ConfigMap {
 	tr := true
 	return &core_v1.ConfigMap{

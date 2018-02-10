@@ -29,10 +29,6 @@ type resourceStatusDependenciesNotReady struct {
 	dependencies []smith_v1.ResourceName
 }
 
-// resourceStatusBlockedByError means there was an error, shouldn't do any work.
-type resourceStatusBlockedByError struct {
-}
-
 // resourceStatusInProgress means resource is being processed by its controller.
 type resourceStatusInProgress struct {
 }
@@ -77,17 +73,19 @@ type resourceSyncTask struct {
 	processedResources map[smith_v1.ResourceName]*resourceInfo
 	pluginContainers   map[smith_v1.PluginName]plugin.PluginContainer
 	scheme             *runtime.Scheme
-	blockedOnError     bool
 }
 
 func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo {
 	st.logger.Debug("Processing resource")
 
 	// Check if all resource dependencies are ready (so we can start processing this one)
-	status := st.checkAllDependenciesAreReady(res)
-	if status != nil {
+	notReadyDependencies := st.checkAllDependenciesAreReady(res)
+	if len(notReadyDependencies) > 0 {
+		st.logger.Sugar().Infof("Dependencies required by resource but not ready: %q", notReadyDependencies)
 		return resourceInfo{
-			status: status,
+			status: resourceStatusDependenciesNotReady{
+				dependencies: notReadyDependencies,
+			},
 		}
 	}
 
@@ -106,13 +104,6 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 			status: resourceStatusError{
 				err: err,
 			},
-		}
-	}
-
-	// There was an error, shouldn't do any work
-	if st.blockedOnError {
-		return resourceInfo{
-			status: resourceStatusBlockedByError{},
 		}
 	}
 
@@ -210,20 +201,14 @@ func (st *resourceSyncTask) maybeExtractBindingSecret(obj *unstructured.Unstruct
 	return secret.(*core_v1.Secret), nil
 }
 
-func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource) resourceStatus {
+func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource) []smith_v1.ResourceName {
 	var notReadyDependencies []smith_v1.ResourceName
 	for _, dependency := range res.DependsOn {
 		if !st.processedResources[dependency].isReady() {
-			st.logger.Sugar().Infof("Dependency %q is required by resource but it's not ready", dependency)
 			notReadyDependencies = append(notReadyDependencies, dependency)
 		}
 	}
-	if len(notReadyDependencies) > 0 {
-		return resourceStatusDependenciesNotReady{
-			dependencies: notReadyDependencies,
-		}
-	}
-	return nil
+	return notReadyDependencies
 }
 
 func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Object, resourceStatus) {
@@ -292,7 +277,7 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 		res = res.DeepCopy() // Spec processor mutates in place
 		objectOrPluginSpec = res.Spec.Plugin.Spec
 	} else {
-		return nil, errors.New("invalid resource")
+		return nil, errors.New(`neither "object" nor "plugin" field is specified`)
 	}
 
 	// Process references
@@ -313,7 +298,7 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 			return nil, err
 		}
 	} else {
-		panic(errors.New("unreachable"))
+		return nil, errors.New(`neither "object" nor "plugin" field is specified`)
 	}
 
 	// Update label to point at the parent bundle
