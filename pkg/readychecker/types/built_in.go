@@ -9,18 +9,16 @@ import (
 	apps_v1b2 "k8s.io/api/apps/v1beta2"
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
-	settings_v1a1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
-	{Group: core_v1.GroupName, Kind: "ConfigMap"}:       alwaysReady,
-	{Group: core_v1.GroupName, Kind: "Secret"}:          alwaysReady,
-	{Group: core_v1.GroupName, Kind: "Service"}:         alwaysReady,
-	{Group: apps_v1b2.GroupName, Kind: "Deployment"}:    isDeploymentReady,
-	{Group: settings_v1a1.GroupName, Kind: "PodPreset"}: alwaysReady,
-	{Group: ext_v1b1.GroupName, Kind: "Ingress"}:        alwaysReady,
+	{Group: core_v1.GroupName, Kind: "ConfigMap"}:    alwaysReady,
+	{Group: core_v1.GroupName, Kind: "Secret"}:       alwaysReady,
+	{Group: core_v1.GroupName, Kind: "Service"}:      alwaysReady,
+	{Group: apps_v1b2.GroupName, Kind: "Deployment"}: isDeploymentReady,
+	{Group: ext_v1b1.GroupName, Kind: "Ingress"}:     alwaysReady,
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{

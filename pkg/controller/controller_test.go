@@ -957,7 +957,7 @@ func (tc *testCase) run(t *testing.T) {
 
 	bs, err := store.NewBundle(bundleInf, multiStore, nil)
 	require.NoError(t, err)
-	resourceInfs := apitypes.ResourceInformers(mainClient, scClient, meta_v1.NamespaceAll, 0, true)
+	resourceInfs := apitypes.ResourceInformers(mainClient, scClient, meta_v1.NamespaceAll, 0)
 
 	crdStore, err := store.NewCrd(crdInf)
 	require.NoError(t, err)

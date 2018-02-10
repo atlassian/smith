@@ -68,7 +68,6 @@ type App struct {
 	Namespace             string
 	Plugins               []plugin.NewFunc
 	Workers               int
-	PodPresetSupport      bool
 	ServiceCatalogSupport bool
 	LeaderElectionConfig  LeaderElectionConfig
 }
@@ -169,7 +168,7 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	}
 
-	resourceInfs := apitypes.ResourceInformers(clientset, scClient, a.Namespace, a.ResyncPeriod, a.PodPresetSupport)
+	resourceInfs := apitypes.ResourceInformers(clientset, scClient, a.Namespace, a.ResyncPeriod)
 
 	// Controller
 	cntrlr := controller.BundleController{
@@ -288,7 +287,6 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	a := App{}
 	zapConfig := zap.NewProductionConfig()
-	flagset.BoolVar(&a.PodPresetSupport, "pod-preset", false, "PodPreset support. Disabled by default.")
 	flagset.BoolVar(&a.ServiceCatalogSupport, "service-catalog", true, "Service Catalog support. Enabled by default.")
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
