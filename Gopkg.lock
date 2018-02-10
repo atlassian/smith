@@ -474,7 +474,6 @@
     "informers/core/v1",
     "informers/extensions/v1beta1",
     "informers/internalinterfaces",
-    "informers/settings/v1alpha1",
     "kubernetes",
     "kubernetes/fake",
     "kubernetes/scheme",
@@ -537,7 +536,6 @@
     "listers/apps/v1beta2",
     "listers/core/v1",
     "listers/extensions/v1beta1",
-    "listers/settings/v1alpha1",
     "pkg/version",
     "rest",
     "rest/watch",
@@ -607,6 +605,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "5048711b90b92b6a0df872e094340b338c7c02130582866b9498eb5f89bd8d55"
+  inputs-digest = "71c5db814b2463f0e2a77a63f92994f6c25861dcb0f98c71608e9d10eec1cd50"
   solver-name = "gps-cdcl"
   solver-version = 1

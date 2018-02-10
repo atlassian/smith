@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -292,6 +293,7 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
 	pprofAddr := flagset.String("pprof-address", "", "Address for pprof to listen on")
+	qps := flagset.Float64("api-qps", 5, "Maximum queries per second when talking to Kubernetes API")
 
 	// This flag is off by default only because leader election package says it is ALPHA API.
 	flagset.BoolVar(&a.LeaderElectionConfig.LeaderElect, "leader-elect", false, ""+
@@ -336,6 +338,7 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	}
 
 	config.UserAgent = "smith"
+	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(float32(*qps), int(*qps*1.5))
 	a.RestConfig = config
 
 	logger, err := zapConfig.Build()
