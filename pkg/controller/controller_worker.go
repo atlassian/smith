@@ -119,7 +119,17 @@ func (c *BundleController) loggerForObj(obj interface{}) *zap.Logger {
 	}
 	runtimeObj, ok := metaObj.(runtime.Object)
 	if ok {
-		gvk := runtimeObj.GetObjectKind().GroupVersionKind() // TODO does this work for typed objects?
+		gvk := runtimeObj.GetObjectKind().GroupVersionKind()
+		if gvk.Kind == "" || gvk.Version == "" {
+			gvks, _, err := c.Scheme.ObjectKinds(runtimeObj)
+			if err != nil {
+				if !runtime.IsNotRegisteredError(err) {
+					logger.With(zap.Error(err)).Sugar().Warnf("Cannot get object's GVK. Type %T", runtimeObj)
+				}
+				return logger
+			}
+			gvk = gvks[0]
+		}
 		logger = logger.With(logz.Gvk(gvk))
 	}
 	return logger
