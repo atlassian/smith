@@ -3,8 +3,8 @@ package controller
 import (
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/catalog"
 	"github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/atlassian/smith/pkg/util/logz"
 
@@ -74,7 +74,7 @@ type resourceSyncTask struct {
 	processedResources map[smith_v1.ResourceName]*resourceInfo
 	pluginContainers   map[smith_v1.PluginName]plugin.PluginContainer
 	scheme             *runtime.Scheme
-	catalog            *catalog.Catalog
+	catalog            *store.Catalog
 }
 
 func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo {
