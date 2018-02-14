@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"encoding/json"
+
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
@@ -82,6 +84,10 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 
 	// Do as much prevalidation of the spec as we can before dependencies are resolved.
 	// (e.g. plugin/service instance/service binding schemas)
+	// We may want to move this out of the resource processing entirely and do
+	// it before we start processing the bundle, both to fail faster and avoid
+	// some unnecessary schema validations (particularly if we want to cache
+	// entire bundle prevalidation results rather than specific validations).
 	if err := st.prevalidate(res); err != nil {
 		return resourceInfo{
 			status: resourceStatusError{
@@ -277,7 +283,10 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 
 // prevalidate does as much validation as possible before doing any real work.
 func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
+	sp := NewExamplesSpec(res.Name, res.DependsOn)
 	serviceInstanceGvk := sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance")
+	res = res.DeepCopy() // Spec processor mutates in place
+
 	if res.Spec.Object != nil {
 		if res.Spec.Object.GetObjectKind().GroupVersionKind() == serviceInstanceGvk {
 			if st.catalog == nil {
@@ -289,23 +298,66 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 				return errors.WithStack(err)
 			}
 			serviceInstance := actual.(*sc_v1b1.ServiceInstance)
-			servicePlan, err := st.catalog.GetPlanOf(&serviceInstance.Spec)
-			if err != nil {
-				return err
+
+			if len(serviceInstance.Spec.ParametersFrom) > 0 {
+				st.logger.Debug("Not validating against schema due to parametersFrom block")
+				return nil
 			}
 
-			// TODO preprocess and actually validate
-			// performance implications of this may be horrifying...
-			_ = servicePlan.Spec.ServiceInstanceCreateParameterSchema
+			if serviceInstance.Spec.Parameters != nil {
+				var parameters map[string]interface{}
+				if err := json.Unmarshal(serviceInstance.Spec.Parameters.Raw, &parameters); err != nil {
+					return errors.Wrap(err, "unable to unmarshal ServiceInstance resource parameters as object")
+				}
+
+				if err := sp.ProcessObject(parameters); err != nil {
+					if _, ok := errors.Cause(err).(*noExampleError); ok {
+						// a noExampleError occurs when an example wasn't provided
+						// by the user in one of the references. For now, we assume this
+						// is intentional and don't error out.
+						st.logger.Debug("Not validating against schema due to missing examples", zap.Error(err))
+						return nil
+					}
+					return err
+				}
+
+				serviceInstance.Spec.Parameters.Raw, err = json.Marshal(parameters)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+			}
+
+			err = st.catalog.ValidateServiceInstanceSpec(&serviceInstance.Spec)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 		// TODO validate service binding parameters
-		return nil
+		// (low priority, not currently used)
 	} else if res.Spec.Plugin != nil {
-		// TODO validate plugin against schema
-		return nil
-	} else {
-		return nil
+		if res.Spec.Plugin.Spec != nil {
+			if err := sp.ProcessObject(res.Spec.Plugin.Spec); err != nil {
+				if _, ok := errors.Cause(err).(*noExampleError); ok {
+					// a noExampleError occurs when an example wasn't provided
+					// by the user in one of the references. For now, we assume this
+					// is intentional and don't error out.
+					st.logger.Debug("Not validating against schema due to missing examples", zap.Error(err))
+					return nil
+				}
+				return err
+			}
+		}
+		pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
+		if !ok {
+			return errors.Errorf("plugin %q does not exist", res.Spec.Plugin.Name)
+		}
+		err := pluginContainer.ValidateSpec(res.Spec.Plugin.Spec)
+		if err != nil {
+			return errors.Wrapf(err, "invalid spec")
+		}
 	}
+
+	return nil
 }
 
 // evalSpec evaluates the resource specification and returns the result.

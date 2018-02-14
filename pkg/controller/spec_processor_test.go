@@ -23,49 +23,43 @@ func TestSpecProcessor(t *testing.T) {
 	}
 	obj := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"slice":      "str>{{res1#a.slice[?(@.label==\"label2\")].value}}<str",
-			"string":     "str>{{res1#a.string}}<str",
-			"intStr":     "str>{{res1#a.int}}<str",
-			"boolStr":    "str>{{res1#a.bool}}<str",
-			"float64Str": "str>{{res1#a.float64}}<str",
+			"slice":  "{{res1#a.slice[?(@.label==\"label2\")].value}}",
+			"string": "{{res1#a.string}}",
 
-			"int":     "{{{res1#a.int}}}",
-			"bool":    "{{{res1#a.bool}}}",
-			"float64": "{{{res1#a.float64}}}",
-			"object":  "{{{res1#a.object}}}",
+			"int":     "{{res1#a.int}}",
+			"bool":    "{{res1#a.bool}}",
+			"float64": "{{res1#a.float64}}",
+			"object":  "{{res1#a.object}}",
 
 			"slice1": []string{
-				"{{{res1#a.int}}}",
+				"{{res1#a.int}}",
 				"23",
-				"{{{res1#a.object}}}",
+				"{{res1#a.object}}",
 			},
 			"slice2": []interface{}{
 				map[string]interface{}{
-					"x": "{{{res1#a.int}}}",
+					"x": "{{res1#a.int}}",
 				},
-				"{{{res1#a.int}}}",
+				"{{res1#a.int}}",
 				23,
-				"{{{res1#a.object}}}",
+				"{{res1#a.object}}",
 			},
 			"slice3": [][]interface{}{
-				{"{{{res1#a.int}}}"},
+				{"{{res1#a.int}}"},
 				{23},
-				{"{{{res1#a.object}}}"},
+				{"{{res1#a.object}}"},
 			},
 			"slice4": []interface{}{
-				[]interface{}{"{{{res1#a.int}}}"},
+				[]interface{}{"{{res1#a.int}}"},
 				[]interface{}{23},
-				[]interface{}{"{{{res1#a.object}}}"},
+				[]interface{}{"{{res1#a.object}}"},
 			},
 		},
 	}
 	expected := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"slice":      "str>value2<str",
-			"string":     "str>string1<str",
-			"intStr":     "str>42<str",
-			"boolStr":    "str>true<str",
-			"float64Str": "str>1.1<str",
+			"slice":  "value2",
+			"string": "string1",
 
 			"int":     42,
 			"bool":    true,
@@ -129,7 +123,7 @@ func TestSpecProcessorBindSecret(t *testing.T) {
 	}
 	obj := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"int":    "{{{res1#a.int}}}",
+			"int":    "{{res1#a.int}}",
 			"secret": "{{resbinding:bindsecret#Data.password}}",
 		},
 	}
@@ -144,45 +138,48 @@ func TestSpecProcessorBindSecret(t *testing.T) {
 	assert.Equal(t, expected, obj)
 }
 
+func TestSpecProcessorExamples(t *testing.T) {
+	t.Parallel()
+	sp := NewExamplesSpec("abc", []smith_v1.ResourceName{"res1", "resbinding"})
+	obj := map[string]interface{}{
+		"ref": map[string]interface{}{
+			"int":    "{{res1#a.int#25}}",
+			"secret": "{{resbinding:bindsecret#Data.password#{\"x\":\"pass\"}}}",
+		},
+	}
+	expected := map[string]interface{}{
+		"ref": map[string]interface{}{
+			"int":    float64(25), // because JSON only believes in floats...
+			"secret": map[string]interface{}{"x": "pass"},
+		},
+	}
+
+	require.NoError(t, sp.ProcessObject(obj))
+	assert.Equal(t, expected, obj)
+}
+
 func TestSpecProcessorErrors(t *testing.T) {
 	t.Parallel()
 	inputs := []struct {
-		obj map[string]interface{}
-		err string
+		obj          map[string]interface{}
+		err          string
+		examplesOnly bool
 	}{
 		{
 			obj: map[string]interface{}{
-				"invalid": "{{{res1#something}}}",
+				"invalid": "{{res1#something}}",
 			},
 			err: `invalid reference at "invalid": failed to process JsonPath reference res1#something: JsonPath execute error: something is not found`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "{{{res1#a.string}}}",
-			},
-			err: `invalid reference at "invalid": cannot expand field res1#a.string of type string as naked reference`,
-		},
-		{
-			obj: map[string]interface{}{
-				"invalid": "{{{res1#a.string}}}b",
-			},
-			err: `invalid reference at "invalid": naked reference in the middle of a string`,
-		},
-		{
-			obj: map[string]interface{}{
-				"invalid": "a{{{res1#a.string}}}",
-			},
-			err: `invalid reference at "invalid": naked reference in the middle of a string`,
-		},
-		{
-			obj: map[string]interface{}{
-				"invalid": "{{{res2#a.string}}}",
+				"invalid": "{{res2#a.string}}",
 			},
 			err: `invalid reference at "invalid": object not found: res2#a.string`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "{{{res1}}}",
+				"invalid": "{{res1}}",
 			},
 			err: `invalid reference at "invalid": cannot include whole object: res1`,
 		},
@@ -200,27 +197,15 @@ func TestSpecProcessorErrors(t *testing.T) {
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "{{{self1#x.b}}}",
+				"invalid": "{{self1#x.b}}",
 			},
 			err: `invalid reference at "invalid": self references are not allowed: self1#x.b`,
 		},
 		{
 			obj: map[string]interface{}{
-				"invalid": "{{{resX#a.string}}}",
+				"invalid": "{{resX#a.string}}",
 			},
 			err: `invalid reference at "invalid": references can only point at direct dependencies: resX#a.string`,
-		},
-		{
-			obj: map[string]interface{}{
-				"invalid": "a{{resX#a.string}}b",
-			},
-			err: `invalid reference at "invalid": references can only point at direct dependencies: resX#a.string`,
-		},
-		{
-			obj: map[string]interface{}{
-				"invalid": []interface{}{"a{{resX#a.string}}b"},
-			},
-			err: `invalid reference at "invalid#[0]": references can only point at direct dependencies: resX#a.string`,
 		},
 		{
 			obj: map[string]interface{}{
@@ -240,6 +225,20 @@ func TestSpecProcessorErrors(t *testing.T) {
 			},
 			err: `invalid reference at "invalid": cannot expand non-UTF8 byte array field "resbinding:bindsecret#Data.nonutf8"`,
 		},
+		{
+			obj: map[string]interface{}{
+				"invalid": "{{resbinding:bindsecret#Data.nonutf8}}",
+			},
+			err:          `invalid reference at "invalid": no example value provided in selector "resbinding:bindsecret#Data.nonutf8"`,
+			examplesOnly: true,
+		},
+		{
+			obj: map[string]interface{}{
+				"invalid": "{{resX#a.string}}",
+			},
+			err:          `invalid reference at "invalid": references can only point at direct dependencies: resX#a.string`,
+			examplesOnly: true,
+		},
 	}
 	for i, input := range inputs {
 		input := input
@@ -251,7 +250,9 @@ func TestSpecProcessorErrors(t *testing.T) {
 				allowedResources: map[smith_v1.ResourceName]struct{}{
 					"res1":       {},
 					"resbinding": {},
+					"res2":       {},
 				},
+				examplesOnly: input.examplesOnly,
 			}
 			assert.EqualError(t, sp.ProcessObject(input.obj), input.err)
 		})

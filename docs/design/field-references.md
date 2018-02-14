@@ -4,11 +4,8 @@ Cross-object field references are a way for an object to get output field(s) of 
 (or multiple dependencies) injected into it as a field (or multiple fields). References to only direct
 dependencies are supported.
 
-Syntax `"{{dependency1#fieldName}}"` means that value of `fieldName` will be injected as a string instead
-of the placeholder. In this case value must be a string, boolean or number.
-
-Syntax `"{{{dependency1#fieldName}}}"` means that value of `fieldName` will be injected without quotes
-instead of the placeholder. In this case it can be of any type including objects.
+Syntax `"{{dependency1#fieldName}}"` means that value of `fieldName` will be injected instead
+of the placeholder. The existing type is maintained.
 
 The `fieldName` could be specified in JsonPath format (with `$.` prefix added by default), for example:
 `{{dependency1#status.conditions[?(@.type=="Ready")].status}}`
@@ -55,7 +52,7 @@ spec:
         kind: Sleeper
         metadata:
           name: sleeper3
-        spec: "{{{sleeper2#spec}}}"
+        spec: "{{sleeper2#spec}}"
 ```
 
 ## Referring to ServiceBinding outputs
@@ -88,6 +85,7 @@ spec:
           parameters:
             credentials:
               password: mypassword
+              host: http://google.com
 
   - name: a-binding
     dependsOn:
@@ -116,6 +114,65 @@ spec:
           clusterServiceClassExternalName: user-provided-service
           clusterServicePlanExternalName: default
           parameters:
-            x: y
+            important: true
+            host: "{{a-binding:bindsecret#host}}"
             password: "{{a-binding:bindsecret#password}}"
 ```
+
+**Warning: it is not currently safe to have a truly secret field
+passed this way (cf `a-binding:bindsecret#password`) unless it's inserted
+into a secret, as it will be exposed in the parameters of the created object.**
+To do the example above correctly, we could instead construct a new secret object
+in the appropriate form for a `ServiceInstance` `parametersFrom` secret reference.
+In future, this [should be automatic](https://github.com/atlassian/smith/issues/233).
+
+## Early validation
+
+Having references inside an object or plugin means that the final
+shape of the object will only be known once the dependencies have
+been evaluated. However, because we would like to fail as quickly
+as possible if the user has entered invalid parameters, 'example'
+values can be specified (as placeholders) so that ServiceInstance
+objects and plugins can be evaluated against their json schemas.
+
+Modifying part of the example from the previous section:
+
+```yaml
+  - name: b
+    dependsOn:
+    - a-binding
+    spec:
+      object:
+        metadata:
+          name: ups-instance-2
+        apiVersion: servicecatalog.k8s.io/v1beta1
+        kind: ServiceInstance
+        spec:
+          clusterServiceClassExternalName: user-provided-service
+          clusterServicePlanExternalName: default
+          parameters:
+            important: true
+            host: '{{a-binding:bindsecret#host#"http://example.com"}}'
+            password: '{{a-binding:bindsecret#password#"fakepassword"}}'
+```
+
+The difference here is that the `host` and `password` fields now have an additional
+`#`, following which there is a chunk of embedded JSON. This allows us
+to validate the parameters against the json schema exposed
+by the OSB catalog endpoint (and currently accessible via a field on
+Service Catalog's ClusterServicePlan resources). Therefore the above
+resource has the provisional `parameters` block for validation purposes
+of:
+
+```json
+{
+  "important": true,
+  "host": "http://example.com",
+  "password": "fakepassword",
+}
+```
+
+This means we can check that `important: true` is reasonable and that we are
+providing all required fields, though of course host/password themselves may
+change. However, if references are used and examples are not provided,
+this validation step is ignored.

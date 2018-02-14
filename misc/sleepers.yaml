@@ -32,4 +32,4 @@ spec:
       kind: Sleeper
       metadata:
         name: sleeper3
-      spec: "{{{sleeper2#spec}}}"
+      spec: "{{sleeper2#spec}}"

@@ -3,24 +3,46 @@
 package store
 
 import (
+	"fmt"
+	"strings"
+	"sync"
+
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
+	"github.com/xeipuuv/gojsonschema"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
 type planSchemaAction string
 type planSchemaKey string
-type planResourceVersionKey string
 
 const (
 	serviceClassExternalNameIndex        = "ServiceClassExternalNameIndex"
 	serviceClassAndPlanExternalNameIndex = "ServiceClassAndPlanExternalNameIndex"
+	instanceCreateAction                 = planSchemaAction("instanceCreate")
+	instanceUpdateAction                 = planSchemaAction("instanceUpdate")
+	bindingCreateAction                  = planSchemaAction("bindingCreate")
 )
+
+type schemaWithResourceVersion struct {
+	resourceVersion string
+	schema          *gojsonschema.Schema
+}
 
 // Catalog is a convenience interface to access OSB catalog information
 type Catalog struct {
 	serviceClassInfIndexer cache.Indexer
 	servicePlanInfIndexer  cache.Indexer
+
+	// schemas is a cache of schemas by plan/action, but NOT resourceVersion.
+	// However, we check ResourceVersion in the accessor to see if something is cached,
+	// which means we don't hold old ResourceVersions around (but instead
+	// replace them with an up-to-date version ASAP).
+	// Unlike other parts of smith, this is an on-demand cache, and processing is
+	// NOT currently triggered by addition/updates of plans.
+	schemas        map[planSchemaKey]schemaWithResourceVersion
+	schemasRWMutex sync.RWMutex
 }
 
 func NewCatalog(serviceClassInf cache.SharedIndexInformer, servicePlanInf cache.SharedIndexInformer) *Catalog {
@@ -40,6 +62,7 @@ func NewCatalog(serviceClassInf cache.SharedIndexInformer, servicePlanInf cache.
 	return &Catalog{
 		serviceClassInfIndexer: serviceClassInf.GetIndexer(),
 		servicePlanInfIndexer:  servicePlanInf.GetIndexer(),
+		schemas:                make(map[planSchemaKey]schemaWithResourceVersion),
 	}
 }
 
@@ -123,4 +146,114 @@ func (c *Catalog) GetPlanOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (*
 	default:
 		return nil, errors.Errorf("informer reported multiple instances for ClusterServicePlan %q", planKey)
 	}
+}
+
+func makePlanSchemaKey(plan *sc_v1b1.ClusterServicePlan, action planSchemaAction) planSchemaKey {
+	return planSchemaKey(fmt.Sprintf("%s/%s", plan.Name, action))
+}
+
+func (c *Catalog) getSchemaCache(plan *sc_v1b1.ClusterServicePlan, action planSchemaAction) (*gojsonschema.Schema, bool) {
+	key := makePlanSchemaKey(plan, action)
+
+	c.schemasRWMutex.RLock()
+	defer c.schemasRWMutex.RUnlock()
+	if schemaWithRv, ok := c.schemas[key]; ok && schemaWithRv.resourceVersion == plan.ResourceVersion {
+		return schemaWithRv.schema, true
+	} else {
+		// nil is a valid entry in the cache
+		return nil, false
+	}
+}
+
+func (c *Catalog) setSchemaCache(plan *sc_v1b1.ClusterServicePlan, action planSchemaAction, schema *gojsonschema.Schema) {
+	key := makePlanSchemaKey(plan, action)
+
+	c.schemasRWMutex.Lock()
+	defer c.schemasRWMutex.Unlock()
+	c.schemas[key] = schemaWithResourceVersion{plan.ResourceVersion, schema}
+}
+
+func (c *Catalog) getParsedSchema(plan *sc_v1b1.ClusterServicePlan, action planSchemaAction) (*gojsonschema.Schema, error) {
+	if schema, ok := c.getSchemaCache(plan, action); ok {
+		return schema, nil
+	}
+
+	var rawSchema *runtime.RawExtension
+	switch action {
+	case instanceCreateAction:
+		rawSchema = plan.Spec.ServiceInstanceCreateParameterSchema
+	case instanceUpdateAction:
+		rawSchema = plan.Spec.ServiceInstanceUpdateParameterSchema
+	case bindingCreateAction:
+		rawSchema = plan.Spec.ServiceBindingCreateParameterSchema
+	default:
+		return nil, errors.Errorf("plan action %q not understood", action)
+	}
+
+	var schema *gojsonschema.Schema
+	if rawSchema == nil {
+		schema = nil
+	} else {
+		var err error
+		schema, err = gojsonschema.NewSchema(gojsonschema.NewBytesLoader(rawSchema.Raw))
+		if err != nil {
+			return nil, errors.Wrapf(err,
+				"cannot parse json schema for plan %q on broker %q",
+				plan.Spec.ExternalName, plan.Spec.ClusterServiceBrokerName)
+		}
+	}
+
+	c.setSchemaCache(plan, action, schema)
+	return schema, nil
+}
+
+func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) error {
+	if len(serviceInstanceSpec.ParametersFrom) > 0 {
+		return errors.New("cannot validate ServiceInstanceSpec which has a ParametersFrom block (insufficient information)")
+	}
+
+	servicePlan, err := c.GetPlanOf(serviceInstanceSpec)
+	if err != nil {
+		return err
+	}
+
+	// We ignore the update schema here and assume it's equivalent to
+	// create (since kubernetes/service catalog can't properly distinguish
+	// them anyway as there are currently no true PATCH updates).
+	schema, err := c.getParsedSchema(servicePlan, instanceCreateAction)
+	if err != nil {
+		return err
+	}
+	if schema == nil {
+		// no schema to validate against anyway
+		return nil
+	}
+	var parameters []byte
+	if serviceInstanceSpec.Parameters != nil {
+		parameters = serviceInstanceSpec.Parameters.Raw
+	} else {
+		// I'm not entirely sure what request ServiceCatalog ends up making when
+		// no parameters at all are provided, but pretending it's an empty object
+		// here makes testing more straight-forward and means that leaving out
+		// parameters will give sane looking early validation failures...
+		parameters = []byte("{}")
+	}
+	validationResult, err := schema.Validate(gojsonschema.NewBytesLoader(parameters))
+	if err != nil {
+		return errors.Wrapf(err, "error validating osb resource parameters for %q", servicePlan.Spec.ExternalName)
+	}
+
+	if !validationResult.Valid() {
+		validationErrors := validationResult.Errors()
+		msgs := make([]string, 0, len(validationErrors))
+
+		for _, validationErr := range validationErrors {
+			msgs = append(msgs, validationErr.String())
+		}
+
+		return errors.Errorf("spec failed validation against schema: %s",
+			strings.Join(msgs, ", "))
+	}
+
+	return nil
 }
