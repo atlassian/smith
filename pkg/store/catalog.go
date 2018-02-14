@@ -1,16 +1,16 @@
 // Package catalog handles interacting with the OSB catalog endpoint
 // (i.e. informers/helpers for ClusterServiceClass and ClusterServicePlan)
-package catalog
+package store
 
 import (
-	"time"
-
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
-	clientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
-	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/tools/cache"
 )
+
+type planSchemaAction string
+type planSchemaKey string
+type planResourceVersionKey string
 
 const (
 	serviceClassExternalNameIndex        = "ServiceClassExternalNameIndex"
@@ -19,33 +19,32 @@ const (
 
 // Catalog is a convenience interface to access OSB catalog information
 type Catalog struct {
-	serviceClassInf cache.SharedIndexInformer
-	servicePlanInf  cache.SharedIndexInformer
+	serviceClassInfIndexer cache.Indexer
+	servicePlanInfIndexer  cache.Indexer
 }
 
-func NewCatalog(scClient clientset.Interface, resyncPeriod time.Duration) *Catalog {
+func NewCatalog(serviceClassInf cache.SharedIndexInformer, servicePlanInf cache.SharedIndexInformer) *Catalog {
+	serviceClassInf.AddIndexers(cache.Indexers{
+		serviceClassExternalNameIndex: func(obj interface{}) ([]string, error) {
+			serviceClass := obj.(*sc_v1b1.ClusterServiceClass)
+			return []string{serviceClass.Spec.ExternalName}, nil
+		},
+	})
+	servicePlanInf.AddIndexers(cache.Indexers{
+		serviceClassAndPlanExternalNameIndex: func(obj interface{}) ([]string, error) {
+			servicePlan := obj.(*sc_v1b1.ClusterServicePlan)
+			return []string{serviceClassAndPlanExternalNameIndexKey(servicePlan.Spec.ClusterServiceClassRef.Name, servicePlan.Spec.ExternalName)}, nil
+		},
+	})
+
 	return &Catalog{
-		serviceClassInf: sc_v1b1inf.NewClusterServiceClassInformer(scClient, resyncPeriod, cache.Indexers{
-			serviceClassExternalNameIndex: func(obj interface{}) ([]string, error) {
-				serviceClass := obj.(*sc_v1b1.ClusterServiceClass)
-				return []string{serviceClass.Spec.ExternalName}, nil
-			},
-		}),
-		servicePlanInf: sc_v1b1inf.NewClusterServicePlanInformer(scClient, resyncPeriod, cache.Indexers{
-			serviceClassAndPlanExternalNameIndex: func(obj interface{}) ([]string, error) {
-				servicePlan := obj.(*sc_v1b1.ClusterServicePlan)
-				return []string{serviceClassAndPlanExternalNameIndexKey(servicePlan.Spec.ClusterServiceClassRef.Name, servicePlan.Spec.ExternalName)}, nil
-			},
-		}),
+		serviceClassInfIndexer: serviceClassInf.GetIndexer(),
+		servicePlanInfIndexer:  servicePlanInf.GetIndexer(),
 	}
 }
 
 func serviceClassAndPlanExternalNameIndexKey(serviceClassName string, servicePlanExternalName string) string {
 	return serviceClassName + "/" + servicePlanExternalName
-}
-
-func (c *Catalog) InformersToRegister() []cache.SharedIndexInformer {
-	return []cache.SharedIndexInformer{c.servicePlanInf, c.serviceClassInf}
 }
 
 func (c *Catalog) GetClassOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (*sc_v1b1.ClusterServiceClass, error) {
@@ -58,7 +57,7 @@ func (c *Catalog) GetClassOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (
 	}
 
 	if serviceInstanceSpec.ClusterServiceClassName != "" {
-		item, exists, err := c.serviceClassInf.GetIndexer().GetByKey(serviceInstanceSpec.ClusterServiceClassName)
+		item, exists, err := c.serviceClassInfIndexer.GetByKey(serviceInstanceSpec.ClusterServiceClassName)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -68,7 +67,7 @@ func (c *Catalog) GetClassOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (
 		return item.(*sc_v1b1.ClusterServiceClass), nil
 	}
 
-	items, err := c.serviceClassInf.GetIndexer().ByIndex(serviceClassExternalNameIndex, serviceInstanceSpec.ClusterServiceClassExternalName)
+	items, err := c.serviceClassInfIndexer.ByIndex(serviceClassExternalNameIndex, serviceInstanceSpec.ClusterServiceClassExternalName)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -95,7 +94,7 @@ func (c *Catalog) GetPlanOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (*
 	}
 
 	if serviceInstanceSpec.ClusterServicePlanName != "" {
-		item, exists, err := c.servicePlanInf.GetIndexer().GetByKey(serviceInstanceSpec.ClusterServicePlanName)
+		item, exists, err := c.servicePlanInfIndexer.GetByKey(serviceInstanceSpec.ClusterServicePlanName)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -112,7 +111,7 @@ func (c *Catalog) GetPlanOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (*
 	}
 
 	planKey := serviceClassAndPlanExternalNameIndexKey(serviceClass.Name, serviceInstanceSpec.ClusterServicePlanExternalName)
-	items, err := c.servicePlanInf.GetIndexer().ByIndex(serviceClassAndPlanExternalNameIndex, planKey)
+	items, err := c.servicePlanInfIndexer.ByIndex(serviceClassAndPlanExternalNameIndex, planKey)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

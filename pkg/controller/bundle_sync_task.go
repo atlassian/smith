@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/catalog"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util/graph"
 	"github.com/atlassian/smith/pkg/util/logz"
 
@@ -31,7 +31,7 @@ type bundleSyncTask struct {
 	processedResources map[smith_v1.ResourceName]*resourceInfo
 	pluginContainers   map[smith_v1.PluginName]plugin.PluginContainer
 	scheme             *runtime.Scheme
-	catalog            *catalog.Catalog
+	catalog            *store.Catalog
 }
 
 // Parse bundle, build resource graph, traverse graph, assert each resource exists.
