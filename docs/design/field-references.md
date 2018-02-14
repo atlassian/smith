@@ -119,3 +119,52 @@ spec:
             x: y
             password: "{{a-binding:bindsecret#password}}"
 ```
+
+## Early validation
+
+Having references inside an object or plugin means that the final
+shape of the object will only be known once the dependencies have
+been evaluated. However, because we would like to fail as quickly
+as possible if the user has entered invalid parameters, 'default'
+values can be specified (as placeholders) so that ServiceInstance
+objects and plugins can be evaluated against their json schemas.
+
+Modifying part of the example from the previous section:
+
+```yaml
+  - name: b
+    dependsOn:
+    - a-binding
+    spec:
+      object:
+        metadata:
+          name: ups-instance-2
+        apiVersion: servicecatalog.k8s.io/v1beta1
+        kind: ServiceInstance
+        spec:
+          clusterServiceClassExternalName: user-provided-service
+          clusterServicePlanExternalName: default
+          parameters:
+            x: y
+            password: "{{a-binding:bindsecret#password#\"fakepassword\"}}"
+```
+
+The difference here is that the `password` field now has an additional
+`#`, following which there is a chunk of embedded JSON. This allows us
+to validate the parameters against the json schema exposed
+by the OSB catalog endpoint (and currently accessible via a field on
+Service Catalog's ClusterServicePlan resources). Therefore the above
+resource has the provisional `parameters` block for validation purposes
+of:
+
+```json
+{
+  "x": "y",
+  "password": "fakepassword",
+}
+```
+
+This helps us validate that `x: y` is reasonable and that we are
+providing all required fields, though of course password itself may
+change. However, if references are used and defaults are not provided,
+this validation step is ignored.

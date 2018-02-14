@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"encoding/json"
+
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
@@ -82,6 +84,9 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 
 	// Do as much prevalidation of the spec as we can before dependencies are resolved.
 	// (e.g. plugin/service instance/service binding schemas)
+	// We may want to move this out of the resource processing entirely and do
+	// it before we start processing the bundle, both to fail faster and to avoid
+	// many schema validations.
 	if err := st.prevalidate(res); err != nil {
 		return resourceInfo{
 			status: resourceStatusError{
@@ -277,7 +282,9 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 
 // prevalidate does as much validation as possible before doing any real work.
 func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
+	sp := NewDefaultsSpec(res.Name)
 	serviceInstanceGvk := sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance")
+
 	if res.Spec.Object != nil {
 		if res.Spec.Object.GetObjectKind().GroupVersionKind() == serviceInstanceGvk {
 			if st.catalog == nil {
@@ -289,23 +296,67 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 				return errors.WithStack(err)
 			}
 			serviceInstance := actual.(*sc_v1b1.ServiceInstance)
-			servicePlan, err := st.catalog.GetPlanOf(&serviceInstance.Spec)
-			if err != nil {
-				return err
+
+			if serviceInstance.Spec.ParametersFrom != nil && len(serviceInstance.Spec.ParametersFrom) > 0 {
+				st.logger.Debug("Not validating against schema due to parametersFrom block", zap.Error(err), zap.String("resourceName", string(res.Name)))
+				return nil
 			}
 
-			// TODO preprocess and actually validate
-			// performance implications of this may be horrifying...
-			_ = servicePlan.Spec.ServiceInstanceCreateParameterSchema
+			if serviceInstance.Spec.Parameters != nil {
+				var parameters map[string]interface{}
+				if err := json.Unmarshal(serviceInstance.Spec.Parameters.Raw, &parameters); err != nil {
+					return errors.Wrapf(err, "unable to unmarshal ServiceInstance resource %q parameters as object", res.Name)
+				}
+
+				if err := sp.ProcessObject(parameters); err != nil {
+					if _, ok := errors.Cause(err).(*noDefaultValueError); ok {
+						// a noDefaultValueError occurs when a default wasn't provided
+						// by the user in one of the references. For now, we assume this
+						// is intentional and don't error out.
+						st.logger.Debug("Not validating against schema due to missing defaults", zap.Error(err), zap.String("resourceName", string(res.Name)))
+						return nil
+					}
+					return err
+				}
+
+				serviceInstance.Spec.Parameters.Raw, err = json.Marshal(parameters)
+				if err != nil {
+					return errors.WithStack(err)
+				}
+			}
+
+			err = st.catalog.ValidateServiceInstanceSpec(&serviceInstance.Spec)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 		// TODO validate service binding parameters
-		return nil
+		// (low priority, not currently used)
 	} else if res.Spec.Plugin != nil {
-		// TODO validate plugin against schema
-		return nil
-	} else {
-		return nil
+		res = res.DeepCopy() // Spec processor mutates in place
+		if res.Spec.Plugin.Spec != nil {
+			if err := sp.ProcessObject(res.Spec.Plugin.Spec); err != nil {
+				if _, ok := errors.Cause(err).(*noDefaultValueError); ok {
+					// a noDefaultValueError occurs when a default wasn't provided
+					// by the user in one of the references. For now, we assume this
+					// is intentional and don't error out.
+					st.logger.Debug("Not validating against schema due to missing defaults", zap.Error(err), zap.String("resourceName", string(res.Name)))
+					return nil
+				}
+				return err
+			}
+		}
+		pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
+		if !ok {
+			return errors.Errorf("no such plugin %q", res.Spec.Plugin.Name)
+		}
+		err := pluginContainer.ValidateSpec(res.Spec.Plugin.Spec)
+		if err != nil {
+			return errors.Wrapf(err, "plugin %q has invalid spec", res.Spec.Plugin.Name)
+		}
 	}
+
+	return nil
 }
 
 // evalSpec evaluates the resource specification and returns the result.
