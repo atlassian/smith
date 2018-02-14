@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"encoding/json"
+
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/pkg/errors"
@@ -31,6 +33,16 @@ type SpecProcessor struct {
 	selfName         smith_v1.ResourceName
 	resources        map[smith_v1.ResourceName]*resourceInfo
 	allowedResources map[smith_v1.ResourceName]struct{}
+	defaultsOnly     bool
+}
+
+// errorString is a trivial implementation of error.
+type noDefaultValueError struct {
+	selector string
+}
+
+func (e *noDefaultValueError) Error() string {
+	return fmt.Sprintf("no default value provided in selector %q", e.selector)
 }
 
 func NewSpec(selfName smith_v1.ResourceName, resources map[smith_v1.ResourceName]*resourceInfo, allowedResources []smith_v1.ResourceName) *SpecProcessor {
@@ -42,6 +54,14 @@ func NewSpec(selfName smith_v1.ResourceName, resources map[smith_v1.ResourceName
 		selfName:         selfName,
 		resources:        resources,
 		allowedResources: ar,
+		defaultsOnly:     false,
+	}
+}
+
+func NewDefaultsSpec(selfName smith_v1.ResourceName) *SpecProcessor {
+	return &SpecProcessor{
+		selfName:     selfName,
+		defaultsOnly: true,
 	}
 }
 
@@ -125,6 +145,19 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	if objName == sp.selfName {
 		return nil, errors.Errorf("self references are not allowed: %s", selector)
 	}
+
+	if sp.defaultsOnly {
+		evalParts := strings.SplitN(parts[1], ResourceOutputSeparator, 2)
+		if len(evalParts) < 2 {
+			return nil, errors.WithStack(&noDefaultValueError{selector})
+		}
+		var defaultValue interface{}
+		if err := json.Unmarshal([]byte(evalParts[1]), &defaultValue); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		return defaultValue, nil
+	}
+
 	resInfo := sp.resources[objName]
 	if resInfo == nil {
 		return nil, errors.Errorf("object not found: %s", selector)
