@@ -76,6 +76,7 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 						},
 					},
 				},
+				Spec: serviceInstanceSpec,
 				Status: sc_v1b1.ServiceInstanceStatus{
 					Conditions: []sc_v1b1.ServiceInstanceCondition{
 						{
@@ -105,6 +106,7 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 								ObjectMeta: meta_v1.ObjectMeta{
 									Name: si1,
 								},
+								Spec: serviceInstanceSpec,
 							},
 						},
 					},
@@ -148,6 +150,7 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 										"Secret": "{{" + resSb1 + ":bindsecret#Data.mysecret}}",
 									},
 								},
+								Spec: serviceInstanceSpec,
 							},
 						},
 					},

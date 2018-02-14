@@ -31,6 +31,7 @@ import (
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	scFake "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake"
+	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -123,6 +124,20 @@ const (
 
 	pluginSimpleConfigMap   = "simpleConfigMap"
 	pluginConfigMapWithDeps = "configMapWithDeps"
+
+	serviceClassName         = "uid-1"
+	serviceClassExternalName = "database"
+	servicePlanName          = "uid-2"
+	servicePlanExternalName  = "default"
+)
+
+var (
+	serviceInstanceSpec = sc_v1b1.ServiceInstanceSpec{
+		PlanReference: sc_v1b1.PlanReference{
+			ClusterServiceClassExternalName: serviceClassExternalName,
+			ClusterServicePlanExternalName:  servicePlanExternalName,
+		},
+	}
 )
 
 func (tc *testCase) run(t *testing.T) {
@@ -147,14 +162,58 @@ func (tc *testCase) run(t *testing.T) {
 	for _, reactor := range tc.crdReactors {
 		crdClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
+
+	// Informers
+	var infs []cache.SharedIndexInformer
+
 	var scClient scClientset.Interface
+	var catalog *store.Catalog
 	if tc.enableServiceCatalog {
-		scClientFake := scFake.NewSimpleClientset(tc.scClientObjects...)
+		scClientFake := scFake.NewSimpleClientset(append(
+			tc.scClientObjects,
+			[]runtime.Object{
+				&sc_v1b1.ClusterServiceClass{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ClusterServiceClass",
+						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name: serviceClassName,
+					},
+					Spec: sc_v1b1.ClusterServiceClassSpec{
+						ExternalName: serviceClassExternalName,
+						ExternalID:   serviceClassName,
+					},
+				},
+				&sc_v1b1.ClusterServicePlan{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "ClusterServicePlan",
+						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name: servicePlanName,
+					},
+					Spec: sc_v1b1.ClusterServicePlanSpec{
+						ClusterServiceClassRef: sc_v1b1.ClusterObjectReference{
+							Name: serviceClassName,
+						},
+						ExternalName: servicePlanExternalName,
+						ExternalID:   servicePlanName,
+					},
+				},
+			}...)...,
+		)
+
 		tc.scFake = &scClientFake.Fake
 		scClient = scClientFake
 		for _, reactor := range tc.scReactors {
 			scClientFake.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 		}
+		serviceClassInf := sc_v1b1inf.NewClusterServiceClassInformer(scClient, 0, cache.Indexers{})
+		infs = append(infs, serviceClassInf)
+		servicePlanInf := sc_v1b1inf.NewClusterServicePlanInformer(scClient, 0, cache.Indexers{})
+		infs = append(infs, servicePlanInf)
+		catalog = store.NewCatalog(serviceClassInf, servicePlanInf)
 	}
 
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, 0, cache.Indexers{})
@@ -247,20 +306,28 @@ func (tc *testCase) run(t *testing.T) {
 		Namespace:        tc.namespace,
 		PluginContainers: pluginContainers,
 		Scheme:           scheme,
+		Catalog:          catalog,
 	}
 	prepare := func(ctx context.Context) {
 		cntrlr.Prepare(ctx, crdInf, resourceInfs)
 
 		resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
 		resourceInfs[smith_v1.BundleGVK] = bundleInf
-		infs := make([]cache.InformerSynced, 0, len(resourceInfs))
 		stage := stgr.NextStage()
+
+		// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
 		for gvk, inf := range resourceInfs {
 			multiStore.AddInformer(gvk, inf)
-			stage.StartWithChannel(inf.Run)
-			infs = append(infs, inf.HasSynced)
+			infs = append(infs, inf)
 		}
-		require.True(t, cache.WaitForCacheSync(ctx.Done(), infs...))
+
+		// Start all informers then wait on them
+		infCacheSyncs := make([]cache.InformerSynced, len(infs))
+		for i, inf := range infs {
+			stage.StartWithChannel(inf.Run) // Must be after AddInformer()
+			infCacheSyncs[i] = inf.HasSynced
+		}
+		require.True(t, cache.WaitForCacheSync(ctx.Done(), infCacheSyncs...))
 	}
 
 	defer tc.verifyActions(t)
@@ -635,6 +702,7 @@ func serviceInstance(ready, inProgress, error bool) *sc_v1b1.ServiceInstance {
 			},
 		},
 		Status: status,
+		Spec:   serviceInstanceSpec,
 	}
 }
 

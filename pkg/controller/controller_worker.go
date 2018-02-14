@@ -106,6 +106,7 @@ func (c *BundleController) ProcessKey(logger *zap.Logger, key string) (retriable
 		bundle:           bundleObj.(*smith_v1.Bundle).DeepCopy(), // Deep-copy otherwise we are mutating our cache.
 		pluginContainers: c.PluginContainers,
 		scheme:           c.Scheme,
+		catalog:          c.Catalog,
 	}
 	retriable, err := st.process()
 	return st.handleProcessResult(retriable, err)

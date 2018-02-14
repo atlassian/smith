@@ -25,6 +25,7 @@ import (
 
 	"github.com/ash2k/stager"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
@@ -111,11 +112,22 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// Informers
+	var infs []cache.SharedIndexInformer
+	// We don't add these to 'infs' because they're added later as part of
+	// resourceInfs processing.
 	bundleInf := client.BundleInformer(bundleClient.SmithV1(), a.Namespace, a.ResyncPeriod)
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, a.ResyncPeriod, cache.Indexers{})
 	crdStore, err := store.NewCrd(crdInf)
 	if err != nil {
 		return err
+	}
+	var catalog *store.Catalog
+	if a.ServiceCatalogSupport {
+		serviceClassInf := sc_v1b1inf.NewClusterServiceClassInformer(scClient, a.ResyncPeriod, cache.Indexers{})
+		infs = append(infs, serviceClassInf)
+		servicePlanInf := sc_v1b1inf.NewClusterServicePlanInformer(scClient, a.ResyncPeriod, cache.Indexers{})
+		infs = append(infs, servicePlanInf)
+		catalog = store.NewCatalog(serviceClassInf, servicePlanInf)
 	}
 
 	// Ready Checker
@@ -187,6 +199,7 @@ func (a *App) Run(ctx context.Context) error {
 		Namespace:        a.Namespace,
 		PluginContainers: pluginContainers,
 		Scheme:           scheme,
+		Catalog:          catalog,
 	}
 	cntrlr.Prepare(ctx, crdInf, resourceInfs)
 
@@ -198,15 +211,20 @@ func (a *App) Run(ctx context.Context) error {
 	defer stgr.Shutdown()
 	stage := stgr.NextStage()
 
-	infs := make([]cache.InformerSynced, 0, len(resourceInfs))
-	// Add all informers to Multi store and start them
+	// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
 	for gvk, inf := range resourceInfs {
 		multiStore.AddInformer(gvk, inf)
+		infs = append(infs, inf)
+	}
+
+	// Start all informers then wait on them
+	infCacheSyncs := make([]cache.InformerSynced, len(infs))
+	for i, inf := range infs {
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
-		infs = append(infs, inf.HasSynced)
+		infCacheSyncs[i] = inf.HasSynced
 	}
 	a.Logger.Info("Waiting for informers to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), infs...) {
+	if !cache.WaitForCacheSync(ctx.Done(), infCacheSyncs...) {
 		return ctx.Err()
 	}
 

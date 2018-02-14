@@ -8,6 +8,7 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util/logz"
 
 	"github.com/ash2k/stager/wait"
@@ -53,6 +54,8 @@ type BundleController struct {
 
 	PluginContainers map[smith_v1.PluginName]plugin.PluginContainer
 	Scheme           *runtime.Scheme
+
+	Catalog *store.Catalog
 }
 
 // Prepare prepares the controller to be run.

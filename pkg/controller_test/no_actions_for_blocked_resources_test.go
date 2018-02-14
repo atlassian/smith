@@ -48,6 +48,7 @@ func TestNoActionsForBlockedResources(t *testing.T) {
 								ObjectMeta: meta_v1.ObjectMeta{
 									Name: si1,
 								},
+								Spec: serviceInstanceSpec,
 							},
 						},
 					},
