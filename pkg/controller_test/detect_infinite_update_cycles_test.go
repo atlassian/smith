@@ -8,6 +8,7 @@ import (
 	"github.com/atlassian/smith/pkg/controller"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 
+	"github.com/atlassian/smith/pkg/controller/gc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
@@ -27,9 +28,10 @@ func TestDetectInfiniteUpdateCycles(t *testing.T) {
 		},
 		bundle: &smith_v1.Bundle{
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name:      bundle1,
-				Namespace: testNamespace,
-				UID:       bundle1uid,
+				Name:       bundle1,
+				Namespace:  testNamespace,
+				UID:        bundle1uid,
+				Finalizers: []string{gc.FinalizerDeleteResources},
 			},
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{

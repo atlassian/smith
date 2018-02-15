@@ -5,6 +5,7 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
+	"github.com/atlassian/smith/pkg/controller/gc"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,9 +23,10 @@ func TestNoDeletionsWhileInProgress(t *testing.T) {
 		},
 		bundle: &smith_v1.Bundle{
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name:      bundle1,
-				Namespace: testNamespace,
-				UID:       bundle1uid,
+				Name:       bundle1,
+				Namespace:  testNamespace,
+				UID:        bundle1uid,
+				Finalizers: []string{gc.FinalizerDeleteResources},
 			},
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{
