@@ -385,6 +385,8 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 	if st.newFinalizers != nil {
 		finalizersUpdated = true
 		st.bundle.Finalizers = st.newFinalizers
+		// clear the status
+		st.bundle.Status = smith_v1.BundleStatus{}
 	}
 
 	if statusUpdated || finalizersUpdated {

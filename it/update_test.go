@@ -292,7 +292,7 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	cfg.Logger.Sugar().Info("EmptyBundle after: %#v", string(bundleJsonAfter))
 
 	// TODO: debug checking if we just need to wait more
-	time.Sleep(5 * time.Second)
+	//time.Sleep(5 * time.Second)
 
 	cfMap, err = cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	isOrWillBeDeleted(t, cfMap, err)
