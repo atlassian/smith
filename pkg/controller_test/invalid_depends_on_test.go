@@ -8,7 +8,6 @@ import (
 	"github.com/atlassian/smith/pkg/controller"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 
-	"github.com/atlassian/smith/pkg/controller/gc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +24,7 @@ func TestInvalidDependsOn(t *testing.T) {
 				Name:       bundle1,
 				Namespace:  testNamespace,
 				UID:        bundle1uid,
-				Finalizers: []string{gc.FinalizerDeleteResources},
+				Finalizers: []string{controller.FinalizerDeleteResources},
 			},
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{

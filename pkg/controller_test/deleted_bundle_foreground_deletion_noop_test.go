@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-
 	"github.com/atlassian/smith/pkg/controller"
+
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -6,8 +6,8 @@ import (
 
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/controller"
 
-	"github.com/atlassian/smith/pkg/controller/gc"
 	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,7 +47,7 @@ func TestSecretKeysNotMerged(t *testing.T) {
 				Name:       bundle1,
 				Namespace:  testNamespace,
 				UID:        bundle1uid,
-				Finalizers: []string{gc.FinalizerDeleteResources},
+				Finalizers: []string{controller.FinalizerDeleteResources},
 			},
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{
