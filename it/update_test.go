@@ -275,11 +275,11 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	emptyBundle.ResourceVersion = bundleRes2.ResourceVersion
 
 	// TODO: remove debug
+	// TODO: this Bundle doesn't contain finalizer (hence accidentally erases it?)
+	// Should we read bundle and wait until finalizer is there before updating it?
 	bundleJsonBefore, err := json.Marshal(&emptyBundle)
 	assert.NoError(t, err)
 	cfg.Logger.Sugar().Info("EmptyBundle before: %#v", string(bundleJsonBefore))
-
-	assert.Nil(t, &emptyBundle)
 
 	res, err = cfg.BundleClient.SmithV1().Bundles(cfg.Namespace).Update(&emptyBundle)
 	require.NoError(t, err)
