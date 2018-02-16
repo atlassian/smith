@@ -10,7 +10,7 @@ const (
 	FinalizerDeleteResources string = smith.Domain + "/deleteResources"
 )
 
-func hasFinalizer(accessor meta_v1.Object, finalizer string) bool {
+func HasFinalizer(accessor meta_v1.Object, finalizer string) bool {
 	finalizers := accessor.GetFinalizers()
 	for _, f := range finalizers {
 		if f == finalizer {
@@ -21,7 +21,7 @@ func hasFinalizer(accessor meta_v1.Object, finalizer string) bool {
 }
 
 func hasDeleteResourcesFinalizer(accessor meta_v1.Object) bool {
-	return hasFinalizer(accessor, FinalizerDeleteResources)
+	return HasFinalizer(accessor, FinalizerDeleteResources)
 }
 
 func addDeleteResourcesFinalizerToObject(accessor meta_v1.Object) {
