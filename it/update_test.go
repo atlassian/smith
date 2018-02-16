@@ -10,6 +10,7 @@ import (
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
+	"encoding/json"
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -295,9 +296,13 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 
 func isOrWillBeDeleted(t *testing.T, obj runtime.Object, err error) {
 	if err == nil {
-		assert.NotNil(t, obj.(meta_v1.Object).GetDeletionTimestamp()) // Still in api but marked for deletion
+		jsonBytes, err := json.Marshal(obj)
+		assert.NoError(t, err)
+		// Still in api but marked for deletion
+		assert.NotNil(t, obj.(meta_v1.Object).GetDeletionTimestamp(), "Object is not marked with DeletionTimestamp: \n%#v", string(jsonBytes))
 	} else {
-		assert.True(t, api_errors.IsNotFound(err)) // Has been removed from api already
+		// Has been removed from api already
+		assert.True(t, api_errors.IsNotFound(err))
 	}
 }
 
