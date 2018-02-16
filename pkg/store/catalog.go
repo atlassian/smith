@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"sync"
+
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/xeipuuv/gojsonschema"
@@ -15,7 +17,6 @@ import (
 
 type planSchemaAction string
 type planSchemaKey string
-type planResourceVersionKey string
 
 const (
 	serviceClassExternalNameIndex        = "ServiceClassExternalNameIndex"
@@ -25,14 +26,24 @@ const (
 	bindingCreateAction                  = planSchemaAction("bindingCreate")
 )
 
+type schemaWithResourceVersion struct {
+	resourceVersion string
+	schema          *gojsonschema.Schema
+}
+
 // Catalog is a convenience interface to access OSB catalog information
 type Catalog struct {
 	serviceClassInfIndexer cache.Indexer
 	servicePlanInfIndexer  cache.Indexer
-	schemas                map[planSchemaKey]*gojsonschema.Schema
-	// map of plans without resource versions to the current resource version
-	// so we can remove old resource versions.
-	currentPlanResourceVersions map[planResourceVersionKey]string
+
+	// schemas is a cache of schemas by plan/action, but NOT resourceVersion.
+	// However, we check ResourceVersion in the accessor to see if something is cached,
+	// which means we don't hold old ResourceVersions around (but instead
+	// replace them with an up-to-date version ASAP).
+	// Unlike other parts of smith, this is an on-demand cache, and processing is
+	// NOT currently triggered by addition/updates of plans.
+	schemas        map[planSchemaKey]schemaWithResourceVersion
+	schemasRWMutex sync.RWMutex
 }
 
 func NewCatalog(serviceClassInf cache.SharedIndexInformer, servicePlanInf cache.SharedIndexInformer) *Catalog {
@@ -50,10 +61,9 @@ func NewCatalog(serviceClassInf cache.SharedIndexInformer, servicePlanInf cache.
 	})
 
 	return &Catalog{
-		serviceClassInfIndexer:      serviceClassInf.GetIndexer(),
-		servicePlanInfIndexer:       servicePlanInf.GetIndexer(),
-		schemas:                     make(map[planSchemaKey]*gojsonschema.Schema),
-		currentPlanResourceVersions: make(map[planResourceVersionKey]string),
+		serviceClassInfIndexer: serviceClassInf.GetIndexer(),
+		servicePlanInfIndexer:  servicePlanInf.GetIndexer(),
+		schemas:                make(map[planSchemaKey]schemaWithResourceVersion),
 	}
 }
 
@@ -140,24 +150,33 @@ func (c *Catalog) GetPlanOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (*
 }
 
 func makePlanSchemaKey(plan *sc_v1b1.ClusterServicePlan, action planSchemaAction) planSchemaKey {
-	return planSchemaKey(fmt.Sprintf("%s/%s/%s", plan.Name, action, plan.ResourceVersion))
+	return planSchemaKey(fmt.Sprintf("%s/%s/%s", plan.Name, action))
 }
 
-func makePlanResourceVersionKey(plan *sc_v1b1.ClusterServicePlan, action planSchemaAction) planResourceVersionKey {
-	return planResourceVersionKey(fmt.Sprintf("%s/%s/%s", plan.Name, action))
+func (c *Catalog) getSchemaCache(plan *sc_v1b1.ClusterServicePlan, action planSchemaAction) (*gojsonschema.Schema, bool) {
+	key := makePlanSchemaKey(plan, action)
+
+	c.schemasRWMutex.RLock()
+	defer c.schemasRWMutex.RUnlock()
+	if schemaWithRv, ok := c.schemas[key]; ok && schemaWithRv.resourceVersion == plan.ResourceVersion {
+		return schemaWithRv.schema, true
+	} else {
+		// nil is a valid entry in the cache
+		return nil, false
+	}
+}
+
+func (c *Catalog) setSchemaCache(plan *sc_v1b1.ClusterServicePlan, action planSchemaAction, schema *gojsonschema.Schema) {
+	key := makePlanSchemaKey(plan, action)
+
+	c.schemasRWMutex.Lock()
+	defer c.schemasRWMutex.Unlock()
+	c.schemas[key] = schemaWithResourceVersion{plan.ResourceVersion, schema}
 }
 
 func (c *Catalog) getParsedSchema(plan *sc_v1b1.ClusterServicePlan, action planSchemaAction) (*gojsonschema.Schema, error) {
-	key := makePlanSchemaKey(plan, action)
-	if schema, ok := c.schemas[key]; ok {
+	if schema, ok := c.getSchemaCache(plan, action); ok {
 		return schema, nil
-	}
-
-	if resourceVersion, ok := c.currentPlanResourceVersions[makePlanResourceVersionKey(plan, action)]; ok {
-		// Looks like we have an old one in the cache. Let's remove it to avoid growing indefinitely.
-		fakePlan := plan.DeepCopy()
-		fakePlan.ResourceVersion = resourceVersion
-		delete(c.schemas, makePlanSchemaKey(fakePlan, action))
 	}
 
 	var rawSchema *runtime.RawExtension
@@ -180,18 +199,17 @@ func (c *Catalog) getParsedSchema(plan *sc_v1b1.ClusterServicePlan, action planS
 		schema, err = gojsonschema.NewSchema(gojsonschema.NewBytesLoader(rawSchema.Raw))
 		if err != nil {
 			return nil, errors.Wrapf(err,
-				"cannot parse json schema for plan %s on broker %s",
+				"cannot parse json schema for plan %q on broker %q",
 				plan.Spec.ExternalName, plan.Spec.ClusterServiceBrokerName)
 		}
 	}
 
-	c.currentPlanResourceVersions[makePlanResourceVersionKey(plan, action)] = plan.ResourceVersion
-	c.schemas[key] = schema
+	c.setSchemaCache(plan, action, schema)
 	return schema, nil
 }
 
 func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) error {
-	if serviceInstanceSpec.ParametersFrom != nil && len(serviceInstanceSpec.ParametersFrom) > 0 {
+	if len(serviceInstanceSpec.ParametersFrom) > 0 {
 		return errors.New("cannot validate ServiceInstanceSpec which has a ParametersFrom block (insufficient information)")
 	}
 
@@ -200,9 +218,9 @@ func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.Servi
 		return err
 	}
 
-	// We ignore the update schema here, and assume it's equivalent to
+	// We ignore the update schema here and assume it's equivalent to
 	// create (since kubernetes/service catalog can't properly distinguish
-	// them anyway).
+	// them anyway as there are currently no true PATCH updates).
 	schema, err := c.getParsedSchema(servicePlan, instanceCreateAction)
 	if err != nil {
 		return err

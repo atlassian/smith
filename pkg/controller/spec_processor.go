@@ -36,7 +36,8 @@ type SpecProcessor struct {
 	defaultsOnly     bool
 }
 
-// errorString is a trivial implementation of error.
+// noDefaultValueError occurs when we try to process the spec according to defaults,
+// but at least one of references doesn't specify a default.
 type noDefaultValueError struct {
 	selector string
 }
@@ -46,23 +47,28 @@ func (e *noDefaultValueError) Error() string {
 }
 
 func NewSpec(selfName smith_v1.ResourceName, resources map[smith_v1.ResourceName]*resourceInfo, allowedResources []smith_v1.ResourceName) *SpecProcessor {
-	ar := make(map[smith_v1.ResourceName]struct{}, len(allowedResources))
-	for _, allowedResource := range allowedResources {
-		ar[allowedResource] = struct{}{}
-	}
 	return &SpecProcessor{
 		selfName:         selfName,
 		resources:        resources,
-		allowedResources: ar,
+		allowedResources: convertResourceNamesToMap(allowedResources),
 		defaultsOnly:     false,
 	}
 }
 
-func NewDefaultsSpec(selfName smith_v1.ResourceName) *SpecProcessor {
+func NewDefaultsSpec(selfName smith_v1.ResourceName, allowedResources []smith_v1.ResourceName) *SpecProcessor {
 	return &SpecProcessor{
-		selfName:     selfName,
-		defaultsOnly: true,
+		selfName:         selfName,
+		allowedResources: convertResourceNamesToMap(allowedResources),
+		defaultsOnly:     true,
 	}
+}
+
+func convertResourceNamesToMap(resources []smith_v1.ResourceName) map[smith_v1.ResourceName]struct{} {
+	ar := make(map[smith_v1.ResourceName]struct{}, len(resources))
+	for _, allowedResource := range resources {
+		ar[allowedResource] = struct{}{}
+	}
+	return ar
 }
 
 func (sp *SpecProcessor) ProcessObject(obj map[string]interface{}, path ...string) error {
@@ -132,7 +138,7 @@ func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{
 }
 
 func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (interface{}, error) {
-	parts := strings.SplitN(selector, ReferenceSeparator, 2)
+	parts := strings.SplitN(selector, ReferenceSeparator, 3)
 	if len(parts) < 2 {
 		return nil, errors.Errorf("cannot include whole object: %s", selector)
 	}
@@ -146,13 +152,16 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 		return nil, errors.Errorf("self references are not allowed: %s", selector)
 	}
 
+	if _, allowed := sp.allowedResources[objName]; !allowed {
+		return nil, errors.Errorf("references can only point at direct dependencies: %s", selector)
+	}
+
 	if sp.defaultsOnly {
-		evalParts := strings.SplitN(parts[1], ResourceOutputSeparator, 2)
-		if len(evalParts) < 2 {
+		if len(parts) < 3 {
 			return nil, errors.WithStack(&noDefaultValueError{selector})
 		}
 		var defaultValue interface{}
-		if err := json.Unmarshal([]byte(evalParts[1]), &defaultValue); err != nil {
+		if err := json.Unmarshal([]byte(parts[2]), &defaultValue); err != nil {
 			return nil, errors.WithStack(err)
 		}
 		return defaultValue, nil
@@ -161,9 +170,6 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	resInfo := sp.resources[objName]
 	if resInfo == nil {
 		return nil, errors.Errorf("object not found: %s", selector)
-	}
-	if _, allowed := sp.allowedResources[objName]; !allowed {
-		return nil, errors.Errorf("references can only point at direct dependencies: %s", selector)
 	}
 
 	var objToTraverse interface{}

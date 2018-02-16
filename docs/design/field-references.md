@@ -88,6 +88,7 @@ spec:
           parameters:
             credentials:
               password: mypassword
+              host: http://google.com
 
   - name: a-binding
     dependsOn:
@@ -116,9 +117,17 @@ spec:
           clusterServiceClassExternalName: user-provided-service
           clusterServicePlanExternalName: default
           parameters:
-            x: y
+            important: true
+            host: "{{a-binding:bindsecret#host}}"
             password: "{{a-binding:bindsecret#password}}"
 ```
+
+**Warning: it is not currently safe to have a truly secret field
+passed this way (cf `a-binding:bindsecret#password`) unless it's inserted
+into a secret, as it will be exposed in the parameters of the created object.**
+To do the example above correctly, we could instead construct a new secret object
+in the appropriate form for a `ServiceInstance` `parametersFrom` secret reference.
+In future, this [should be automatic](https://github.com/atlassian/smith/issues/233).
 
 ## Early validation
 
@@ -145,11 +154,12 @@ Modifying part of the example from the previous section:
           clusterServiceClassExternalName: user-provided-service
           clusterServicePlanExternalName: default
           parameters:
-            x: y
+            important: true
+            host: "{{a-binding:bindsecret#host#\"http://example.com\"}}"
             password: "{{a-binding:bindsecret#password#\"fakepassword\"}}"
 ```
 
-The difference here is that the `password` field now has an additional
+The difference here is that the `host` and `password` fields now have an additional
 `#`, following which there is a chunk of embedded JSON. This allows us
 to validate the parameters against the json schema exposed
 by the OSB catalog endpoint (and currently accessible via a field on
@@ -159,12 +169,13 @@ of:
 
 ```json
 {
-  "x": "y",
+  "important": true,
+  "host": "http://example.com",
   "password": "fakepassword",
 }
 ```
 
-This helps us validate that `x: y` is reasonable and that we are
-providing all required fields, though of course password itself may
+This allows us to validate that `important: true` is reasonable and that we are
+providing all required fields, though of course host/password themselves may
 change. However, if references are used and defaults are not provided,
 this validation step is ignored.
