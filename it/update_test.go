@@ -10,7 +10,6 @@ import (
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 
-	"encoding/json"
 	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -273,26 +272,10 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	emptyBundle := *cfg.Bundle
 	emptyBundle.Spec.Resources = []smith_v1.Resource{}
 	emptyBundle.ResourceVersion = bundleRes2.ResourceVersion
-
-	// TODO: remove debug
-	// TODO: this Bundle doesn't contain finalizer (hence accidentally erases it?)
-	// Should we read bundle and wait until finalizer is there before updating it?
-	bundleJsonBefore, err := json.Marshal(&emptyBundle)
-	assert.NoError(t, err)
-	cfg.Logger.Sugar().Info("EmptyBundle before: %#v", string(bundleJsonBefore))
-
 	res, err = cfg.BundleClient.SmithV1().Bundles(cfg.Namespace).Update(&emptyBundle)
 	require.NoError(t, err)
 
-	updatedEmptyBundle := cfg.AssertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
-
-	// TODO: remove debug
-	bundleJsonAfter, err := json.Marshal(&updatedEmptyBundle)
-	assert.NoError(t, err)
-	cfg.Logger.Sugar().Info("EmptyBundle after: %#v", string(bundleJsonAfter))
-
-	// TODO: debug checking if we just need to wait more
-	//time.Sleep(5 * time.Second)
+	cfg.AssertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
 
 	cfMap, err = cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	isOrWillBeDeleted(t, cfMap, err)
@@ -312,13 +295,9 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 
 func isOrWillBeDeleted(t *testing.T, obj runtime.Object, err error) {
 	if err == nil {
-		jsonBytes, err := json.Marshal(obj)
-		assert.NoError(t, err)
-		// Still in api but marked for deletion
-		assert.NotNil(t, obj.(meta_v1.Object).GetDeletionTimestamp(), "Object is not marked with DeletionTimestamp: \n%#v", string(jsonBytes))
+		assert.NotNil(t, obj.(meta_v1.Object).GetDeletionTimestamp()) // Still in api but marked for deletion
 	} else {
-		// Has been removed from api already
-		assert.True(t, api_errors.IsNotFound(err))
+		assert.True(t, api_errors.IsNotFound(err)) // Has been removed from api already
 	}
 }
 

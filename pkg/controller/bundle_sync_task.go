@@ -281,8 +281,23 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		return false, processErr
 	}
 
-	statusUpdated := false
-	if st.bundle.DeletionTimestamp == nil {
+	bundleUpdated := false
+
+	if st.newFinalizers != nil {
+		// Update finalizers
+		st.bundle.Finalizers = st.newFinalizers
+		// Set status to "InProgress: True"
+		// (there will be one more iteration for resource sync)
+		// TODO: add more details to the status (reason, resources status)?
+		st.bundle.Status = smith_v1.BundleStatus{
+			Conditions: []smith_v1.BundleCondition{
+				{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionTrue},
+				{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse},
+				{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse},
+			},
+		}
+		bundleUpdated = true
+	} else if st.bundle.DeletionTimestamp == nil {
 		// Construct resource conditions and check if there were any resource errors
 		resourceStatuses := make([]smith_v1.ResourceStatus, 0, len(st.processedResources))
 		var failedResources []smith_v1.ResourceName
@@ -332,10 +347,10 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 				readyCond.Status = smith_v1.ConditionUnknown
 				errorCond.Status = smith_v1.ConditionUnknown
 			}
-			statusUpdated = updateResourceCondition(st.bundle, res.Name, &blockedCond) || statusUpdated
-			statusUpdated = updateResourceCondition(st.bundle, res.Name, &inProgressCond) || statusUpdated
-			statusUpdated = updateResourceCondition(st.bundle, res.Name, &readyCond) || statusUpdated
-			statusUpdated = updateResourceCondition(st.bundle, res.Name, &errorCond) || statusUpdated
+			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &blockedCond) || bundleUpdated
+			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &inProgressCond) || bundleUpdated
+			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &readyCond) || bundleUpdated
+			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &errorCond) || bundleUpdated
 			resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
 				Name:       res.Name,
 				Conditions: []smith_v1.ResourceCondition{blockedCond, inProgressCond, readyCond, errorCond},
@@ -369,27 +384,18 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 			}
 		}
 
-		statusUpdated = updateBundleCondition(st.bundle, &inProgressCond) || statusUpdated
-		statusUpdated = updateBundleCondition(st.bundle, &readyCond) || statusUpdated
-		statusUpdated = updateBundleCondition(st.bundle, &errorCond) || statusUpdated
+		bundleUpdated = updateBundleCondition(st.bundle, &inProgressCond) || bundleUpdated
+		bundleUpdated = updateBundleCondition(st.bundle, &readyCond) || bundleUpdated
+		bundleUpdated = updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
 
 		// Update the bundle status
-		if statusUpdated {
+		if bundleUpdated {
 			st.bundle.Status.ResourceStatuses = resourceStatuses
 			st.bundle.Status.Conditions = []smith_v1.BundleCondition{inProgressCond, readyCond, errorCond}
 		}
 	}
 
-	// Update finalizers
-	finalizersUpdated := false
-	if st.newFinalizers != nil {
-		finalizersUpdated = true
-		st.bundle.Finalizers = st.newFinalizers
-		// clear the status
-		st.bundle.Status = smith_v1.BundleStatus{}
-	}
-
-	if statusUpdated || finalizersUpdated {
+	if bundleUpdated {
 		ex := st.updateBundle()
 		if processErr == nil {
 			processErr = ex
