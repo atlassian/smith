@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+
 	"github.com/atlassian/smith/pkg/controller"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -73,7 +74,7 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 			},
 		},
 		namespace:            testNamespace,
-		enableServiceCatalog: true,
+		enableServiceCatalog: false,
 		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase, prepare func(ctx context.Context)) {
 			prepare(ctx)
 			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
@@ -83,10 +84,8 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 
 			actions := tc.bundleFake.Actions()
 			require.Len(t, actions, 2)
-			_, ok := actions[0].(kube_testing.ListAction)
-			assert.True(t, ok)
-			_, ok = actions[1].(kube_testing.WatchAction)
-			assert.True(t, ok)
+			assert.Implements(t, (*kube_testing.ListAction)(nil), actions[0])
+			assert.Implements(t, (*kube_testing.WatchAction)(nil), actions[1])
 		},
 	}
 	tc.run(t)
