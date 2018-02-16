@@ -273,10 +273,23 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	emptyBundle := *cfg.Bundle
 	emptyBundle.Spec.Resources = []smith_v1.Resource{}
 	emptyBundle.ResourceVersion = bundleRes2.ResourceVersion
+
+	// TODO: remove debug
+	bundleJsonBefore, err := json.Marshal(&emptyBundle)
+	assert.NoError(t, err)
+	cfg.Logger.Sugar().Info("EmptyBundle before: %#v", string(bundleJsonBefore))
+
+	assert.Nil(t, &emptyBundle)
+
 	res, err = cfg.BundleClient.SmithV1().Bundles(cfg.Namespace).Update(&emptyBundle)
 	require.NoError(t, err)
 
-	cfg.AssertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
+	updatedEmptyBundle := cfg.AssertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
+
+	// TODO: remove debug
+	bundleJsonAfter, err := json.Marshal(&updatedEmptyBundle)
+	assert.NoError(t, err)
+	cfg.Logger.Sugar().Info("EmptyBundle after: %#v", string(bundleJsonAfter))
 
 	cfMap, err = cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	isOrWillBeDeleted(t, cfMap, err)
