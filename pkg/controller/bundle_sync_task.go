@@ -409,9 +409,6 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 	}
 
 	if statusUpdated || finalizersUpdated {
-		bytes, _ := json.Marshal(st.bundle)
-		j := string(bytes)
-		st.logger.Info(j)
 		ex := st.updateBundle()
 		if processErr == nil {
 			processErr = ex
