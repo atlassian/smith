@@ -6,6 +6,7 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
+	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +38,7 @@ func TestKeepFinalizerWhenResourceDeletionFails(t *testing.T) {
 				UID:               bundle1uid,
 				DeletionTimestamp: &now,
 				// Finalizer to enforce manual deletion
-				Finalizers:        []string{controller.FinalizerDeleteResources},
+				Finalizers: []string{controller.FinalizerDeleteResources},
 			},
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{
@@ -89,9 +90,20 @@ func TestKeepFinalizerWhenResourceDeletionFails(t *testing.T) {
 			assert.EqualError(t, err, `an error on the server ("unknown") has prevented the request from succeeding (delete configmaps `+mapNeedsDelete+`)`)
 
 			actions := tc.bundleFake.Actions()
-			require.Len(t, actions, 2)
+			require.Len(t, actions, 3)
 			assert.Implements(t, (*kube_testing.ListAction)(nil), actions[0])
 			assert.Implements(t, (*kube_testing.WatchAction)(nil), actions[1])
+
+			bundleUpdate := actions[2].(kube_testing.UpdateAction)
+			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
+			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
+			// Make sure that the "deleteResources" finalizer is still present
+			assert.True(t, controller.HasFinalizer(updateBundle, controller.FinalizerDeleteResources))
+
+			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleReady, smith_v1.ConditionFalse)
+			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleError, smith_v1.ConditionFalse)
+			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleBlocked, smith_v1.ConditionTrue)
 		},
 	}
 	tc.run(t)

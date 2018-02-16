@@ -283,10 +283,6 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 	}
 
 	statusUpdated := false
-	// TODO: We might want to update the status even if bundle is marked for
-	// deletion (e.g. report which resources have been deleted and which block
-	// the deletion of the bundle), but currently it will generate useless "Unknown"
-	// status for each resource
 	if st.bundle.DeletionTimestamp == nil {
 		// Construct resource conditions and check if there were any resource errors
 		resourceStatuses := make([]smith_v1.ResourceStatus, 0, len(st.processedResources))
@@ -356,6 +352,7 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		inProgressCond := smith_v1.BundleCondition{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionFalse}
 		readyCond := smith_v1.BundleCondition{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse}
 		errorCond := smith_v1.BundleCondition{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse}
+
 		if processErr == nil {
 			if st.isBundleReady() {
 				readyCond.Status = smith_v1.ConditionTrue
@@ -381,6 +378,26 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		if statusUpdated {
 			st.bundle.Status.ResourceStatuses = resourceStatuses
 			st.bundle.Status.Conditions = []smith_v1.BundleCondition{inProgressCond, readyCond, errorCond}
+		}
+	} else {
+		// Bundle conditions
+		inProgressCond := smith_v1.BundleCondition{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionFalse}
+		readyCond := smith_v1.BundleCondition{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse}
+		errorCond := smith_v1.BundleCondition{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse}
+
+		// Set the blocked condition on the bundle
+		blockedCond := smith_v1.BundleCondition{Type: smith_v1.BundleBlocked, Status: smith_v1.ConditionTrue}
+		blockedCond.Status = smith_v1.ConditionTrue
+		blockedCond.Reason = smith_v1.ResourceReasonDeleteInProgress
+
+		statusUpdated = updateBundleCondition(st.bundle, &inProgressCond) || statusUpdated
+		statusUpdated = updateBundleCondition(st.bundle, &readyCond) || statusUpdated
+		statusUpdated = updateBundleCondition(st.bundle, &errorCond) || statusUpdated
+		statusUpdated = updateBundleCondition(st.bundle, &blockedCond) || statusUpdated
+
+		// Update the bundle status
+		if statusUpdated {
+			st.bundle.Status.Conditions = []smith_v1.BundleCondition{inProgressCond, readyCond, errorCond, blockedCond}
 		}
 	}
 
