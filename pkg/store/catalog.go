@@ -233,7 +233,11 @@ func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.Servi
 	if serviceInstanceSpec.Parameters != nil {
 		parameters = serviceInstanceSpec.Parameters.Raw
 	} else {
-		parameters = []byte{}
+		// I'm not entirely sure what request ServiceCatalog ends up making when
+		// no parameters at all are provided, but pretending it's an empty object
+		// here makes testing more straight-forward and means that leaving out
+		// parameters will give sane looking early validation failures...
+		parameters = []byte("{}")
 	}
 	validationResult, err := schema.Validate(gojsonschema.NewBytesLoader(parameters))
 	if err != nil {

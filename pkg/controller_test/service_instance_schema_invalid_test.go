@@ -7,18 +7,24 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	kube_testing "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 )
 
 // Should not process plugin if specification is invalid according to the schema
-func TestPluginSchemaInvalid(t *testing.T) {
+func TestServiceInstanceSchemaInvalid(t *testing.T) {
 	t.Parallel()
 	tc := testCase{
+		scClientObjects: []runtime.Object{
+			serviceInstance(false, false, true),
+		},
+		enableServiceCatalog: true,
 		bundle: &smith_v1.Bundle{
 			ObjectMeta: meta_v1.ObjectMeta{
 				Name:      bundle1,
@@ -28,13 +34,22 @@ func TestPluginSchemaInvalid(t *testing.T) {
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{
 					{
-						Name: resP1,
+						Name: resSi1,
 						Spec: smith_v1.ResourceSpec{
-							Plugin: &smith_v1.PluginSpec{
-								Name:       pluginConfigMapWithDeps,
-								ObjectName: m1,
-								Spec: map[string]interface{}{
-									"p1": nil,
+							Object: &sc_v1b1.ServiceInstance{
+								TypeMeta: meta_v1.TypeMeta{
+									Kind:       "ServiceInstance",
+									APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+								},
+								ObjectMeta: meta_v1.ObjectMeta{
+									Name: si1,
+								},
+								Spec: sc_v1b1.ServiceInstanceSpec{
+									Parameters: &runtime.RawExtension{Raw: []byte(`{"testSchema": "invalid"}`)},
+									PlanReference: sc_v1b1.PlanReference{
+										ClusterServiceClassExternalName: serviceClassExternalName,
+										ClusterServicePlanExternalName:  servicePlanExternalName,
+									},
 								},
 							},
 						},
@@ -50,9 +65,8 @@ func TestPluginSchemaInvalid(t *testing.T) {
 			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 			require.NoError(t, err)
 			retriable, err := cntrlr.ProcessKey(tc.logger, key)
-			// Sadly, the actual error is not current propagated
-			assert.EqualError(t, err, `error processing resource(s): ["`+resP1+`"]`)
 			assert.False(t, retriable)
+			assert.EqualError(t, err, `error processing resource(s): ["`+resSi1+`"]`)
 
 			actions := tc.bundleFake.Actions()
 			require.Len(t, actions, 3)
@@ -60,9 +74,9 @@ func TestPluginSchemaInvalid(t *testing.T) {
 			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 
-			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceError, smith_v1.ConditionTrue)
+			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceError, smith_v1.ConditionTrue)
 			assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-			assert.Equal(t, "invalid spec: spec failed validation against schema: p1: Invalid type. Expected: string, given: null", resCond.Message)
+			assert.Equal(t, "spec failed validation against schema: testSchema: Invalid type. Expected: boolean, given: string", resCond.Message)
 		},
 	}
 	tc.run(t)

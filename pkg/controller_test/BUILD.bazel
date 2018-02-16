@@ -2,7 +2,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 go_test(
     name = "go_default_xtest",
-    size = "small",
     srcs = [
         "actual_object_passed_to_plugin_test.go",
         "cr_in_another_namespace_test.go",
@@ -15,7 +14,9 @@ go_test(
         "plugin_spec_processed_test.go",
         "processing_continues_after_error_test.go",
         "resolve_binding_secret_references_test.go",
+        "schema_early_validation_test.go",
         "secret_keys_not_merged_test.go",
+        "service_instance_schema_invalid_test.go",
         "two_resources_same_name_test.go",
         "zz_plumbing_for_test.go",
     ],
