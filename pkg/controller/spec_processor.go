@@ -151,7 +151,7 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	jsonPath := fmt.Sprintf("{$.%s}", parts[1])
 	fieldValue, err := resources.GetJsonPathValue(objToTraverse, jsonPath, false)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to processNormal JsonPath reference %s", selector)
+		return nil, errors.Wrapf(err, "failed to process JsonPath reference %s", selector)
 	}
 	if fieldValue == nil {
 		return nil, errors.Errorf("field not found: %s", selector)

@@ -154,7 +154,7 @@ func TestSpecProcessorErrors(t *testing.T) {
 			obj: map[string]interface{}{
 				"invalid": "{{{res1#something}}}",
 			},
-			err: `invalid reference at "invalid": failed to processNormal JsonPath reference res1#something: JsonPath execute error: something is not found`,
+			err: `invalid reference at "invalid": failed to process JsonPath reference res1#something: JsonPath execute error: something is not found`,
 		},
 		{
 			obj: map[string]interface{}{
