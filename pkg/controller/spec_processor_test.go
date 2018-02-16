@@ -144,11 +144,32 @@ func TestSpecProcessorBindSecret(t *testing.T) {
 	assert.Equal(t, expected, obj)
 }
 
+func TestSpecProcessorDefaults(t *testing.T) {
+	t.Parallel()
+	sp := NewDefaultsSpec("abc", []smith_v1.ResourceName{"res1", "resbinding"})
+	obj := map[string]interface{}{
+		"ref": map[string]interface{}{
+			"blah":   "this is {{res1#a.int#25}} a {{res1#a.int#25}} test",
+			"int":    "{{{res1#a.int#25}}}",
+			"secret": "{{{resbinding:bindsecret#Data.password#{\"x\":\"pass\"}}}}",
+		},
+	}
+	expected := map[string]interface{}{
+		"ref": map[string]interface{}{
+			"int":    5,
+			"secret": map[string]interface{}{"x": "pass"},
+		},
+	}
+
+	require.NoError(t, sp.ProcessObject(obj))
+	assert.Equal(t, expected, obj)
+}
 func TestSpecProcessorErrors(t *testing.T) {
 	t.Parallel()
 	inputs := []struct {
-		obj map[string]interface{}
-		err string
+		obj          map[string]interface{}
+		err          string
+		defaultsOnly bool
 	}{
 		{
 			obj: map[string]interface{}{
@@ -240,6 +261,20 @@ func TestSpecProcessorErrors(t *testing.T) {
 			},
 			err: `invalid reference at "invalid": cannot expand non-UTF8 byte array field "resbinding:bindsecret#Data.nonutf8"`,
 		},
+		{
+			obj: map[string]interface{}{
+				"invalid": "{{resbinding:bindsecret#Data.nonutf8}}",
+			},
+			err:          `invalid reference at "invalid": no default value provided in selector "resbinding:bindsecret#Data.nonutf8"`,
+			defaultsOnly: true,
+		},
+		{
+			obj: map[string]interface{}{
+				"invalid": "{{{resX#a.string}}}",
+			},
+			err:          `invalid reference at "invalid": references can only point at direct dependencies: resX#a.string`,
+			defaultsOnly: true,
+		},
 	}
 	for i, input := range inputs {
 		input := input
@@ -251,7 +286,9 @@ func TestSpecProcessorErrors(t *testing.T) {
 				allowedResources: map[smith_v1.ResourceName]struct{}{
 					"res1":       {},
 					"resbinding": {},
+					"res2":       {},
 				},
+				defaultsOnly: input.defaultsOnly,
 			}
 			assert.EqualError(t, sp.ProcessObject(input.obj), input.err)
 		})

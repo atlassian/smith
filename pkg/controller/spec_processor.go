@@ -24,9 +24,7 @@ const (
 )
 
 var (
-	reference             = regexp.MustCompile(`\{\{.+}}`)
-	nakedReference        = regexp.MustCompile(`^\{\{\{.+}}}$`)
-	invalidNakedReference = regexp.MustCompile(`(\{\{\{.+}}}.|.\{\{\{.+}}})`)
+	reference = regexp.MustCompile(`^\{\{.+}}$`)
 )
 
 type SpecProcessor struct {
@@ -116,28 +114,14 @@ func (sp *SpecProcessor) ProcessValue(value interface{}, path ...string) (interf
 func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{}, error) {
 	var err error
 	var processed interface{}
-	if invalidNakedReference.MatchString(value) {
-		err = errors.New("naked reference in the middle of a string")
+	if reference.MatchString(value) {
+		return sp.processMatch(value[2 : len(value)-2])
 	} else {
-		if nakedReference.MatchString(value) {
-			processed, err = sp.processMatch(value[3:len(value)-3], false)
-		} else {
-			processed = reference.ReplaceAllStringFunc(value, func(match string) string {
-				processedValue, e := sp.processMatch(match[2:len(match)-2], true)
-				if err == nil {
-					err = e
-				}
-				return fmt.Sprintf("%v", processedValue)
-			})
-		}
+		return value, nil
 	}
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid reference at %q", strings.Join(path, ReferenceSeparator))
-	}
-	return processed, nil
 }
 
-func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (interface{}, error) {
+func (sp *SpecProcessor) processMatch(selector string) (interface{}, error) {
 	parts := strings.SplitN(selector, ReferenceSeparator, 3)
 	if len(parts) < 2 {
 		return nil, errors.Errorf("cannot include whole object: %s", selector)
@@ -162,7 +146,7 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 		}
 		var defaultValue interface{}
 		if err := json.Unmarshal([]byte(parts[2]), &defaultValue); err != nil {
-			return nil, errors.WithStack(err)
+			return nil, errors.Wrapf(err, "failed to parse default %q", parts[2])
 		}
 		return defaultValue, nil
 	}
