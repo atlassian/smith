@@ -19,7 +19,6 @@ const (
 	BundleInProgress BundleConditionType = "InProgress"
 	BundleReady      BundleConditionType = "Ready"
 	BundleError      BundleConditionType = "Error"
-	BundleBlocked    BundleConditionType = "Blocked"
 )
 
 const (
@@ -41,7 +40,6 @@ const (
 	// Blocked condition reasons
 
 	ResourceReasonDependenciesNotReady = "DependenciesNotReady"
-	ResourceReasonDeleteInProgress     = "DeleteInProgress"
 
 	// Error condition reasons
 

@@ -11,7 +11,6 @@ import (
 	"github.com/atlassian/smith/pkg/util/graph"
 	"github.com/atlassian/smith/pkg/util/logz"
 
-	"encoding/json"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -378,26 +377,6 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		if statusUpdated {
 			st.bundle.Status.ResourceStatuses = resourceStatuses
 			st.bundle.Status.Conditions = []smith_v1.BundleCondition{inProgressCond, readyCond, errorCond}
-		}
-	} else {
-		// Bundle conditions
-		inProgressCond := smith_v1.BundleCondition{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionFalse}
-		readyCond := smith_v1.BundleCondition{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse}
-		errorCond := smith_v1.BundleCondition{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse}
-
-		// Set the blocked condition on the bundle
-		blockedCond := smith_v1.BundleCondition{Type: smith_v1.BundleBlocked, Status: smith_v1.ConditionTrue}
-		blockedCond.Status = smith_v1.ConditionTrue
-		blockedCond.Reason = smith_v1.ResourceReasonDeleteInProgress
-
-		statusUpdated = updateBundleCondition(st.bundle, &inProgressCond) || statusUpdated
-		statusUpdated = updateBundleCondition(st.bundle, &readyCond) || statusUpdated
-		statusUpdated = updateBundleCondition(st.bundle, &errorCond) || statusUpdated
-		statusUpdated = updateBundleCondition(st.bundle, &blockedCond) || statusUpdated
-
-		// Update the bundle status
-		if statusUpdated {
-			st.bundle.Status.Conditions = []smith_v1.BundleCondition{inProgressCond, readyCond, errorCond, blockedCond}
 		}
 	}
 
