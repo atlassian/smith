@@ -6,6 +6,7 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
+
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,11 +17,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// Should not perform any creates/updates/deletes on resources after bundle
-// is marked with deletionTimestamp and "foregroundDeletion" finalizer
-func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
+// Should add a "deleteResources" finalizer if it's missing
+func TestFinalizerAdded(t *testing.T) {
 	t.Parallel()
-	now := meta_v1.Now()
 	tc := testCase{
 		mainClientObjects: []runtime.Object{
 			configMapNeedsDelete(),
@@ -31,11 +30,9 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 		},
 		bundle: &smith_v1.Bundle{
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name:              bundle1,
-				Namespace:         testNamespace,
-				UID:               bundle1uid,
-				DeletionTimestamp: &now,
-				Finalizers:        []string{meta_v1.FinalizerDeleteDependents},
+				Name:      bundle1,
+				Namespace: testNamespace,
+				UID:       bundle1uid,
 			},
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{
@@ -82,9 +79,15 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 			assert.NoError(t, err)
 
 			actions := tc.bundleFake.Actions()
-			require.Len(t, actions, 2)
+			require.Len(t, actions, 3)
 			assert.Implements(t, (*kube_testing.ListAction)(nil), actions[0])
 			assert.Implements(t, (*kube_testing.WatchAction)(nil), actions[1])
+
+			bundleUpdate := actions[2].(kube_testing.UpdateAction)
+			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
+			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
+			// Make sure that the "deleteResources" finalizer was added
+			assert.True(t, controller.HasFinalizer(updateBundle, controller.FinalizerDeleteResources))
 		},
 	}
 	tc.run(t)

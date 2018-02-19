@@ -6,6 +6,7 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
+
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,9 +17,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// Should not perform any creates/updates/deletes on resources after bundle
-// is marked with deletionTimestamp and "foregroundDeletion" finalizer
-func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
+// Should just remove the "deletedResources" finalizer if the "foregroundDeletion"
+// finalizer is present
+func TestRemoveFinalizerWhenForegroundDeletion(t *testing.T) {
 	t.Parallel()
 	now := meta_v1.Now()
 	tc := testCase{
@@ -35,7 +36,9 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 				Namespace:         testNamespace,
 				UID:               bundle1uid,
 				DeletionTimestamp: &now,
-				Finalizers:        []string{meta_v1.FinalizerDeleteDependents},
+				// If both "foregroundDeletion" and "deleteResources" finalizers
+				// are present, just remove the latter and let GC do the work
+				Finalizers: []string{meta_v1.FinalizerDeleteDependents, controller.FinalizerDeleteResources},
 			},
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{
@@ -82,9 +85,17 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 			assert.NoError(t, err)
 
 			actions := tc.bundleFake.Actions()
-			require.Len(t, actions, 2)
+			require.Len(t, actions, 3)
 			assert.Implements(t, (*kube_testing.ListAction)(nil), actions[0])
 			assert.Implements(t, (*kube_testing.WatchAction)(nil), actions[1])
+
+			bundleUpdate := actions[2].(kube_testing.UpdateAction)
+			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
+			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
+			// Make sure that the "deleteResources" finalizer was removed and
+			// the "foregroundDeletion" finalizer is still present
+			assert.False(t, controller.HasFinalizer(updateBundle, controller.FinalizerDeleteResources))
+			assert.True(t, controller.HasFinalizer(updateBundle, meta_v1.FinalizerDeleteDependents))
 		},
 	}
 	tc.run(t)

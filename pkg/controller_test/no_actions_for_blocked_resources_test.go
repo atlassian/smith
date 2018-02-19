@@ -31,9 +31,10 @@ func TestNoActionsForBlockedResources(t *testing.T) {
 		},
 		bundle: &smith_v1.Bundle{
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name:      bundle1,
-				Namespace: testNamespace,
-				UID:       bundle1uid,
+				Name:       bundle1,
+				Namespace:  testNamespace,
+				UID:        bundle1uid,
+				Finalizers: []string{controller.FinalizerDeleteResources},
 			},
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{

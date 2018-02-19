@@ -29,6 +29,7 @@ type bundleSyncTask struct {
 	specCheck          SpecCheck
 	bundle             *smith_v1.Bundle
 	processedResources map[smith_v1.ResourceName]*resourceInfo
+	newFinalizers      []string
 	pluginContainers   map[smith_v1.PluginName]plugin.PluginContainer
 	scheme             *runtime.Scheme
 	catalog            *store.Catalog
@@ -42,7 +43,13 @@ type bundleSyncTask struct {
 // READY state might mean something different for each resource type. For a Custom Resource it may mean
 // that a field "State" in the Status of the resource is set to "Ready". It is customizable via
 // annotations with some defaults.
-func (st *bundleSyncTask) process() (retriableError bool, e error) {
+func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
+	// If the "deleteResources" finalizer is missing, add it and finish the processing iteration
+	if !hasDeleteResourcesFinalizer(st.bundle) {
+		st.newFinalizers = addDeleteResourcesFinalizer(st.bundle.GetFinalizers())
+		return false, nil
+	}
+
 	// Build resource map by name
 	resourceMap := make(map[smith_v1.ResourceName]smith_v1.Resource, len(st.bundle.Spec.Resources))
 	for _, res := range st.bundle.Spec.Resources {
@@ -100,6 +107,76 @@ func (st *bundleSyncTask) process() (retriableError bool, e error) {
 	}
 
 	return false, nil
+}
+
+// Process the bundle marked with DeletionTimestamp
+// TODO: remove this method after https://github.com/kubernetes/kubernetes/issues/59850 is fixed
+func (st *bundleSyncTask) processDeleted() (retriableError bool, e error) {
+	if hasDeleteResourcesFinalizer(st.bundle) {
+		if !HasFinalizer(st.bundle, meta_v1.FinalizerDeleteDependents) {
+			// If "foregroundDeletion" finalizer was not set, perform manual cascade deletion
+			retrieable, err := st.deleteAllResources()
+			if err != nil {
+				return retrieable, err
+			}
+		}
+
+		// If the "foregroundDeletion" finalizer is set, or the manual deletion
+		// of resources has succeeded, remove the "deleteResources" finalizer
+		st.newFinalizers = removeDeleteResourcesFinalizer(st.bundle.GetFinalizers())
+	}
+	return false, nil
+}
+
+func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
+	objs, err := st.store.ObjectsControlledBy(st.bundle.Namespace, st.bundle.UID)
+	if err != nil {
+		return false, err
+	}
+
+	var firstErr error
+	retriable := true
+	policy := meta_v1.DeletePropagationForeground
+	for _, obj := range objs {
+		m := obj.(meta_v1.Object)
+		if m.GetDeletionTimestamp() != nil {
+			// Object is marked for deletion already
+			continue
+		}
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		name := m.GetName()
+		uid := m.GetUID()
+
+		st.logger.Info("Deleting object", logz.Gvk(gvk), logz.ObjectName(name))
+		resClient, err := st.smartClient.ForGVK(gvk, st.bundle.Namespace)
+		if err != nil {
+			if firstErr == nil {
+				retriable = false
+				firstErr = err
+			} else {
+				st.logger.Error("Failed to get client for object", logz.Gvk(gvk), zap.Error(err))
+			}
+			continue
+		}
+
+		err = resClient.Delete(name, &meta_v1.DeleteOptions{
+			Preconditions: &meta_v1.Preconditions{
+				UID: &uid,
+			},
+			PropagationPolicy: &policy,
+		})
+		if err != nil && !api_errors.IsNotFound(err) && !api_errors.IsConflict(err) {
+			// not found means object has been deleted already
+			// conflict means it has been deleted and re-created (UID does not match)
+			if firstErr == nil {
+				firstErr = err
+			} else {
+				st.logger.Warn("Failed to delete object", logz.Gvk(gvk), logz.ObjectName(name), zap.Error(err))
+			}
+			continue
+		}
+	}
+	return retriable, firstErr
 }
 
 func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error) {
@@ -174,7 +251,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 	return retriable, firstErr
 }
 
-func (st *bundleSyncTask) setBundleStatus() error {
+func (st *bundleSyncTask) updateBundle() error {
 	bundleUpdated, err := st.bundleClient.Bundles(st.bundle.Namespace).Update(st.bundle)
 	if err != nil {
 		if api_errors.IsConflict(err) {
@@ -185,9 +262,10 @@ func (st *bundleSyncTask) setBundleStatus() error {
 			// It is safe to ignore this conflict because we will reiterate because of the update event.
 			return nil
 		}
-		return errors.Wrap(err, "failed to set bundle status")
+		return errors.Wrap(err, "failed to update bundle")
 	}
 	st.logger.Sugar().Debugf("Set bundle status to %s", &bundleUpdated.Status)
+	st.logger.Sugar().Debugf("Set bundle finalizers to %#v", &bundleUpdated.Finalizers)
 	return nil
 }
 
@@ -199,106 +277,129 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		return false, processErr
 	}
 
-	// Construct resource conditions and check if there were any resource errors
-	resourceStatuses := make([]smith_v1.ResourceStatus, 0, len(st.processedResources))
-	var failedResources []smith_v1.ResourceName
-	retriableResourceErr := true
-	statusUpdated := false
-	for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
-		blockedCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceBlocked, Status: smith_v1.ConditionFalse}
-		inProgressCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceInProgress, Status: smith_v1.ConditionFalse}
-		readyCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceReady, Status: smith_v1.ConditionFalse}
-		errorCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceError, Status: smith_v1.ConditionFalse}
+	bundleUpdated := false
 
-		if resInfo, ok := st.processedResources[res.Name]; ok {
-			// Resource was processed
-			switch resStatus := resInfo.status.(type) {
-			case resourceStatusDependenciesNotReady:
-				blockedCond.Status = smith_v1.ConditionTrue
-				blockedCond.Reason = smith_v1.ResourceReasonDependenciesNotReady
-				blockedCond.Message = fmt.Sprintf("Not ready: %q", resStatus.dependencies)
-			case resourceStatusInProgress:
-				inProgressCond.Status = smith_v1.ConditionTrue
-			case resourceStatusReady:
-				readyCond.Status = smith_v1.ConditionTrue
-			case resourceStatusError:
-				errorCond.Status = smith_v1.ConditionTrue
-				errorCond.Message = resStatus.err.Error()
-				if resStatus.isRetriableError {
-					errorCond.Reason = smith_v1.ResourceReasonRetriableError
+	if st.newFinalizers != nil {
+		// Update finalizers
+		st.bundle.Finalizers = st.newFinalizers
+		// Set status to "InProgress: True"
+		// (there will be one more iteration for resource sync that will set an appropriate status)
+		// TODO: Setting status to "InProgress" here might be unnecessary
+		// (if the Bundle spec wasn't updated during the last update, the status should be kept with no changes)
+		// The better solution could be storing "ObservedGeneration" in the status to reflect
+		// whether the status is up-to-date with the spec or stale
+		st.bundle.Status.Conditions = []smith_v1.BundleCondition{
+			{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionTrue},
+			{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse},
+			{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse},
+		}
+		bundleUpdated = true
+	} else if st.bundle.DeletionTimestamp == nil {
+		// Construct resource conditions and check if there were any resource errors
+		resourceStatuses := make([]smith_v1.ResourceStatus, 0, len(st.processedResources))
+		var failedResources []smith_v1.ResourceName
+		retriableResourceErr := true
+		for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
+			blockedCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceBlocked, Status: smith_v1.ConditionFalse}
+			inProgressCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceInProgress, Status: smith_v1.ConditionFalse}
+			readyCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceReady, Status: smith_v1.ConditionFalse}
+			errorCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceError, Status: smith_v1.ConditionFalse}
+
+			if resInfo, ok := st.processedResources[res.Name]; ok {
+				// Resource was processed
+				switch resStatus := resInfo.status.(type) {
+				case resourceStatusDependenciesNotReady:
+					blockedCond.Status = smith_v1.ConditionTrue
+					blockedCond.Reason = smith_v1.ResourceReasonDependenciesNotReady
+					blockedCond.Message = fmt.Sprintf("Not ready: %q", resStatus.dependencies)
+				case resourceStatusInProgress:
 					inProgressCond.Status = smith_v1.ConditionTrue
-				} else {
+				case resourceStatusReady:
+					readyCond.Status = smith_v1.ConditionTrue
+				case resourceStatusError:
+					errorCond.Status = smith_v1.ConditionTrue
+					errorCond.Message = resStatus.err.Error()
+					if resStatus.isRetriableError {
+						errorCond.Reason = smith_v1.ResourceReasonRetriableError
+						inProgressCond.Status = smith_v1.ConditionTrue
+					} else {
+						errorCond.Reason = smith_v1.ResourceReasonTerminalError
+					}
+					failedResources = append(failedResources, res.Name)
+					retriableResourceErr = retriableResourceErr && resStatus.isRetriableError // Must not continue if at least one error is not retriable
+				default:
+					blockedCond.Status = smith_v1.ConditionUnknown
+					inProgressCond.Status = smith_v1.ConditionUnknown
+					readyCond.Status = smith_v1.ConditionUnknown
+					errorCond.Status = smith_v1.ConditionTrue
 					errorCond.Reason = smith_v1.ResourceReasonTerminalError
+					errorCond.Message = fmt.Sprintf("internal error - unknown resource status type %T", resInfo.status)
+					failedResources = append(failedResources, res.Name)
+					retriableResourceErr = false
 				}
-				failedResources = append(failedResources, res.Name)
-				retriableResourceErr = retriableResourceErr && resStatus.isRetriableError // Must not continue if at least one error is not retriable
-			default:
+			} else {
+				// Resource was not processed
 				blockedCond.Status = smith_v1.ConditionUnknown
 				inProgressCond.Status = smith_v1.ConditionUnknown
 				readyCond.Status = smith_v1.ConditionUnknown
-				errorCond.Status = smith_v1.ConditionTrue
-				errorCond.Reason = smith_v1.ResourceReasonTerminalError
-				errorCond.Message = fmt.Sprintf("internal error - unknown resource status type %T", resInfo.status)
-				failedResources = append(failedResources, res.Name)
-				retriableResourceErr = false
+				errorCond.Status = smith_v1.ConditionUnknown
+			}
+			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &blockedCond) || bundleUpdated
+			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &inProgressCond) || bundleUpdated
+			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &readyCond) || bundleUpdated
+			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &errorCond) || bundleUpdated
+			resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
+				Name:       res.Name,
+				Conditions: []smith_v1.ResourceCondition{blockedCond, inProgressCond, readyCond, errorCond},
+			})
+		}
+
+		if processErr == nil && len(failedResources) > 0 {
+			processErr = errors.Errorf("error processing resource(s): %q", failedResources)
+			retriable = retriableResourceErr
+		}
+
+		// Bundle conditions
+		inProgressCond := smith_v1.BundleCondition{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionFalse}
+		readyCond := smith_v1.BundleCondition{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse}
+		errorCond := smith_v1.BundleCondition{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse}
+
+		if processErr == nil {
+			if st.isBundleReady() {
+				readyCond.Status = smith_v1.ConditionTrue
+			} else {
+				inProgressCond.Status = smith_v1.ConditionTrue
 			}
 		} else {
-			// Resource was not processed
-			blockedCond.Status = smith_v1.ConditionUnknown
-			inProgressCond.Status = smith_v1.ConditionUnknown
-			readyCond.Status = smith_v1.ConditionUnknown
-			errorCond.Status = smith_v1.ConditionUnknown
+			errorCond.Status = smith_v1.ConditionTrue
+			errorCond.Message = processErr.Error()
+			if retriable {
+				errorCond.Reason = smith_v1.BundleReasonRetriableError
+				inProgressCond.Status = smith_v1.ConditionTrue
+			} else {
+				errorCond.Reason = smith_v1.BundleReasonTerminalError
+			}
 		}
-		statusUpdated = updateResourceCondition(st.bundle, res.Name, &blockedCond) || statusUpdated
-		statusUpdated = updateResourceCondition(st.bundle, res.Name, &inProgressCond) || statusUpdated
-		statusUpdated = updateResourceCondition(st.bundle, res.Name, &readyCond) || statusUpdated
-		statusUpdated = updateResourceCondition(st.bundle, res.Name, &errorCond) || statusUpdated
-		resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
-			Name:       res.Name,
-			Conditions: []smith_v1.ResourceCondition{blockedCond, inProgressCond, readyCond, errorCond},
-		})
-	}
 
-	if processErr == nil && len(failedResources) > 0 {
-		processErr = errors.Errorf("error processing resource(s): %q", failedResources)
-		retriable = retriableResourceErr
-	}
+		bundleUpdated = updateBundleCondition(st.bundle, &inProgressCond) || bundleUpdated
+		bundleUpdated = updateBundleCondition(st.bundle, &readyCond) || bundleUpdated
+		bundleUpdated = updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
 
-	// Bundle conditions
-	inProgressCond := smith_v1.BundleCondition{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionFalse}
-	readyCond := smith_v1.BundleCondition{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse}
-	errorCond := smith_v1.BundleCondition{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse}
-	if processErr == nil {
-		if st.isBundleReady() {
-			readyCond.Status = smith_v1.ConditionTrue
-		} else {
-			inProgressCond.Status = smith_v1.ConditionTrue
-		}
-	} else {
-		errorCond.Status = smith_v1.ConditionTrue
-		errorCond.Message = processErr.Error()
-		if retriable {
-			errorCond.Reason = smith_v1.BundleReasonRetriableError
-			inProgressCond.Status = smith_v1.ConditionTrue
-		} else {
-			errorCond.Reason = smith_v1.BundleReasonTerminalError
+		// Update the bundle status
+		if bundleUpdated {
+			st.bundle.Status.ResourceStatuses = resourceStatuses
+			st.bundle.Status.Conditions = []smith_v1.BundleCondition{inProgressCond, readyCond, errorCond}
 		}
 	}
 
-	statusUpdated = updateBundleCondition(st.bundle, &inProgressCond) || statusUpdated
-	statusUpdated = updateBundleCondition(st.bundle, &readyCond) || statusUpdated
-	statusUpdated = updateBundleCondition(st.bundle, &errorCond) || statusUpdated
-
-	// Update the bundle status
-	if statusUpdated {
-		st.bundle.Status.ResourceStatuses = resourceStatuses
-		st.bundle.Status.Conditions = []smith_v1.BundleCondition{inProgressCond, readyCond, errorCond}
-		ex := st.setBundleStatus()
+	if bundleUpdated {
+		ex := st.updateBundle()
 		if processErr == nil {
 			processErr = ex
 			retriable = true
 		}
 	}
+
 	return retriable, processErr
 }
 

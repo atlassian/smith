@@ -6,19 +6,19 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
-	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kube_testing "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"net/http"
 )
 
-// Should not perform any creates/updates/deletes on resources after bundle
-// is marked with deletionTimestamp and "foregroundDeletion" finalizer
-func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
+// Should keep the "deleteResources" finalizer if some resources can't be deleted
+func TestKeepFinalizerWhenResourceDeletionFails(t *testing.T) {
 	t.Parallel()
 	now := meta_v1.Now()
 	tc := testCase{
@@ -35,28 +35,13 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 				Namespace:         testNamespace,
 				UID:               bundle1uid,
 				DeletionTimestamp: &now,
-				Finalizers:        []string{meta_v1.FinalizerDeleteDependents},
+				// Finalizer to enforce manual deletion
+				Finalizers: []string{controller.FinalizerDeleteResources},
 			},
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{
 					{
-						Name: resSi1,
-						Spec: smith_v1.ResourceSpec{
-							Object: &sc_v1b1.ServiceInstance{
-								TypeMeta: meta_v1.TypeMeta{
-									Kind:       "ServiceInstance",
-									APIVersion: sc_v1b1.SchemeGroupVersion.String(),
-								},
-								ObjectMeta: meta_v1.ObjectMeta{
-									Name: si1,
-								},
-								Spec: serviceInstanceSpec,
-							},
-						},
-					},
-					{
-						Name:      resMapNeedsAnUpdate,
-						DependsOn: []smith_v1.ResourceName{resSi1},
+						Name: resMapNeedsAnUpdate,
 						Spec: smith_v1.ResourceSpec{
 							Object: &core_v1.ConfigMap{
 								TypeMeta: meta_v1.TypeMeta{
@@ -72,6 +57,27 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 				},
 			},
 		},
+		expectedActions: sets.NewString(
+			"DELETE=/api/v1/namespaces/"+testNamespace+"/configmaps/"+mapNeedsAnUpdate,
+			"DELETE=/api/v1/namespaces/"+testNamespace+"/configmaps/"+mapNeedsDelete,
+		),
+		testHandler: fakeActionHandler{
+			response: map[path]fakeResponse{
+				{
+					method: "DELETE",
+					path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate,
+				}: {
+					statusCode: http.StatusOK,
+				},
+				{
+					method: "DELETE",
+					path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsDelete,
+				}: {
+					statusCode: http.StatusInternalServerError,
+					content:    []byte("something went wrong"),
+				},
+			},
+		},
 		namespace:            testNamespace,
 		enableServiceCatalog: false,
 		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase, prepare func(ctx context.Context)) {
@@ -79,7 +85,7 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 			require.NoError(t, err)
 			_, err = cntrlr.ProcessKey(tc.logger, key)
-			assert.NoError(t, err)
+			assert.EqualError(t, err, `an error on the server ("unknown") has prevented the request from succeeding (delete configmaps `+mapNeedsDelete+`)`)
 
 			actions := tc.bundleFake.Actions()
 			require.Len(t, actions, 2)

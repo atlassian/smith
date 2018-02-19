@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/controller"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,9 +21,10 @@ func TestDeleteRemovedObject(t *testing.T) {
 		},
 		bundle: &smith_v1.Bundle{
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name:      bundle1,
-				Namespace: testNamespace,
-				UID:       bundle1uid,
+				Name:       bundle1,
+				Namespace:  testNamespace,
+				UID:        bundle1uid,
+				Finalizers: []string{controller.FinalizerDeleteResources},
 			},
 		},
 		expectedActions: sets.NewString("DELETE=/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate),

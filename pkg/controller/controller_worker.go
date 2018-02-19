@@ -109,12 +109,12 @@ func (c *BundleController) ProcessKey(logger *zap.Logger, key string) (retriable
 		catalog:          c.Catalog,
 	}
 
+	var retriable bool
 	if st.bundle.DeletionTimestamp != nil {
-		// Nothing to do, let GC do the work
-		return false, nil
+		retriable, err = st.processDeleted()
+	} else {
+		retriable, err = st.processNormal()
 	}
-
-	retriable, err := st.process()
 	return st.handleProcessResult(retriable, err)
 }
 

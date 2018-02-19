@@ -5,6 +5,7 @@ import (
 
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/controller"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	core_v1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 							BlockOwnerDeletion: &tr,
 						},
 					},
+					Finalizers: []string{controller.FinalizerDeleteResources},
 				},
 				Data: map[string][]byte{
 					"mysecret": []byte("bla"),
