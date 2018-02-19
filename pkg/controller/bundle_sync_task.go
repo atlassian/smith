@@ -128,42 +128,38 @@ func (st *bundleSyncTask) processDeleted() (retriableError bool, e error) {
 	return false, nil
 }
 
-// TODO: delete this method after the issue in kubectl is fixed:
 func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 	objs, err := st.store.ObjectsControlledBy(st.bundle.Namespace, st.bundle.UID)
 	if err != nil {
 		return false, err
 	}
-	existingObjs := make(map[objectRef]types.UID, len(objs))
+
+	var firstErr error
+	retriable := true
+	policy := meta_v1.DeletePropagationForeground
 	for _, obj := range objs {
 		m := obj.(meta_v1.Object)
 		if m.GetDeletionTimestamp() != nil {
 			// Object is marked for deletion already
 			continue
 		}
-		ref := objectRef{
-			GroupVersionKind: obj.GetObjectKind().GroupVersionKind(),
-			Name:             m.GetName(),
-		}
-		existingObjs[ref] = m.GetUID()
-	}
-	var firstErr error
-	retriable := true
-	policy := meta_v1.DeletePropagationForeground
-	for ref, uid := range existingObjs {
-		st.logger.Info("Deleting object", logz.Gvk(ref.GroupVersionKind), logz.ObjectName(ref.Name))
-		resClient, err := st.smartClient.ForGVK(ref.GroupVersionKind, st.bundle.Namespace)
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		name := m.GetName()
+		uid := m.GetUID()
+
+		st.logger.Info("Deleting object", logz.Gvk(gvk), logz.ObjectName(name))
+		resClient, err := st.smartClient.ForGVK(gvk, st.bundle.Namespace)
 		if err != nil {
 			if firstErr == nil {
 				retriable = false
 				firstErr = err
 			} else {
-				st.logger.Error("Failed to get client for object", logz.Gvk(ref.GroupVersionKind), zap.Error(err))
+				st.logger.Error("Failed to get client for object", logz.Gvk(gvk), zap.Error(err))
 			}
 			continue
 		}
 
-		err = resClient.Delete(ref.Name, &meta_v1.DeleteOptions{
+		err = resClient.Delete(name, &meta_v1.DeleteOptions{
 			Preconditions: &meta_v1.Preconditions{
 				UID: &uid,
 			},
@@ -175,7 +171,7 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 			if firstErr == nil {
 				firstErr = err
 			} else {
-				st.logger.Warn("Failed to delete object", logz.Gvk(ref.GroupVersionKind), logz.ObjectName(ref.Name), zap.Error(err))
+				st.logger.Warn("Failed to delete object", logz.Gvk(gvk), logz.ObjectName(name), zap.Error(err))
 			}
 			continue
 		}
