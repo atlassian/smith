@@ -9,6 +9,7 @@ go_library(
         "controller_crd_event_handler.go",
         "controller_resource_event_handler.go",
         "controller_worker.go",
+        "finalizers.go",
         "resource_sync_task.go",
         "service_instance.go",
         "spec_processor.go",

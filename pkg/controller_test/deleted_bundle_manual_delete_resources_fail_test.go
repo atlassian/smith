@@ -2,10 +2,12 @@ package controller_test
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
@@ -14,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	kube_testing "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"net/http"
 )
 
 // Should keep the "deleteResources" finalizer if some resources can't be deleted

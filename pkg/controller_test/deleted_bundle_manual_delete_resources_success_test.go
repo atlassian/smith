@@ -2,6 +2,7 @@ package controller_test
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
@@ -15,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	kube_testing "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"net/http"
 )
 
 // Should manually delete all resources and remove the "deleteResources"
