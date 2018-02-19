@@ -283,14 +283,15 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		// Update finalizers
 		st.bundle.Finalizers = st.newFinalizers
 		// Set status to "InProgress: True"
-		// (there will be one more iteration for resource sync)
-		// TODO: add more details to the status (reason, resources status)?
-		st.bundle.Status = smith_v1.BundleStatus{
-			Conditions: []smith_v1.BundleCondition{
-				{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionTrue},
-				{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse},
-				{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse},
-			},
+		// (there will be one more iteration for resource sync that will set an appropriate status)
+		// TODO: Setting status to "InProgress" here might be unnecessary
+		// (if the Bundle spec wasn't updated during the last update, the status should be kept with no changes)
+		// The better solution could be storing "ObservedGeneration" in the status to reflect
+		// whether the status is up-to-date with the spec or stale
+		st.bundle.Status.Conditions = []smith_v1.BundleCondition{
+			{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionTrue},
+			{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse},
+			{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse},
 		}
 		bundleUpdated = true
 	} else if st.bundle.DeletionTimestamp == nil {
