@@ -194,8 +194,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 				OpenAPIV3Schema: &apiext_v1b1.JSONSchemaProps{
 					Properties: map[string]apiext_v1b1.JSONSchemaProps{
 						"spec": {
-							Type:     "object",
-							Required: []string{"resources"},
+							Type: "object",
 							Properties: map[string]apiext_v1b1.JSONSchemaProps{
 								"resources": {
 									Type: "array",
