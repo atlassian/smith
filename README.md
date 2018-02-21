@@ -169,7 +169,7 @@ working properly. We test on 1.8+;
 standard library in this version;
 * List of project dependencies and their versions can be found in `Gopkg.toml` and `Gopkg.lock` files.
 
-## Building
+## Building, testing and running
 
 * [`dep`](https://github.com/golang/dep) is used for package management. Please [install it](https://github.com/golang/dep#setup).
 * [`Bazel`](https://www.bazel.build/) is used as the build tool. Please [install it](https://docs.bazel.build/versions/master/install.html).
@@ -177,23 +177,41 @@ standard library in this version;
 ```bash
 make setup
 ```
-* To run integration tests with [minikube](https://github.com/kubernetes/minikube) run
+
+Integration tests can be run against any Kuberentes context that is configured locally. To see which contexts are
+available run:
 ```bash
-make minikube-test
+kubectl config get-contexts
+```
+By default a context named `minikube` is used. If you use [minikube](https://github.com/kubernetes/minikube) and want
+to run tests against that context then you don't need to do anything extra. If you want to run against some other
+context you may do so by setting the `KUBE_CONTEXT` environment variable which is honored by the makefile.
+
+E.g. to run against Kubernetes-for-Docker use `KUBE_CONTEXT=docker-for-desktop`.
+
+* To run integration tests run
+```bash
+make integration-test
 ```
 * To run integration tests for [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support run
 ```bash
-make minikube-test-sc
+make integration-test-sc
 ```
-This command assumes Service Catalog and UPS Broker are installed on your minikube. To install them follow the
+This command assumes Service Catalog and UPS Broker are installed in the cluster. To install them follow the
 [Service Catalog walkthrough](https://github.com/kubernetes-incubator/service-catalog/blob/master/docs/walkthrough.md).
-* To run against minikube run
+* To run Smith locally against the configured context run
 ```bash
-make minikube-run
+make run
+# or to run with Service Catalog support enabled
+make run-sc
 ```
-* To build the docker image run
+* To build the Docker image run
 ```bash
 make docker
+```
+This command only builds the image, which is not very useful. If you want to import it into your Docker run
+```bash
+make docker-export
 ```
 
 ## Contributing
