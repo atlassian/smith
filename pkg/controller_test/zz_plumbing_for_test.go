@@ -241,6 +241,7 @@ func (tc *testCase) run(t *testing.T) {
 
 	loggerConfig := zap.NewDevelopmentConfig()
 	loggerConfig.DisableCaller = true
+	loggerConfig.DisableStacktrace = true
 	tc.logger, err = loggerConfig.Build()
 	require.NoError(t, err)
 	defer tc.logger.Sync()

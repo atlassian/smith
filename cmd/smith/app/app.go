@@ -342,8 +342,8 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	configContext := flagset.String("client-config-context", "",
 		"Context to use for REST client configuration. This is only applicable if --client-config-from=file is set.")
 	flagset.StringVar(&zapConfig.Encoding, "log-encoding", "json", `Sets the logger's encoding. Valid values are "json" and "console".`)
-	flagset.BoolVar(&zapConfig.DisableCaller, "log-disable-caller", false, `Stops annotating logs with the calling function's file name and line number.`)
-	flagset.BoolVar(&zapConfig.DisableStacktrace, "log-disable-stacktrace", false, `Completely disables automatic stacktrace capturing. `+
+	flagset.BoolVar(&zapConfig.DisableCaller, "log-disable-caller", true, `Stops annotating logs with the calling function's file name and line number.`)
+	flagset.BoolVar(&zapConfig.DisableStacktrace, "log-disable-stacktrace", true, `Completely disables automatic stacktrace capturing. `+
 		`By default, stacktraces are captured for ErrorLevel and above.`)
 
 	if err := flagset.Parse(arguments); err != nil {

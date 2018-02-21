@@ -191,7 +191,6 @@ func TestPluginSpecProcessed(t *testing.T) {
 					watch:  true,
 				}: {
 					statusCode: http.StatusOK,
-					content:    []byte(`{"type": "ADDED", "object": { "kind": "Sleeper" } }`),
 				},
 				{
 					method: "POST",

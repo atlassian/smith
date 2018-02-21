@@ -48,7 +48,6 @@ func TestCrInAnotherNamespace(t *testing.T) {
 					path:   "/apis/" + sleeper_v1.SleeperResourceGroupVersion + "/namespaces/" + testNamespace + "/" + sleeper_v1.SleeperResourcePlural,
 				}: {
 					statusCode: http.StatusOK,
-					content:    []byte(`{"type": "ADDED", "object": { "kind": "Unknown" } }`),
 				},
 			},
 		},
