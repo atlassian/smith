@@ -154,6 +154,7 @@ Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes
 * Graph of dependencies is defined explicitly.
 * It uses polling and blocks while waiting for the resource to become READY.
 * The goal of Smith is to manage Custom Resources and Service Catalog objects. App Controller cannot manage them as of this writing (?).
+* Smith has very advanced support for Service Catalog objects.
 
 ### On [Helm](https://helm.sh/)
 Helm is a package manager for Kubernetes. Smith operates on a lower level, even though it can be used by a human,
