@@ -199,6 +199,9 @@ func (tc *testCase) run(t *testing.T) {
 						},
 						ExternalName: servicePlanExternalName,
 						ExternalID:   servicePlanName,
+						ServiceInstanceCreateParameterSchema: &runtime.RawExtension{Raw: []byte(`
+{"type": "object", "properties": {"testSchema": {"type": "boolean"}}}
+`)},
 					},
 				},
 			}...)...,

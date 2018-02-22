@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"encoding/json"
+
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/pkg/errors"
@@ -22,27 +24,49 @@ const (
 )
 
 var (
-	reference             = regexp.MustCompile(`\{\{.+}}`)
-	nakedReference        = regexp.MustCompile(`^\{\{\{.+}}}$`)
-	invalidNakedReference = regexp.MustCompile(`(\{\{\{.+}}}.|.\{\{\{.+}}})`)
+	reference = regexp.MustCompile(`^\{\{.+}}$`)
 )
 
 type SpecProcessor struct {
 	selfName         smith_v1.ResourceName
 	resources        map[smith_v1.ResourceName]*resourceInfo
 	allowedResources map[smith_v1.ResourceName]struct{}
+	examplesOnly     bool
+}
+
+// noExampleError occurs when we try to process the spec with examples rather
+// than resolving references, but at least one of references doesn't specify an example.
+type noExampleError struct {
+	selector string
+}
+
+func (e *noExampleError) Error() string {
+	return fmt.Sprintf("no example value provided in selector %q", e.selector)
 }
 
 func NewSpec(selfName smith_v1.ResourceName, resources map[smith_v1.ResourceName]*resourceInfo, allowedResources []smith_v1.ResourceName) *SpecProcessor {
-	ar := make(map[smith_v1.ResourceName]struct{}, len(allowedResources))
-	for _, allowedResource := range allowedResources {
-		ar[allowedResource] = struct{}{}
-	}
 	return &SpecProcessor{
 		selfName:         selfName,
 		resources:        resources,
-		allowedResources: ar,
+		allowedResources: convertResourceNamesToMap(allowedResources),
+		examplesOnly:     false,
 	}
+}
+
+func NewExamplesSpec(selfName smith_v1.ResourceName, allowedResources []smith_v1.ResourceName) *SpecProcessor {
+	return &SpecProcessor{
+		selfName:         selfName,
+		allowedResources: convertResourceNamesToMap(allowedResources),
+		examplesOnly:     true,
+	}
+}
+
+func convertResourceNamesToMap(resources []smith_v1.ResourceName) map[smith_v1.ResourceName]struct{} {
+	ar := make(map[smith_v1.ResourceName]struct{}, len(resources))
+	for _, allowedResource := range resources {
+		ar[allowedResource] = struct{}{}
+	}
+	return ar
 }
 
 func (sp *SpecProcessor) ProcessObject(obj map[string]interface{}, path ...string) error {
@@ -88,31 +112,19 @@ func (sp *SpecProcessor) ProcessValue(value interface{}, path ...string) (interf
 }
 
 func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{}, error) {
-	var err error
-	var processed interface{}
-	if invalidNakedReference.MatchString(value) {
-		err = errors.New("naked reference in the middle of a string")
-	} else {
-		if nakedReference.MatchString(value) {
-			processed, err = sp.processMatch(value[3:len(value)-3], false)
-		} else {
-			processed = reference.ReplaceAllStringFunc(value, func(match string) string {
-				processedValue, e := sp.processMatch(match[2:len(match)-2], true)
-				if err == nil {
-					err = e
-				}
-				return fmt.Sprintf("%v", processedValue)
-			})
-		}
+	if !reference.MatchString(value) {
+		return value, nil
 	}
+
+	result, err := sp.processMatch(value[2 : len(value)-2])
 	if err != nil {
-		return nil, errors.Wrapf(err, "invalid reference at %q", strings.Join(path, ReferenceSeparator))
+		return nil, errors.Wrapf(err, "invalid reference at \"%s\"", strings.Join(path, "."))
 	}
-	return processed, nil
+	return result, nil
 }
 
-func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (interface{}, error) {
-	parts := strings.SplitN(selector, ReferenceSeparator, 2)
+func (sp *SpecProcessor) processMatch(selector string) (interface{}, error) {
+	parts := strings.SplitN(selector, ReferenceSeparator, 3)
 	if len(parts) < 2 {
 		return nil, errors.Errorf("cannot include whole object: %s", selector)
 	}
@@ -125,12 +137,25 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 	if objName == sp.selfName {
 		return nil, errors.Errorf("self references are not allowed: %s", selector)
 	}
+
+	if _, allowed := sp.allowedResources[objName]; !allowed {
+		return nil, errors.Errorf("references can only point at direct dependencies: %s", selector)
+	}
+
+	if sp.examplesOnly {
+		if len(parts) < 3 {
+			return nil, errors.WithStack(&noExampleError{selector})
+		}
+		var exampleValue interface{}
+		if err := json.Unmarshal([]byte(parts[2]), &exampleValue); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse default %q", parts[2])
+		}
+		return exampleValue, nil
+	}
+
 	resInfo := sp.resources[objName]
 	if resInfo == nil {
 		return nil, errors.Errorf("object not found: %s", selector)
-	}
-	if _, allowed := sp.allowedResources[objName]; !allowed {
-		return nil, errors.Errorf("references can only point at direct dependencies: %s", selector)
 	}
 
 	var objToTraverse interface{}
@@ -146,8 +171,8 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 		return nil, errors.Errorf("resource output name %q not understood for %q", resourceOutputName, objName)
 	}
 
-	// To avoid overcomplicated format of reference like this: {{{res1#{$.a.string}}}}
-	// And have something like this instead: {{{res1#a.string}}}
+	// To avoid overcomplicated format of reference like this: {{res1#{$.a.string}}}
+	// And have something like this instead: {{res1#a.string}}
 	jsonPath := fmt.Sprintf("{$.%s}", parts[1])
 	fieldValue, err := resources.GetJsonPathValue(objToTraverse, jsonPath, false)
 	if err != nil {
@@ -157,28 +182,14 @@ func (sp *SpecProcessor) processMatch(selector string, primitivesOnly bool) (int
 		return nil, errors.Errorf("field not found: %s", selector)
 	}
 
-	if primitivesOnly {
-		switch typedFieldValue := fieldValue.(type) {
-		case []byte:
-			// Secrets are in bytes. We wildly cast them to a string and hope for the best
-			// so we can put them in the JSON in a 'nice' way.
-			if !utf8.Valid(typedFieldValue) {
-				return nil, errors.Errorf("cannot expand non-UTF8 byte array field %q", selector)
-			}
-			fieldValue = string(typedFieldValue)
-		case int, uint:
-		case string, bool:
-		case float32, float64:
-		case uint8, uint16, uint32, uint64:
-		case int8, int16, int32, int64:
-		case complex64, complex128:
-		default:
-			return nil, errors.Errorf("cannot expand non-primitive field %s of type %T", selector, fieldValue)
+	if byteFieldValue, ok := fieldValue.([]byte); ok {
+		// Secrets are in bytes. We wildly cast them to a string and hope for the best
+		// so we can put them in the JSON in a 'nice' way.
+		if !utf8.Valid(byteFieldValue) {
+			return nil, errors.Errorf("cannot expand non-UTF8 byte array field %q", selector)
 		}
-	} else {
-		if _, ok := fieldValue.(string); ok {
-			return nil, errors.Errorf("cannot expand field %s of type string as naked reference", selector)
-		}
+		fieldValue = string(byteFieldValue)
 	}
+
 	return fieldValue, nil
 }

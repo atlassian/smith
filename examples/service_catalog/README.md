@@ -113,7 +113,7 @@ spec:
         replicas: 2
         template:
           metadata:
-            labels: "{{{podpreset1#spec.selector.matchLabels}}}"
+            labels: "{{podpreset1#spec.selector.matchLabels}}"
           spec:
             containers:
             - name: nginx
@@ -135,7 +135,7 @@ spec:
           protocol: TCP
           targetPort: 80
           nodePort: 30090
-        selector: "{{{deployment1#spec.template.metadata.labels}}}"
+        selector: "{{deployment1#spec.template.metadata.labels}}"
         type: NodePort
 
   - name: ingress1
@@ -153,7 +153,7 @@ spec:
             - path: /
               backend:
                 serviceName: "{{service1#metadata.name}}"
-                servicePort: "{{{service1#spec.ports[?(@.protocol==\"TCP\")].port}}}"
+                servicePort: "{{service1#spec.ports[?(@.protocol==\"TCP\")].port}}"
 
 ```
 
