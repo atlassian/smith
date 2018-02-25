@@ -178,6 +178,10 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 	}
 
 	return &apiext_v1b1.CustomResourceDefinition{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind: "CustomResourceDefinition",
+			APIVersion: apiext_v1b1.SchemeGroupVersion.String(),
+		},
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: smith_v1.BundleResourceName,
 		},
