@@ -44,6 +44,15 @@ func TestWorkflow(t *testing.T) {
 			"a": "b",
 		},
 	}
+	sa1 := &core_v1.ServiceAccount{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: "v1",
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: "sa1",
+		},
+	}
 	bundle := &smith_v1.Bundle{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       smith_v1.BundleResourceKind,
@@ -70,6 +79,12 @@ func TestWorkflow(t *testing.T) {
 					Name: "secret2res",
 					Spec: smith_v1.ResourceSpec{
 						Object: s1,
+					},
+				},
+				{
+					Name: "sa1res",
+					Spec: smith_v1.ResourceSpec{
+						Object: sa1,
 					},
 				},
 			},
