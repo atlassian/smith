@@ -168,20 +168,25 @@ func TestSchemaEarlyValidation(t *testing.T) {
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 
 			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resPWithDefaults, smith_v1.ResourceError, smith_v1.ConditionTrue)
-			assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-			assert.Equal(t, "invalid spec: spec failed validation against schema: p1: Invalid type. Expected: string, given: null", resCond.Message)
-
+			if resCond != nil {
+				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+				assert.Equal(t, "invalid spec: spec failed validation against schema: p1: Invalid type. Expected: string, given: null", resCond.Message)
+			}
 			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resSiWithDefaults, smith_v1.ResourceError, smith_v1.ConditionTrue)
-			assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-			assert.Equal(t, "spec failed validation against schema: testSchema: Invalid type. Expected: boolean, given: string", resCond.Message)
-
+			if resCond != nil {
+				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+				assert.Equal(t, "spec failed validation against schema: testSchema: Invalid type. Expected: boolean, given: string", resCond.Message)
+			}
 			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resPWithoutDefaults, smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
-			assert.Equal(t, smith_v1.ResourceReasonDependenciesNotReady, resCond.Reason)
-			assert.Equal(t, `Not ready: ["`+resSb1+`"]`, resCond.Message)
-
+			if resCond != nil {
+				assert.Equal(t, smith_v1.ResourceReasonDependenciesNotReady, resCond.Reason)
+				assert.Equal(t, `Not ready: ["`+resSb1+`"]`, resCond.Message)
+			}
 			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resPWithoutDefaults, smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
-			assert.Equal(t, smith_v1.ResourceReasonDependenciesNotReady, resCond.Reason)
-			assert.Equal(t, `Not ready: ["`+resSb1+`"]`, resCond.Message)
+			if resCond != nil {
+				assert.Equal(t, smith_v1.ResourceReasonDependenciesNotReady, resCond.Reason)
+				assert.Equal(t, `Not ready: ["`+resSb1+`"]`, resCond.Message)
+			}
 		},
 	}
 	tc.run(t)

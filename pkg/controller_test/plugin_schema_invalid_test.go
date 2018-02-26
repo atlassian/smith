@@ -62,8 +62,10 @@ func TestPluginSchemaInvalid(t *testing.T) {
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 
 			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceError, smith_v1.ConditionTrue)
-			assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-			assert.Equal(t, "invalid spec: spec failed validation against schema: p1: Invalid type. Expected: string, given: null", resCond.Message)
+			if resCond != nil {
+				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+				assert.Equal(t, "invalid spec: spec failed validation against schema: p1: Invalid type. Expected: string, given: null", resCond.Message)
+			}
 		},
 	}
 	tc.run(t)
