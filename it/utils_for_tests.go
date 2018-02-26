@@ -68,7 +68,7 @@ func (cfg *Config) CreateObject(ctxTest context.Context, obj, res runtime.Object
 
 func (cfg *Config) AwaitBundleCondition(conditions ...watch.ConditionFunc) *smith_v1.Bundle {
 	lw := cache.NewListWatchFromClient(cfg.BundleClient.SmithV1().RESTClient(), smith_v1.BundleResourcePlural, cfg.Namespace, fields.Everything())
-	event, err := cache.ListWatchUntil(10*time.Second, lw, conditions...)
+	event, err := cache.ListWatchUntil(20*time.Second, lw, conditions...)
 	require.NoError(cfg.T, err)
 	return event.Object.(*smith_v1.Bundle)
 }
@@ -124,7 +124,7 @@ func IsBundleResourceCond(t *testing.T, namespace, name string, resource smith_v
 			b := event.Object.(*smith_v1.Bundle)
 			_, resStatus := b.Status.GetResourceStatus(resource)
 			if resStatus == nil {
-				t.Logf("Resource status for resource %q not found", resource)
+				t.Logf("Resource status for resource %q not found. Bundle status: %s", resource, &b.Status)
 				return false, nil
 			}
 			for _, condExpected := range conds {
@@ -136,6 +136,7 @@ func IsBundleResourceCond(t *testing.T, namespace, name string, resource smith_v
 				if condExpected.Status != condActual.Status ||
 					condExpected.Reason != condActual.Reason ||
 					condExpected.Message != condActual.Message {
+					t.Logf("Resource condition %q for resource %q not satisfied: %s", condExpected.Type, resource, condActual)
 					return false, nil
 				}
 				t.Logf("Resource condition %q for resource %q satisfied", condExpected.Type, resource)
