@@ -6,7 +6,7 @@ import (
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
-	apps_v1b2 "k8s.io/api/apps/v1beta2"
+	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,9 +14,9 @@ import (
 )
 
 var MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
-	{Group: apps_v1b2.GroupName, Kind: "Deployment"}: deploymentCleanup,
-	{Group: core_v1.GroupName, Kind: "Service"}:      serviceCleanup,
-	{Group: core_v1.GroupName, Kind: "Secret"}:       secretCleanup,
+	{Group: apps_v1.GroupName, Kind: "Deployment"}: deploymentCleanup,
+	{Group: core_v1.GroupName, Kind: "Service"}:    serviceCleanup,
+	{Group: core_v1.GroupName, Kind: "Secret"}:     secretCleanup,
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
@@ -25,7 +25,7 @@ var ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
 }
 
 func deploymentCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
-	var deploymentSpec apps_v1b2.Deployment
+	var deploymentSpec apps_v1.Deployment
 	if err := util.ConvertType(scheme, spec, &deploymentSpec); err != nil {
 		return nil, err
 	}

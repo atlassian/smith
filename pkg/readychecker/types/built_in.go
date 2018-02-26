@@ -6,7 +6,7 @@ import (
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
-	apps_v1b2 "k8s.io/api/apps/v1beta2"
+	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,11 +14,11 @@ import (
 )
 
 var MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
-	{Group: core_v1.GroupName, Kind: "ConfigMap"}:    alwaysReady,
-	{Group: core_v1.GroupName, Kind: "Secret"}:       alwaysReady,
-	{Group: core_v1.GroupName, Kind: "Service"}:      alwaysReady,
-	{Group: apps_v1b2.GroupName, Kind: "Deployment"}: isDeploymentReady,
-	{Group: ext_v1b1.GroupName, Kind: "Ingress"}:     alwaysReady,
+	{Group: core_v1.GroupName, Kind: "ConfigMap"}:  alwaysReady,
+	{Group: core_v1.GroupName, Kind: "Secret"}:     alwaysReady,
+	{Group: core_v1.GroupName, Kind: "Service"}:    alwaysReady,
+	{Group: apps_v1.GroupName, Kind: "Deployment"}: isDeploymentReady,
+	{Group: ext_v1b1.GroupName, Kind: "Ingress"}:   alwaysReady,
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
@@ -33,7 +33,7 @@ func alwaysReady(_ *runtime.Scheme, _ runtime.Object) (isReady, retriableError b
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
 func isDeploymentReady(scheme *runtime.Scheme, obj runtime.Object) (isReady, retriableError bool, e error) {
-	var deployment apps_v1b2.Deployment
+	var deployment apps_v1.Deployment
 	if err := util.ConvertType(scheme, obj, &deployment); err != nil {
 		return false, false, err
 	}
