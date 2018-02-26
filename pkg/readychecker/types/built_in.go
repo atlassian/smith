@@ -14,11 +14,12 @@ import (
 )
 
 var MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
-	{Group: core_v1.GroupName, Kind: "ConfigMap"}:  alwaysReady,
-	{Group: core_v1.GroupName, Kind: "Secret"}:     alwaysReady,
-	{Group: core_v1.GroupName, Kind: "Service"}:    alwaysReady,
-	{Group: apps_v1.GroupName, Kind: "Deployment"}: isDeploymentReady,
-	{Group: ext_v1b1.GroupName, Kind: "Ingress"}:   alwaysReady,
+	{Group: core_v1.GroupName, Kind: "ConfigMap"}:      alwaysReady,
+	{Group: core_v1.GroupName, Kind: "Secret"}:         alwaysReady,
+	{Group: core_v1.GroupName, Kind: "Service"}:        alwaysReady,
+	{Group: core_v1.GroupName, Kind: "ServiceAccount"}: alwaysReady,
+	{Group: apps_v1.GroupName, Kind: "Deployment"}:     isDeploymentReady,
+	{Group: ext_v1b1.GroupName, Kind: "Ingress"}:       alwaysReady,
 }
 
 var ServiceCatalogKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{

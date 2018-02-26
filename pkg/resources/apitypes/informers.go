@@ -20,11 +20,12 @@ import (
 func ResourceInformers(mainClient kubernetes.Interface, scClient scClientset.Interface, namespace string, resyncPeriod time.Duration) map[schema.GroupVersionKind]cache.SharedIndexInformer {
 	// Core API types
 	infs := map[schema.GroupVersionKind]cache.SharedIndexInformer{
-		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):   ext_v1b1inf.NewIngressInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
-		core_v1.SchemeGroupVersion.WithKind("Service"):    core_v1inf.NewServiceInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
-		core_v1.SchemeGroupVersion.WithKind("ConfigMap"):  core_v1inf.NewConfigMapInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
-		core_v1.SchemeGroupVersion.WithKind("Secret"):     core_v1inf.NewSecretInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
-		apps_v1.SchemeGroupVersion.WithKind("Deployment"): apps_v1inf.NewDeploymentInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):       ext_v1b1inf.NewIngressInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		core_v1.SchemeGroupVersion.WithKind("Service"):        core_v1inf.NewServiceInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		core_v1.SchemeGroupVersion.WithKind("ConfigMap"):      core_v1inf.NewConfigMapInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		core_v1.SchemeGroupVersion.WithKind("Secret"):         core_v1inf.NewSecretInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		core_v1.SchemeGroupVersion.WithKind("ServiceAccount"): core_v1inf.NewServiceAccountInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
+		apps_v1.SchemeGroupVersion.WithKind("Deployment"):     apps_v1inf.NewDeploymentInformer(mainClient, namespace, resyncPeriod, cache.Indexers{}),
 	}
 
 	// Service Catalog types
