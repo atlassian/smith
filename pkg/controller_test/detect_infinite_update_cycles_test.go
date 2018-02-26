@@ -81,8 +81,10 @@ func TestDetectInfiniteUpdateCycles(t *testing.T) {
 			smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
 			smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceReady, smith_v1.ConditionFalse)
 			resCond := smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceError, smith_v1.ConditionTrue)
-			assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-			assert.Equal(t, "specification of the created/updated object does not match the desired spec", resCond.Message)
+			if resCond != nil {
+				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+				assert.Equal(t, "specification of the created/updated object does not match the desired spec", resCond.Message)
+			}
 		},
 	}
 	tc.run(t)

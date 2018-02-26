@@ -76,8 +76,10 @@ func TestServiceInstanceSchemaInvalid(t *testing.T) {
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 
 			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceError, smith_v1.ConditionTrue)
-			assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-			assert.Equal(t, "spec failed validation against schema: testSchema: Invalid type. Expected: boolean, given: string", resCond.Message)
+			if resCond != nil {
+				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+				assert.Equal(t, "spec failed validation against schema: testSchema: Invalid type. Expected: boolean, given: string", resCond.Message)
+			}
 		},
 	}
 	tc.run(t)
