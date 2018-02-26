@@ -82,6 +82,18 @@ func SleeperScheme() *runtime.Scheme {
 	return scheme
 }
 
+func AndCond(conds ...watch.ConditionFunc) watch.ConditionFunc {
+	return func(event watch.Event) (bool, error) {
+		for _, c := range conds {
+			res, err := c(event)
+			if err != nil || !res {
+				return res, err
+			}
+		}
+		return true, nil
+	}
+}
+
 func IsBundleStatusCond(namespace, name string, cType smith_v1.BundleConditionType, status smith_v1.ConditionStatus) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		metaObj := event.Object.(meta_v1.Object)
@@ -93,6 +105,42 @@ func IsBundleStatusCond(namespace, name string, cType smith_v1.BundleConditionTy
 			b := event.Object.(*smith_v1.Bundle)
 			_, cond := b.GetCondition(cType)
 			return cond != nil && cond.Status == status, nil
+		default:
+			return false, errors.Errorf("unexpected event type %q: %v", event.Type, event.Object)
+		}
+	}
+}
+
+// IsBundleResourceCond is a condition that checks conditions of a resource.
+// Sometimes it is necessary to await a particular resource condition(s) to happen, not a Bundle condition.
+func IsBundleResourceCond(t *testing.T, namespace, name string, resource smith_v1.ResourceName, conds ...*smith_v1.ResourceCondition) watch.ConditionFunc {
+	return func(event watch.Event) (bool, error) {
+		metaObj := event.Object.(meta_v1.Object)
+		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
+			return false, nil
+		}
+		switch event.Type {
+		case watch.Added, watch.Modified:
+			b := event.Object.(*smith_v1.Bundle)
+			_, resStatus := b.Status.GetResourceStatus(resource)
+			if resStatus == nil {
+				t.Logf("Resource status for resource %q not found", resource)
+				return false, nil
+			}
+			for _, condExpected := range conds {
+				_, condActual := resStatus.GetCondition(condExpected.Type)
+				if condActual == nil {
+					t.Logf("Resource condition %q for resource %q not found", condExpected.Type, resource)
+					return false, nil
+				}
+				if condExpected.Status != condActual.Status ||
+					condExpected.Reason != condActual.Reason ||
+					condExpected.Message != condActual.Message {
+					return false, nil
+				}
+				t.Logf("Resource condition %q for resource %q satisfied", condExpected.Type, resource)
+			}
+			return true, nil
 		default:
 			return false, errors.Errorf("unexpected event type %q: %v", event.Type, event.Object)
 		}

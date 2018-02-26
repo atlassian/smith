@@ -3,7 +3,6 @@ package it
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
@@ -116,10 +115,20 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	cfg.CreateObject(ctxTest, cfg.Bundle, bundleActual, smith_v1.BundleResourcePlural, cfg.BundleClient.SmithV1().RESTClient())
 	cfg.CreatedBundle = bundleActual
 
-	time.Sleep(1 * time.Second) // TODO this should be removed once race with tpr informer is fixed "no informer for tpr.atlassian.com/v1, Kind=Sleeper is registered"
-
 	// Bundle should be in Error=true state
-	bundleActual = cfg.AwaitBundleCondition(IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleError, smith_v1.ConditionTrue))
+	bundleActual = cfg.AwaitBundleCondition(AndCond(
+		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, resCm, &smith_v1.ResourceCondition{
+			Type:    smith_v1.ResourceError,
+			Status:  smith_v1.ConditionTrue,
+			Reason:  smith_v1.ResourceReasonTerminalError,
+			Message: `object is not controlled by the Bundle and does not have a controller at all`,
+		}),
+		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, resSl, &smith_v1.ResourceCondition{
+			Type:    smith_v1.ResourceError,
+			Status:  smith_v1.ConditionTrue,
+			Reason:  smith_v1.ResourceReasonTerminalError,
+			Message: `object is not controlled by the Bundle and does not have a controller at all`,
+		})))
 
 	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleReady, smith_v1.ConditionFalse)
 	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
@@ -131,18 +140,10 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceReady, smith_v1.ConditionFalse)
-	resCond := smith_testing.AssertResourceCondition(cfg.T, bundleActual, resCm, smith_v1.ResourceError, smith_v1.ConditionTrue)
-	if resCond != nil {
-		assert.Equal(cfg.T, "object is not controlled by the Bundle and does not have a controller at all", resCond.Message)
-	}
 
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
 	smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceReady, smith_v1.ConditionFalse)
-	resCond = smith_testing.AssertResourceCondition(cfg.T, bundleActual, resSl, smith_v1.ResourceError, smith_v1.ConditionTrue)
-	if resCond != nil {
-		assert.Equal(cfg.T, "object is not controlled by the Bundle and does not have a controller at all", resCond.Message)
-	}
 
 	// Delete conflicting ConfigMap
 	trueVar := true
