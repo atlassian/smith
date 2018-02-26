@@ -143,6 +143,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	loggerConfig := zap.NewDevelopmentConfig()
 	loggerConfig.DisableCaller = true
+	loggerConfig.DisableStacktrace = true
 	logger, err := loggerConfig.Build()
 	require.NoError(t, err)
 	defer logger.Sync()
