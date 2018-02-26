@@ -280,3 +280,17 @@ type ResourceCondition struct {
 	// A human readable message indicating details about the transition.
 	Message string `json:"message,omitempty"`
 }
+
+func (rc *ResourceCondition) String() string {
+	var buf bytes.Buffer
+	buf.WriteString(string(rc.Type))
+	buf.WriteByte(' ')
+	buf.WriteString(string(rc.Status))
+	if rc.Reason != "" {
+		fmt.Fprintf(&buf, " %q", rc.Reason)
+	}
+	if rc.Message != "" {
+		fmt.Fprintf(&buf, " %q", rc.Message)
+	}
+	return buf.String()
+}
