@@ -265,7 +265,7 @@ func (st *bundleSyncTask) updateBundle() error {
 		return errors.Wrap(err, "failed to update bundle")
 	}
 	st.logger.Sugar().Debugf("Set bundle status to %s", &bundleUpdated.Status)
-	st.logger.Sugar().Debugf("Set bundle finalizers to %#v", &bundleUpdated.Finalizers)
+	st.logger.Sugar().Debugf("Set bundle finalizers to %s", bundleUpdated.Finalizers)
 	return nil
 }
 
