@@ -470,7 +470,7 @@
     "discovery",
     "discovery/fake",
     "dynamic",
-    "informers/apps/v1beta2",
+    "informers/apps/v1",
     "informers/core/v1",
     "informers/extensions/v1beta1",
     "informers/internalinterfaces",
@@ -533,7 +533,7 @@
     "kubernetes/typed/storage/v1alpha1/fake",
     "kubernetes/typed/storage/v1beta1",
     "kubernetes/typed/storage/v1beta1/fake",
-    "listers/apps/v1beta2",
+    "listers/apps/v1",
     "listers/core/v1",
     "listers/extensions/v1beta1",
     "pkg/version",
@@ -605,6 +605,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "71c5db814b2463f0e2a77a63f92994f6c25861dcb0f98c71608e9d10eec1cd50"
+  inputs-digest = "b832e8a45a17c1a7ebf6bd6cabf3f31b88cbb259ba0997bd1e403310bb84f856"
   solver-name = "gps-cdcl"
   solver-version = 1
