@@ -132,7 +132,7 @@ and following the same behaviour, semantics and code "style" as native Kubernete
 
 ## Features
 
-- Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `PodPreset`, `Ingress`;
+- Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `Ingress`;
 - [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `ServiceInstance` and `ServiceBinding`.
 See [an example](examples/service_catalog) and
 [recording of the presentation](https://youtu.be/7fgPgtQh5Es) to [Service Catalog SIG](https://github.com/kubernetes/community/tree/master/sig-service-catalog);

@@ -54,17 +54,6 @@ rules:
   - delete
 
 - apiGroups:
-  - settings.k8s.io
-  resources:
-  - podpresets
-  verbs:
-  - list
-  - watch
-  - create
-  - update
-  - delete
-
-- apiGroups:
   - extensions
   resources:
   - ingresses
