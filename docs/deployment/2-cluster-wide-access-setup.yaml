@@ -29,6 +29,7 @@ rules:
   - configmaps
   - secrets
   - services
+  - serviceaccounts
   verbs:
   - list
   - watch
