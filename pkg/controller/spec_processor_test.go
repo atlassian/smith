@@ -138,6 +138,36 @@ func TestSpecProcessorBindSecret(t *testing.T) {
 	assert.Equal(t, expected, obj)
 }
 
+func TestSpecProcessorBindSecretWithJsonField(t *testing.T) {
+	// We don't convert the Secret to unstructured so we have base64 decoded 'stuff'.
+	// However, kubernetes jsonpath is smart (crazy?) enough to use both the json
+	// tags AND the field names in its lookups...
+	t.Parallel()
+	sp := SpecProcessor{
+		selfName:  "abc",
+		resources: processedResources(),
+		allowedResources: map[smith_v1.ResourceName]struct{}{
+			"res1":       {},
+			"resbinding": {},
+		},
+	}
+	obj := map[string]interface{}{
+		"ref": map[string]interface{}{
+			"int":    "{{res1#a.int}}",
+			"secret": "{{resbinding:bindsecret#data.password}}",
+		},
+	}
+	expected := map[string]interface{}{
+		"ref": map[string]interface{}{
+			"int":    42,
+			"secret": "secret",
+		},
+	}
+
+	require.NoError(t, sp.ProcessObject(obj))
+	assert.Equal(t, expected, obj)
+}
+
 func TestSpecProcessorExamples(t *testing.T) {
 	t.Parallel()
 	sp := NewExamplesSpec("abc", []smith_v1.ResourceName{"res1", "resbinding"})
