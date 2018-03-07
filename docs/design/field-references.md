@@ -59,8 +59,10 @@ spec:
 
 When Service Catalog processes a ServiceBinding, the output is placed in a Secret
 (since they might be secret). If they're not secret, it's convenient to directly
-reference them in the bundle. This can be done by using `dependency:bindsecret#Data.secretkey`.
-At the moment, `bindsecret` is the only parameterisation of the dependency that is allowed.
+reference them in the bundle. This can be done by using `dependency:bindsecret#data.secretkey`.
+Secrets inside data fields are stored base64 encoded in kubernetes, but when you refer to
+them in Smith they are plain. At the moment, `bindsecret` is the only parameterisation of
+the dependency that is allowed.
 
 For example:
 
@@ -115,12 +117,12 @@ spec:
           clusterServicePlanExternalName: default
           parameters:
             important: true
-            host: "{{a-binding:bindsecret#host}}"
-            password: "{{a-binding:bindsecret#password}}"
+            host: "{{a-binding:bindsecret#data.host}}"
+            password: "{{a-binding:bindsecret#data.password}}"
 ```
 
 **Warning: it is not currently safe to have a truly secret field
-passed this way (cf `a-binding:bindsecret#password`) unless it's inserted
+passed this way (cf `a-binding:bindsecret#data.password`) unless it's inserted
 into a secret, as it will be exposed in the parameters of the created object.**
 To do the example above correctly, we could instead construct a new secret object
 in the appropriate form for a `ServiceInstance` `parametersFrom` secret reference.
@@ -152,8 +154,8 @@ Modifying part of the example from the previous section:
           clusterServicePlanExternalName: default
           parameters:
             important: true
-            host: '{{a-binding:bindsecret#host#"http://example.com"}}'
-            password: '{{a-binding:bindsecret#password#"fakepassword"}}'
+            host: '{{a-binding:bindsecret#data.host#"http://example.com"}}'
+            password: '{{a-binding:bindsecret#data.password#"fakepassword"}}'
 ```
 
 The difference here is that the `host` and `password` fields now have an additional
