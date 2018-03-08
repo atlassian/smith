@@ -17,7 +17,6 @@ import (
 	apiext_lst_v1b1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -219,8 +218,8 @@ func int64ptr(val int64) *int64 {
 	return &val
 }
 
-func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, defaulter runtime.ObjectDefaulter, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
-	err := EnsureCrdExists(ctx, logger, defaulter, clientset, crdLister, crd)
+func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+	err := EnsureCrdExists(ctx, logger, clientset, crdLister, crd)
 	if err != nil {
 		return err
 	}
@@ -228,7 +227,7 @@ func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, de
 	return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
 }
 
-func EnsureCrdExists(ctx context.Context, logger *zap.Logger, defaulter runtime.ObjectDefaulter, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+func EnsureCrdExists(ctx context.Context, logger *zap.Logger, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
 	for {
 		obj, err := crdLister.Get(crd.Name)
 		notFound := api_errors.IsNotFound(err)
@@ -247,7 +246,7 @@ func EnsureCrdExists(ctx context.Context, logger *zap.Logger, defaulter runtime.
 			}
 			logger.Info("CustomResourceDefinition was created concurrently", logz.Object(crd))
 		} else {
-			if IsEqualCrd(crd, obj, defaulter) {
+			if IsEqualCrd(crd, obj) {
 				return nil
 			}
 			logger.Info("Updating CustomResourceDefinition", logz.Object(crd))
@@ -316,14 +315,14 @@ func IsCrdConditionPresentAndEqual(crd *apiext_v1b1.CustomResourceDefinition, co
 	return false
 }
 
-func IsEqualCrd(a, b *apiext_v1b1.CustomResourceDefinition, defaulter runtime.ObjectDefaulter) bool {
+func IsEqualCrd(a, b *apiext_v1b1.CustomResourceDefinition) bool {
 	aCopy := *a
 	bCopy := *b
 	a = &aCopy
 	b = &bCopy
 
-	defaulter.Default(a)
-	defaulter.Default(b)
+	apiext_v1b1.SetDefaults_CustomResourceDefinitionSpec(&a.Spec)
+	apiext_v1b1.SetDefaults_CustomResourceDefinitionSpec(&b.Spec)
 
 	// Ignoring labels and annotations for now
 	as := a.Spec

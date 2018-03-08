@@ -55,7 +55,7 @@ func TestCrdAttribute(t *testing.T) {
 
 func testCrdAttribute(ctxTest context.Context, t *testing.T, cfg *Config, args ...interface{}) {
 	sl := args[0].(*sleeper_v1.Sleeper)
-	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
+	sClient, err := sleeper.Client(cfg.Config)
 	require.NoError(t, err)
 
 	stgr := stager.New()

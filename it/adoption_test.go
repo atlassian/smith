@@ -91,7 +91,7 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	sl := args[1].(*sleeper_v1.Sleeper)
 
 	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
-	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
+	sClient, err := sleeper.Client(cfg.Config)
 	require.NoError(t, err)
 
 	// Create orphaned ConfigMap
