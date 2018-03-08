@@ -217,7 +217,7 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 
 	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
 	secretClient := cfg.Clientset.CoreV1().Secrets(cfg.Namespace)
-	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
+	sClient, err := sleeper.Client(cfg.Config)
 	require.NoError(t, err)
 
 	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)

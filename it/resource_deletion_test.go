@@ -92,7 +92,7 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	resSl := smith_v1.ResourceName(sl.Name)
 
 	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
-	sClient, err := sleeper.GetSleeperClient(cfg.Config, SleeperScheme())
+	sClient, err := sleeper.Client(cfg.Config)
 	require.NoError(t, err)
 
 	// Create orphaned ConfigMap

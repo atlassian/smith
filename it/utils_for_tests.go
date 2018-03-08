@@ -10,13 +10,11 @@ import (
 
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
-	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
-	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/util"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 
@@ -50,7 +48,6 @@ type Config struct {
 	Clientset     kubernetes.Interface
 	Sc            *smart.DynamicClient
 	BundleClient  smithClientset.Interface
-	Scheme        *runtime.Scheme
 }
 
 func (cfg *Config) CreateObject(ctxTest context.Context, obj, res runtime.Object, resourcePath string, client rest.Interface) {
@@ -71,15 +68,6 @@ func (cfg *Config) AwaitBundleCondition(conditions ...watch.ConditionFunc) *smit
 	event, err := cache.ListWatchUntil(20*time.Second, lw, conditions...)
 	require.NoError(cfg.T, err)
 	return event.Object.(*smith_v1.Bundle)
-}
-
-func SleeperScheme() *runtime.Scheme {
-	scheme := runtime.NewScheme()
-	scheme.AddUnversionedTypes(core_v1.SchemeGroupVersion, &meta_v1.Status{})
-	if err := sleeper_v1.AddToScheme(scheme); err != nil {
-		panic(err)
-	}
-	return scheme
 }
 
 func AndCond(conds ...watch.ConditionFunc) watch.ConditionFunc {
@@ -197,9 +185,6 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	require.NoError(t, err)
 	defer logger.Sync()
 
-	scheme, err := apitypes.FullScheme(serviceCatalog)
-	require.NoError(t, err)
-
 	cfg := &Config{
 		T:            t,
 		Logger:       logger,
@@ -209,7 +194,6 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 		Clientset:    clientset,
 		Sc:           sc,
 		BundleClient: bundleClient,
-		Scheme:       scheme,
 	}
 
 	t.Logf("Creating namespace %q", cfg.Namespace)
@@ -245,8 +229,8 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	}
 
 	crdLister := apiext_v1b1list.NewCustomResourceDefinitionLister(crdInf.GetIndexer())
-	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, scheme, crdClient, crdLister, sleeper.SleeperCrd()))
-	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, scheme, crdClient, crdLister, resources.BundleCrd()))
+	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, crdClient, crdLister, sleeper.SleeperCrd()))
+	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, crdClient, crdLister, resources.BundleCrd()))
 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := app.App{

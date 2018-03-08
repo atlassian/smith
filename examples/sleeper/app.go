@@ -43,7 +43,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	sClient, err := GetSleeperClient(a.RestConfig, scheme)
+	sClient, err := Client(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	crdLister := apiext_v1b1list.NewCustomResourceDefinitionLister(crdInf.GetIndexer())
-	if err = resources.EnsureCrdExistsAndIsEstablished(ctx, a.Logger, scheme, crdClient, crdLister, SleeperCrd()); err != nil {
+	if err = resources.EnsureCrdExistsAndIsEstablished(ctx, a.Logger, crdClient, crdLister, SleeperCrd()); err != nil {
 		return err
 	}
 
