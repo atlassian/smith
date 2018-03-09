@@ -261,7 +261,7 @@ func (tc *testCase) run(t *testing.T) {
 	if tc.enableServiceCatalog {
 		cleanupTypes = append(cleanupTypes, clean_types.ServiceCatalogKnownTypes)
 	}
-	oc := cleanup.New(scheme, cleanupTypes...)
+	oc := cleanup.New(cleanupTypes...)
 
 	// Spec check
 	specCheck := &speccheck.SpecCheck{
