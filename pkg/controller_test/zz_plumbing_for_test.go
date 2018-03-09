@@ -266,7 +266,6 @@ func (tc *testCase) run(t *testing.T) {
 	// Spec check
 	specCheck := &speccheck.SpecCheck{
 		Logger:  tc.logger,
-		Scheme:  scheme,
 		Cleaner: oc,
 	}
 

@@ -16,18 +16,12 @@ import (
 
 type SpecCheck struct {
 	Logger *zap.Logger
-	Scheme *runtime.Scheme
 	// Server fields cleanup
 	Cleaner SpecCleaner
 }
 
 func (sc *SpecCheck) CompareActualVsSpec(spec, actual runtime.Object) (*unstructured.Unstructured, bool /*match*/, error) {
-	// Apply defaults to the spec
-	specWithDefaults, err := sc.applyDefaults(spec)
-	if err != nil {
-		return nil, false, errors.Wrapf(err, "failed to apply defaults to object spec %s", spec.GetObjectKind().GroupVersionKind())
-	}
-	specWithDefaultsUnstr, err := util.RuntimeToUnstructured(specWithDefaults)
+	specUnstr, err := util.RuntimeToUnstructured(spec)
 	if err != nil {
 		return nil, false, err
 	}
@@ -36,22 +30,7 @@ func (sc *SpecCheck) CompareActualVsSpec(spec, actual runtime.Object) (*unstruct
 		return nil, false, err
 	}
 	// Compare spec and existing resource
-	return sc.compareActualVsSpec(specWithDefaultsUnstr, actualUnstr)
-}
-
-func (sc *SpecCheck) applyDefaults(spec runtime.Object) (runtime.Object, error) {
-	gvk := spec.GetObjectKind().GroupVersionKind()
-	if !sc.Scheme.Recognizes(gvk) {
-		sc.Logger.Debug("Unrecognized object type - not applying defaults", logz.Gvk(gvk))
-		return spec, nil
-	}
-	clone, err := sc.Scheme.ConvertToVersion(spec, gvk.GroupVersion())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to convert to typed object")
-	}
-	sc.Scheme.Default(clone)
-	clone.GetObjectKind().SetGroupVersionKind(gvk)
-	return clone, nil
+	return sc.compareActualVsSpec(specUnstr, actualUnstr)
 }
 
 // compareActualVsSpec checks if actual resource satisfies the desired spec.

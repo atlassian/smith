@@ -37,7 +37,6 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 				scheme := runtime.NewScheme()
 				sc := SpecCheck{
 					Logger:  logger,
-					Scheme:  scheme,
 					Cleaner: cleanup.New(scheme),
 				}
 				updated, match, err := sc.CompareActualVsSpec(spec, actual)
