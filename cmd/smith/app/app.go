@@ -135,7 +135,7 @@ func (a *App) Run(ctx context.Context) error {
 	if a.ServiceCatalogSupport {
 		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
 	}
-	rc := readychecker.New(scheme, crdStore, readyTypes...)
+	rc := readychecker.New(crdStore, readyTypes...)
 
 	// Object cleanup
 	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}
