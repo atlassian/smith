@@ -13,29 +13,43 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
-	{Group: core_v1.GroupName, Kind: "ConfigMap"}:      alwaysReady,
-	{Group: core_v1.GroupName, Kind: "Secret"}:         alwaysReady,
-	{Group: core_v1.GroupName, Kind: "Service"}:        alwaysReady,
-	{Group: core_v1.GroupName, Kind: "ServiceAccount"}: alwaysReady,
-	{Group: apps_v1.GroupName, Kind: "Deployment"}:     isDeploymentReady,
-	{Group: ext_v1b1.GroupName, Kind: "Ingress"}:       alwaysReady,
+var (
+	MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
+		{Group: core_v1.GroupName, Kind: "ConfigMap"}:      alwaysReady,
+		{Group: core_v1.GroupName, Kind: "Secret"}:         alwaysReady,
+		{Group: core_v1.GroupName, Kind: "Service"}:        alwaysReady,
+		{Group: core_v1.GroupName, Kind: "ServiceAccount"}: alwaysReady,
+		{Group: apps_v1.GroupName, Kind: "Deployment"}:     isDeploymentReady,
+		{Group: ext_v1b1.GroupName, Kind: "Ingress"}:       alwaysReady,
+	}
+	ServiceCatalogKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
+		{Group: sc_v1b1.GroupName, Kind: "ServiceBinding"}:  isScServiceBindingReady,
+		{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: isScServiceInstanceReady,
+	}
+	apps_v1_scheme = runtime.NewScheme()
+	sc_v1b1_scheme = runtime.NewScheme()
+)
+
+func init() {
+	err := apps_v1.SchemeBuilder.AddToScheme(apps_v1_scheme)
+	if err != nil {
+		panic(err)
+	}
+	err = sc_v1b1.SchemeBuilder.AddToScheme(sc_v1b1_scheme)
+	if err != nil {
+		panic(err)
+	}
 }
 
-var ServiceCatalogKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
-	{Group: sc_v1b1.GroupName, Kind: "ServiceBinding"}:  isScServiceBindingReady,
-	{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: isScServiceInstanceReady,
-}
-
-func alwaysReady(_ *runtime.Scheme, _ runtime.Object) (isReady, retriableError bool, e error) {
+func alwaysReady(_ runtime.Object) (isReady, retriableError bool, e error) {
 	return true, false, nil
 }
 
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
-func isDeploymentReady(scheme *runtime.Scheme, obj runtime.Object) (isReady, retriableError bool, e error) {
+func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e error) {
 	var deployment apps_v1.Deployment
-	if err := util.ConvertType(scheme, obj, &deployment); err != nil {
+	if err := util.ConvertType(apps_v1_scheme, obj, &deployment); err != nil {
 		return false, false, err
 	}
 
@@ -48,9 +62,9 @@ func isDeploymentReady(scheme *runtime.Scheme, obj runtime.Object) (isReady, ret
 		deployment.Status.UpdatedReplicas == replicas, false, nil
 }
 
-func isScServiceBindingReady(scheme *runtime.Scheme, obj runtime.Object) (isReady, retriableError bool, e error) {
+func isScServiceBindingReady(obj runtime.Object) (isReady, retriableError bool, e error) {
 	var sic sc_v1b1.ServiceBinding
-	if err := util.ConvertType(scheme, obj, &sic); err != nil {
+	if err := util.ConvertType(sc_v1b1_scheme, obj, &sic); err != nil {
 		return false, false, err
 	}
 	readyCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionReady)
@@ -66,9 +80,9 @@ func isScServiceBindingReady(scheme *runtime.Scheme, obj runtime.Object) (isRead
 
 }
 
-func isScServiceInstanceReady(scheme *runtime.Scheme, obj runtime.Object) (isReady, retriableError bool, e error) {
+func isScServiceInstanceReady(obj runtime.Object) (isReady, retriableError bool, e error) {
 	var instance sc_v1b1.ServiceInstance
-	if err := util.ConvertType(scheme, obj, &instance); err != nil {
+	if err := util.ConvertType(sc_v1b1_scheme, obj, &instance); err != nil {
 		return false, false, err
 	}
 	readyCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionReady)
