@@ -147,7 +147,6 @@ func (a *App) Run(ctx context.Context) error {
 	// Spec check
 	specCheck := &speccheck.SpecCheck{
 		Logger:  a.Logger,
-		Scheme:  scheme,
 		Cleaner: oc,
 	}
 
