@@ -13,20 +13,41 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
-	{Group: apps_v1.GroupName, Kind: "Deployment"}: deploymentCleanup,
-	{Group: core_v1.GroupName, Kind: "Service"}:    serviceCleanup,
-	{Group: core_v1.GroupName, Kind: "Secret"}:     secretCleanup,
+var (
+	MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
+		{Group: apps_v1.GroupName, Kind: "Deployment"}: deploymentCleanup,
+		{Group: core_v1.GroupName, Kind: "Service"}:    serviceCleanup,
+		{Group: core_v1.GroupName, Kind: "Secret"}:     secretCleanup,
+	}
+
+	ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
+		{Group: sc_v1b1.GroupName, Kind: "ServiceBinding"}:  scServiceBindingCleanup,
+		{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: scServiceInstanceCleanup,
+	}
+
+	apps_v1_scheme = runtime.NewScheme()
+	sc_v1b1_scheme = runtime.NewScheme()
+	core_v1_scheme = runtime.NewScheme()
+)
+
+func init() {
+	err := apps_v1.SchemeBuilder.AddToScheme(apps_v1_scheme)
+	if err != nil {
+		panic(err)
+	}
+	err = sc_v1b1.SchemeBuilder.AddToScheme(sc_v1b1_scheme)
+	if err != nil {
+		panic(err)
+	}
+	err = core_v1.SchemeBuilder.AddToScheme(core_v1_scheme)
+	if err != nil {
+		panic(err)
+	}
 }
 
-var ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
-	{Group: sc_v1b1.GroupName, Kind: "ServiceBinding"}:  scServiceBindingCleanup,
-	{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: scServiceInstanceCleanup,
-}
-
-func deploymentCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+func deploymentCleanup(spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var deploymentSpec apps_v1.Deployment
-	if err := util.ConvertType(scheme, spec, &deploymentSpec); err != nil {
+	if err := util.ConvertType(apps_v1_scheme, spec, &deploymentSpec); err != nil {
 		return nil, err
 	}
 
@@ -35,13 +56,13 @@ func deploymentCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstru
 	return util.RuntimeToUnstructured(&deploymentSpec)
 }
 
-func serviceCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+func serviceCleanup(spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var serviceSpec core_v1.Service
-	if err := util.ConvertType(scheme, spec, &serviceSpec); err != nil {
+	if err := util.ConvertType(core_v1_scheme, spec, &serviceSpec); err != nil {
 		return nil, err
 	}
 	var serviceActual core_v1.Service
-	if err := util.ConvertType(scheme, actual, &serviceActual); err != nil {
+	if err := util.ConvertType(core_v1_scheme, actual, &serviceActual); err != nil {
 		return nil, err
 	}
 
@@ -64,9 +85,9 @@ func serviceCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstructu
 	return &serviceSpec, nil
 }
 
-func secretCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+func secretCleanup(spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var secretSpec core_v1.Secret
-	if err := util.ConvertType(scheme, spec, &secretSpec); err != nil {
+	if err := util.ConvertType(core_v1_scheme, spec, &secretSpec); err != nil {
 		return nil, err
 	}
 
@@ -84,13 +105,13 @@ func secretCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstructur
 	return &secretSpec, nil
 }
 
-func scServiceBindingCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+func scServiceBindingCleanup(spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var sbSpec sc_v1b1.ServiceBinding
-	if err := util.ConvertType(scheme, spec, &sbSpec); err != nil {
+	if err := util.ConvertType(sc_v1b1_scheme, spec, &sbSpec); err != nil {
 		return nil, err
 	}
 	var sbActual sc_v1b1.ServiceBinding
-	if err := util.ConvertType(scheme, actual, &sbActual); err != nil {
+	if err := util.ConvertType(sc_v1b1_scheme, actual, &sbActual); err != nil {
 		return nil, err
 	}
 
@@ -103,13 +124,13 @@ func scServiceBindingCleanup(scheme *runtime.Scheme, spec, actual *unstructured.
 	return &sbSpec, nil
 }
 
-func scServiceInstanceCleanup(scheme *runtime.Scheme, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var instanceSpec sc_v1b1.ServiceInstance
-	if err := util.ConvertType(scheme, spec, &instanceSpec); err != nil {
+	if err := util.ConvertType(sc_v1b1_scheme, spec, &instanceSpec); err != nil {
 		return nil, err
 	}
 	var instanceActual sc_v1b1.ServiceInstance
-	if err := util.ConvertType(scheme, actual, &instanceActual); err != nil {
+	if err := util.ConvertType(sc_v1b1_scheme, actual, &instanceActual); err != nil {
 		return nil, err
 	}
 

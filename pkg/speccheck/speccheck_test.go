@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
@@ -34,10 +33,9 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 			spec := input2()
 			t.Run(fmt.Sprintf("%s actual, %s spec", kind1, kind2), func(t *testing.T) {
 				t.Parallel()
-				scheme := runtime.NewScheme()
 				sc := SpecCheck{
 					Logger:  logger,
-					Cleaner: cleanup.New(scheme),
+					Cleaner: cleanup.New(),
 				}
 				updated, match, err := sc.CompareActualVsSpec(spec, actual)
 				require.NoError(t, err)
