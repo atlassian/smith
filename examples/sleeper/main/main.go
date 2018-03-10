@@ -10,8 +10,7 @@ import (
 
 	"github.com/atlassian/smith/examples/sleeper"
 	"github.com/atlassian/smith/pkg/client"
-
-	"go.uber.org/zap"
+	"github.com/atlassian/smith/pkg/util/logz"
 	"k8s.io/client-go/rest"
 )
 
@@ -50,14 +49,8 @@ func runWithContext(ctx context.Context) error {
 }
 
 func runWithConfig(ctx context.Context, config *rest.Config) error {
-	loggerConfig := zap.NewDevelopmentConfig()
-	loggerConfig.DisableCaller = true
-	logger, err := loggerConfig.Build()
-	if err != nil {
-		return err
-	}
 	a := sleeper.App{
-		Logger:     logger,
+		Logger:     logz.DevelopmentLogger(),
 		RestConfig: config,
 	}
 	return a.Run(ctx)

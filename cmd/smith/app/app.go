@@ -24,6 +24,7 @@ import (
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
+	"github.com/atlassian/smith/pkg/util/logz"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
@@ -304,7 +305,6 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 
 func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	a := App{}
-	zapConfig := zap.NewProductionConfig()
 	flagset.BoolVar(&a.ServiceCatalogSupport, "service-catalog", true, "Service Catalog support. Enabled by default.")
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
@@ -340,10 +340,8 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 		"Load REST client configuration from the specified Kubernetes config file. This is only applicable if --client-config-from=file is set.")
 	configContext := flagset.String("client-config-context", "",
 		"Context to use for REST client configuration. This is only applicable if --client-config-from=file is set.")
-	flagset.StringVar(&zapConfig.Encoding, "log-encoding", "json", `Sets the logger's encoding. Valid values are "json" and "console".`)
-	flagset.BoolVar(&zapConfig.DisableCaller, "log-disable-caller", true, `Stops annotating logs with the calling function's file name and line number.`)
-	flagset.BoolVar(&zapConfig.DisableStacktrace, "log-disable-stacktrace", true, `Completely disables automatic stacktrace capturing. `+
-		`By default, stacktraces are captured for ErrorLevel and above.`)
+	logEncoding := flagset.String("log-encoding", "json", `Sets the logger's encoding. Valid values are "json" and "console".`)
+	loggingLevel := flagset.String("log-level", "info", `Sets the logger's output level.`)
 
 	if err := flagset.Parse(arguments); err != nil {
 		return nil, err
@@ -358,11 +356,7 @@ func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
 	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(float32(*qps), int(*qps*1.5))
 	a.RestConfig = config
 
-	logger, err := zapConfig.Build()
-	if err != nil {
-		return nil, err
-	}
-	a.Logger = logger
+	a.Logger = logz.Logger(*loggingLevel, *logEncoding)
 
 	if *pprofAddr != "" {
 		go func() {

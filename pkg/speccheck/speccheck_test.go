@@ -5,10 +5,9 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith/pkg/cleanup"
-
+	"github.com/atlassian/smith/pkg/util/logz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -21,10 +20,7 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 		"missing": missingMap,
 		"nil":     nilMap,
 	}
-	loggerConfig := zap.NewDevelopmentConfig()
-	loggerConfig.DisableCaller = true
-	logger, err := loggerConfig.Build()
-	require.NoError(t, err)
+	logger := logz.DevelopmentLogger()
 	defer logger.Sync()
 
 	for kind1, input1 := range inputs {

@@ -14,6 +14,7 @@ go_library(
         "//pkg/client/smart:go_default_library",
         "//pkg/resources:go_default_library",
         "//pkg/util:go_default_library",
+        "//pkg/util/logz:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//vendor/github.com/ash2k/stager:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ash2k/stager"
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
@@ -16,9 +17,8 @@ import (
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util"
+	"github.com/atlassian/smith/pkg/util/logz"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
-
-	"github.com/ash2k/stager"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -178,11 +178,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	sc := smart.NewClient(config, clientset)
 
-	loggerConfig := zap.NewDevelopmentConfig()
-	loggerConfig.DisableCaller = true
-	loggerConfig.DisableStacktrace = true
-	logger, err := loggerConfig.Build()
-	require.NoError(t, err)
+	logger := logz.DevelopmentLogger()
 	defer logger.Sync()
 
 	cfg := &Config{
@@ -197,7 +193,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	}
 
 	t.Logf("Creating namespace %q", cfg.Namespace)
-	_, err = clientset.CoreV1().Namespaces().Create(&core_v1.Namespace{
+	_, err := clientset.CoreV1().Namespaces().Create(&core_v1.Namespace{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: cfg.Namespace,
 		},
