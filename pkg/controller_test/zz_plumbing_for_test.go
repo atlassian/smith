@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ash2k/stager"
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
@@ -26,8 +27,7 @@ import (
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util"
-
-	"github.com/ash2k/stager"
+	"github.com/atlassian/smith/pkg/util/logz"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	scFake "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake"
@@ -242,11 +242,7 @@ func (tc *testCase) run(t *testing.T) {
 	crdStore, err := store.NewCrd(crdInf)
 	require.NoError(t, err)
 
-	loggerConfig := zap.NewDevelopmentConfig()
-	loggerConfig.DisableCaller = true
-	loggerConfig.DisableStacktrace = true
-	tc.logger, err = loggerConfig.Build()
-	require.NoError(t, err)
+	tc.logger = logz.DevelopmentLogger()
 	defer tc.logger.Sync()
 
 	// Ready Checker
