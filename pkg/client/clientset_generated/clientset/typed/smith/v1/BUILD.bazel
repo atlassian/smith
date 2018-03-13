@@ -7,6 +7,7 @@ go_library(
         "doc.go",
         "generated_expansion.go",
         "smith_client.go",
+        "templaterender.go",
     ],
     importpath = "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1",
     visibility = ["//visibility:public"],

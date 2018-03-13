@@ -11,6 +11,7 @@ import (
 type SmithV1Interface interface {
 	RESTClient() rest.Interface
 	BundlesGetter
+	TemplateRendersGetter
 }
 
 // SmithV1Client is used to interact with features provided by the smith.atlassian.com group.
@@ -20,6 +21,10 @@ type SmithV1Client struct {
 
 func (c *SmithV1Client) Bundles(namespace string) BundleInterface {
 	return newBundles(c, namespace)
+}
+
+func (c *SmithV1Client) TemplateRenders(namespace string) TemplateRenderInterface {
+	return newTemplateRenders(c, namespace)
 }
 
 // NewForConfig creates a new SmithV1Client for the given config.

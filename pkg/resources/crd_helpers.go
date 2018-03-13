@@ -214,6 +214,37 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 	}
 }
 
+func TemplateRenderCrd() *apiext_v1b1.CustomResourceDefinition {
+	return &apiext_v1b1.CustomResourceDefinition{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "CustomResourceDefinition",
+			APIVersion: apiext_v1b1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: smith_v1.TemplateRenderResourceName,
+		},
+		Spec: apiext_v1b1.CustomResourceDefinitionSpec{
+			Group:   smith.GroupName,
+			Version: smith_v1.BundleResourceVersion,
+			Names: apiext_v1b1.CustomResourceDefinitionNames{
+				Plural:   smith_v1.TemplateRenderResourcePlural,
+				Singular: smith_v1.TemplateRenderResourceSingular,
+				Kind:     smith_v1.TemplateRenderResourceKind,
+			},
+			Scope: apiext_v1b1.NamespaceScoped,
+			Validation: &apiext_v1b1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiext_v1b1.JSONSchemaProps{
+					Properties: map[string]apiext_v1b1.JSONSchemaProps{
+						"spec": {
+							Type: "object",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func int64ptr(val int64) *int64 {
 	return &val
 }

@@ -255,6 +255,16 @@
   revision = "87b1dfb5b2fa649f52695dd9eae19abe404a4308"
 
 [[projects]]
+  name = "github.com/taskcluster/json-e"
+  packages = [
+    ".",
+    "interpreter",
+    "interpreter/prattparser"
+  ]
+  revision = "e7c5057d292797e63f41e90ae469a1007e1f69bc"
+  version = "v2.5.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/xeipuuv/gojsonpointer"
   packages = ["."]
@@ -605,6 +615,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b832e8a45a17c1a7ebf6bd6cabf3f31b88cbb259ba0997bd1e403310bb84f856"
+  inputs-digest = "f31813299de06e1da435b0a553bfd16ed51b6dc56bcbeb9b850ccb6c8d2a45c0"
   solver-name = "gps-cdcl"
   solver-version = 1

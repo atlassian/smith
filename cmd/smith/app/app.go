@@ -24,6 +24,7 @@ import (
 	"github.com/atlassian/smith/pkg/store"
 
 	"github.com/ash2k/stager"
+	"github.com/atlassian/smith/pkg/templatecontroller"
 	"github.com/atlassian/smith/pkg/util/logz"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
@@ -91,7 +92,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	bundleClient, err := smithClientset.NewForConfig(a.RestConfig)
+	smithClient, err := smithClientset.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -116,7 +117,7 @@ func (a *App) Run(ctx context.Context) error {
 	var infs []cache.SharedIndexInformer
 	// We don't add these to 'infs' because they're added later as part of
 	// resourceInfs processing.
-	bundleInf := client.BundleInformer(bundleClient.SmithV1(), a.Namespace, a.ResyncPeriod)
+	bundleInf := client.BundleInformer(smithClient.SmithV1(), a.Namespace, a.ResyncPeriod)
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, a.ResyncPeriod, cache.Indexers{})
 	crdStore, err := store.NewCrd(crdInf)
 	if err != nil {
@@ -183,11 +184,11 @@ func (a *App) Run(ctx context.Context) error {
 
 	resourceInfs := apitypes.ResourceInformers(clientset, scClient, a.Namespace, a.ResyncPeriod)
 
-	// Controller
-	cntrlr := controller.BundleController{
+	// Bundle Controller
+	bc := controller.BundleController{
 		Logger:           a.Logger,
 		BundleInf:        bundleInf,
-		BundleClient:     bundleClient.SmithV1(),
+		BundleClient:     smithClient.SmithV1(),
 		BundleStore:      bs,
 		SmartClient:      sc,
 		Rc:               rc,
@@ -201,7 +202,7 @@ func (a *App) Run(ctx context.Context) error {
 		Scheme:           scheme,
 		Catalog:          catalog,
 	}
-	cntrlr.Prepare(ctx, crdInf, resourceInfs)
+	bc.Prepare(ctx, crdInf, resourceInfs)
 
 	resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
 	resourceInfs[smith_v1.BundleGVK] = bundleInf
@@ -217,18 +218,33 @@ func (a *App) Run(ctx context.Context) error {
 		infs = append(infs, inf)
 	}
 
+	templateRenderInf := client.TemplateRenderInformer(smithClient.SmithV1(), a.Namespace, a.ResyncPeriod)
+	infs = append(infs, templateRenderInf)
+
+	trc := templatecontroller.TemplateController{
+		Logger:               a.Logger,
+		TemplateRenderInf:    templateRenderInf,
+		TemplateRenderClient: smithClient.SmithV1(),
+		Queue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "template"),
+		Workers:              a.Workers,
+	}
+	trc.Prepare()
+
 	// Start all informers then wait on them
 	infCacheSyncs := make([]cache.InformerSynced, len(infs))
 	for i, inf := range infs {
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
 		infCacheSyncs[i] = inf.HasSynced
 	}
+
 	a.Logger.Info("Waiting for informers to sync")
 	if !cache.WaitForCacheSync(ctx.Done(), infCacheSyncs...) {
 		return ctx.Err()
 	}
 
-	cntrlr.Run(ctx)
+	stage.StartWithContext(trc.Run)
+	stage.StartWithContext(bc.Run)
+	<-ctx.Done()
 	return ctx.Err()
 }
 

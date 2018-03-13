@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "fake_bundle.go",
         "fake_smith_client.go",
+        "fake_templaterender.go",
     ],
     importpath = "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1/fake",
     visibility = ["//visibility:public"],

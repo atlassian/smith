@@ -15,6 +15,10 @@ func (c *FakeSmithV1) Bundles(namespace string) v1.BundleInterface {
 	return &FakeBundles{c, namespace}
 }
 
+func (c *FakeSmithV1) TemplateRenders(namespace string) v1.TemplateRenderInterface {
+	return &FakeTemplateRenders{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeSmithV1) RESTClient() rest.Interface {

@@ -2,3 +2,5 @@
 package v1
 
 type BundleExpansion interface{}
+
+type TemplateRenderExpansion interface{}

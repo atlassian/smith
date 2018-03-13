@@ -28,6 +28,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Bundle{},
 		&BundleList{},
+		&TemplateRender{},
 	)
 	meta_v1.AddToGroupVersion(scheme, SchemeGroupVersion)
 

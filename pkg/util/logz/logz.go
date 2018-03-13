@@ -45,6 +45,14 @@ func BundleName(name string) zapcore.Field {
 	return zap.String("bundle_name", name)
 }
 
+func TemplateRender(templateRender *smith_v1.TemplateRender) zapcore.Field {
+	return TemplateRenderName(templateRender.Name)
+}
+
+func TemplateRenderName(name string) zapcore.Field {
+	return zap.String("template_render_name", name)
+}
+
 func Logger(loggingLevel, logEncoding string) *zap.Logger {
 	var levelEnabler zapcore.Level
 	switch loggingLevel {

@@ -26,6 +26,20 @@ const (
 	BundleReasonRetriableError = "RetriableError"
 )
 
+type TemplateRenderConditionType string
+
+// These are valid conditions of a Bundle.
+const (
+	TemplateRenderInProgress BundleConditionType = "InProgress"
+	TemplateRenderReady      BundleConditionType = "Ready"
+	TemplateRenderError      BundleConditionType = "Error"
+)
+
+const (
+	TemplateRenderReasonTerminalError  = "TerminalError"
+	TemplateRenderReasonRetriableError = "RetriableError"
+)
+
 type ResourceConditionType string
 
 // These are valid conditions of a resource.
@@ -68,6 +82,15 @@ const (
 	BundleResourceGroupVersion = smith.GroupName + "/" + BundleResourceVersion
 
 	BundleResourceName = BundleResourcePlural + "." + smith.GroupName
+
+	TemplateRenderResourceSingular = "templaterender"
+	TemplateRenderResourcePlural   = "templaterenders"
+	TemplateRenderResourceVersion  = "v1"
+	TemplateRenderResourceKind     = "TemplateRender"
+
+	TemplateRenderResourceGroupVersion = smith.GroupName + "/" + TemplateRenderResourceVersion
+
+	TemplateRenderResourceName = TemplateRenderResourcePlural + "." + smith.GroupName
 )
 
 var BundleGVK = SchemeGroupVersion.WithKind(BundleResourceKind)
@@ -293,4 +316,115 @@ func (rc *ResourceCondition) String() string {
 		fmt.Fprintf(&buf, " %q", rc.Message)
 	}
 	return buf.String()
+}
+
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type TemplateRenderList struct {
+	meta_v1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	meta_v1.ListMeta `json:"metadata,omitempty"`
+
+	// Items is a list of TemplateRenders.
+	Items []TemplateRender `json:"items"`
+}
+
+// +genclient
+// +genclient:noStatus
+
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// TemplateRender describes a rendering of a Template.
+type TemplateRender struct {
+	meta_v1.TypeMeta `json:",inline"`
+
+	// Standard object metadata
+	meta_v1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the specification of the desired behavior of the Bundle.
+	Spec TemplateRenderSpec `json:"spec,omitempty"`
+
+	// Status is most recently observed status of the Bundle.
+	Status TemplateRenderStatus `json:"status,omitempty"`
+}
+
+func (tr *TemplateRender) GetCondition(conditionType TemplateRenderConditionType) (int, *TemplateRenderCondition) {
+	for i := range tr.Status.Conditions {
+		condition := &tr.Status.Conditions[i]
+		if condition.Type == conditionType {
+			return i, condition
+		}
+	}
+	return -1, nil
+}
+
+// +k8s:deepcopy-gen=true
+type TemplateRenderSpec struct {
+	// TODO use actual template name type
+	Template string                 `json:"template,omitempty"`
+	Context  map[string]interface{} `json:"context,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+// TemplateRenderCondition describes the state of a bundle at a certain point.
+type TemplateRenderCondition struct {
+	// Type of TemplateRender condition.
+	Type TemplateRenderConditionType `json:"type"`
+	// Status of the condition.
+	Status ConditionStatus `json:"status"`
+	// The last time this condition was updated.
+	LastUpdateTime meta_v1.Time `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime meta_v1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message string `json:"message,omitempty"`
+}
+
+func (trc *TemplateRenderCondition) String() string {
+	var buf bytes.Buffer
+	buf.WriteString(string(trc.Type))
+	buf.WriteByte(' ')
+	buf.WriteString(string(trc.Status))
+	if trc.Reason != "" {
+		fmt.Fprintf(&buf, " %q", trc.Reason)
+	}
+	if trc.Message != "" {
+		fmt.Fprintf(&buf, " %q", trc.Message)
+	}
+	return buf.String()
+}
+
+// +k8s:deepcopy-gen=true
+// TemplateRenderStatus represents the latest available observations of a TemplateRender's current state.
+type TemplateRenderStatus struct {
+	Conditions       []TemplateRenderCondition `json:"conditions,omitempty"`
+	ResourceStatuses []ResourceStatus          `json:"resourceStatuses,omitempty"`
+}
+
+func (trs *TemplateRenderStatus) String() string {
+	first := true
+	var buf bytes.Buffer
+	buf.WriteByte('[')
+	for _, cond := range trs.Conditions {
+		if first {
+			first = false
+		} else {
+			buf.WriteByte('|')
+		}
+		buf.WriteString(cond.String())
+	}
+	buf.WriteByte(']')
+	return buf.String()
+}
+
+func (trs *TemplateRenderStatus) GetResourceStatus(resName ResourceName) (int, *ResourceStatus) {
+	for i := range trs.ResourceStatuses {
+		resStatus := &trs.ResourceStatuses[i]
+		if resStatus.Name == resName {
+			return i, resStatus
+		}
+	}
+	return -1, nil
 }
