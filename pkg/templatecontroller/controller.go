@@ -11,7 +11,11 @@ import (
 
 	"github.com/ash2k/stager/wait"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -21,6 +25,25 @@ const (
 	// to be dequeued.
 	workDeduplicationPeriod = 50 * time.Millisecond
 )
+
+type SpecCheck interface {
+	CompareActualVsSpec(spec, actual runtime.Object) (updatedSpec *unstructured.Unstructured, match bool, err error)
+}
+
+type ReadyChecker interface {
+	IsReady(*unstructured.Unstructured) (isReady, retriableError bool, e error)
+}
+
+type SmartClient interface {
+	ForGVK(gvk schema.GroupVersionKind, namespace string) (dynamic.ResourceInterface, error)
+}
+
+type Store interface {
+	Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error)
+	ObjectsControlledBy(namespace string, uid types.UID) ([]runtime.Object, error)
+	AddInformer(schema.GroupVersionKind, cache.SharedIndexInformer)
+	RemoveInformer(schema.GroupVersionKind) bool
+}
 
 type TemplateController struct {
 	// wg.Wait() is called from Run() and first wg.Add() may be called concurrently from CRD listener
@@ -34,9 +57,11 @@ type TemplateController struct {
 	Logger *zap.Logger
 
 	TemplateRenderInf    cache.SharedIndexInformer
-	TemplateRenderClient smithClient_v1.TemplateRendersGetter
-	//TemplateInf          cache.SharedIndexInformer
-	//TemplateClient       smithClient_v1.BundlesGetter
+	TemplateInf          cache.SharedIndexInformer
+	TemplateRenderClient smithClient_v1.BundlesGetter
+	SmartClient          SmartClient
+	Store                Store
+	SpecCheck            SpecCheck
 
 	// TemplateRender objects that need to be synced.
 	Queue   workqueue.RateLimitingInterface
@@ -53,6 +78,9 @@ func (tc *TemplateController) Prepare() {
 		UpdateFunc: tc.onTemplateRenderUpdate,
 		DeleteFunc: tc.onTemplateRenderDelete,
 	})
+	// TODO add AddFunc etc. for Template. Need to also to index the TemplateRenders
+	// by Template so we can enqueue...
+	// Not to mention enqueuing for the generated resource mutations. Probably should share that.
 }
 
 // Run begins watching and syncing.

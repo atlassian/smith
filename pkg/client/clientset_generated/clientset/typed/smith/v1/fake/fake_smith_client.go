@@ -15,6 +15,10 @@ func (c *FakeSmithV1) Bundles(namespace string) v1.BundleInterface {
 	return &FakeBundles{c, namespace}
 }
 
+func (c *FakeSmithV1) Templates(namespace string) v1.TemplateInterface {
+	return &FakeTemplates{c, namespace}
+}
+
 func (c *FakeSmithV1) TemplateRenders(namespace string) v1.TemplateRenderInterface {
 	return &FakeTemplateRenders{c, namespace}
 }

@@ -27,3 +27,19 @@ func TemplateRenderInformer(trc smithClient_v1.TemplateRendersGetter, namespace 
 		resyncPeriod,
 		cache.Indexers{})
 }
+
+func TemplateInformer(trc smithClient_v1.TemplatesGetter, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	templateApi := trc.Templates(namespace)
+	return cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				return templateApi.List(options)
+			},
+			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				return templateApi.Watch(options)
+			},
+		},
+		&smith_v1.Template{},
+		resyncPeriod,
+		cache.Indexers{})
+}

@@ -5,7 +5,7 @@ go_library(
     srcs = [
         "bundle.go",
         "config.go",
-        "templaterender.go",
+        "template.go",
     ],
     importpath = "github.com/atlassian/smith/pkg/client",
     visibility = ["//visibility:public"],

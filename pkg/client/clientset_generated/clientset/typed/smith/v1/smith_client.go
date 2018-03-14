@@ -11,6 +11,7 @@ import (
 type SmithV1Interface interface {
 	RESTClient() rest.Interface
 	BundlesGetter
+	TemplatesGetter
 	TemplateRendersGetter
 }
 
@@ -21,6 +22,10 @@ type SmithV1Client struct {
 
 func (c *SmithV1Client) Bundles(namespace string) BundleInterface {
 	return newBundles(c, namespace)
+}
+
+func (c *SmithV1Client) Templates(namespace string) TemplateInterface {
+	return newTemplates(c, namespace)
 }
 
 func (c *SmithV1Client) TemplateRenders(namespace string) TemplateRenderInterface {

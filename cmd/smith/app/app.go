@@ -220,11 +220,17 @@ func (a *App) Run(ctx context.Context) error {
 
 	templateRenderInf := client.TemplateRenderInformer(smithClient.SmithV1(), a.Namespace, a.ResyncPeriod)
 	infs = append(infs, templateRenderInf)
+	templateInf := client.TemplateInformer(smithClient.SmithV1(), a.Namespace, a.ResyncPeriod)
+	infs = append(infs, templateInf)
 
 	trc := templatecontroller.TemplateController{
 		Logger:               a.Logger,
+		SmartClient:          sc,
 		TemplateRenderInf:    templateRenderInf,
 		TemplateRenderClient: smithClient.SmithV1(),
+		TemplateInf:          templateInf,
+		Store:                multiStore,
+		SpecCheck:            specCheck,
 		Queue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "template"),
 		Workers:              a.Workers,
 	}

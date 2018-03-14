@@ -20,22 +20,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
-	// Schema is based on:
-	// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/architecture/identifiers.md
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
-	// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/architecture/namespaces.md
-	// https://github.com/kubernetes/kubernetes/tree/master/api/openapi-spec
+var dnsSubdomain = apiext_v1b1.JSONSchemaProps{
+	Type:      "string",
+	MinLength: int64ptr(1),
+	MaxLength: int64ptr(253),
+	Pattern:   `^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`,
+}
 
-	// definitions are not supported, do what we can :)
-
-	DNS_SUBDOMAIN := apiext_v1b1.JSONSchemaProps{
-		Type:      "string",
-		MinLength: int64ptr(1),
-		MaxLength: int64ptr(253),
-		Pattern:   `^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`,
-	}
-	resourceName := DNS_SUBDOMAIN
+func objectSchema() *apiext_v1b1.JSONSchemaProps {
 	apiVersion := apiext_v1b1.JSONSchemaProps{
 		Type:      "string",
 		MinLength: int64ptr(1),
@@ -50,7 +42,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 		Properties: map[string]apiext_v1b1.JSONSchemaProps{
 			"kind":       kind,
 			"apiVersion": apiVersion,
-			"name":       DNS_SUBDOMAIN,
+			"name":       dnsSubdomain,
 			"blockOwnerDeletion": {
 				Type: "boolean",
 			},
@@ -72,7 +64,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 		Description: "Schema for some fields of ObjectMeta",
 		Type:        "object",
 		Properties: map[string]apiext_v1b1.JSONSchemaProps{
-			"name": DNS_SUBDOMAIN,
+			"name": dnsSubdomain,
 			"labels": {
 				Type: "object",
 				// TODO there is a bug in marshling/unmarshaling of AdditionalProperties
@@ -122,7 +114,8 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			},
 		},
 	}
-	objectSpec := apiext_v1b1.JSONSchemaProps{
+
+	return &apiext_v1b1.JSONSchemaProps{
 		Description: "Schema for a resource that describes an object",
 		Type:        "object",
 		Required:    []string{"apiVersion", "kind", "metadata"},
@@ -132,13 +125,25 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			"metadata":   objectMeta,
 		},
 	}
+}
+
+func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
+	// Schema is based on:
+	// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/architecture/identifiers.md
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
+	// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/architecture/namespaces.md
+	// https://github.com/kubernetes/kubernetes/tree/master/api/openapi-spec
+
+	// definitions are not supported, do what we can :)
+
+	resourceName := dnsSubdomain
 	pluginSpec := apiext_v1b1.JSONSchemaProps{
 		Description: "Schema for a resource that describes a plugin",
 		Type:        "object",
 		Required:    []string{"name", "objectName"},
 		Properties: map[string]apiext_v1b1.JSONSchemaProps{
-			"name":       DNS_SUBDOMAIN,
-			"objectName": DNS_SUBDOMAIN,
+			"name":       dnsSubdomain,
+			"objectName": dnsSubdomain,
 			"spec": {
 				Type: "object",
 			},
@@ -162,7 +167,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 					{
 						Required: []string{"object"},
 						Properties: map[string]apiext_v1b1.JSONSchemaProps{
-							"object": objectSpec,
+							"object": *objectSchema(),
 						},
 					},
 					{
@@ -215,6 +220,11 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 }
 
 func TemplateRenderCrd() *apiext_v1b1.CustomResourceDefinition {
+	object := objectSchema()
+	// We strip the metadata validation here (i.e. ObjectMeta, NOT TypeMeta),
+	// because the template is likely to generate the name etc. However, we expect
+	// the type/version (TypeMeta) to be fixed (for extra sanity?).
+	delete(object.Properties, "metadata")
 	return &apiext_v1b1.CustomResourceDefinition{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
@@ -233,6 +243,31 @@ func TemplateRenderCrd() *apiext_v1b1.CustomResourceDefinition {
 			},
 			Scope: apiext_v1b1.NamespaceScoped,
 			Validation: &apiext_v1b1.CustomResourceValidation{
+				OpenAPIV3Schema: object,
+			},
+		},
+	}
+}
+
+func TemplateCrd() *apiext_v1b1.CustomResourceDefinition {
+	return &apiext_v1b1.CustomResourceDefinition{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "CustomResourceDefinition",
+			APIVersion: apiext_v1b1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: smith_v1.TemplateResourceName,
+		},
+		Spec: apiext_v1b1.CustomResourceDefinitionSpec{
+			Group:   smith.GroupName,
+			Version: smith_v1.BundleResourceVersion,
+			Names: apiext_v1b1.CustomResourceDefinitionNames{
+				Plural:   smith_v1.TemplateResourcePlural,
+				Singular: smith_v1.TemplateResourceSingular,
+				Kind:     smith_v1.TemplateResourceKind,
+			},
+			Scope: apiext_v1b1.NamespaceScoped,
+			Validation: &apiext_v1b1.CustomResourceValidation{
 				OpenAPIV3Schema: &apiext_v1b1.JSONSchemaProps{
 					Properties: map[string]apiext_v1b1.JSONSchemaProps{
 						"spec": {
@@ -244,7 +279,6 @@ func TemplateRenderCrd() *apiext_v1b1.CustomResourceDefinition {
 		},
 	}
 }
-
 func int64ptr(val int64) *int64 {
 	return &val
 }

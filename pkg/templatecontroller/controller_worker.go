@@ -3,11 +3,10 @@ package templatecontroller
 import (
 	"time"
 
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util/logz"
 
-	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/pkg/errors"
-	"github.com/taskcluster/json-e"
 	"go.uber.org/zap"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,25 +81,25 @@ func (c *TemplateController) ProcessKey(logger *zap.Logger, key string) (retriab
 		}
 		logger.Sugar().Infof("Synced TemplateRender in %v%s", time.Since(startTime), msg)
 	}()
+
 	templateRenderObj, exists, err := c.TemplateRenderInf.GetIndexer().GetByKey(key)
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to get Template by key %q", key)
+		return false, errors.Wrapf(err, "failed to get TemplateRender by key %q", key)
 	}
 	if !exists {
-		logger.Info("Template not in cache. Was deleted?")
+		logger.Info("TemplateRender not in cache. Was deleted?")
 		return false, nil
 	}
-	templateRender := templateRenderObj.(*smith_v1.TemplateRender)
-	template := map[string]interface{}{
-		"foo": "foo",
-	}
-	result, err := jsone.Render(template, templateRender.Spec.Context)
-	if err != nil {
-		return false, errors.Wrapf(err, "failed to render template %s", templateRender.Name)
-	}
-	logger.Sugar().Infof("%+v", result)
+	templateRender := templateRenderObj.(*smith_v1.TemplateRender).DeepCopy()
 
-	return false, errors.Errorf("TemplateRender processing not implemented: %+v", templateRenderObj)
+	trst := templateRenderSyncTask{
+		logger:      logger,
+		templateInf: c.TemplateInf,
+		smartClient: c.SmartClient,
+		store:       c.Store,
+		specCheck:   c.SpecCheck,
+	}
+	return trst.process(templateRender)
 }
 
 func (c *TemplateController) loggerForObj(obj interface{}) *zap.Logger {

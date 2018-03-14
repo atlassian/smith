@@ -30,9 +30,9 @@ type TemplateRenderConditionType string
 
 // These are valid conditions of a Bundle.
 const (
-	TemplateRenderInProgress BundleConditionType = "InProgress"
-	TemplateRenderReady      BundleConditionType = "Ready"
-	TemplateRenderError      BundleConditionType = "Error"
+	TemplateRenderInProgress TemplateRenderConditionType = "InProgress"
+	TemplateRenderReady      TemplateRenderConditionType = "Ready"
+	TemplateRenderError      TemplateRenderConditionType = "Error"
 )
 
 const (
@@ -91,6 +91,15 @@ const (
 	TemplateRenderResourceGroupVersion = smith.GroupName + "/" + TemplateRenderResourceVersion
 
 	TemplateRenderResourceName = TemplateRenderResourcePlural + "." + smith.GroupName
+
+	TemplateResourceSingular = "template"
+	TemplateResourcePlural   = "templates"
+	TemplateResourceVersion  = "v1"
+	TemplateResourceKind     = "Template"
+
+	TemplateResourceGroupVersion = smith.GroupName + "/" + TemplateResourceVersion
+
+	TemplateResourceName = TemplateResourcePlural + "." + smith.GroupName
 )
 
 var BundleGVK = SchemeGroupVersion.WithKind(BundleResourceKind)
@@ -320,6 +329,39 @@ func (rc *ResourceCondition) String() string {
 
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type TemplateList struct {
+	meta_v1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	meta_v1.ListMeta `json:"metadata,omitempty"`
+
+	// Items is a list of Templates.
+	Items []Template `json:"items"`
+}
+
+// +genclient
+// +genclient:noStatus
+
+// Template describes a template for use by a TemplateRender
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type Template struct {
+	meta_v1.TypeMeta `json:",inline"`
+
+	// Standard object metadata
+	meta_v1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the template of a single object.
+	Spec map[string]interface{} `json:"spec,omitempty"`
+}
+
+// DeepCopyInto is an deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *Template) DeepCopyInto(out *Template) {
+	*out = *in
+	out.Spec = runtime.DeepCopyJSON(in.Spec)
+}
+
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TemplateRenderList struct {
 	meta_v1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -341,7 +383,7 @@ type TemplateRender struct {
 	// Standard object metadata
 	meta_v1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec is the specification of the desired behavior of the Bundle.
+	// Spec is the specification of the template/context to use.
 	Spec TemplateRenderSpec `json:"spec,omitempty"`
 
 	// Status is most recently observed status of the Bundle.
@@ -361,8 +403,14 @@ func (tr *TemplateRender) GetCondition(conditionType TemplateRenderConditionType
 // +k8s:deepcopy-gen=true
 type TemplateRenderSpec struct {
 	// TODO use actual template name type
-	Template string                 `json:"template,omitempty"`
-	Context  map[string]interface{} `json:"context,omitempty"`
+	TemplateName string                 `json:"templateName,omitempty"`
+	Context      map[string]interface{} `json:"context,omitempty"`
+}
+
+// DeepCopyInto is an deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *TemplateRenderSpec) DeepCopyInto(out *TemplateRenderSpec) {
+	*out = *in
+	out.Context = runtime.DeepCopyJSON(in.Context)
 }
 
 // +k8s:deepcopy-gen=true
