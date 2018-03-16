@@ -184,6 +184,9 @@ func (bs *BundleStatus) GetResourceStatus(resName ResourceName) (int, *ResourceS
 // ResourceName is a reference to another Resource in the same bundle.
 type ResourceName string
 
+// ReferenceName is a the name of a reference which can be used inside a resource.
+type ReferenceName string
+
 // PluginName is a name of a plugin to be invoked.
 type PluginName string
 
@@ -194,9 +197,25 @@ type Resource struct {
 	Name ResourceName `json:"name"`
 
 	// Explicit dependencies.
-	DependsOn []ResourceName `json:"dependsOn,omitempty"`
+	References []Reference `json:"reference,omitempty"`
 
 	Spec ResourceSpec `json:"spec"`
+}
+
+// +k8s:deepcopy-gen=true
+// Refer to a part of another object
+type Reference struct {
+	Name     ReferenceName `json:"name,omitempty"`
+	Resource ResourceName  `json:"resource"`
+	Path     string        `json:"path,omitempty"`
+	Example  interface{}   `json:"example,omitempty"`
+	Modifier string        `json:"modifier,omitempty"`
+}
+
+// DeepCopyInto is an deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *Reference) DeepCopyInto(out *Reference) {
+	*out = *in
+	out.Example = runtime.DeepCopyJSONValue(in.Example)
 }
 
 // +k8s:deepcopy-gen=true

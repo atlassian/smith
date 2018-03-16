@@ -114,8 +114,8 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 					},
 					{
 						Name: resSb1,
-						DependsOn: []smith_v1.ResourceName{
-							resSi1,
+						References: []smith_v1.Reference{
+							{Resource: smith_v1.ResourceName(resSi1)},
 						},
 						Spec: smith_v1.ResourceSpec{
 							Object: &sc_v1b1.ServiceBinding{
@@ -137,8 +137,8 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 					},
 					{
 						Name: resSi2,
-						DependsOn: []smith_v1.ResourceName{
-							resSb1,
+						References: []smith_v1.Reference{
+							{Resource: smith_v1.ResourceName(resSb1)},
 						},
 						Spec: smith_v1.ResourceSpec{
 							Object: &sc_v1b1.ServiceInstance{

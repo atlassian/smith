@@ -14,45 +14,75 @@ import (
 
 func TestSpecProcessor(t *testing.T) {
 	t.Parallel()
-	sp := SpecProcessor{
-		selfName:  "abc",
-		resources: processedResources(),
-		allowedResources: map[smith_v1.ResourceName]struct{}{
-			"res1": {},
+	sp, err := NewSpec(processedResources(), []smith_v1.Reference{
+		{
+			// Nameless references cause dependencies only.
+			Resource: "resX",
 		},
-	}
+		{
+			Name:     "res1aslice",
+			Resource: "res1",
+			Path:     "a.slice[?(@.label==\"label2\")].value",
+		},
+		{
+			Name:     "res1astring",
+			Resource: "res1",
+			Path:     "a.string",
+		},
+		{
+			Name:     "res1aint",
+			Resource: "res1",
+			Path:     "a.int",
+		},
+		{
+			Name:     "res1abool",
+			Resource: "res1",
+			Path:     "a.bool",
+		},
+		{
+			Name:     "res1afloat64",
+			Resource: "res1",
+			Path:     "a.float64",
+		},
+		{
+			Name:     "res1aobject",
+			Resource: "res1",
+			Path:     "a.object",
+		},
+	})
+	require.NoError(t, err)
 	obj := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"slice":  "{{res1#a.slice[?(@.label==\"label2\")].value}}",
-			"string": "{{res1#a.string}}",
+			"slice":  "!{res1aslice}",
+			"string": "!{res1astring}",
 
-			"int":     "{{res1#a.int}}",
-			"bool":    "{{res1#a.bool}}",
-			"float64": "{{res1#a.float64}}",
-			"object":  "{{res1#a.object}}",
+			"int":     "!{res1aint}",
+			"bool":    "!{res1abool}",
+			"float64": "!{res1afloat64}",
+			"object":  "!{res1aobject}",
 
 			"slice1": []string{
-				"{{res1#a.int}}",
+				"!{res1aint}",
 				"23",
-				"{{res1#a.object}}",
+				"!{res1aobject}",
 			},
 			"slice2": []interface{}{
 				map[string]interface{}{
-					"x": "{{res1#a.int}}",
+					"x": "!{res1aint}",
 				},
-				"{{res1#a.int}}",
+				"!{res1aint}",
 				23,
-				"{{res1#a.object}}",
+				"!{res1aobject}",
 			},
 			"slice3": [][]interface{}{
-				{"{{res1#a.int}}"},
+				{"!{res1aint}"},
 				{23},
-				{"{{res1#a.object}}"},
+				{"!{res1aobject}"},
 			},
 			"slice4": []interface{}{
-				[]interface{}{"{{res1#a.int}}"},
+				[]interface{}{"!{res1aint}"},
 				[]interface{}{23},
-				[]interface{}{"{{res1#a.object}}"},
+				[]interface{}{"!{res1aobject}"},
 			},
 		},
 	}
@@ -113,18 +143,24 @@ func TestSpecProcessor(t *testing.T) {
 
 func TestSpecProcessorBindSecret(t *testing.T) {
 	t.Parallel()
-	sp := SpecProcessor{
-		selfName:  "abc",
-		resources: processedResources(),
-		allowedResources: map[smith_v1.ResourceName]struct{}{
-			"res1":       {},
-			"resbinding": {},
+	sp, err := NewSpec(processedResources(), []smith_v1.Reference{
+		{
+			Name:     "res1aint",
+			Resource: "res1",
+			Path:     "a.int",
 		},
-	}
+		{
+			Name:     "password",
+			Resource: "resbinding",
+			Path:     "Data.password",
+			Modifier: "bindsecret",
+		},
+	})
+	require.NoError(t, err)
 	obj := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"int":    "{{res1#a.int}}",
-			"secret": "{{resbinding:bindsecret#Data.password}}",
+			"int":    "!{res1aint}",
+			"secret": "!{password}",
 		},
 	}
 	expected := map[string]interface{}{
@@ -143,18 +179,24 @@ func TestSpecProcessorBindSecretWithJsonField(t *testing.T) {
 	// However, kubernetes jsonpath is smart (crazy?) enough to use both the json
 	// tags AND the field names in its lookups...
 	t.Parallel()
-	sp := SpecProcessor{
-		selfName:  "abc",
-		resources: processedResources(),
-		allowedResources: map[smith_v1.ResourceName]struct{}{
-			"res1":       {},
-			"resbinding": {},
+	sp, err := NewSpec(processedResources(), []smith_v1.Reference{
+		{
+			Name:     "res1aint",
+			Resource: "res1",
+			Path:     "a.int",
 		},
-	}
+		{
+			Name:     "password",
+			Resource: "resbinding",
+			Path:     "data.password",
+			Modifier: "bindsecret",
+		},
+	})
+	require.NoError(t, err)
 	obj := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"int":    "{{res1#a.int}}",
-			"secret": "{{resbinding:bindsecret#data.password}}",
+			"int":    "!{res1aint}",
+			"secret": "!{password}",
 		},
 	}
 	expected := map[string]interface{}{
@@ -170,16 +212,33 @@ func TestSpecProcessorBindSecretWithJsonField(t *testing.T) {
 
 func TestSpecProcessorExamples(t *testing.T) {
 	t.Parallel()
-	sp := NewExamplesSpec("abc", []smith_v1.ResourceName{"res1", "resbinding"})
+	sp, err := NewExamplesSpec([]smith_v1.Reference{
+		{
+			Name:     "res1aint",
+			Resource: "res1",
+			Path:     "a.int",
+			Example:  25,
+		},
+		{
+			Name:     "password",
+			Resource: "resbinding",
+			Path:     "data.password",
+			Modifier: "bindsecret",
+			Example: map[string]interface{}{
+				"x": "pass",
+			},
+		},
+	})
+	require.NoError(t, err)
 	obj := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"int":    "{{res1#a.int#25}}",
-			"secret": "{{resbinding:bindsecret#Data.password#{\"x\":\"pass\"}}}",
+			"int":    "!{res1aint}",
+			"secret": "!{password}",
 		},
 	}
 	expected := map[string]interface{}{
 		"ref": map[string]interface{}{
-			"int":    float64(25), // because JSON only believes in floats...
+			"int":    25,
 			"secret": map[string]interface{}{"x": "pass"},
 		},
 	}
@@ -192,81 +251,68 @@ func TestSpecProcessorErrors(t *testing.T) {
 	t.Parallel()
 	inputs := []struct {
 		obj          map[string]interface{}
+		reference    smith_v1.Reference
 		err          string
 		examplesOnly bool
 	}{
 		{
-			obj: map[string]interface{}{
-				"invalid": "{{res1#something}}",
+			reference: smith_v1.Reference{
+				Name:     "x",
+				Resource: "res1",
+				Path:     "something",
 			},
-			err: `invalid reference at "invalid": failed to process JsonPath reference res1#something: JsonPath execute error: something is not found`,
+			err: `failed to process reference "x": JsonPath execute error: something is not found`,
 		},
 		{
-			obj: map[string]interface{}{
-				"invalid": "{{res2#a.string}}",
+			reference: smith_v1.Reference{
+				Name:     "x",
+				Resource: "res2",
+				Path:     "a.string",
 			},
-			err: `invalid reference at "invalid": object not found: res2#a.string`,
+			err: `internal dependency resolution error - resource referenced by "x" not found in Bundle: res2`,
 		},
 		{
-			obj: map[string]interface{}{
-				"invalid": "{{res1}}",
+			reference: smith_v1.Reference{
+				Name:     "x",
+				Resource: "res1",
 			},
-			err: `invalid reference at "invalid": cannot include whole object: res1`,
+			err: `failed to process reference "x": JsonPath execute error:  is not found`,
 		},
 		{
-			obj: map[string]interface{}{
-				"invalid": "{{res1}}",
+			reference: smith_v1.Reference{
+				Name:     "x",
+				Resource: "res1",
+				Path:     "data.password",
+				Modifier: "bindsecret",
 			},
-			err: `invalid reference at "invalid": cannot include whole object: res1`,
+			err: `"bindsecret" requested, but "res1" is not a ServiceBinding`,
 		},
 		{
-			obj: map[string]interface{}{
-				"invalid": "{{self1#x.b}}",
+			reference: smith_v1.Reference{
+				Name:     "x",
+				Resource: "res1",
+				Path:     "data.password",
+				Modifier: "someotherthing",
 			},
-			err: `invalid reference at "invalid": self references are not allowed: self1#x.b`,
+			err: `reference modifier "someotherthing" not understood for "res1"`,
 		},
 		{
-			obj: map[string]interface{}{
-				"invalid": "{{self1#x.b}}",
+			reference: smith_v1.Reference{
+				Name:     "password",
+				Resource: "resbinding",
+				Path:     "data.nonutf8",
+				Modifier: "bindsecret",
 			},
-			err: `invalid reference at "invalid": self references are not allowed: self1#x.b`,
+			err: `cannot expand non-UTF8 byte array field "data.nonutf8"`,
 		},
 		{
-			obj: map[string]interface{}{
-				"invalid": "{{resX#a.string}}",
+			reference: smith_v1.Reference{
+				Name:     "password",
+				Resource: "resbinding",
+				Path:     "data.nonutf8",
+				Modifier: "bindsecret",
 			},
-			err: `invalid reference at "invalid": references can only point at direct dependencies: resX#a.string`,
-		},
-		{
-			obj: map[string]interface{}{
-				"invalid": "{{res1:bindsecret#Data.password}}",
-			},
-			err: `invalid reference at "invalid": "bindsecret" requested, but "res1" is not a ServiceBinding`,
-		},
-		{
-			obj: map[string]interface{}{
-				"invalid": "{{resbinding:someotherthing#notthere}}",
-			},
-			err: `invalid reference at "invalid": resource output name "someotherthing" not understood for "resbinding"`,
-		},
-		{
-			obj: map[string]interface{}{
-				"invalid": "{{resbinding:bindsecret#Data.nonutf8}}",
-			},
-			err: `invalid reference at "invalid": cannot expand non-UTF8 byte array field "resbinding:bindsecret#Data.nonutf8"`,
-		},
-		{
-			obj: map[string]interface{}{
-				"invalid": "{{resbinding:bindsecret#Data.nonutf8}}",
-			},
-			err:          `invalid reference at "invalid": no example value provided in selector "resbinding:bindsecret#Data.nonutf8"`,
-			examplesOnly: true,
-		},
-		{
-			obj: map[string]interface{}{
-				"invalid": "{{resX#a.string}}",
-			},
-			err:          `invalid reference at "invalid": references can only point at direct dependencies: resX#a.string`,
+			err:          `no example value provided in reference "password"`,
 			examplesOnly: true,
 		},
 	}
@@ -274,17 +320,13 @@ func TestSpecProcessorErrors(t *testing.T) {
 		input := input
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
-			sp := SpecProcessor{
-				selfName:  "self1",
-				resources: processedResources(),
-				allowedResources: map[smith_v1.ResourceName]struct{}{
-					"res1":       {},
-					"resbinding": {},
-					"res2":       {},
-				},
-				examplesOnly: input.examplesOnly,
+			var err error
+			if input.examplesOnly {
+				_, err = NewExamplesSpec([]smith_v1.Reference{input.reference})
+			} else {
+				_, err = NewSpec(processedResources(), []smith_v1.Reference{input.reference})
 			}
-			assert.EqualError(t, sp.ProcessObject(input.obj), input.err)
+			assert.EqualError(t, err, input.err)
 		})
 	}
 }

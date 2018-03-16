@@ -220,11 +220,16 @@ func (st *resourceSyncTask) maybeExtractBindingSecret(obj *unstructured.Unstruct
 }
 
 func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource) []smith_v1.ResourceName {
-	var notReadyDependencies []smith_v1.ResourceName
-	for _, dependency := range res.DependsOn {
-		if !st.processedResources[dependency].isReady() {
-			notReadyDependencies = append(notReadyDependencies, dependency)
+	// No len here because dependencies can occur more than once in reference list
+	notReadyDependenciesSet := make(map[smith_v1.ResourceName]bool)
+	for _, reference := range res.References {
+		if !st.processedResources[reference.Resource].isReady() {
+			notReadyDependenciesSet[reference.Resource] = true
 		}
+	}
+	notReadyDependencies := make([]smith_v1.ResourceName, 0, len(notReadyDependenciesSet))
+	for resourceName, _ := range notReadyDependenciesSet {
+		notReadyDependencies = append(notReadyDependencies, resourceName)
 	}
 	return notReadyDependencies
 }
@@ -283,7 +288,17 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 
 // prevalidate does as much validation as possible before doing any real work.
 func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
-	sp := NewExamplesSpec(res.Name, res.DependsOn)
+	sp, err := NewExamplesSpec(res.References)
+	if err != nil {
+		if _, ok := errors.Cause(err).(*noExampleError); ok {
+			// a noExampleError occurs when an example wasn't provided
+			// by the user in one of the references. For now, we assume this
+			// is intentional and don't error out.
+			st.logger.Debug("Not validating against schema due to missing examples", zap.Error(err))
+			return nil
+		}
+		return err
+	}
 	serviceInstanceGvk := sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance")
 	res = res.DeepCopy() // Spec processor mutates in place
 
@@ -311,13 +326,6 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 				}
 
 				if err := sp.ProcessObject(parameters); err != nil {
-					if _, ok := errors.Cause(err).(*noExampleError); ok {
-						// a noExampleError occurs when an example wasn't provided
-						// by the user in one of the references. For now, we assume this
-						// is intentional and don't error out.
-						st.logger.Debug("Not validating against schema due to missing examples", zap.Error(err))
-						return nil
-					}
 					return err
 				}
 
@@ -337,13 +345,6 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 	} else if res.Spec.Plugin != nil {
 		if res.Spec.Plugin.Spec != nil {
 			if err := sp.ProcessObject(res.Spec.Plugin.Spec); err != nil {
-				if _, ok := errors.Cause(err).(*noExampleError); ok {
-					// a noExampleError occurs when an example wasn't provided
-					// by the user in one of the references. For now, we assume this
-					// is intentional and don't error out.
-					st.logger.Debug("Not validating against schema due to missing examples", zap.Error(err))
-					return nil
-				}
 				return err
 			}
 		}
@@ -378,7 +379,10 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 	}
 
 	// Process references
-	sp := NewSpec(res.Name, st.processedResources, res.DependsOn)
+	sp, err := NewSpec(st.processedResources, res.References)
+	if err != nil {
+		return nil, err
+	}
 	if err := sp.ProcessObject(objectOrPluginSpec); err != nil {
 		return nil, err
 	}
@@ -422,8 +426,8 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 		Controller:         &trueRef,
 		BlockOwnerDeletion: &trueRef,
 	})
-	for _, dep := range res.DependsOn {
-		processedObj := st.processedResources[dep].actual // this is ok because we've checked earlier that resources contains all dependencies
+	for _, dep := range res.References {
+		processedObj := st.processedResources[dep.Resource].actual // this is ok because we've checked earlier that resources contains all dependencies
 		refs = append(refs, meta_v1.OwnerReference{
 			APIVersion:         processedObj.GetAPIVersion(),
 			Kind:               processedObj.GetKind(),
@@ -449,7 +453,7 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtim
 	}
 
 	// validate above should guarantee that our plugin is there
-	dependencies, err := st.prepareDependencies(res.DependsOn)
+	dependencies, err := st.prepareDependencies(res.References)
 	if err != nil {
 		return nil, err
 	}
@@ -478,10 +482,14 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtim
 	return object, nil
 }
 
-func (st *resourceSyncTask) prepareDependencies(dependsOn []smith_v1.ResourceName) (map[smith_v1.ResourceName]plugin.Dependency, error) {
-	dependencies := make(map[smith_v1.ResourceName]plugin.Dependency, len(dependsOn))
-	for _, name := range dependsOn {
-		unstructuredActual := st.processedResources[name].actual.DeepCopy() // Pass a copy to the plugin to insulate from it
+func (st *resourceSyncTask) prepareDependencies(references []smith_v1.Reference) (map[smith_v1.ResourceName]plugin.Dependency, error) {
+	dependencies := make(map[smith_v1.ResourceName]plugin.Dependency)
+	for _, reference := range references {
+		if _, ok := dependencies[reference.Resource]; ok {
+			// References could refer to the same resource as a previous one.
+			continue
+		}
+		unstructuredActual := st.processedResources[reference.Resource].actual.DeepCopy() // Pass a copy to the plugin to insulate from it
 		gvk := unstructuredActual.GroupVersionKind()
 		var actual runtime.Object
 		if st.scheme.Recognizes(gvk) {
@@ -504,7 +512,7 @@ func (st *resourceSyncTask) prepareDependencies(dependsOn []smith_v1.ResourceNam
 				return nil, errors.Wrapf(err, "error processing ServiceBinding %q", obj.Name)
 			}
 		}
-		dependencies[name] = dependency
+		dependencies[reference.Resource] = dependency
 	}
 	return dependencies, nil
 }

@@ -58,8 +58,10 @@ func TestRemoveFinalizerWhenForegroundDeletion(t *testing.T) {
 						},
 					},
 					{
-						Name:      resMapNeedsAnUpdate,
-						DependsOn: []smith_v1.ResourceName{resSi1},
+						Name: resMapNeedsAnUpdate,
+						References: []smith_v1.Reference{
+							{Resource: resSi1},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Object: &core_v1.ConfigMap{
 								TypeMeta: meta_v1.TypeMeta{

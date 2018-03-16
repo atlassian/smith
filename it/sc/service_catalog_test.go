@@ -68,8 +68,10 @@ func TestServiceCatalog(t *testing.T) {
 					},
 				},
 				{
-					Name:      smith_v1.ResourceName(binding.Name),
-					DependsOn: []smith_v1.ResourceName{smith_v1.ResourceName(instance.Name)},
+					Name: smith_v1.ResourceName(binding.Name),
+					References: []smith_v1.Reference{
+						{Resource: smith_v1.ResourceName(instance.Name)},
+					},
 					Spec: smith_v1.ResourceSpec{
 						Object: binding,
 					},

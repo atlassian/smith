@@ -16,19 +16,31 @@ func TestBundleSort(t *testing.T) {
 		Spec: smith_v1.BundleSpec{
 			Resources: []smith_v1.Resource{
 				{
-					Name:      "a",
-					DependsOn: []smith_v1.ResourceName{"c"},
+					Name: "a",
+					References: []smith_v1.Reference{
+						{
+							Resource: "c",
+						},
+					},
 				},
 				{
 					Name: "b",
 				},
 				{
-					Name:      "c",
-					DependsOn: []smith_v1.ResourceName{"b"},
+					Name: "c",
+					References: []smith_v1.Reference{
+						{
+							Resource: "b",
+						},
+					},
 				},
 				{
-					Name:      "d",
-					DependsOn: []smith_v1.ResourceName{"e"},
+					Name: "d",
+					References: []smith_v1.Reference{
+						{
+							Resource: "e",
+						},
+					},
 				},
 				{
 					Name: "e",
@@ -48,19 +60,31 @@ func TestBundleSortMissingDependency(t *testing.T) {
 		Spec: smith_v1.BundleSpec{
 			Resources: []smith_v1.Resource{
 				{
-					Name:      "a",
-					DependsOn: []smith_v1.ResourceName{"x"},
+					Name: "a",
+					References: []smith_v1.Reference{
+						{
+							Resource: "x",
+						},
+					},
 				},
 				{
 					Name: "b",
 				},
 				{
-					Name:      "c",
-					DependsOn: []smith_v1.ResourceName{"b"},
+					Name: "c",
+					References: []smith_v1.Reference{
+						{
+							Resource: "b",
+						},
+					},
 				},
 				{
-					Name:      "d",
-					DependsOn: []smith_v1.ResourceName{"e"},
+					Name: "d",
+					References: []smith_v1.Reference{
+						{
+							Resource: "e",
+						},
+					},
 				},
 				{
 					Name: "e",
@@ -70,4 +94,46 @@ func TestBundleSortMissingDependency(t *testing.T) {
 	}
 	_, sorted, err := sortBundle(&bundle)
 	require.EqualError(t, err, "vertex \"x\" not found", "%v", sorted)
+}
+
+func TestBundleSortSelfReference(t *testing.T) {
+	t.Parallel()
+	bundle := smith_v1.Bundle{
+		Spec: smith_v1.BundleSpec{
+			Resources: []smith_v1.Resource{
+				{
+					Name: "a",
+					References: []smith_v1.Reference{
+						{
+							Resource: "a",
+						},
+					},
+				},
+				{
+					Name: "b",
+				},
+				{
+					Name: "c",
+					References: []smith_v1.Reference{
+						{
+							Resource: "b",
+						},
+					},
+				},
+				{
+					Name: "d",
+					References: []smith_v1.Reference{
+						{
+							Resource: "e",
+						},
+					},
+				},
+				{
+					Name: "e",
+				},
+			},
+		},
+	}
+	_, sorted, err := sortBundle(&bundle)
+	require.EqualError(t, err, "cycle error: [a a]", "%v", sorted)
 }
