@@ -10,20 +10,19 @@ spec:
     clusterServiceClassExternalName: dynamo-db
     clusterServicePlanExternalName: default
     parameters:
-      $merge:
-        - {$eval: parameters}
-        - environment:
-            lowPriorityPagerdutyEndpoint: ${config.notifications.pagerduty.lowPriorityPagerdutyEndpoint.cloudwatch}
-            notificationEmail: ${config.notifications.email}
-            pagerdutyEndpoint: ${config.notifications.pagerduty.pagerdutyEndpoint.cloudwatch}
-            primaryVpcEnvironment:
-              appSubnets: {$eval: config.vpc.subnets}
-              region: ${config.location.region}
-            tags: ${config.tags}
-          resource:
-            name: ${name}
-            type: dynamo-db
-          serviceName: ${serviceName}
+      environment:
+        lowPriorityPagerdutyEndpoint: ${config.notifications.pagerduty.lowPriorityPagerdutyEndpoint.cloudwatch}
+        notificationEmail: ${config.notifications.email}
+        pagerdutyEndpoint: ${config.notifications.pagerduty.pagerdutyEndpoint.cloudwatch}
+        primaryVpcEnvironment:
+          appSubnets: {$eval: config.vpc.subnets}
+          region: ${config.location.region}
+        tags: ${config.tags}
+      resource:
+        name: ${name}
+        type: dynamo-db
+        attributes: {$eval: parameters}
+      serviceName: ${serviceName}
 ---
 apiVersion: smith.atlassian.com/v1
 kind: Template
@@ -36,14 +35,13 @@ spec:
     clusterServiceClassExternalName: sqs
     clusterServicePlanExternalName: default
     parameters:
-      $merge:
-        - {$eval: parameters}
-        - environment:
-            tags: ${config.tags}
-          resource:
-            name: ${name}
-            type: sqs
-          serviceName: ${serviceName}
+      environment:
+        tags: ${config.tags}
+      resource:
+        name: ${name}
+        type: sqs
+        attributes: {$eval: parameters}
+      serviceName: ${serviceName}
 ---
 apiVersion: smith.atlassian.com/v1
 kind: Template
