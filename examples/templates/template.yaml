@@ -1,0 +1,13 @@
+apiVersion: smith.atlassian.com/v1
+kind: Template
+metadata:
+  name: ups-fake
+spec:
+  apiVersion: servicecatalog.k8s.io/v1beta1
+  kind: ServiceInstance
+  spec:
+    clusterServiceClassExternalName: user-provided-service
+    clusterServicePlanExternalName: default
+    parameters:
+      credentials:
+        password: '${mypassword}'

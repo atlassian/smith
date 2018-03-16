@@ -1,0 +1,39 @@
+apiVersion: smith.atlassian.com/v1
+kind: TemplateRender
+metadata:
+  name: my-micros-service
+spec:
+  templateName: microsSd
+  context:
+    name: my-micros-service
+    # parameters is the 'sd' without resources, and currently maps
+    # directly to the micros API. However, it's easy to be API compatible
+    # (i.e. one could implement this SD on top of a differently structured
+    # Micros plan)
+    parameters:  # i.e. sd except resources...
+      links:
+        binary:
+          type: docker
+          name: docker.atl-paas.net/my-micros-service
+          tag: foo
+      cleanup: false
+      scaling:
+        min: 1
+        max: 1
+        instance: t2.micro
+      config:
+        environmentVariables:
+          FOO: 1
+    # This is basically identical to a Micros resources block. Whoo.
+    resources:
+      - name: database
+        type: dynamo
+        attributes:
+          ReadCapacityUnits: 2
+          WriteCapacityUnits: 1
+          HashKeyName: key
+          HashKeyType: S
+      - name: queue
+        type: sqs
+        attributes:
+          MaxWaitSeconds: 20

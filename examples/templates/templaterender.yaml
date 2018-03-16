@@ -1,0 +1,8 @@
+apiVersion: smith.atlassian.com/v1
+kind: TemplateRender
+metadata:
+  name: my-ups-instance
+spec:
+  templateName: ups-fake
+  context:
+    mypassword: 'supersecret'

@@ -1,0 +1,58 @@
+---
+apiVersion: smith.atlassian.com/v1
+kind: Template
+metadata:
+  name: microsSd
+spec:
+  apiVersion: smith.atlassian.com/v1
+  kind: Bundle
+  spec:
+    resources:
+      $flatten:
+        # Here we get some 'environment config' to pass in everywhere (whatever this is called...)
+        # this model could be extended to 'service specific config' vs 'platform config', etc.
+        # (but more a POC thought bubble - this could be implemented in different ways)
+        - name: config
+          spec:
+            external:
+              apiVersion: v1
+              kind: ConfigMap
+            metadata:
+              name: ops-cfg
+              namespace: voyager
+
+        # maps our micros style resources to voyager template style resources...
+        - $map: resources
+          each(resource):
+            - dependsOn: config
+              name: ${resource.name}
+              spec:
+                object:
+                  apiVersion: smith.atlassian.com/v1
+                  kind: Template
+                  spec:
+                    templateName: ${resource.type}
+                    context:
+                      name: ${resource.name}
+                      serviceName: ${name}
+                      config: {$eval: '{{config#config.yaml#{exampleconfig: {}}}}'}
+                      parameters: ${resource.attributes}
+
+        # and finally, a compute!
+        - dependsOn:
+            $flatten:
+              - config
+              - $map: resources
+                each(resource): ${resource.name}
+          name: webserver
+          spec:
+            object:
+              apiVersion: smith.atlassian.com/v1
+              kind: Template
+              spec:
+                templateName: ec2compute
+                context:
+                  name: webserver
+                  serviceName: ${name}
+                  config: {$eval: '{{config#config.yaml#{exampleconfig: {}}}}'}
+                  parameters: ${parameters}

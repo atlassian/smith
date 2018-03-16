@@ -1,0 +1,121 @@
+---
+apiVersion: smith.atlassian.com/v1
+kind: Template
+metadata:
+  name: dynamo
+spec:
+  apiVersion: servicecatalog.k8s.io/v1beta1
+  kind: ServiceInstance
+  spec:
+    clusterServiceClassExternalName: dynamo-db
+    clusterServicePlanExternalName: default
+    parameters:
+      $merge:
+        - {$eval: parameters}
+        - environment:
+            lowPriorityPagerdutyEndpoint: ${config.notifications.pagerduty.lowPriorityPagerdutyEndpoint.cloudwatch}
+            notificationEmail: ${config.notifications.email}
+            pagerdutyEndpoint: ${config.notifications.pagerduty.pagerdutyEndpoint.cloudwatch}
+            primaryVpcEnvironment:
+              appSubnets: {$eval: config.vpc.subnets}
+              region: ${config.location.region}
+            tags: ${config.tags}
+          resource:
+            name: ${name}
+            type: dynamo-db
+          serviceName: ${serviceName}
+---
+apiVersion: smith.atlassian.com/v1
+kind: Template
+metadata:
+  name: sqs
+spec:
+  apiVersion: servicecatalog.k8s.io/v1beta1
+  kind: ServiceInstance
+  spec:
+    clusterServiceClassExternalName: sqs
+    clusterServicePlanExternalName: default
+    parameters:
+      $merge:
+        - {$eval: parameters}
+        - environment:
+            tags: ${config.tags}
+          resource:
+            name: ${name}
+            type: sqs
+          serviceName: ${serviceName}
+---
+apiVersion: smith.atlassian.com/v1
+kind: Template
+metadata:
+  name: ec2compute
+spec:
+  apiVersion: smith.atlassian.com/v1
+  kind: Bundle
+
+  spec:
+    resources:
+      $flatten:
+        # bind to each of the resources
+        - $map: {$eval: dependencies}
+          each(dependency):
+            - name: ${name}--${dependency.name}
+              spec:
+                object:
+                  apiVersion: servicecatalog.k8s.io/v1beta1
+                  kind: ServiceBinding
+                  metadata:
+                    name: ${name}--${dependency.name}
+                    annotations:
+                      voyager.atl-paas.net/envResourcePrefix: ${dependency.spec.clusterServiceClassExternalName}
+                  spec:
+                    instanceRef:
+                      name: ${dependency.name}
+                    secretName: ${name}--${dependency.name}
+
+        # create an iam role based on those bindings
+        # Note that this could easily be converted from 'not a plugin'...
+        # (since we have access to the secrets at this point of evaluation)
+        - dependsOn:
+            - $map: {$eval: dependencies}
+              each(dependency): ${name}--${dependency.name}
+          name: iamrole
+          spec:
+            plugin:
+              name: iamrole
+              objectName: ${name}--iamrole
+              spec:
+                serviceId: ${serviceName}
+                environment: ${config.environment}
+                tags: ${config.tags}
+
+        # create the actual compute
+        # Here we go all in and actually process the dependencies...
+        # (replacing secretenvvar)
+        # To be honest, I would prefer to be declarative about dependency relationships
+        # here rather than autopopulating, which is more reasonable with templates that
+        # are easy to change... but let's try to echo what's going on currently.
+        - dependsOn:
+            $flatten:
+              - iamrole
+              - $map: {$eval: dependencies}
+                each(dependency): ${name}--${dependency.name}
+          name:
+          spec:
+            object:
+              apiVersion: servicecatalog.k8s.io/v1beta1
+              kind: ServiceInstance
+              spec:
+                clusterServiceClassExternalName: micros
+                clusterServicePlanExternalName: default-plan
+                parameters:
+                  name: ${serviceName}--${name}
+                  env: ${config.environment}
+                  sd: {$eval: parameters}
+                  secretEnvVars:
+                    $map: {$eval: dependencies}
+                    each(dependency):
+                      $map: {$eval: getSecret(dependency.spec.secretName).data}
+                      each(secret): {'${uppercase(dependency.metadata.annotations["voyager.atl-paas.net/envResourcePrefix"])_${uppercase(dependency.spec.instanceRef.name)}_${uppercase(secret.key)}': '${secret.value}'}
+                  iamRole: '{{iamrole:bindsecret#data.IAMRole*"exampleIamRole"}}'
+                  iamInstanceProfile: '{{iamrole:bindsecret#data.InstanceProfile*"exampleIamInstanceProfile"}}'
