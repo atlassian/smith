@@ -50,7 +50,7 @@ func runWithContext(ctx context.Context) error {
 
 func runWithConfig(ctx context.Context, config *rest.Config) error {
 	a := sleeper.App{
-		Logger:     logz.DevelopmentLogger(),
+		Logger:     logz.Logger("debug", "console"),
 		RestConfig: config,
 	}
 	return a.Run(ctx)

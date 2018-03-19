@@ -27,7 +27,7 @@ import (
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util"
-	"github.com/atlassian/smith/pkg/util/logz"
+	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	scFake "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake"
@@ -243,7 +243,7 @@ func (tc *testCase) run(t *testing.T) {
 	crdStore, err := store.NewCrd(crdInf)
 	require.NoError(t, err)
 
-	tc.logger = logz.DevelopmentLogger()
+	tc.logger = smith_testing.DevelopmentLogger(t)
 	defer tc.logger.Sync()
 
 	// Ready Checker

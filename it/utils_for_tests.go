@@ -17,7 +17,6 @@ import (
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util"
-	"github.com/atlassian/smith/pkg/util/logz"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -178,7 +177,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	sc := smart.NewClient(config, clientset)
 
-	logger := logz.DevelopmentLogger()
+	logger := smith_testing.DevelopmentLogger(t)
 	defer logger.Sync()
 
 	cfg := &Config{
