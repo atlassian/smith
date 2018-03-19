@@ -37,10 +37,15 @@ func (f fakeStore) Get(gvk schema.GroupVersionKind, namespace, name string) (obj
 	}
 	return v, ok, nil
 }
+
 func (f fakeStore) ObjectsControlledBy(namespace string, uid types.UID) ([]runtime.Object, error) {
 	return nil, nil
 }
-func (f fakeStore) AddInformer(schema.GroupVersionKind, cache.SharedIndexInformer) {}
+
+func (f fakeStore) AddInformer(schema.GroupVersionKind, cache.SharedIndexInformer) error {
+	return nil
+}
+
 func (f fakeStore) RemoveInformer(schema.GroupVersionKind) bool {
 	return false
 }

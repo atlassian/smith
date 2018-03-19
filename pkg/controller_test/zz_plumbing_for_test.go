@@ -216,7 +216,8 @@ func (tc *testCase) run(t *testing.T) {
 		infs = append(infs, serviceClassInf)
 		servicePlanInf := sc_v1b1inf.NewClusterServicePlanInformer(scClient, 0, cache.Indexers{})
 		infs = append(infs, servicePlanInf)
-		catalog = store.NewCatalog(serviceClassInf, servicePlanInf)
+		catalog, err = store.NewCatalog(serviceClassInf, servicePlanInf)
+		require.NoError(t, err)
 	}
 
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, 0, cache.Indexers{})
@@ -316,7 +317,8 @@ func (tc *testCase) run(t *testing.T) {
 
 		// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
 		for gvk, inf := range resourceInfs {
-			multiStore.AddInformer(gvk, inf)
+			err = multiStore.AddInformer(gvk, inf)
+			require.NoError(t, err)
 			infs = append(infs, inf)
 		}
 

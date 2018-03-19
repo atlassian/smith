@@ -115,9 +115,13 @@ func (h *crdEventHandler) ensureWatch(logger *zap.Logger, crd *apiext_v1b1.Custo
 		return false
 	}
 	crdInf.AddEventHandler(h.resourceHandler)
+	err = h.Store.AddInformer(gvk, crdInf)
+	if err != nil {
+		logger.Error("Failed to add informer for CRD to multisore", zap.Error(err))
+		return false
+	}
 	ctx, cancel := context.WithCancel(h.ctx)
 	h.watchers[crd.Name] = watchState{cancel: cancel}
-	h.Store.AddInformer(gvk, crdInf)
 	h.wg.StartWithChannel(ctx.Done(), crdInf.Run)
 	return true
 }

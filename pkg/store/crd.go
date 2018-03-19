@@ -20,7 +20,7 @@ func NewCrd(crdInf cache.SharedIndexInformer) (*Crd, error) {
 		byGroupKindIndexName: byGroupKindIndex,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return &Crd{
 		byIndex: crdInf.GetIndexer().ByIndex,

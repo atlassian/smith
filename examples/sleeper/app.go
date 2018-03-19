@@ -58,7 +58,10 @@ func (a *App) Run(ctx context.Context) error {
 	multiStore := store.NewMulti()
 
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, ResyncPeriod, cache.Indexers{})
-	multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
+	err = multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
+	if err != nil {
+		return err
+	}
 	stage := stgr.NextStage()
 	stage.StartWithChannel(crdInf.Run) // Must be after multiStore.AddInformer()
 

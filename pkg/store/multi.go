@@ -28,21 +28,20 @@ func NewMulti() *Multi {
 
 // AddInformer adds an Informer to the store.
 // Can only be called with a not yet started informer. Otherwise bad things will happen.
-func (s *Multi) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer) {
+func (s *Multi) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer) error {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 	if _, ok := s.informers[gvk]; ok {
-		// It is a programming error hence panic
-		panic(errors.Errorf("Informer for %s is already registered", gvk))
+		return errors.New("informer is already registered")
 	}
 	err := informer.AddIndexers(cache.Indexers{
 		ByNamespaceAndControllerUidIndex: byNamespaceAndControllerUidIndex,
 	})
 	if err != nil {
-		// Must never happen in our case
-		panic(err)
+		return errors.WithStack(err)
 	}
 	s.informers[gvk] = informer
+	return nil
 }
 
 func (s *Multi) RemoveInformer(gvk schema.GroupVersionKind) bool {
