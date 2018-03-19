@@ -128,7 +128,10 @@ func (a *App) Run(ctx context.Context) error {
 		infs = append(infs, serviceClassInf)
 		servicePlanInf := sc_v1b1inf.NewClusterServicePlanInformer(scClient, a.ResyncPeriod, cache.Indexers{})
 		infs = append(infs, servicePlanInf)
-		catalog = store.NewCatalog(serviceClassInf, servicePlanInf)
+		catalog, err = store.NewCatalog(serviceClassInf, servicePlanInf)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Ready Checker
@@ -213,7 +216,10 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
 	for gvk, inf := range resourceInfs {
-		multiStore.AddInformer(gvk, inf)
+		err = multiStore.AddInformer(gvk, inf)
+		if err != nil {
+			return errors.Errorf("failed to add informer for %s", gvk)
+		}
 		infs = append(infs, inf)
 	}
 

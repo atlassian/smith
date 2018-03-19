@@ -23,7 +23,7 @@ type ReadyChecker interface {
 type Store interface {
 	Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error)
 	ObjectsControlledBy(namespace string, uid types.UID) ([]runtime.Object, error)
-	AddInformer(schema.GroupVersionKind, cache.SharedIndexInformer)
+	AddInformer(schema.GroupVersionKind, cache.SharedIndexInformer) error
 	RemoveInformer(schema.GroupVersionKind) bool
 }
 

@@ -45,25 +45,31 @@ type Catalog struct {
 	schemasRWMutex sync.RWMutex
 }
 
-func NewCatalog(serviceClassInf cache.SharedIndexInformer, servicePlanInf cache.SharedIndexInformer) *Catalog {
-	serviceClassInf.AddIndexers(cache.Indexers{
+func NewCatalog(serviceClassInf cache.SharedIndexInformer, servicePlanInf cache.SharedIndexInformer) (*Catalog, error) {
+	err := serviceClassInf.AddIndexers(cache.Indexers{
 		serviceClassExternalNameIndex: func(obj interface{}) ([]string, error) {
 			serviceClass := obj.(*sc_v1b1.ClusterServiceClass)
 			return []string{serviceClass.Spec.ExternalName}, nil
 		},
 	})
-	servicePlanInf.AddIndexers(cache.Indexers{
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	err = servicePlanInf.AddIndexers(cache.Indexers{
 		serviceClassAndPlanExternalNameIndex: func(obj interface{}) ([]string, error) {
 			servicePlan := obj.(*sc_v1b1.ClusterServicePlan)
 			return []string{serviceClassAndPlanExternalNameIndexKey(servicePlan.Spec.ClusterServiceClassRef.Name, servicePlan.Spec.ExternalName)}, nil
 		},
 	})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
 
 	return &Catalog{
 		serviceClassInfIndexer: serviceClassInf.GetIndexer(),
 		servicePlanInfIndexer:  servicePlanInf.GetIndexer(),
 		schemas:                make(map[planSchemaKey]schemaWithResourceVersion),
-	}
+	}, nil
 }
 
 func serviceClassAndPlanExternalNameIndexKey(serviceClassName string, servicePlanExternalName string) string {
