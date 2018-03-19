@@ -73,18 +73,3 @@ func Logger(loggingLevel, logEncoding string) *zap.Logger {
 		),
 	)
 }
-
-func DevelopmentLogger() *zap.Logger {
-	cfg := zap.NewProductionEncoderConfig()
-	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
-	lockedSyncer := zapcore.Lock(zapcore.AddSync(os.Stderr))
-	return zap.New(
-		zapcore.NewCore(
-			zapcore.NewConsoleEncoder(cfg),
-			lockedSyncer,
-			zap.InfoLevel,
-		),
-		zap.Development(),
-		zap.ErrorOutput(lockedSyncer),
-	)
-}

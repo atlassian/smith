@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith/pkg/cleanup"
-	"github.com/atlassian/smith/pkg/util/logz"
+	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -20,7 +20,7 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 		"missing": missingMap,
 		"nil":     nilMap,
 	}
-	logger := logz.DevelopmentLogger()
+	logger := smith_testing.DevelopmentLogger(t)
 	defer logger.Sync()
 
 	for kind1, input1 := range inputs {
