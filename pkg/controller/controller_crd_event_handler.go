@@ -3,10 +3,10 @@ package controller
 import (
 	"context"
 
+	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util/logz"
-
 	"go.uber.org/zap"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +35,10 @@ type crdEventHandler struct {
 func (h *crdEventHandler) OnAdd(obj interface{}) {
 	crd := obj.(*apiext_v1b1.CustomResourceDefinition)
 	logger := h.loggerForObj(crd)
+	if !supportEnabled(crd) {
+		logger.Sugar().Debugf("Not setting up watch for CRD because %s annotation is not set to 'true'", smith.CrdSupportEnabled)
+		return
+	}
 	if h.ensureWatch(logger, crd) {
 		h.rebuildBundles(logger, crd, "added")
 	}
@@ -50,6 +54,10 @@ func (h *crdEventHandler) OnAdd(obj interface{}) {
 func (h *crdEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	newCrd := newObj.(*apiext_v1b1.CustomResourceDefinition)
 	logger := h.loggerForObj(newCrd)
+	if !supportEnabled(newCrd) {
+		h.ensureNoWatch(logger, newCrd)
+		return
+	}
 	if h.ensureWatch(logger, newCrd) {
 		h.rebuildBundles(logger, newCrd, "updated")
 	}
@@ -71,10 +79,15 @@ func (h *crdEventHandler) OnDelete(obj interface{}) {
 		}
 		logger = h.loggerForObj(crd)
 	}
-	h.unwatch(logger, crd)
-	h.rebuildBundles(logger, crd, "deleted")
+	if h.ensureNoWatch(logger, crd) {
+		// Rebuild only if the watch was removed. Otherwise it is pointless.
+		h.rebuildBundles(logger, crd, "deleted")
+	}
 }
 
+// ensureWatch ensures there is a watch for CRs of a CRD.
+// Returns true if a watch was found or set up successfully and false if there is no watch and it was not set up for
+// some reason.
 func (h *crdEventHandler) ensureWatch(logger *zap.Logger, crd *apiext_v1b1.CustomResourceDefinition) bool {
 	if crd.Name == smith_v1.BundleResourceName {
 		return false
@@ -126,11 +139,13 @@ func (h *crdEventHandler) ensureWatch(logger *zap.Logger, crd *apiext_v1b1.Custo
 	return true
 }
 
-func (h *crdEventHandler) unwatch(logger *zap.Logger, crd *apiext_v1b1.CustomResourceDefinition) {
+// ensureNoWatch ensures there is no watch for CRs of a CRD.
+// Returns true if a watch was found and terminated and false if there was no watch already.
+func (h *crdEventHandler) ensureNoWatch(logger *zap.Logger, crd *apiext_v1b1.CustomResourceDefinition) bool {
 	crdWatch, ok := h.watchers[crd.Name]
 	if !ok {
 		// Nothing to do. This can happen if there was an error adding a watch
-		return
+		return false
 	}
 	logger.Info("Removing watch for CRD")
 	crdWatch.cancel()
@@ -141,6 +156,7 @@ func (h *crdEventHandler) unwatch(logger *zap.Logger, crd *apiext_v1b1.CustomRes
 		Kind:    crd.Spec.Names.Kind,
 	}
 	h.Store.RemoveInformer(gvk)
+	return true
 }
 
 func (h *crdEventHandler) rebuildBundles(logger *zap.Logger, crd *apiext_v1b1.CustomResourceDefinition, addUpdateDelete string) {
@@ -155,4 +171,8 @@ func (h *crdEventHandler) rebuildBundles(logger *zap.Logger, crd *apiext_v1b1.Cu
 			Sugar().Infof("Rebuilding bundle because CRD was %s", addUpdateDelete)
 		h.enqueue(bundle)
 	}
+}
+
+func supportEnabled(crd *apiext_v1b1.CustomResourceDefinition) bool {
+	return crd.Annotations[smith.CrdSupportEnabled] == "true"
 }

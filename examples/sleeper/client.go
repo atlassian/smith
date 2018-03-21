@@ -42,6 +42,7 @@ func SleeperCrd() *apiext_v1b1.CustomResourceDefinition {
 			Annotations: map[string]string{
 				smith.CrFieldPathAnnotation:  sleeper_v1.SleeperReadyStatePath,
 				smith.CrFieldValueAnnotation: string(sleeper_v1.SleeperReadyStateValue),
+				smith.CrdSupportEnabled:      "true",
 			},
 		},
 		Spec: apiext_v1b1.CustomResourceDefinitionSpec{
