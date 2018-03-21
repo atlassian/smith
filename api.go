@@ -6,6 +6,7 @@ const (
 	// See docs/design/managing-resources.md
 	CrFieldPathAnnotation  = Domain + "/CrReadyWhenFieldPath"
 	CrFieldValueAnnotation = Domain + "/CrReadyWhenFieldValue"
+	CrdSupportEnabled      = Domain + "/SupportEnabled"
 
 	BundleNameLabel = Domain + "/BundleName"
 )

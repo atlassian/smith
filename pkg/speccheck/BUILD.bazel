@@ -30,7 +30,7 @@ go_test(
     race = "on",
     deps = [
         "//pkg/cleanup:go_default_library",
-        "//pkg/util/logz:go_default_library",
+        "//pkg/util/testing:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",

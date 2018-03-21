@@ -324,14 +324,15 @@ func IsEqualCrd(a, b *apiext_v1b1.CustomResourceDefinition) bool {
 	apiext_v1b1.SetDefaults_CustomResourceDefinitionSpec(&a.Spec)
 	apiext_v1b1.SetDefaults_CustomResourceDefinitionSpec(&b.Spec)
 
-	// Ignoring labels and annotations for now
+	// Ignoring labels
 	as := a.Spec
 	bs := b.Spec
 	return as.Group == bs.Group &&
 		as.Version == bs.Version &&
 		isEqualCrdNames(as.Names, bs.Names) &&
 		a.Spec.Scope == b.Spec.Scope &&
-		isEqualValidation(as.Validation, bs.Validation)
+		isEqualValidation(as.Validation, bs.Validation) &&
+		isEqualAnnotations(a.Annotations, b.Annotations)
 }
 
 func isEqualCrdNames(n1, n2 apiext_v1b1.CustomResourceDefinitionNames) bool {
@@ -358,4 +359,8 @@ func isEqualShortNames(a, b []string) bool {
 
 func isEqualValidation(av, bv *apiext_v1b1.CustomResourceValidation) bool {
 	return reflect.DeepEqual(av, bv)
+}
+
+func isEqualAnnotations(a, b map[string]string) bool {
+	return reflect.DeepEqual(a, b)
 }

@@ -5,6 +5,11 @@ This file describes the way Smith manages
 
 ## Defined annotations
 
+### smith.a.c/SupportEnabled=true/false
+
+Applied to a CRD to indicate that instances of it should be watched by Smith and supported as an object
+kind in Bundles. Defaults to `false` if not present.
+
 ### smith.a.c/CrdReadyWhenFieldPath=`<FieldPath>`, smith.a.c/CrdReadyWhenFieldValue=`<Value>`
 
 Applied to a CRD `T` to indicate that an instance of it `Tinst` is considered `READY` when it has a field,
