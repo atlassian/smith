@@ -164,8 +164,10 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Events
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(a.Logger.Sugar().Infof)
-	eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: clientset.CoreV1().Events("")})
+	loggingWatch := eventBroadcaster.StartLogging(a.Logger.Sugar().Infof)
+	defer loggingWatch.Stop()
+	recordingWatch := eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: clientset.CoreV1().Events("")})
+	defer recordingWatch.Stop()
 	recorder := eventBroadcaster.NewRecorder(scheme, core_v1.EventSource{Component: "smith-controller"})
 
 	// Leader election
