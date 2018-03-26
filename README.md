@@ -16,7 +16,7 @@ It's functional and under active development.
 
 ## News
 
-- 01.01.2018: [Milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0) is complete and v1.0.0 released! 
+- 01.01.2018: [Milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0) is complete and v1.0.0 released!
 
 ## The idea
 
@@ -110,7 +110,7 @@ Some resource types can have Outputs:
 - New objects likes [Secrets](https://kubernetes.io/docs/user-guide/secrets/) and/or [ConfigMaps](https://kubernetes.io/docs/user-guide/configmap/)
 - [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) [objects](https://github.com/kubernetes-incubator/service-catalog/blob/master/docs/v1/api.md)
 
-Resources can reference outputs of other resources within the same bundle. [See what is supported](./docs/design/field-references.md). 
+Resources can reference outputs of other resources within the same bundle. [See what is supported](./docs/design/field-references.md).
 
 ### Dependencies
 Resources may depend on each other explicitly via `DependsOn` object references. Resources are created in the reverse dependency order.
@@ -146,7 +146,7 @@ See [an example](examples/service_catalog) and
 ### Presentations
 Smith has been presented to:
 - SIG Service Catalog - see information, screencast and recording [here](examples/service_catalog).
-- SIG Apps - see [recoding of the meeting](https://youtu.be/Eak9EN1PVds?t=875).  
+- SIG Apps - see [recoding of the meeting](https://youtu.be/Eak9EN1PVds?t=875).
 
 ### On [App Controller](https://github.com/Mirantis/k8s-AppController)
 Mirantis App Controller (discussed here https://github.com/kubernetes/kubernetes/issues/29453) is a very similar workflow engine with a few differences.
@@ -241,7 +241,7 @@ those contributing as an individual.
 ## Stargazers over time
 
 [![Stargazers over time](https://starcharts.herokuapp.com/atlassian/smith.svg)](https://starcharts.herokuapp.com/atlassian/smith)
-      
+
 ## License
 
 Copyright (c) 2016-2018 Atlassian and others. Apache 2.0 licensed, see LICENSE file.

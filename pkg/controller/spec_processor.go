@@ -17,6 +17,7 @@ const (
 )
 
 var (
+	// ?s allows us to match multiline expressions.
 	reference = regexp.MustCompile(`(?s)^(!+)\{(.+)}$`)
 )
 
@@ -51,7 +52,7 @@ func NewSpec(resources map[smith_v1.ResourceName]*resourceInfo, references []smi
 func NewExamplesSpec(references []smith_v1.Reference) (*SpecProcessor, error) {
 	variables, err := resolveAllReferences(references, func(reference smith_v1.Reference) (interface{}, error) {
 		if reference.Example == nil {
-			return nil, errors.WithStack(&noExampleError{reference.Name})
+			return nil, errors.WithStack(&noExampleError{referenceName: reference.Name})
 		}
 		return reference.Example, nil
 	})
@@ -75,13 +76,15 @@ func resolveAllReferences(
 	for _, reference := range references {
 		// Don't 'resolve' nameless references - they're just being
 		// used to cause dependencies.
-		if reference.Name != "" {
-			resolvedRef, err := resolveReference(reference)
-			if err != nil {
-				finalerr = multierr.Append(finalerr, err)
-			}
-			ar[reference.Name] = resolvedRef
+		if reference.Name == "" {
+			continue
 		}
+
+		resolvedRef, err := resolveReference(reference)
+		if err != nil {
+			finalerr = multierr.Append(finalerr, err)
+		}
+		ar[reference.Name] = resolvedRef
 	}
 
 	return ar, finalerr
@@ -136,6 +139,7 @@ func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{
 	}
 
 	// This means we have multiple '!' at the start, so we're escaping.
+	// i.e. !!!{foo} becomes !!{foo} (we escape !{} by adding !).
 	if len(match[1]) > 1 {
 		return value[1:], nil
 	}
@@ -175,7 +179,7 @@ func resolveReference(resInfos map[smith_v1.ResourceName]*resourceInfo, referenc
 		return nil, errors.Wrapf(err, "failed to process reference %q", reference.Name)
 	}
 	if fieldValue == nil {
-		return nil, errors.Errorf("field not found: %s", reference.Path)
+		return nil, errors.Errorf("field not found: %q", reference.Path)
 	}
 
 	if byteFieldValue, ok := fieldValue.([]byte); ok {

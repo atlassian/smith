@@ -221,14 +221,14 @@ func (st *resourceSyncTask) maybeExtractBindingSecret(obj *unstructured.Unstruct
 
 func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource) []smith_v1.ResourceName {
 	// No len here because dependencies can occur more than once in reference list
-	notReadyDependenciesSet := make(map[smith_v1.ResourceName]bool)
+	notReadyDependenciesSet := make(map[smith_v1.ResourceName]struct{})
 	for _, reference := range res.References {
 		if !st.processedResources[reference.Resource].isReady() {
-			notReadyDependenciesSet[reference.Resource] = true
+			notReadyDependenciesSet[reference.Resource] = struct{}{}
 		}
 	}
 	notReadyDependencies := make([]smith_v1.ResourceName, 0, len(notReadyDependenciesSet))
-	for resourceName, _ := range notReadyDependenciesSet {
+	for resourceName := range notReadyDependenciesSet {
 		notReadyDependencies = append(notReadyDependencies, resourceName)
 	}
 	return notReadyDependencies
