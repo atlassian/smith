@@ -56,12 +56,10 @@ func TestSpecProcessor(t *testing.T) {
 			"slice":  "!{res1aslice}",
 			"string": "!{res1astring}",
 
-			"int":               "!{res1aint}",
-			"bool":              "!{res1abool}",
-			"float64":           "!{res1afloat64}",
-			"object":            "!{res1aobject}",
-			"notAnObject":       "!!{res1aobject}",
-			"reallyNotAnObject": "!!!!{res1aobject}",
+			"int":     "!{res1aint}",
+			"bool":    "!{res1abool}",
+			"float64": "!{res1afloat64}",
+			"object":  "!{res1aobject}",
 
 			"slice1": []string{
 				"!{res1aint}",
@@ -100,9 +98,6 @@ func TestSpecProcessor(t *testing.T) {
 				"a": 1,
 				"b": "str",
 			},
-
-			"notAnObject":       "!{res1aobject}",
-			"reallyNotAnObject": "!!!{res1aobject}",
 
 			"slice1": []interface{}{
 				42,

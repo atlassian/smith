@@ -138,11 +138,7 @@ func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{
 		return value, nil
 	}
 
-	// This means we have multiple '!' at the start, so we're escaping.
-	// i.e. !!!{foo} becomes !!{foo} (we escape !{} by adding !).
-	if len(match[1]) > 1 {
-		return value[1:], nil
-	}
+	// TODO escaping.
 
 	reference, allowed := sp.variables[smith_v1.ReferenceName(match[2])]
 	if !allowed {
