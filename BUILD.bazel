@@ -1,3 +1,10 @@
+# Disable build files generation for this directories
+# gazelle:exclude vendor/github.com/bazelbuild/buildtools/buildifier2
+# gazelle:exclude vendor/golang.org/x/tools/cmd/fiximports/testdata
+# gazelle:exclude vendor/golang.org/x/tools/go/gcimporter15/testdata
+# gazelle:exclude vendor/golang.org/x/tools/go/internal/gccgoimporter/testdata
+# gazelle:exclude vendor/golang.org/x/tools/go/loader/testdata
+
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("@bazel_gazelle//:def.bzl", "gazelle")
 
