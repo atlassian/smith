@@ -181,8 +181,10 @@ func (tc *testCase) run(t *testing.T) {
 						Name: serviceClassName,
 					},
 					Spec: sc_v1b1.ClusterServiceClassSpec{
-						ExternalName: serviceClassExternalName,
-						ExternalID:   serviceClassName,
+						CommonServiceClassSpec: sc_v1b1.CommonServiceClassSpec{
+							ExternalName: serviceClassExternalName,
+							ExternalID:   serviceClassName,
+						},
 					},
 				},
 				&sc_v1b1.ClusterServicePlan{
@@ -197,11 +199,13 @@ func (tc *testCase) run(t *testing.T) {
 						ClusterServiceClassRef: sc_v1b1.ClusterObjectReference{
 							Name: serviceClassName,
 						},
-						ExternalName: servicePlanExternalName,
-						ExternalID:   servicePlanName,
-						ServiceInstanceCreateParameterSchema: &runtime.RawExtension{Raw: []byte(`
+						CommonServicePlanSpec: sc_v1b1.CommonServicePlanSpec{
+							ExternalName: servicePlanExternalName,
+							ExternalID:   servicePlanName,
+							ServiceInstanceCreateParameterSchema: &runtime.RawExtension{Raw: []byte(`
 {"type": "object", "properties": {"testSchema": {"type": "boolean"}}}
 `)},
+						},
 					},
 				},
 			}...)...,

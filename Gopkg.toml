@@ -32,7 +32,7 @@ required = [
   go-tests = true
 
 [[override]]
-  branch = "release-1.9" # correct branch
+  branch = "release-1.10" # correct branch
   name = "k8s.io/code-generator"
 
 [[constraint]]
@@ -40,7 +40,7 @@ required = [
   name = "github.com/bazelbuild/buildtools"
 
 [[override]]
-  revision = "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4" # from 1.9 branch
+  revision = "01a732e01d00cb9a81bb0ca050d3e6d2b947927b" # from 1.10 branch
   name = "k8s.io/gengo"
 
 [[constraint]]
@@ -53,16 +53,16 @@ required = [
 
 [[override]]
   name = "k8s.io/apiextensions-apiserver"
-  branch = "release-1.9" # correct branch
+  branch = "release-1.10" # correct branch
 
 [[override]]
   name = "k8s.io/apimachinery"
-  branch = "release-1.9" # correct branch
+  branch = "release-1.10" # correct branch
 
 [[override]]
   name = "k8s.io/client-go"
-  branch = "release-6.0" # correct branch
+  branch = "release-7.0" # correct branch
 
 [[override]]
   name = "k8s.io/api"
-  branch = "release-1.9" # correct branch
+  branch = "release-1.10" # correct branch
