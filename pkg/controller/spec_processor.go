@@ -9,7 +9,7 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/pkg/errors"
-	"go.uber.org/multierr"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 const (
@@ -33,6 +33,22 @@ type noExampleError struct {
 
 func (e *noExampleError) Error() string {
 	return fmt.Sprintf("no example value provided in reference %q", e.referenceName)
+}
+
+func isNoExampleError(err error) bool {
+	switch typedErr := err.(type) {
+	case utilerrors.Aggregate:
+		for _, e := range typedErr.Errors() {
+			if _, ok := errors.Cause(e).(*noExampleError); !ok {
+				return false
+			}
+		}
+		return true
+	case *noExampleError:
+		return true
+	default:
+		return false
+	}
 }
 
 func NewSpec(resources map[smith_v1.ResourceName]*resourceInfo, references []smith_v1.Reference) (*SpecProcessor, error) {
@@ -71,8 +87,8 @@ func resolveAllReferences(
 	resolveReference func(reference smith_v1.Reference) (interface{}, error),
 ) (map[smith_v1.ReferenceName]interface{}, error) {
 
-	ar := make(map[smith_v1.ReferenceName]interface{}, len(references))
-	var finalerr error
+	refs := make(map[smith_v1.ReferenceName]interface{}, len(references))
+	var errs []error
 	for _, reference := range references {
 		// Don't 'resolve' nameless references - they're just being
 		// used to cause dependencies.
@@ -82,12 +98,16 @@ func resolveAllReferences(
 
 		resolvedRef, err := resolveReference(reference)
 		if err != nil {
-			finalerr = multierr.Append(finalerr, err)
+			errs = append(errs, err)
+			continue
 		}
-		ar[reference.Name] = resolvedRef
+		refs[reference.Name] = resolvedRef
 	}
 
-	return ar, finalerr
+	if len(errs) > 0 {
+		return nil, utilerrors.NewAggregate(errs)
+	}
+	return refs, nil
 }
 
 func (sp *SpecProcessor) ProcessObject(obj map[string]interface{}, path ...string) error {

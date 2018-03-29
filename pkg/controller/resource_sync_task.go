@@ -290,7 +290,7 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 	sp, err := NewExamplesSpec(res.References)
 	if err != nil {
-		if _, ok := errors.Cause(err).(*noExampleError); ok {
+		if isNoExampleError(errors.Cause(err)) {
 			// a noExampleError occurs when an example wasn't provided
 			// by the user in one of the references. For now, we assume this
 			// is intentional and don't error out.

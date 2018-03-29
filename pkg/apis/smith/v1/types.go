@@ -197,7 +197,7 @@ type Resource struct {
 	Name ResourceName `json:"name"`
 
 	// Explicit dependencies.
-	References []Reference `json:"reference,omitempty"`
+	References []Reference `json:"references,omitempty"`
 
 	Spec ResourceSpec `json:"spec"`
 }
