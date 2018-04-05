@@ -494,8 +494,8 @@ func sortBundle(bundle *smith_v1.Bundle) (*graph.Graph, []graph.V, error) {
 	}
 
 	for _, res := range bundle.Spec.Resources {
-		for _, d := range res.DependsOn {
-			if err := g.AddEdge(res.Name, d); err != nil {
+		for _, reference := range res.References {
+			if err := g.AddEdge(res.Name, reference.Resource); err != nil {
 				return nil, nil, err
 			}
 		}

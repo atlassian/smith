@@ -57,8 +57,10 @@ func TestSchemaEarlyValidation(t *testing.T) {
 						},
 					},
 					{
-						Name:      resSb1,
-						DependsOn: []smith_v1.ResourceName{resSi1},
+						Name: resSb1,
+						References: []smith_v1.Reference{
+							{Resource: resSi1},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Object: &sc_v1b1.ServiceBinding{
 								TypeMeta: meta_v1.TypeMeta{
@@ -78,8 +80,16 @@ func TestSchemaEarlyValidation(t *testing.T) {
 						},
 					},
 					{
-						Name:      resSiWithDefaults,
-						DependsOn: []smith_v1.ResourceName{resSb1},
+						Name: resSiWithDefaults,
+						References: []smith_v1.Reference{
+							{
+								Name:     "resSb1",
+								Resource: resSb1,
+								Modifier: "bindsecret",
+								Path:     "Data.mysecret",
+								Example:  "nooo",
+							},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Object: &sc_v1b1.ServiceInstance{
 								TypeMeta: meta_v1.TypeMeta{
@@ -90,7 +100,7 @@ func TestSchemaEarlyValidation(t *testing.T) {
 									Name: si1,
 								},
 								Spec: sc_v1b1.ServiceInstanceSpec{
-									Parameters: &runtime.RawExtension{Raw: []byte(`{"testSchema": "{{` + resSb1 + `:bindsecret#Data.mysecret#\"nooo\"}}"}`)},
+									Parameters: &runtime.RawExtension{Raw: []byte(`{"testSchema": "!{resSb1}"}`)},
 									PlanReference: sc_v1b1.PlanReference{
 										ClusterServiceClassExternalName: serviceClassExternalName,
 										ClusterServicePlanExternalName:  servicePlanExternalName,
@@ -100,21 +110,37 @@ func TestSchemaEarlyValidation(t *testing.T) {
 						},
 					},
 					{
-						Name:      resPWithDefaults,
-						DependsOn: []smith_v1.ResourceName{resSb1},
+						Name: resPWithDefaults,
+						References: []smith_v1.Reference{
+							{
+								Name:     "resSb1",
+								Resource: resSb1,
+								Modifier: "bindsecret",
+								Path:     "Data.mysecret",
+								Example:  true,
+							},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Plugin: &smith_v1.PluginSpec{
 								Name:       pluginConfigMapWithDeps,
 								ObjectName: m1,
 								Spec: map[string]interface{}{
-									"p1": "{{" + resSb1 + ":bindsecret#Data.mysecret#null}}",
+									"p1": "!{resSb1}",
 								},
 							},
 						},
 					},
 					{
-						Name:      resSiWithoutDefaults,
-						DependsOn: []smith_v1.ResourceName{resSb1},
+						Name: resSiWithoutDefaults,
+						References: []smith_v1.Reference{
+							{
+								Name:     "resSb1",
+								Resource: resSb1,
+								Modifier: "bindsecret",
+								Path:     "Data.mysecret",
+								Example:  nil,
+							},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Object: &sc_v1b1.ServiceInstance{
 								TypeMeta: meta_v1.TypeMeta{
@@ -125,7 +151,7 @@ func TestSchemaEarlyValidation(t *testing.T) {
 									Name: si1,
 								},
 								Spec: sc_v1b1.ServiceInstanceSpec{
-									Parameters: &runtime.RawExtension{Raw: []byte(`{"testSchema": "{{` + resSb1 + `:bindsecret#Data.mysecret}}"}`)},
+									Parameters: &runtime.RawExtension{Raw: []byte(`{"testSchema": "!{resSb1}"}`)},
 									PlanReference: sc_v1b1.PlanReference{
 										ClusterServiceClassExternalName: serviceClassExternalName,
 										ClusterServicePlanExternalName:  servicePlanExternalName,
@@ -135,14 +161,22 @@ func TestSchemaEarlyValidation(t *testing.T) {
 						},
 					},
 					{
-						Name:      resPWithoutDefaults,
-						DependsOn: []smith_v1.ResourceName{resSb1},
+						Name: resPWithoutDefaults,
+						References: []smith_v1.Reference{
+							{
+								Name:     "resSb1",
+								Resource: resSb1,
+								Modifier: "bindsecret",
+								Path:     "Data.mysecret",
+								Example:  nil,
+							},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Plugin: &smith_v1.PluginSpec{
 								Name:       pluginConfigMapWithDeps,
 								ObjectName: m1,
 								Spec: map[string]interface{}{
-									"p1": "{{" + resSb1 + ":bindsecret#Data.mysecret}}",
+									"p1": "!{resSb1}",
 								},
 							},
 						},
@@ -170,7 +204,7 @@ func TestSchemaEarlyValidation(t *testing.T) {
 			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resPWithDefaults, smith_v1.ResourceError, smith_v1.ConditionTrue)
 			if resCond != nil {
 				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-				assert.Equal(t, "invalid spec: spec failed validation against schema: p1: Invalid type. Expected: string, given: null", resCond.Message)
+				assert.Equal(t, "invalid spec: spec failed validation against schema: p1: Invalid type. Expected: string, given: boolean", resCond.Message)
 			}
 			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resSiWithDefaults, smith_v1.ResourceError, smith_v1.ConditionTrue)
 			if resCond != nil {

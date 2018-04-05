@@ -76,8 +76,10 @@ func TestPluginSpecProcessed(t *testing.T) {
 						},
 					},
 					{
-						Name:      resSb1,
-						DependsOn: []smith_v1.ResourceName{resSi1},
+						Name: resSb1,
+						References: []smith_v1.Reference{
+							{Resource: smith_v1.ResourceName(resSi1)},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Object: &sc_v1b1.ServiceBinding{
 								TypeMeta: meta_v1.TypeMeta{
@@ -110,14 +112,21 @@ func TestPluginSpecProcessed(t *testing.T) {
 							}},
 					},
 					{
-						Name:      resP1,
-						DependsOn: []smith_v1.ResourceName{resSb1, resSleeper1},
+						Name: resP1,
+						References: []smith_v1.Reference{
+							{
+								Name:     "bindingName",
+								Resource: smith_v1.ResourceName(resSb1),
+								Path:     "metadata.name",
+							},
+							{Resource: smith_v1.ResourceName(resSleeper1)},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Plugin: &smith_v1.PluginSpec{
 								Name:       pluginConfigMapWithDeps,
 								ObjectName: m1,
 								Spec: map[string]interface{}{
-									"p1": "v1", "p2": "{{" + resSb1 + "#metadata.name}}",
+									"p1": "v1", "p2": "!{bindingName}",
 								},
 							},
 						},

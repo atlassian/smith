@@ -4,69 +4,110 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
-	"strings"
 	"unicode/utf8"
-
-	"encoding/json"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/pkg/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 const (
-	// Separator between reference to a resource by name and JsonPath within a resource
-	ReferenceSeparator = "#"
-	// Separator between dependency and type of output (i.e. resolve a dependency
-	// to some produced object)
-	ResourceOutputSeparator      = ":"
-	ResourceOutputNameBindSecret = "bindsecret"
+	ReferenceModifierBindSecret = "bindsecret"
 )
 
 var (
-	reference = regexp.MustCompile(`^\{\{.+}}$`)
+	// ?s allows us to match multiline expressions.
+	reference = regexp.MustCompile(`(?s)^(!+)\{(.+)}$`)
 )
 
 type SpecProcessor struct {
-	selfName         smith_v1.ResourceName
-	resources        map[smith_v1.ResourceName]*resourceInfo
-	allowedResources map[smith_v1.ResourceName]struct{}
-	examplesOnly     bool
+	variables map[smith_v1.ReferenceName]interface{}
 }
 
 // noExampleError occurs when we try to process the spec with examples rather
 // than resolving references, but at least one of references doesn't specify an example.
 type noExampleError struct {
-	selector string
+	referenceName smith_v1.ReferenceName
 }
 
 func (e *noExampleError) Error() string {
-	return fmt.Sprintf("no example value provided in selector %q", e.selector)
+	return fmt.Sprintf("no example value provided in reference %q", e.referenceName)
 }
 
-func NewSpec(selfName smith_v1.ResourceName, resources map[smith_v1.ResourceName]*resourceInfo, allowedResources []smith_v1.ResourceName) *SpecProcessor {
+func isNoExampleError(err error) bool {
+	switch typedErr := err.(type) {
+	case utilerrors.Aggregate:
+		for _, e := range typedErr.Errors() {
+			if _, ok := errors.Cause(e).(*noExampleError); !ok {
+				return false
+			}
+		}
+		return true
+	case *noExampleError:
+		return true
+	default:
+		return false
+	}
+}
+
+func NewSpec(resources map[smith_v1.ResourceName]*resourceInfo, references []smith_v1.Reference) (*SpecProcessor, error) {
+	variables, err := resolveAllReferences(references, func(reference smith_v1.Reference) (interface{}, error) {
+		return resolveReference(resources, reference)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &SpecProcessor{
-		selfName:         selfName,
-		resources:        resources,
-		allowedResources: convertResourceNamesToMap(allowedResources),
-		examplesOnly:     false,
-	}
+		variables: variables,
+	}, nil
 }
 
-func NewExamplesSpec(selfName smith_v1.ResourceName, allowedResources []smith_v1.ResourceName) *SpecProcessor {
+func NewExamplesSpec(references []smith_v1.Reference) (*SpecProcessor, error) {
+	variables, err := resolveAllReferences(references, func(reference smith_v1.Reference) (interface{}, error) {
+		if reference.Example == nil {
+			return nil, errors.WithStack(&noExampleError{referenceName: reference.Name})
+		}
+		return reference.Example, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &SpecProcessor{
-		selfName:         selfName,
-		allowedResources: convertResourceNamesToMap(allowedResources),
-		examplesOnly:     true,
-	}
+		variables: variables,
+	}, nil
 }
 
-func convertResourceNamesToMap(resources []smith_v1.ResourceName) map[smith_v1.ResourceName]struct{} {
-	ar := make(map[smith_v1.ResourceName]struct{}, len(resources))
-	for _, allowedResource := range resources {
-		ar[allowedResource] = struct{}{}
+func resolveAllReferences(
+	references []smith_v1.Reference,
+	resolveReference func(reference smith_v1.Reference) (interface{}, error),
+) (map[smith_v1.ReferenceName]interface{}, error) {
+
+	refs := make(map[smith_v1.ReferenceName]interface{}, len(references))
+	var errs []error
+	for _, reference := range references {
+		// Don't 'resolve' nameless references - they're just being
+		// used to cause dependencies.
+		if reference.Name == "" {
+			continue
+		}
+
+		resolvedRef, err := resolveReference(reference)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		refs[reference.Name] = resolvedRef
 	}
-	return ar
+
+	if len(errs) > 0 {
+		return nil, utilerrors.NewAggregate(errs)
+	}
+	return refs, nil
 }
 
 func (sp *SpecProcessor) ProcessObject(obj map[string]interface{}, path ...string) error {
@@ -112,81 +153,56 @@ func (sp *SpecProcessor) ProcessValue(value interface{}, path ...string) (interf
 }
 
 func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{}, error) {
-	if !reference.MatchString(value) {
+	match := reference.FindStringSubmatch(value)
+	if match == nil {
 		return value, nil
 	}
 
-	result, err := sp.processMatch(value[2 : len(value)-2])
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid reference at \"%s\"", strings.Join(path, "."))
+	// TODO escaping.
+
+	reference, allowed := sp.variables[smith_v1.ReferenceName(match[2])]
+	if !allowed {
+		return nil, errors.Errorf("reference does not exist in resource references block: %s", match[2])
 	}
-	return result, nil
+
+	return reference, nil
 }
 
-func (sp *SpecProcessor) processMatch(selector string) (interface{}, error) {
-	parts := strings.SplitN(selector, ReferenceSeparator, 3)
-	if len(parts) < 2 {
-		return nil, errors.Errorf("cannot include whole object: %s", selector)
-	}
-	objNameParts := strings.SplitN(parts[0], ResourceOutputSeparator, 2)
-	objName := smith_v1.ResourceName(objNameParts[0])
-	resourceOutputName := ""
-	if len(objNameParts) == 2 {
-		resourceOutputName = objNameParts[1]
-	}
-	if objName == sp.selfName {
-		return nil, errors.Errorf("self references are not allowed: %s", selector)
-	}
-
-	if _, allowed := sp.allowedResources[objName]; !allowed {
-		return nil, errors.Errorf("references can only point at direct dependencies: %s", selector)
-	}
-
-	if sp.examplesOnly {
-		if len(parts) < 3 {
-			return nil, errors.WithStack(&noExampleError{selector})
-		}
-		var exampleValue interface{}
-		if err := json.Unmarshal([]byte(parts[2]), &exampleValue); err != nil {
-			return nil, errors.Wrapf(err, "failed to parse default %q", parts[2])
-		}
-		return exampleValue, nil
-	}
-
-	resInfo := sp.resources[objName]
+func resolveReference(resInfos map[smith_v1.ResourceName]*resourceInfo, reference smith_v1.Reference) (interface{}, error) {
+	resInfo := resInfos[reference.Resource]
 	if resInfo == nil {
-		return nil, errors.Errorf("object not found: %s", selector)
+		return nil, errors.Errorf("internal dependency resolution error - resource referenced by %q not found in Bundle: %s", reference.Name, reference.Resource)
 	}
 
 	var objToTraverse interface{}
-	switch resourceOutputName {
+	switch reference.Modifier {
 	case "":
 		objToTraverse = resInfo.actual.Object
-	case ResourceOutputNameBindSecret:
+	case ReferenceModifierBindSecret:
 		if resInfo.serviceBindingSecret == nil {
-			return nil, errors.Errorf("%q requested, but %q is not a ServiceBinding", resourceOutputName, objName)
+			return nil, errors.Errorf("%q requested, but %q is not a ServiceBinding", ReferenceModifierBindSecret, reference.Resource)
 		}
 		objToTraverse = resInfo.serviceBindingSecret
 	default:
-		return nil, errors.Errorf("resource output name %q not understood for %q", resourceOutputName, objName)
+		return nil, errors.Errorf("reference modifier %q not understood for %q", reference.Modifier, reference.Resource)
 	}
 
 	// To avoid overcomplicated format of reference like this: {{res1#{$.a.string}}}
 	// And have something like this instead: {{res1#a.string}}
-	jsonPath := fmt.Sprintf("{$.%s}", parts[1])
+	jsonPath := fmt.Sprintf("{$.%s}", reference.Path)
 	fieldValue, err := resources.GetJsonPathValue(objToTraverse, jsonPath, false)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to process JsonPath reference %s", selector)
+		return nil, errors.Wrapf(err, "failed to process reference %q", reference.Name)
 	}
 	if fieldValue == nil {
-		return nil, errors.Errorf("field not found: %s", selector)
+		return nil, errors.Errorf("field not found: %q", reference.Path)
 	}
 
 	if byteFieldValue, ok := fieldValue.([]byte); ok {
 		// Secrets are in bytes. We wildly cast them to a string and hope for the best
 		// so we can put them in the JSON in a 'nice' way.
 		if !utf8.Valid(byteFieldValue) {
-			return nil, errors.Errorf("cannot expand non-UTF8 byte array field %q", selector)
+			return nil, errors.Errorf("cannot expand non-UTF8 byte array field %q", reference.Path)
 		}
 		fieldValue = string(byteFieldValue)
 	}

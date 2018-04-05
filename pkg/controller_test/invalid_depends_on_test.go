@@ -29,8 +29,10 @@ func TestInvalidDependsOn(t *testing.T) {
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{
 					{
-						Name:      resP1,
-						DependsOn: []smith_v1.ResourceName{"bla"},
+						Name: resP1,
+						References: []smith_v1.Reference{
+							{Resource: smith_v1.ResourceName("bla")},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Plugin: &smith_v1.PluginSpec{
 								Name:       pluginConfigMapWithDeps,

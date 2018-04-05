@@ -54,8 +54,10 @@ func TestNoActionsForBlockedResources(t *testing.T) {
 						},
 					},
 					{
-						Name:      resSb1,
-						DependsOn: []smith_v1.ResourceName{resSi1},
+						Name: resSb1,
+						References: []smith_v1.Reference{
+							{Resource: smith_v1.ResourceName(resSi1)},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Object: &sc_v1b1.ServiceBinding{
 								TypeMeta: meta_v1.TypeMeta{
@@ -75,8 +77,10 @@ func TestNoActionsForBlockedResources(t *testing.T) {
 						},
 					},
 					{
-						Name:      resMapNeedsAnUpdate,
-						DependsOn: []smith_v1.ResourceName{resSb1},
+						Name: resMapNeedsAnUpdate,
+						References: []smith_v1.Reference{
+							{Resource: smith_v1.ResourceName(resSb1)},
+						},
 						Spec: smith_v1.ResourceSpec{
 							Object: &core_v1.ConfigMap{
 								TypeMeta: meta_v1.TypeMeta{

@@ -69,8 +69,10 @@ func TestWorkflow(t *testing.T) {
 		Spec: smith_v1.BundleSpec{
 			Resources: []smith_v1.Resource{
 				{
-					Name:      "config1res",
-					DependsOn: []smith_v1.ResourceName{"secret2res"},
+					Name: "config1res",
+					References: []smith_v1.Reference{
+						{Resource: "secret2res"},
+					},
 					Spec: smith_v1.ResourceSpec{
 						Object: c1,
 					},

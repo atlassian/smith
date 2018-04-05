@@ -144,16 +144,43 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			},
 		},
 	}
+	reference := apiext_v1b1.JSONSchemaProps{
+		Description: "A reference to a path in another resource",
+		Type:        "object",
+		OneOf: []apiext_v1b1.JSONSchemaProps{
+			{
+				Required: []string{"resource"},
+				Properties: map[string]apiext_v1b1.JSONSchemaProps{
+					"resource": resourceName,
+				},
+			},
+			{
+				Required: []string{"name", "resource", "path"},
+				Properties: map[string]apiext_v1b1.JSONSchemaProps{
+					"name":     DNS_SUBDOMAIN,
+					"resource": resourceName,
+					"example": {
+						Description: "example of how we expect reference to resolve. Used for validation",
+					},
+					"modifier": DNS_SUBDOMAIN,
+					"path": {
+						Description: "JSONPath expression used to extract data from resource",
+						Type:        "string",
+					},
+				},
+			},
+		},
+	}
 	resource := apiext_v1b1.JSONSchemaProps{
 		Description: "Resource describes an object that should be provisioned",
 		Type:        "object",
 		Required:    []string{"name", "spec"},
 		Properties: map[string]apiext_v1b1.JSONSchemaProps{
 			"name": resourceName,
-			"dependsOn": {
+			"references": {
 				Type: "array",
 				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
-					Schema: &resourceName,
+					Schema: &reference,
 				},
 			},
 			"spec": {
