@@ -16,7 +16,7 @@ import (
 func TestCrInAnotherNamespace(t *testing.T) {
 	t.Parallel()
 	tc := testCase{
-		crdClientObjects: []runtime.Object{
+		apiExtClientObjects: []runtime.Object{
 			SleeperCrdWithStatus(),
 		},
 		expectedActions: sets.NewString(

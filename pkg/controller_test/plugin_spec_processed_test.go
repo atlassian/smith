@@ -21,7 +21,7 @@ func TestPluginSpecProcessed(t *testing.T) {
 	t.Parallel()
 	tr := true
 	tc := testCase{
-		crdClientObjects: []runtime.Object{
+		apiExtClientObjects: []runtime.Object{
 			SleeperCrdWithStatus(),
 		},
 		mainClientObjects: []runtime.Object{

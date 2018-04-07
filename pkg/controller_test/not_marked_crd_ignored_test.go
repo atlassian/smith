@@ -18,7 +18,7 @@ func TestNotMarkedCrdIgnored(t *testing.T) {
 		sleeperCrd := SleeperCrdWithStatus()
 		sleeperCrd.Annotations[smith.CrdSupportEnabled] = "false"
 		tc := testCase{
-			crdClientObjects: []runtime.Object{
+			apiExtClientObjects: []runtime.Object{
 				sleeperCrd,
 			},
 			bundle: &smith_v1.Bundle{
@@ -38,7 +38,7 @@ func TestNotMarkedCrdIgnored(t *testing.T) {
 		sleeperCrd := SleeperCrdWithStatus()
 		delete(sleeperCrd.Annotations, smith.CrdSupportEnabled)
 		tc := testCase{
-			crdClientObjects: []runtime.Object{
+			apiExtClientObjects: []runtime.Object{
 				sleeperCrd,
 			},
 			bundle: &smith_v1.Bundle{

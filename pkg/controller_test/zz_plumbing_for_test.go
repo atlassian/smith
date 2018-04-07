@@ -61,17 +61,17 @@ type reaction struct {
 }
 
 type testCase struct {
-	logger             *zap.Logger
-	mainClientObjects  []runtime.Object
-	mainReactors       []reaction
-	smithClientObjects []runtime.Object
-	smithReactors      []reaction
-	crdClientObjects   []runtime.Object
-	crdReactors        []reaction
-	scClientObjects    []runtime.Object
-	scReactors         []reaction
-	bundle             *smith_v1.Bundle
-	namespace          string
+	logger              *zap.Logger
+	mainClientObjects   []runtime.Object
+	mainReactors        []reaction
+	smithClientObjects  []runtime.Object
+	smithReactors       []reaction
+	apiExtClientObjects []runtime.Object
+	apiExtReactors      []reaction
+	scClientObjects     []runtime.Object
+	scReactors          []reaction
+	bundle              *smith_v1.Bundle
+	namespace           string
 
 	expectedActions        sets.String
 	enableServiceCatalog   bool
@@ -158,9 +158,9 @@ func (tc *testCase) run(t *testing.T) {
 	for _, reactor := range tc.smithReactors {
 		smithClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
-	apiExtClient := apiExtFake.NewSimpleClientset(tc.crdClientObjects...)
+	apiExtClient := apiExtFake.NewSimpleClientset(tc.apiExtClientObjects...)
 	tc.apiExtFake = &apiExtClient.Fake
-	for _, reactor := range tc.crdReactors {
+	for _, reactor := range tc.apiExtReactors {
 		apiExtClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
 
@@ -228,7 +228,7 @@ func (tc *testCase) run(t *testing.T) {
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(apiExtClient, 0, cache.Indexers{})
 	bundleInf := client.BundleInformer(smithClient.SmithV1(), meta_v1.NamespaceAll, 0)
 
-	for _, object := range tc.crdClientObjects {
+	for _, object := range tc.apiExtClientObjects {
 		crd := object.(*apiext_v1b1.CustomResourceDefinition)
 		scheme.AddKnownTypeWithName(schema.GroupVersionKind{
 			Group:   crd.Spec.Group,
