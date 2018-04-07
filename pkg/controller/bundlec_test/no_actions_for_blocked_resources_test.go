@@ -96,7 +96,7 @@ func TestNoActionsForBlockedResources(t *testing.T) {
 		},
 		namespace:            testNamespace,
 		enableServiceCatalog: true,
-		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.BundleController, tc *testCase) {
+		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
 			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.EqualError(t, err, `error processing resource(s): ["`+resSi1+`"]`)
 			assert.False(t, retriable)

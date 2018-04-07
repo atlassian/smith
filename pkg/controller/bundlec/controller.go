@@ -23,7 +23,7 @@ const (
 	workDeduplicationPeriod = 50 * time.Millisecond
 )
 
-type BundleController struct {
+type Controller struct {
 	// wg.Wait() is called from Run() and first wg.Add() may be called concurrently from CRD listener
 	// to start an Informer. This is a data race. This mutex is used to ensure ordering.
 	// See https://github.com/atlassian/smith/issues/156
@@ -60,7 +60,7 @@ type BundleController struct {
 }
 
 // Prepare prepares the controller to be run.
-func (c *BundleController) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
+func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
 	c.crdContext, c.crdContextCancel = context.WithCancel(context.Background())
 	c.resourceHandler = cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onResourceAdd,
@@ -73,8 +73,8 @@ func (c *BundleController) Prepare(crdInf cache.SharedIndexInformer, resourceInf
 		DeleteFunc: c.onBundleDelete,
 	})
 	crdInf.AddEventHandler(&crdEventHandler{
-		BundleController: c,
-		watchers:         make(map[string]watchState),
+		Controller: c,
+		watchers:   make(map[string]watchState),
 	})
 
 	for _, resourceInf := range resourceInfs {
@@ -84,7 +84,7 @@ func (c *BundleController) Prepare(crdInf cache.SharedIndexInformer, resourceInf
 
 // Run begins watching and syncing.
 // All informers must be synched before this method is invoked.
-func (c *BundleController) Run(ctx context.Context) {
+func (c *Controller) Run(ctx context.Context) {
 	defer c.wg.Wait()
 	defer c.crdContextCancel() // should be executed after stopping is set to true
 	defer func() {
@@ -104,13 +104,13 @@ func (c *BundleController) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (c *BundleController) enqueue(bundle *smith_v1.Bundle) {
+func (c *Controller) enqueue(bundle *smith_v1.Bundle) {
 	c.enqueueKey(queueKey{
 		namespace: bundle.Namespace,
 		name:      bundle.Name,
 	})
 }
 
-func (c *BundleController) enqueueKey(key queueKey) {
+func (c *Controller) enqueueKey(key queueKey) {
 	c.Queue.AddAfter(key, workDeduplicationPeriod)
 }

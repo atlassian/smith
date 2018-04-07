@@ -6,19 +6,19 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func (c *BundleController) onBundleAdd(obj interface{}) {
+func (c *Controller) onBundleAdd(obj interface{}) {
 	bundle := obj.(*smith_v1.Bundle)
 	c.Logger.Info("Rebuilding Bundle because it was added", logz.Namespace(bundle), logz.Bundle(bundle))
 	c.enqueue(bundle)
 }
 
-func (c *BundleController) onBundleUpdate(oldObj, newObj interface{}) {
+func (c *Controller) onBundleUpdate(oldObj, newObj interface{}) {
 	bundle := newObj.(*smith_v1.Bundle)
 	c.Logger.Info("Rebuilding Bundle because it was updated", logz.Namespace(bundle), logz.Bundle(bundle))
 	c.enqueue(bundle)
 }
 
-func (c *BundleController) onBundleDelete(obj interface{}) {
+func (c *Controller) onBundleDelete(obj interface{}) {
 	bundle, ok := obj.(*smith_v1.Bundle)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)

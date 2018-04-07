@@ -26,7 +26,7 @@ func TestCrInAnotherNamespace(t *testing.T) {
 				"=watch",
 		),
 		namespace: testNamespace,
-		test: func(t *testing.T, ctx context.Context, bundleController *bundlec.BundleController, testcase *testCase) {
+		test: func(t *testing.T, ctx context.Context, bundleController *bundlec.Controller, testcase *testCase) {
 			bundleController.Run(ctx)
 		},
 		testHandler: fakeActionHandler{

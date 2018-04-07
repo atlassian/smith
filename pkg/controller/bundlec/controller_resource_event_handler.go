@@ -10,13 +10,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func (c *BundleController) onResourceAdd(obj interface{}) {
+func (c *Controller) onResourceAdd(obj interface{}) {
 	bundleName, namespace := getBundleNameAndNamespace(obj)
 	logger := c.loggerForObj(obj)
 	c.rebuildByName(logger, namespace, bundleName, "added", obj)
 }
 
-func (c *BundleController) onResourceUpdate(oldObj, newObj interface{}) {
+func (c *Controller) onResourceUpdate(oldObj, newObj interface{}) {
 	oldBundleName, oldNamespace := getBundleNameAndNamespace(oldObj)
 
 	newBundleName, newNamespace := getBundleNameAndNamespace(newObj)
@@ -29,7 +29,7 @@ func (c *BundleController) onResourceUpdate(oldObj, newObj interface{}) {
 	c.rebuildByName(logger, newNamespace, newBundleName, "updated", newObj)
 }
 
-func (c *BundleController) onResourceDelete(obj interface{}) {
+func (c *Controller) onResourceDelete(obj interface{}) {
 	logger := c.loggerForObj(obj)
 	metaObj, ok := obj.(meta_v1.Object)
 	if !ok {
@@ -62,7 +62,7 @@ func (c *BundleController) onResourceDelete(obj interface{}) {
 }
 
 // This method may be called with empty bundleName.
-func (c *BundleController) rebuildByName(logger *zap.Logger, namespace, bundleName, addUpdateDelete string, obj interface{}) {
+func (c *Controller) rebuildByName(logger *zap.Logger, namespace, bundleName, addUpdateDelete string, obj interface{}) {
 	if bundleName == "" {
 		return
 	}

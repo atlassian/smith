@@ -76,7 +76,7 @@ type testCase struct {
 	expectedActions        sets.String
 	enableServiceCatalog   bool
 	testHandler            fakeActionHandler
-	test                   func(*testing.T, context.Context, *bundlec.BundleController, *testCase)
+	test                   func(*testing.T, context.Context, *bundlec.Controller, *testCase)
 	plugins                map[smith_v1.PluginName]func(*testing.T) testingPlugin
 	pluginsShouldBeInvoked sets.String
 	testTimeout            time.Duration
@@ -291,7 +291,7 @@ func (tc *testCase) run(t *testing.T) {
 		tc.pluginsConstructed = append(tc.pluginsConstructed, pluginInstance)
 	}
 
-	cntrlr := &bundlec.BundleController{
+	cntrlr := &bundlec.Controller{
 		Logger:           tc.logger,
 		BundleInf:        bundleInf,
 		BundleClient:     smithClient.SmithV1(),
@@ -349,7 +349,7 @@ func (tc *testCase) run(t *testing.T) {
 	}
 }
 
-func (tc *testCase) defaultTest(t *testing.T, ctx context.Context, cntrlr *bundlec.BundleController) {
+func (tc *testCase) defaultTest(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller) {
 	require.NotNil(t, tc.bundle)
 	_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 	assert.NoError(t, err)

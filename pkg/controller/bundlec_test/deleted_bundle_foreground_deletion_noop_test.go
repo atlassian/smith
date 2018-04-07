@@ -75,7 +75,7 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 		},
 		namespace:            testNamespace,
 		enableServiceCatalog: false,
-		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.BundleController, tc *testCase) {
+		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
 			_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.NoError(t, err)
 

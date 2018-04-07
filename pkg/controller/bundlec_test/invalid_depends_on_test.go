@@ -45,7 +45,7 @@ func TestInvalidDependsOn(t *testing.T) {
 		plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
 			pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
 		},
-		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.BundleController, tc *testCase) {
+		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
 			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.EqualError(t, err, `topological sort of resources failed: vertex "bla" not found`)
 			assert.False(t, retriable)

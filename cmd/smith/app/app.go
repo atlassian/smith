@@ -200,7 +200,7 @@ func (a *App) Run(ctx context.Context) error {
 		ClientPool: dynamic.NewClientPool(a.RestConfig, rm, dynamic.LegacyAPIPathResolverFunc),
 		Mapper:     rm,
 	}
-	cntrlr := bundlec.BundleController{
+	cntrlr := bundlec.Controller{
 		Logger:           a.Logger,
 		BundleInf:        bundleInf,
 		BundleClient:     smithClient.SmithV1(),

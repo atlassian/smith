@@ -27,12 +27,12 @@ type objectRef struct {
 	Name string
 }
 
-func (c *BundleController) worker() {
+func (c *Controller) worker() {
 	for c.processNextWorkItem() {
 	}
 }
 
-func (c *BundleController) processNextWorkItem() bool {
+func (c *Controller) processNextWorkItem() bool {
 	key, quit := c.Queue.Get()
 	if quit {
 		return false
@@ -49,7 +49,7 @@ func (c *BundleController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *BundleController) handleErr(logger *zap.Logger, retriable bool, err error, key queueKey) {
+func (c *Controller) handleErr(logger *zap.Logger, retriable bool, err error, key queueKey) {
 	if err == nil {
 		c.Queue.Forget(key)
 		return
@@ -64,7 +64,7 @@ func (c *BundleController) handleErr(logger *zap.Logger, retriable bool, err err
 	c.Queue.Forget(key)
 }
 
-func (c *BundleController) processKey(logger *zap.Logger, key queueKey) (retriableRet bool, errRet error) {
+func (c *Controller) processKey(logger *zap.Logger, key queueKey) (retriableRet bool, errRet error) {
 	bundleObj, exists, err := c.BundleInf.GetIndexer().GetByKey(key.namespace + "/" + key.name)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to get Bundle by key %q", key)
@@ -78,7 +78,7 @@ func (c *BundleController) processKey(logger *zap.Logger, key queueKey) (retriab
 }
 
 // ProcessBundle is only visible for testing purposes. Should not be called directly.
-func (c *BundleController) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) (retriableRet bool, errRet error) {
+func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) (retriableRet bool, errRet error) {
 	startTime := time.Now()
 	logger.Info("Started syncing Bundle")
 	defer func() {
@@ -113,7 +113,7 @@ func (c *BundleController) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bu
 	return st.handleProcessResult(retriable, err)
 }
 
-func (c *BundleController) loggerForObj(obj interface{}) *zap.Logger {
+func (c *Controller) loggerForObj(obj interface{}) *zap.Logger {
 	logger := c.Logger
 	metaObj, ok := obj.(meta_v1.Object)
 	if ok {

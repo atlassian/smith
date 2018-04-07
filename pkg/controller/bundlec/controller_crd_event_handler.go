@@ -24,7 +24,7 @@ type watchState struct {
 // crdEventHandler handles events for objects with Kind: CustomResourceDefinition.
 // For each object a new informer is started to watch for events.
 type crdEventHandler struct {
-	*BundleController
+	*Controller
 	watchers map[string]watchState // CRD name -> state
 }
 
