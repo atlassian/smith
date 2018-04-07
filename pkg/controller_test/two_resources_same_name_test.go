@@ -61,7 +61,7 @@ func TestTwoResourcesWithSameName(t *testing.T) {
 			assert.EqualError(t, err, `bundle contains two resources with the same name "`+resP1+`"`)
 			assert.False(t, retriable)
 
-			actions := tc.bundleFake.Actions()
+			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 3)
 			bundleUpdate := actions[2].(kube_testing.UpdateAction)
 			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())

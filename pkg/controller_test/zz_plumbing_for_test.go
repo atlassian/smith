@@ -38,7 +38,7 @@ import (
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	crdFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
+	apiExtFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,8 +81,8 @@ type testCase struct {
 	pluginsShouldBeInvoked sets.String
 
 	mainFake           *kube_testing.Fake
-	bundleFake         *kube_testing.Fake
-	crdFake            *kube_testing.Fake
+	smithFake          *kube_testing.Fake
+	apiExtFake         *kube_testing.Fake
 	scFake             *kube_testing.Fake
 	pluginsConstructed []testingPlugin
 }
@@ -152,15 +152,15 @@ func (tc *testCase) run(t *testing.T) {
 		convertBundleResourcesToUnstrucutred(t, tc.bundle, tc.enableServiceCatalog)
 		tc.smithClientObjects = append(tc.smithClientObjects, tc.bundle)
 	}
-	bundleClient := smithFake.NewSimpleClientset(tc.smithClientObjects...)
-	tc.bundleFake = &bundleClient.Fake
+	smithClient := smithFake.NewSimpleClientset(tc.smithClientObjects...)
+	tc.smithFake = &smithClient.Fake
 	for _, reactor := range tc.smithReactors {
-		bundleClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
+		smithClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
-	crdClient := crdFake.NewSimpleClientset(tc.crdClientObjects...)
-	tc.crdFake = &crdClient.Fake
+	apiExtClient := apiExtFake.NewSimpleClientset(tc.crdClientObjects...)
+	tc.apiExtFake = &apiExtClient.Fake
 	for _, reactor := range tc.crdReactors {
-		crdClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
+		apiExtClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
 
 	// Informers
@@ -224,8 +224,8 @@ func (tc *testCase) run(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, 0, cache.Indexers{})
-	bundleInf := client.BundleInformer(bundleClient.SmithV1(), meta_v1.NamespaceAll, 0)
+	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(apiExtClient, 0, cache.Indexers{})
+	bundleInf := client.BundleInformer(smithClient.SmithV1(), meta_v1.NamespaceAll, 0)
 
 	for _, object := range tc.crdClientObjects {
 		crd := object.(*apiext_v1b1.CustomResourceDefinition)
@@ -299,7 +299,7 @@ func (tc *testCase) run(t *testing.T) {
 	cntrlr := &controller.BundleController{
 		Logger:           tc.logger,
 		BundleInf:        bundleInf,
-		BundleClient:     bundleClient.SmithV1(),
+		BundleClient:     smithClient.SmithV1(),
 		BundleStore:      bs,
 		SmartClient:      sc,
 		Rc:               rc,

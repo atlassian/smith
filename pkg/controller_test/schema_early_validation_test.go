@@ -195,7 +195,7 @@ func TestSchemaEarlyValidation(t *testing.T) {
 			assert.False(t, retriable)
 			assert.EqualError(t, err, `error processing resource(s): ["`+resSiWithDefaults+`" "`+resPWithDefaults+`"]`)
 
-			actions := tc.bundleFake.Actions()
+			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 3)
 			bundleUpdate := actions[2].(kube_testing.UpdateAction)
 			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())

@@ -68,7 +68,7 @@ func TestDetectInfiniteUpdateCycles(t *testing.T) {
 			retriable, err := cntrlr.ProcessKey(tc.logger, key)
 			assert.EqualError(t, err, `error processing resource(s): ["`+mapNeedsAnUpdate+`"]`)
 			assert.False(t, retriable)
-			actions := tc.bundleFake.Actions()
+			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 3)
 			bundleUpdate := actions[2].(kube_testing.UpdateAction)
 			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())

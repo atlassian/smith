@@ -83,7 +83,7 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 			_, err = cntrlr.ProcessKey(tc.logger, key)
 			assert.NoError(t, err)
 
-			actions := tc.bundleFake.Actions()
+			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 2)
 			assert.Implements(t, (*kube_testing.ListAction)(nil), actions[0])
 			assert.Implements(t, (*kube_testing.WatchAction)(nil), actions[1])

@@ -55,7 +55,7 @@ func TestInvalidDependsOn(t *testing.T) {
 			assert.EqualError(t, err, `topological sort of resources failed: vertex "bla" not found`)
 			assert.False(t, retriable)
 
-			actions := tc.bundleFake.Actions()
+			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 3)
 			bundleUpdate := actions[2].(kube_testing.UpdateAction)
 			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
