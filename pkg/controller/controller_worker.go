@@ -5,14 +5,12 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util/logz"
-
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -41,26 +39,17 @@ func (c *BundleController) processNextWorkItem() bool {
 	}
 	defer c.Queue.Done(key)
 
-	k := key.(string)
+	k := key.(queueKey)
 
-	namespace, name, err := cache.SplitMetaNamespaceKey(k)
-	if err != nil {
-		c.Logger.
-			With(zap.Error(err)).
-			Sugar().Errorf("Failed to split key %q", key)
-		c.Queue.Forget(key)
-		return true
-	}
+	logger := c.Logger.With(logz.NamespaceName(k.namespace), logz.BundleName(k.name))
 
-	logger := c.Logger.With(logz.NamespaceName(namespace), logz.BundleName(name))
-
-	retriable, err := c.ProcessKey(logger, k)
+	retriable, err := c.processKey(logger, k)
 	c.handleErr(logger, retriable, err, k)
 
 	return true
 }
 
-func (c *BundleController) handleErr(logger *zap.Logger, retriable bool, err error, key string) {
+func (c *BundleController) handleErr(logger *zap.Logger, retriable bool, err error, key queueKey) {
 	if err == nil {
 		c.Queue.Forget(key)
 		return
@@ -75,8 +64,21 @@ func (c *BundleController) handleErr(logger *zap.Logger, retriable bool, err err
 	c.Queue.Forget(key)
 }
 
-// ProcessKey is only visible for testing purposes. Should not be called directly.
-func (c *BundleController) ProcessKey(logger *zap.Logger, key string) (retriableRet bool, errRet error) {
+func (c *BundleController) processKey(logger *zap.Logger, key queueKey) (retriableRet bool, errRet error) {
+	bundleObj, exists, err := c.BundleInf.GetIndexer().GetByKey(key.namespace + "/" + key.name)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get Bundle by key %q", key)
+	}
+	if !exists {
+		logger.Info("Bundle not in cache. Was deleted?")
+		return false, nil
+	}
+	// Deep-copy otherwise we are mutating our cache.
+	return c.ProcessBundle(logger, bundleObj.(*smith_v1.Bundle).DeepCopy())
+}
+
+// ProcessBundle is only visible for testing purposes. Should not be called directly.
+func (c *BundleController) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) (retriableRet bool, errRet error) {
 	startTime := time.Now()
 	logger.Info("Started syncing Bundle")
 	defer func() {
@@ -87,14 +89,6 @@ func (c *BundleController) ProcessKey(logger *zap.Logger, key string) (retriable
 		}
 		logger.Sugar().Infof("Synced Bundle in %v%s", time.Since(startTime), msg)
 	}()
-	bundleObj, exists, err := c.BundleInf.GetIndexer().GetByKey(key)
-	if err != nil {
-		return false, errors.Wrapf(err, "failed to get Bundle by key %q", key)
-	}
-	if !exists {
-		logger.Info("Bundle not in cache. Was deleted?")
-		return false, nil
-	}
 
 	st := bundleSyncTask{
 		logger:           logger,
@@ -103,13 +97,14 @@ func (c *BundleController) ProcessKey(logger *zap.Logger, key string) (retriable
 		rc:               c.Rc,
 		store:            c.Store,
 		specCheck:        c.SpecCheck,
-		bundle:           bundleObj.(*smith_v1.Bundle).DeepCopy(), // Deep-copy otherwise we are mutating our cache.
+		bundle:           bundle,
 		pluginContainers: c.PluginContainers,
 		scheme:           c.Scheme,
 		catalog:          c.Catalog,
 	}
 
 	var retriable bool
+	var err error
 	if st.bundle.DeletionTimestamp != nil {
 		retriable, err = st.processDeleted()
 	} else {

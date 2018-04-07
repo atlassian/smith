@@ -6,7 +6,6 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
-
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,7 +13,6 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kube_testing "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
 )
 
 // Should just remove the "deletedResources" finalizer if the "foregroundDeletion"
@@ -80,9 +78,7 @@ func TestRemoveFinalizerWhenForegroundDeletion(t *testing.T) {
 		namespace:            testNamespace,
 		enableServiceCatalog: false,
 		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase) {
-			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
-			require.NoError(t, err)
-			_, err = cntrlr.ProcessKey(tc.logger, key)
+			_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.NoError(t, err)
 
 			actions := tc.smithFake.Actions()

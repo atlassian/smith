@@ -7,12 +7,10 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube_testing "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
 )
 
 // Should detect invalid depends on
@@ -48,9 +46,7 @@ func TestInvalidDependsOn(t *testing.T) {
 			pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
 		},
 		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase) {
-			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
-			require.NoError(t, err)
-			retriable, err := cntrlr.ProcessKey(tc.logger, key)
+			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.EqualError(t, err, `topological sort of resources failed: vertex "bla" not found`)
 			assert.False(t, retriable)
 

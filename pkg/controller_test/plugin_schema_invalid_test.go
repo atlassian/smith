@@ -7,12 +7,10 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube_testing "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
 )
 
 // Should not process plugin if specification is invalid according to the schema
@@ -47,9 +45,7 @@ func TestPluginSchemaInvalid(t *testing.T) {
 			pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
 		},
 		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase) {
-			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
-			require.NoError(t, err)
-			retriable, err := cntrlr.ProcessKey(tc.logger, key)
+			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			// Sadly, the actual error is not current propagated
 			assert.EqualError(t, err, `error processing resource(s): ["`+resP1+`"]`)
 			assert.False(t, retriable)

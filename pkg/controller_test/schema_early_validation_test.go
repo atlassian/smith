@@ -8,13 +8,11 @@ import (
 	"github.com/atlassian/smith/pkg/controller"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kube_testing "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -188,9 +186,7 @@ func TestSchemaEarlyValidation(t *testing.T) {
 			pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
 		},
 		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase) {
-			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
-			require.NoError(t, err)
-			retriable, err := cntrlr.ProcessKey(tc.logger, key)
+			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.False(t, retriable)
 			assert.EqualError(t, err, `error processing resource(s): ["`+resSiWithDefaults+`" "`+resPWithDefaults+`"]`)
 

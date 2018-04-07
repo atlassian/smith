@@ -13,7 +13,6 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kube_testing "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
 )
 
 // Should not perform any creates/updates/deletes on resources after bundle
@@ -77,9 +76,7 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 		namespace:            testNamespace,
 		enableServiceCatalog: false,
 		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase) {
-			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
-			require.NoError(t, err)
-			_, err = cntrlr.ProcessKey(tc.logger, key)
+			_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.NoError(t, err)
 
 			actions := tc.smithFake.Actions()

@@ -5,13 +5,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ash2k/stager/wait"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/store"
-	"github.com/atlassian/smith/pkg/util/logz"
-
-	"github.com/ash2k/stager/wait"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -107,14 +105,12 @@ func (c *BundleController) Run(ctx context.Context) {
 }
 
 func (c *BundleController) enqueue(bundle *smith_v1.Bundle) {
-	key, err := cache.MetaNamespaceKeyFunc(bundle)
-	if err != nil {
-		c.Logger.Error("Couldn't get key for Bundle", logz.Namespace(bundle), logz.Bundle(bundle), zap.Error(err))
-		return
-	}
-	c.enqueueKey(key)
+	c.enqueueKey(queueKey{
+		namespace: bundle.Namespace,
+		name:      bundle.Name,
+	})
 }
 
-func (c *BundleController) enqueueKey(key string) {
+func (c *BundleController) enqueueKey(key queueKey) {
 	c.Queue.AddAfter(key, workDeduplicationPeriod)
 }

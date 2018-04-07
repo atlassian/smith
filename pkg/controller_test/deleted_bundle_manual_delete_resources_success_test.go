@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kube_testing "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
 )
 
 // Should manually delete all resources and remove the "deleteResources"
@@ -81,9 +80,7 @@ func TestDeleteResourcesManuallyWithoutForegroundDeletion(t *testing.T) {
 		namespace:            testNamespace,
 		enableServiceCatalog: false,
 		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase) {
-			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
-			require.NoError(t, err)
-			_, err = cntrlr.ProcessKey(tc.logger, key)
+			_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.NoError(t, err)
 
 			actions := tc.smithFake.Actions()

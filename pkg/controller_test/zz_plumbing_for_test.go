@@ -351,9 +351,7 @@ func (tc *testCase) run(t *testing.T) {
 
 func (tc *testCase) defaultTest(t *testing.T, ctx context.Context, cntrlr *controller.BundleController) {
 	require.NotNil(t, tc.bundle)
-	key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
-	require.NoError(t, err)
-	_, err = cntrlr.ProcessKey(tc.logger, key)
+	_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 	assert.NoError(t, err)
 }
 
