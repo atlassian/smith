@@ -16,7 +16,7 @@ import (
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
-	"github.com/atlassian/smith/pkg/controller"
+	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
@@ -200,7 +200,7 @@ func (a *App) Run(ctx context.Context) error {
 		ClientPool: dynamic.NewClientPool(a.RestConfig, rm, dynamic.LegacyAPIPathResolverFunc),
 		Mapper:     rm,
 	}
-	cntrlr := controller.BundleController{
+	cntrlr := bundlec.BundleController{
 		Logger:           a.Logger,
 		BundleInf:        bundleInf,
 		BundleClient:     smithClient.SmithV1(),

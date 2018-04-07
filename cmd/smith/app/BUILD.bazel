@@ -12,7 +12,7 @@ go_library(
         "//pkg/client:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/smart:go_default_library",
-        "//pkg/controller:go_default_library",
+        "//pkg/controller/bundlec:go_default_library",
         "//pkg/plugin:go_default_library",
         "//pkg/readychecker:go_default_library",
         "//pkg/readychecker/types:go_default_library",
