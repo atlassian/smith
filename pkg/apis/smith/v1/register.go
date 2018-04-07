@@ -9,7 +9,7 @@ import (
 )
 
 // SchemeGroupVersion is group version used to register these objects.
-var SchemeGroupVersion = schema.GroupVersion{Group: smith.GroupName, Version: "v1"}
+var SchemeGroupVersion = schema.GroupVersion{Group: smith.GroupName, Version: BundleResourceVersion}
 
 // Kind takes an unqualified kind and returns a Group qualified GroupKind.
 func Kind(kind string) schema.GroupKind {
