@@ -28,10 +28,10 @@ type DynamicClient struct {
 	Mapper     Mapper
 }
 
-func NewClient(config *rest.Config, clientset kubernetes.Interface) *DynamicClient {
+func NewClient(config *rest.Config, mainClient kubernetes.Interface) *DynamicClient {
 	rm := discovery.NewDeferredDiscoveryRESTMapper(
 		&CachedDiscoveryClient{
-			DiscoveryInterface: clientset.Discovery(),
+			DiscoveryInterface: mainClient.Discovery(),
 		},
 		meta.InterfacesForUnstructured,
 	)

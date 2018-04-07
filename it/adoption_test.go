@@ -90,7 +90,7 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	cm := args[0].(*core_v1.ConfigMap)
 	sl := args[1].(*sleeper_v1.Sleeper)
 
-	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
+	cmClient := cfg.MainClient.CoreV1().ConfigMaps(cfg.Namespace)
 	sClient, err := sleeper.Client(cfg.Config)
 	require.NoError(t, err)
 

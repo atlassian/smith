@@ -44,7 +44,7 @@ type Config struct {
 	Bundle        *smith_v1.Bundle
 	CreatedBundle *smith_v1.Bundle
 	Config        *rest.Config
-	Clientset     kubernetes.Interface
+	MainClient    kubernetes.Interface
 	Sc            *smart.DynamicClient
 	BundleClient  smithClientset.Interface
 }
@@ -162,20 +162,20 @@ func TestSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClients
 	config, err := client.LoadConfig(configFileFrom, configFileName, configContext)
 	require.NoError(t, err)
 
-	clientset, err := kubernetes.NewForConfig(config)
+	mainClient, err := kubernetes.NewForConfig(config)
 	require.NoError(t, err)
 
 	bundleClient, err := smithClientset.NewForConfig(config)
 	require.NoError(t, err)
 
-	return config, clientset, bundleClient
+	return config, mainClient, bundleClient
 }
 
 func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundle bool, test TestFunc, args ...interface{}) {
 	convertBundleResourcesToUnstrucutred(t, bundle)
-	config, clientset, bundleClient := TestSetup(t)
+	config, mainClient, bundleClient := TestSetup(t)
 
-	sc := smart.NewClient(config, clientset)
+	sc := smart.NewClient(config, mainClient)
 
 	logger := smith_testing.DevelopmentLogger(t)
 	defer logger.Sync()
@@ -186,13 +186,13 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 		Namespace:    fmt.Sprintf("smith-it-%d", rand.Uint32()),
 		Bundle:       bundle,
 		Config:       config,
-		Clientset:    clientset,
+		MainClient:   mainClient,
 		Sc:           sc,
 		BundleClient: bundleClient,
 	}
 
 	t.Logf("Creating namespace %q", cfg.Namespace)
-	_, err := clientset.CoreV1().Namespaces().Create(&core_v1.Namespace{
+	_, err := mainClient.CoreV1().Namespaces().Create(&core_v1.Namespace{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: cfg.Namespace,
 		},
@@ -201,7 +201,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	defer func() {
 		t.Logf("Deleting namespace %q", cfg.Namespace)
-		assert.NoError(t, clientset.CoreV1().Namespaces().Delete(cfg.Namespace, nil))
+		assert.NoError(t, mainClient.CoreV1().Namespaces().Delete(cfg.Namespace, nil))
 	}()
 
 	stgr := stager.New()

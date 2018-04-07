@@ -87,7 +87,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// Clients
-	clientset, err := kubernetes.NewForConfig(a.RestConfig)
+	mainClient, err := kubernetes.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	sc := smart.NewClient(a.RestConfig, clientset)
+	sc := smart.NewClient(a.RestConfig, mainClient)
 	scheme, err := apitypes.FullScheme(a.ServiceCatalogSupport)
 	if err != nil {
 		return err
@@ -166,7 +166,7 @@ func (a *App) Run(ctx context.Context) error {
 	eventBroadcaster := record.NewBroadcaster()
 	loggingWatch := eventBroadcaster.StartLogging(a.Logger.Sugar().Infof)
 	defer loggingWatch.Stop()
-	recordingWatch := eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: clientset.CoreV1().Events("")})
+	recordingWatch := eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: mainClient.CoreV1().Events("")})
 	defer recordingWatch.Stop()
 	recorder := eventBroadcaster.NewRecorder(scheme, core_v1.EventSource{Component: "smith-controller"})
 
@@ -175,7 +175,7 @@ func (a *App) Run(ctx context.Context) error {
 		a.Logger.Info("Starting leader election", zap.String("namespace", a.LeaderElectionConfig.ConfigMapNamespace))
 
 		var startedLeading <-chan struct{}
-		ctx, startedLeading, err = a.startLeaderElection(ctx, clientset.CoreV1(), recorder)
+		ctx, startedLeading, err = a.startLeaderElection(ctx, mainClient.CoreV1(), recorder)
 		if err != nil {
 			return err
 		}
@@ -186,7 +186,7 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	}
 
-	resourceInfs := apitypes.ResourceInformers(clientset, scClient, a.Namespace, a.ResyncPeriod)
+	resourceInfs := apitypes.ResourceInformers(mainClient, scClient, a.Namespace, a.ResyncPeriod)
 
 	// Controller
 	cntrlr := controller.BundleController{

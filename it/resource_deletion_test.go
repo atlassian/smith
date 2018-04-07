@@ -91,7 +91,7 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	sl := args[1].(*sleeper_v1.Sleeper)
 	resSl := smith_v1.ResourceName(sl.Name)
 
-	cmClient := cfg.Clientset.CoreV1().ConfigMaps(cfg.Namespace)
+	cmClient := cfg.MainClient.CoreV1().ConfigMaps(cfg.Namespace)
 	sClient, err := sleeper.Client(cfg.Config)
 	require.NoError(t, err)
 
