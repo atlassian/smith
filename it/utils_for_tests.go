@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
-	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	apiext_v1b1list "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -210,7 +210,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	ctxTest, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 
-	crdClient, err := crdClientset.NewForConfig(config)
+	crdClient, err := apiExtClientset.NewForConfig(config)
 	require.NoError(t, err)
 
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, 0, cache.Indexers{})

@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_lst_v1b1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -245,7 +245,7 @@ func int64ptr(val int64) *int64 {
 	return &val
 }
 
-func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, clientset apiExtClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
 	err := EnsureCrdExists(ctx, logger, clientset, crdLister, crd)
 	if err != nil {
 		return err
@@ -254,7 +254,7 @@ func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, cl
 	return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
 }
 
-func EnsureCrdExists(ctx context.Context, logger *zap.Logger, clientset crdClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+func EnsureCrdExists(ctx context.Context, logger *zap.Logger, clientset apiExtClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
 	for {
 		obj, err := crdLister.Get(crd.Name)
 		notFound := api_errors.IsNotFound(err)

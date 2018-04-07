@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	crdClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	apiext_v1b1list "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +47,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	crdClient, err := crdClientset.NewForConfig(a.RestConfig)
+	crdClient, err := apiExtClientset.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
 	}
