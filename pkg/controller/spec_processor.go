@@ -18,7 +18,7 @@ var (
 	reference = regexp.MustCompile(`(?s)^(!+)\{(.+)}$`)
 )
 
-type SpecProcessor struct {
+type specProcessor struct {
 	variables map[smith_v1.ReferenceName]interface{}
 }
 
@@ -48,7 +48,7 @@ func isNoExampleError(err error) bool {
 	}
 }
 
-func NewSpec(resources map[smith_v1.ResourceName]*resourceInfo, references []smith_v1.Reference) (*SpecProcessor, error) {
+func newSpec(resources map[smith_v1.ResourceName]*resourceInfo, references []smith_v1.Reference) (*specProcessor, error) {
 	variables, err := resolveAllReferences(references, func(reference smith_v1.Reference) (interface{}, error) {
 		return resolveReference(resources, reference)
 	})
@@ -57,12 +57,12 @@ func NewSpec(resources map[smith_v1.ResourceName]*resourceInfo, references []smi
 		return nil, err
 	}
 
-	return &SpecProcessor{
+	return &specProcessor{
 		variables: variables,
 	}, nil
 }
 
-func NewExamplesSpec(references []smith_v1.Reference) (*SpecProcessor, error) {
+func newExamplesSpec(references []smith_v1.Reference) (*specProcessor, error) {
 	variables, err := resolveAllReferences(references, func(reference smith_v1.Reference) (interface{}, error) {
 		if reference.Example == nil {
 			return nil, errors.WithStack(&noExampleError{referenceName: reference.Name})
@@ -74,7 +74,7 @@ func NewExamplesSpec(references []smith_v1.Reference) (*SpecProcessor, error) {
 		return nil, err
 	}
 
-	return &SpecProcessor{
+	return &specProcessor{
 		variables: variables,
 	}, nil
 }
@@ -107,7 +107,7 @@ func resolveAllReferences(
 	return refs, nil
 }
 
-func (sp *SpecProcessor) ProcessObject(obj map[string]interface{}, path ...string) error {
+func (sp *specProcessor) ProcessObject(obj map[string]interface{}, path ...string) error {
 	for key, value := range obj {
 		v, err := sp.ProcessValue(value, append(path, key)...)
 		if err != nil {
@@ -118,7 +118,7 @@ func (sp *SpecProcessor) ProcessObject(obj map[string]interface{}, path ...strin
 	return nil
 }
 
-func (sp *SpecProcessor) ProcessValue(value interface{}, path ...string) (interface{}, error) {
+func (sp *specProcessor) ProcessValue(value interface{}, path ...string) (interface{}, error) {
 	switch v := value.(type) {
 	case string:
 		return sp.ProcessString(v, path...)
@@ -149,7 +149,7 @@ func (sp *SpecProcessor) ProcessValue(value interface{}, path ...string) (interf
 	return value, nil
 }
 
-func (sp *SpecProcessor) ProcessString(value string, path ...string) (interface{}, error) {
+func (sp *specProcessor) ProcessString(value string, path ...string) (interface{}, error) {
 	match := reference.FindStringSubmatch(value)
 	if match == nil {
 		return value, nil

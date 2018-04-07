@@ -288,7 +288,7 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 
 // prevalidate does as much validation as possible before doing any real work.
 func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
-	sp, err := NewExamplesSpec(res.References)
+	sp, err := newExamplesSpec(res.References)
 	if err != nil {
 		if isNoExampleError(errors.Cause(err)) {
 			// a noExampleError occurs when an example wasn't provided
@@ -379,7 +379,7 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 	}
 
 	// Process references
-	sp, err := NewSpec(st.processedResources, res.References)
+	sp, err := newSpec(st.processedResources, res.References)
 	if err != nil {
 		return nil, err
 	}

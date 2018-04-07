@@ -14,7 +14,7 @@ import (
 
 func TestSpecProcessor(t *testing.T) {
 	t.Parallel()
-	sp, err := NewSpec(processedResources(), []smith_v1.Reference{
+	sp, err := newSpec(processedResources(), []smith_v1.Reference{
 		{
 			// Nameless references cause dependencies only.
 			Resource: "resX",
@@ -143,7 +143,7 @@ func TestSpecProcessor(t *testing.T) {
 
 func TestSpecProcessorBindSecret(t *testing.T) {
 	t.Parallel()
-	sp, err := NewSpec(processedResources(), []smith_v1.Reference{
+	sp, err := newSpec(processedResources(), []smith_v1.Reference{
 		{
 			Name:     "res1aint",
 			Resource: "res1",
@@ -179,7 +179,7 @@ func TestSpecProcessorBindSecretWithJsonField(t *testing.T) {
 	// However, kubernetes jsonpath is smart (crazy?) enough to use both the json
 	// tags AND the field names in its lookups...
 	t.Parallel()
-	sp, err := NewSpec(processedResources(), []smith_v1.Reference{
+	sp, err := newSpec(processedResources(), []smith_v1.Reference{
 		{
 			Name:     "res1aint",
 			Resource: "res1",
@@ -212,7 +212,7 @@ func TestSpecProcessorBindSecretWithJsonField(t *testing.T) {
 
 func TestSpecProcessorExamples(t *testing.T) {
 	t.Parallel()
-	sp, err := NewExamplesSpec([]smith_v1.Reference{
+	sp, err := newExamplesSpec([]smith_v1.Reference{
 		{
 			Name:     "res1aint",
 			Resource: "res1",
@@ -322,9 +322,9 @@ func TestSpecProcessorErrors(t *testing.T) {
 			t.Parallel()
 			var err error
 			if input.examplesOnly {
-				_, err = NewExamplesSpec([]smith_v1.Reference{input.reference})
+				_, err = newExamplesSpec([]smith_v1.Reference{input.reference})
 			} else {
-				_, err = NewSpec(processedResources(), []smith_v1.Reference{input.reference})
+				_, err = newSpec(processedResources(), []smith_v1.Reference{input.reference})
 			}
 			assert.EqualError(t, err, input.err)
 		})
