@@ -167,7 +167,7 @@ func (a *App) Run(ctx context.Context) error {
 	eventBroadcaster := record.NewBroadcaster()
 	loggingWatch := eventBroadcaster.StartLogging(a.Logger.Sugar().Infof)
 	defer loggingWatch.Stop()
-	recordingWatch := eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: mainClient.CoreV1().Events("")})
+	recordingWatch := eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: mainClient.CoreV1().Events(meta_v1.NamespaceNone)})
 	defer recordingWatch.Stop()
 	recorder := eventBroadcaster.NewRecorder(scheme, core_v1.EventSource{Component: "smith-controller"})
 
