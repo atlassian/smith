@@ -76,9 +76,10 @@ type testCase struct {
 	expectedActions        sets.String
 	enableServiceCatalog   bool
 	testHandler            fakeActionHandler
-	test                   func(*testing.T, context.Context, *controller.BundleController, *testCase, func(context.Context))
+	test                   func(*testing.T, context.Context, *controller.BundleController, *testCase)
 	plugins                map[smith_v1.PluginName]func(*testing.T) testingPlugin
 	pluginsShouldBeInvoked sets.String
+	testTimeout            time.Duration
 
 	mainFake           *kube_testing.Fake
 	smithFake          *kube_testing.Fake
@@ -281,12 +282,6 @@ func (tc *testCase) run(t *testing.T) {
 		Mapper:     restMapper,
 	}
 
-	stgr := stager.New()
-	defer stgr.Shutdown()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-
 	pluginContainers := make(map[smith_v1.PluginName]plugin.PluginContainer, len(tc.plugins))
 	for name, factory := range tc.plugins {
 		pluginInstance := factory(t)
@@ -312,37 +307,43 @@ func (tc *testCase) run(t *testing.T) {
 		Scheme:           scheme,
 		Catalog:          catalog,
 	}
-	prepare := func(ctx context.Context) {
-		cntrlr.Prepare(ctx, crdInf, resourceInfs)
-
-		resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
-		resourceInfs[smith_v1.BundleGVK] = bundleInf
-		stage := stgr.NextStage()
-
-		// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
-		for gvk, inf := range resourceInfs {
-			err = multiStore.AddInformer(gvk, inf)
-			require.NoError(t, err)
-			infs = append(infs, inf)
-		}
-
-		// Start all informers then wait on them
-		infCacheSyncs := make([]cache.InformerSynced, len(infs))
-		for i, inf := range infs {
-			stage.StartWithChannel(inf.Run) // Must be after AddInformer()
-			infCacheSyncs[i] = inf.HasSynced
-		}
-		require.True(t, cache.WaitForCacheSync(ctx.Done(), infCacheSyncs...))
-	}
+	cntrlr.Prepare(crdInf, resourceInfs)
 
 	defer tc.verifyActions(t)
 	defer tc.verifyPlugins(t)
 
+	stgr := stager.New()
+	defer stgr.Shutdown()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
+	resourceInfs[smith_v1.BundleGVK] = bundleInf
+	stage := stgr.NextStage()
+
+	// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
+	for gvk, inf := range resourceInfs {
+		err = multiStore.AddInformer(gvk, inf)
+		require.NoError(t, err)
+		infs = append(infs, inf)
+	}
+
+	// Start all informers then wait on them
+	for _, inf := range infs {
+		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
+		require.True(t, cache.WaitForCacheSync(ctx.Done(), inf.HasSynced))
+	}
+	if tc.testTimeout != 0 {
+		testCtx, testCancel := context.WithTimeout(ctx, tc.testTimeout)
+		defer testCancel()
+		ctx = testCtx
+	}
+
 	if tc.test == nil {
-		prepare(ctx)
 		tc.defaultTest(t, ctx, cntrlr)
 	} else {
-		tc.test(t, ctx, cntrlr, tc, prepare)
+		tc.test(t, ctx, cntrlr, tc)
 	}
 }
 

@@ -217,7 +217,7 @@ func (a *App) Run(ctx context.Context) error {
 		Scheme:           scheme,
 		Catalog:          catalog,
 	}
-	cntrlr.Prepare(ctx, crdInf, resourceInfs)
+	cntrlr.Prepare(crdInf, resourceInfs)
 
 	resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
 	resourceInfs[smith_v1.BundleGVK] = bundleInf

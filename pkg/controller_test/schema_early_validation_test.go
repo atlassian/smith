@@ -187,8 +187,7 @@ func TestSchemaEarlyValidation(t *testing.T) {
 		plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
 			pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
 		},
-		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase, prepare func(ctx context.Context)) {
-			prepare(ctx)
+		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase) {
 			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 			require.NoError(t, err)
 			retriable, err := cntrlr.ProcessKey(tc.logger, key)

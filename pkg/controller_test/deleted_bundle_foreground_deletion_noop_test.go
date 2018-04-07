@@ -76,8 +76,7 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 		},
 		namespace:            testNamespace,
 		enableServiceCatalog: false,
-		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase, prepare func(ctx context.Context)) {
-			prepare(ctx)
+		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase) {
 			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 			require.NoError(t, err)
 			_, err = cntrlr.ProcessKey(tc.logger, key)

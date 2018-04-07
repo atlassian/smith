@@ -34,6 +34,9 @@ type BundleController struct {
 	wg       wait.Group
 	stopping bool
 
+	crdContext       context.Context
+	crdContextCancel context.CancelFunc
+
 	Logger *zap.Logger
 
 	BundleInf    cache.SharedIndexInformer
@@ -59,8 +62,8 @@ type BundleController struct {
 }
 
 // Prepare prepares the controller to be run.
-// ctx must be the same context as the one passed to Run() method.
-func (c *BundleController) Prepare(ctx context.Context, crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
+func (c *BundleController) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
+	c.crdContext, c.crdContextCancel = context.WithCancel(context.Background())
 	c.resourceHandler = cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onResourceAdd,
 		UpdateFunc: c.onResourceUpdate,
@@ -72,7 +75,6 @@ func (c *BundleController) Prepare(ctx context.Context, crdInf cache.SharedIndex
 		DeleteFunc: c.onBundleDelete,
 	})
 	crdInf.AddEventHandler(&crdEventHandler{
-		ctx:              ctx,
 		BundleController: c,
 		watchers:         make(map[string]watchState),
 	})
@@ -86,6 +88,7 @@ func (c *BundleController) Prepare(ctx context.Context, crdInf cache.SharedIndex
 // All informers must be synched before this method is invoked.
 func (c *BundleController) Run(ctx context.Context) {
 	defer c.wg.Wait()
+	defer c.crdContextCancel() // should be executed after stopping is set to true
 	defer func() {
 		c.wgLock.Lock()
 		defer c.wgLock.Unlock()

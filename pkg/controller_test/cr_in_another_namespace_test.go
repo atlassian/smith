@@ -8,7 +8,6 @@ import (
 
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	"github.com/atlassian/smith/pkg/controller"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -27,11 +26,8 @@ func TestCrInAnotherNamespace(t *testing.T) {
 				"=watch",
 		),
 		namespace: testNamespace,
-		test: func(t *testing.T, ctx context.Context, bundleController *controller.BundleController, testcase *testCase, prepare func(ctx context.Context)) {
-			subContext, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-			defer cancel()
-			prepare(subContext)
-			bundleController.Run(subContext)
+		test: func(t *testing.T, ctx context.Context, bundleController *controller.BundleController, testcase *testCase) {
+			bundleController.Run(ctx)
 		},
 		testHandler: fakeActionHandler{
 			response: map[path]fakeResponse{
@@ -51,6 +47,7 @@ func TestCrInAnotherNamespace(t *testing.T) {
 				},
 			},
 		},
+		testTimeout: 500 * time.Millisecond,
 	}
 	tc.run(t)
 }

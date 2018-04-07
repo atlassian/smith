@@ -7,7 +7,6 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
@@ -81,8 +80,7 @@ func TestKeepFinalizerWhenResourceDeletionFails(t *testing.T) {
 		},
 		namespace:            testNamespace,
 		enableServiceCatalog: false,
-		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase, prepare func(ctx context.Context)) {
-			prepare(ctx)
+		test: func(t *testing.T, ctx context.Context, cntrlr *controller.BundleController, tc *testCase) {
 			key, err := cache.MetaNamespaceKeyFunc(tc.bundle)
 			require.NoError(t, err)
 			_, err = cntrlr.ProcessKey(tc.logger, key)

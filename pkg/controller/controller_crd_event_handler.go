@@ -24,7 +24,6 @@ type watchState struct {
 // crdEventHandler handles events for objects with Kind: CustomResourceDefinition.
 // For each object a new informer is started to watch for events.
 type crdEventHandler struct {
-	ctx context.Context
 	*BundleController
 	watchers map[string]watchState // CRD name -> state
 }
@@ -133,7 +132,7 @@ func (h *crdEventHandler) ensureWatch(logger *zap.Logger, crd *apiext_v1b1.Custo
 		logger.Error("Failed to add informer for CRD to multisore", zap.Error(err))
 		return false
 	}
-	ctx, cancel := context.WithCancel(h.ctx)
+	ctx, cancel := context.WithCancel(h.crdContext)
 	h.watchers[crd.Name] = watchState{cancel: cancel}
 	h.wg.StartWithChannel(ctx.Done(), crdInf.Run)
 	return true
