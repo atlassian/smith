@@ -6,14 +6,11 @@ import (
 	"regexp"
 	"unicode/utf8"
 
+	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/pkg/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-)
-
-const (
-	ReferenceModifierBindSecret = "bindsecret"
 )
 
 var (
@@ -178,9 +175,9 @@ func resolveReference(resInfos map[smith_v1.ResourceName]*resourceInfo, referenc
 	switch reference.Modifier {
 	case "":
 		objToTraverse = resInfo.actual.Object
-	case ReferenceModifierBindSecret:
+	case smith.ReferenceModifierBindSecret:
 		if resInfo.serviceBindingSecret == nil {
-			return nil, errors.Errorf("%q requested, but %q is not a ServiceBinding", ReferenceModifierBindSecret, reference.Resource)
+			return nil, errors.Errorf("%q requested, but %q is not a ServiceBinding", smith.ReferenceModifierBindSecret, reference.Resource)
 		}
 		objToTraverse = resInfo.serviceBindingSecret
 	default:
