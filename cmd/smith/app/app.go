@@ -237,14 +237,14 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// Start all informers then wait on them
-	infCacheSyncs := make([]cache.InformerSynced, len(infs))
-	for i, inf := range infs {
+	for _, inf := range infs {
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
-		infCacheSyncs[i] = inf.HasSynced
 	}
 	a.Logger.Info("Waiting for informers to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), infCacheSyncs...) {
-		return ctx.Err()
+	for _, inf := range infs {
+		if !cache.WaitForCacheSync(ctx.Done(), inf.HasSynced) {
+			return ctx.Err()
+		}
 	}
 
 	cntrlr.Run(ctx)

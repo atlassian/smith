@@ -332,6 +332,8 @@ func (tc *testCase) run(t *testing.T) {
 	// Start all informers then wait on them
 	for _, inf := range infs {
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
+	}
+	for _, inf := range infs {
 		require.True(t, cache.WaitForCacheSync(ctx.Done(), inf.HasSynced))
 	}
 	if tc.testTimeout != 0 {
