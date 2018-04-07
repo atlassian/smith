@@ -46,7 +46,7 @@ type Config struct {
 	Config        *rest.Config
 	MainClient    kubernetes.Interface
 	Sc            *smart.DynamicClient
-	BundleClient  smithClientset.Interface
+	SmithClient   smithClientset.Interface
 }
 
 func (cfg *Config) CreateObject(ctxTest context.Context, obj, res runtime.Object, resourcePath string, client rest.Interface) {
@@ -63,7 +63,7 @@ func (cfg *Config) CreateObject(ctxTest context.Context, obj, res runtime.Object
 }
 
 func (cfg *Config) AwaitBundleCondition(conditions ...watch.ConditionFunc) *smith_v1.Bundle {
-	lw := cache.NewListWatchFromClient(cfg.BundleClient.SmithV1().RESTClient(), smith_v1.BundleResourcePlural, cfg.Namespace, fields.Everything())
+	lw := cache.NewListWatchFromClient(cfg.SmithClient.SmithV1().RESTClient(), smith_v1.BundleResourcePlural, cfg.Namespace, fields.Everything())
 	event, err := cache.ListWatchUntil(20*time.Second, lw, conditions...)
 	require.NoError(cfg.T, err)
 	return event.Object.(*smith_v1.Bundle)
@@ -165,15 +165,15 @@ func TestSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClients
 	mainClient, err := kubernetes.NewForConfig(config)
 	require.NoError(t, err)
 
-	bundleClient, err := smithClientset.NewForConfig(config)
+	smithClient, err := smithClientset.NewForConfig(config)
 	require.NoError(t, err)
 
-	return config, mainClient, bundleClient
+	return config, mainClient, smithClient
 }
 
 func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundle bool, test TestFunc, args ...interface{}) {
 	convertBundleResourcesToUnstrucutred(t, bundle)
-	config, mainClient, bundleClient := TestSetup(t)
+	config, mainClient, smithClient := TestSetup(t)
 
 	sc := smart.NewClient(config, mainClient)
 
@@ -181,14 +181,14 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	defer logger.Sync()
 
 	cfg := &Config{
-		T:            t,
-		Logger:       logger,
-		Namespace:    fmt.Sprintf("smith-it-%d", rand.Uint32()),
-		Bundle:       bundle,
-		Config:       config,
-		MainClient:   mainClient,
-		Sc:           sc,
-		BundleClient: bundleClient,
+		T:           t,
+		Logger:      logger,
+		Namespace:   fmt.Sprintf("smith-it-%d", rand.Uint32()),
+		Bundle:      bundle,
+		Config:      config,
+		MainClient:  mainClient,
+		Sc:          sc,
+		SmithClient: smithClient,
 	}
 
 	t.Logf("Creating namespace %q", cfg.Namespace)
@@ -242,7 +242,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	if createBundle {
 		res := &smith_v1.Bundle{}
-		cfg.CreateObject(ctxTest, bundle, res, smith_v1.BundleResourcePlural, bundleClient.SmithV1().RESTClient())
+		cfg.CreateObject(ctxTest, bundle, res, smith_v1.BundleResourcePlural, smithClient.SmithV1().RESTClient())
 		cfg.CreatedBundle = res
 	}
 

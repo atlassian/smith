@@ -231,7 +231,7 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	assertSecretData(t, s1, secret)
 
 	bundle2.ResourceVersion = bundleRes1.ResourceVersion
-	res, err := cfg.BundleClient.SmithV1().Bundles(cfg.Namespace).Update(bundle2)
+	res, err := cfg.SmithClient.SmithV1().Bundles(cfg.Namespace).Update(bundle2)
 	require.NoError(t, err)
 
 	bundleRes2 := cfg.AssertBundle(ctxTimeout, bundle2, bundle2.ResourceVersion, res.ResourceVersion)
@@ -272,7 +272,7 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	emptyBundle := *cfg.Bundle
 	emptyBundle.Spec.Resources = []smith_v1.Resource{}
 	emptyBundle.ResourceVersion = bundleRes2.ResourceVersion
-	res, err = cfg.BundleClient.SmithV1().Bundles(cfg.Namespace).Update(&emptyBundle)
+	res, err = cfg.SmithClient.SmithV1().Bundles(cfg.Namespace).Update(&emptyBundle)
 	require.NoError(t, err)
 
 	cfg.AssertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)

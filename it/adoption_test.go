@@ -111,7 +111,7 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 
 	// Create Bundle with same resources
 	bundleActual := &smith_v1.Bundle{}
-	cfg.CreateObject(ctxTest, cfg.Bundle, bundleActual, smith_v1.BundleResourcePlural, cfg.BundleClient.SmithV1().RESTClient())
+	cfg.CreateObject(ctxTest, cfg.Bundle, bundleActual, smith_v1.BundleResourcePlural, cfg.SmithClient.SmithV1().RESTClient())
 	cfg.CreatedBundle = bundleActual
 
 	// Bundle should be in Error=true state

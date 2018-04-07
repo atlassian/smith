@@ -91,7 +91,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	bundleClient, err := smithClientset.NewForConfig(a.RestConfig)
+	smithClient, err := smithClientset.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (a *App) Run(ctx context.Context) error {
 	var infs []cache.SharedIndexInformer
 	// We don't add these to 'infs' because they're added later as part of
 	// resourceInfs processing.
-	bundleInf := client.BundleInformer(bundleClient.SmithV1(), a.Namespace, a.ResyncPeriod)
+	bundleInf := client.BundleInformer(smithClient.SmithV1(), a.Namespace, a.ResyncPeriod)
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(apiExtClient, a.ResyncPeriod, cache.Indexers{})
 	crdStore, err := store.NewCrd(crdInf)
 	if err != nil {
@@ -192,7 +192,7 @@ func (a *App) Run(ctx context.Context) error {
 	cntrlr := controller.BundleController{
 		Logger:           a.Logger,
 		BundleInf:        bundleInf,
-		BundleClient:     bundleClient.SmithV1(),
+		BundleClient:     smithClient.SmithV1(),
 		BundleStore:      bs,
 		SmartClient:      sc,
 		Rc:               rc,
