@@ -102,7 +102,7 @@ func (a *App) Run(ctx context.Context) error {
 			return err
 		}
 	}
-	crdClient, err := apiExtClientset.NewForConfig(a.RestConfig)
+	apiExtClient, err := apiExtClientset.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (a *App) Run(ctx context.Context) error {
 	// We don't add these to 'infs' because they're added later as part of
 	// resourceInfs processing.
 	bundleInf := client.BundleInformer(bundleClient.SmithV1(), a.Namespace, a.ResyncPeriod)
-	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, a.ResyncPeriod, cache.Indexers{})
+	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(apiExtClient, a.ResyncPeriod, cache.Indexers{})
 	crdStore, err := store.NewCrd(crdInf)
 	if err != nil {
 		return err

@@ -47,7 +47,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	crdClient, err := apiExtClientset.NewForConfig(a.RestConfig)
+	apiExtClient, err := apiExtClientset.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	multiStore := store.NewMulti()
 
-	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, ResyncPeriod, cache.Indexers{})
+	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(apiExtClient, ResyncPeriod, cache.Indexers{})
 	err = multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	crdLister := apiext_v1b1list.NewCustomResourceDefinitionLister(crdInf.GetIndexer())
-	if err = resources.EnsureCrdExistsAndIsEstablished(ctx, a.Logger, crdClient, crdLister, SleeperCrd()); err != nil {
+	if err = resources.EnsureCrdExistsAndIsEstablished(ctx, a.Logger, apiExtClient, crdLister, SleeperCrd()); err != nil {
 		return err
 	}
 

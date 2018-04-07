@@ -210,10 +210,10 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	ctxTest, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 
-	crdClient, err := apiExtClientset.NewForConfig(config)
+	apiExtClient, err := apiExtClientset.NewForConfig(config)
 	require.NoError(t, err)
 
-	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(crdClient, 0, cache.Indexers{})
+	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(apiExtClient, 0, cache.Indexers{})
 	stage := stgr.NextStage()
 	stage.StartWithChannel(crdInf.Run)
 
@@ -224,8 +224,8 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	}
 
 	crdLister := apiext_v1b1list.NewCustomResourceDefinitionLister(crdInf.GetIndexer())
-	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, crdClient, crdLister, sleeper.SleeperCrd()))
-	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, crdClient, crdLister, resources.BundleCrd()))
+	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, apiExtClient, crdLister, sleeper.SleeperCrd()))
+	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, apiExtClient, crdLister, resources.BundleCrd()))
 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := app.App{

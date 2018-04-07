@@ -245,8 +245,8 @@ func int64ptr(val int64) *int64 {
 	return &val
 }
 
-func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, clientset apiExtClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
-	err := EnsureCrdExists(ctx, logger, clientset, crdLister, crd)
+func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, apiExtClient apiExtClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+	err := EnsureCrdExists(ctx, logger, apiExtClient, crdLister, crd)
 	if err != nil {
 		return err
 	}
@@ -254,7 +254,7 @@ func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, cl
 	return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
 }
 
-func EnsureCrdExists(ctx context.Context, logger *zap.Logger, clientset apiExtClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
+func EnsureCrdExists(ctx context.Context, logger *zap.Logger, apiExtClient apiExtClientset.Interface, crdLister apiext_lst_v1b1.CustomResourceDefinitionLister, crd *apiext_v1b1.CustomResourceDefinition) error {
 	for {
 		obj, err := crdLister.Get(crd.Name)
 		notFound := api_errors.IsNotFound(err)
@@ -263,7 +263,7 @@ func EnsureCrdExists(ctx context.Context, logger *zap.Logger, clientset apiExtCl
 		}
 		if notFound {
 			logger.Info("Creating CustomResourceDefinition", logz.Object(crd))
-			_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+			_, err = apiExtClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 			if err == nil {
 				logger.Info("CustomResourceDefinition created", logz.Object(crd))
 				return nil
@@ -283,7 +283,7 @@ func EnsureCrdExists(ctx context.Context, logger *zap.Logger, clientset apiExtCl
 			obj.Labels = crd.Labels
 			// TODO erasing the status is only necessary because there is no support for generation/observedGeneration at the moment
 			obj.Status = apiext_v1b1.CustomResourceDefinitionStatus{}
-			_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Update(obj) // This is a CAS
+			_, err = apiExtClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(obj) // This is a CAS
 			if err == nil {
 				logger.Info("CustomResourceDefinition updated", logz.Object(crd))
 				return nil
