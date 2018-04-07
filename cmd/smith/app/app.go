@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ash2k/stager"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/cleanup"
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
@@ -22,8 +23,6 @@ import (
 	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
-
-	"github.com/ash2k/stager"
 	"github.com/atlassian/smith/pkg/util/logz"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
@@ -33,8 +32,11 @@ import (
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	core_v1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -106,7 +108,6 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	sc := smart.NewClient(a.RestConfig, mainClient)
 	scheme, err := apitypes.FullScheme(a.ServiceCatalogSupport)
 	if err != nil {
 		return err
@@ -189,6 +190,16 @@ func (a *App) Run(ctx context.Context) error {
 	resourceInfs := apitypes.ResourceInformers(mainClient, scClient, a.Namespace, a.ResyncPeriod)
 
 	// Controller
+	rm := discovery.NewDeferredDiscoveryRESTMapper(
+		&smart.CachedDiscoveryClient{
+			DiscoveryInterface: mainClient.Discovery(),
+		},
+		meta.InterfacesForUnstructured,
+	)
+	sc := &smart.DynamicClient{
+		ClientPool: dynamic.NewClientPool(a.RestConfig, rm, dynamic.LegacyAPIPathResolverFunc),
+		Mapper:     rm,
+	}
 	cntrlr := controller.BundleController{
 		Logger:           a.Logger,
 		BundleInf:        bundleInf,

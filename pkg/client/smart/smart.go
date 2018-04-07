@@ -5,10 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 type Mapper interface {
@@ -26,19 +23,6 @@ type ClientPool interface {
 type DynamicClient struct {
 	ClientPool ClientPool
 	Mapper     Mapper
-}
-
-func NewClient(config *rest.Config, mainClient kubernetes.Interface) *DynamicClient {
-	rm := discovery.NewDeferredDiscoveryRESTMapper(
-		&CachedDiscoveryClient{
-			DiscoveryInterface: mainClient.Discovery(),
-		},
-		meta.InterfacesForUnstructured,
-	)
-	return &DynamicClient{
-		ClientPool: dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc),
-		Mapper:     rm,
-	}
 }
 
 func (c *DynamicClient) ForGVK(gvk schema.GroupVersionKind, namespace string) (dynamic.ResourceInterface, error) {

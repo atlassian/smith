@@ -26,10 +26,13 @@ import (
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	apiext_v1b1list "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -174,8 +177,16 @@ func TestSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClients
 func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundle bool, test TestFunc, args ...interface{}) {
 	convertBundleResourcesToUnstrucutred(t, bundle)
 	config, mainClient, smithClient := TestSetup(t)
-
-	sc := smart.NewClient(config, mainClient)
+	rm := discovery.NewDeferredDiscoveryRESTMapper(
+		&smart.CachedDiscoveryClient{
+			DiscoveryInterface: mainClient.Discovery(),
+		},
+		meta.InterfacesForUnstructured,
+	)
+	sc := &smart.DynamicClient{
+		ClientPool: dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc),
+		Mapper:     rm,
+	}
 
 	logger := smith_testing.DevelopmentLogger(t)
 	defer logger.Sync()
