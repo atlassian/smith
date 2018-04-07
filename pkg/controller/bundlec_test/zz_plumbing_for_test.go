@@ -11,27 +11,21 @@ import (
 
 	"github.com/ash2k/stager"
 	"github.com/atlassian/smith"
+	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/cleanup"
-	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
-	"github.com/atlassian/smith/pkg/client"
 	smithFake "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/fake"
 	"github.com/atlassian/smith/pkg/client/smart"
+	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
-	"github.com/atlassian/smith/pkg/readychecker"
-	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/resources/apitypes"
-	"github.com/atlassian/smith/pkg/speccheck"
-	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	scFake "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake"
-	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +33,6 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiExtFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
-	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -51,7 +44,6 @@ import (
 	"k8s.io/client-go/rest"
 	kube_testing "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 )
 
 type reaction struct {
@@ -142,8 +134,6 @@ var (
 )
 
 func (tc *testCase) run(t *testing.T) {
-	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
-	require.NoError(t, err)
 	mainClient := mainFake.NewSimpleClientset(tc.mainClientObjects...)
 	tc.mainFake = &mainClient.Fake
 	for _, reactor := range tc.mainReactors {
@@ -164,11 +154,7 @@ func (tc *testCase) run(t *testing.T) {
 		apiExtClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
 
-	// Informers
-	var infs []cache.SharedIndexInformer
-
 	var scClient scClientset.Interface
-	var catalog *store.Catalog
 	if tc.enableServiceCatalog {
 		scClientFake := scFake.NewSimpleClientset(append(
 			tc.scClientObjects,
@@ -217,16 +203,16 @@ func (tc *testCase) run(t *testing.T) {
 		for _, reactor := range tc.scReactors {
 			scClientFake.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 		}
-		serviceClassInf := sc_v1b1inf.NewClusterServiceClassInformer(scClient, 0, cache.Indexers{})
-		infs = append(infs, serviceClassInf)
-		servicePlanInf := sc_v1b1inf.NewClusterServicePlanInformer(scClient, 0, cache.Indexers{})
-		infs = append(infs, servicePlanInf)
-		catalog, err = store.NewCatalog(serviceClassInf, servicePlanInf)
-		require.NoError(t, err)
 	}
 
-	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(apiExtClient, 0, cache.Indexers{})
-	bundleInf := client.BundleInformer(smithClient.SmithV1(), meta_v1.NamespaceAll, 0)
+	plugins := make([]plugin.NewFunc, 0, len(tc.plugins))
+	for _, factory := range tc.plugins {
+		pluginInstance := factory(t)
+		plugins = append(plugins, func() (plugin.Plugin, error) { return pluginInstance, nil })
+		tc.pluginsConstructed = append(tc.pluginsConstructed, pluginInstance)
+	}
+	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
+	require.NoError(t, err)
 
 	for _, object := range tc.apiExtClientObjects {
 		crd := object.(*apiext_v1b1.CustomResourceDefinition)
@@ -238,104 +224,53 @@ func (tc *testCase) run(t *testing.T) {
 			// is here _only_ to keep rest scheme happy, we do not currently use scheme to deserialize
 		}, &unstructured.Unstructured{})
 	}
-
-	multiStore := store.NewMulti()
-
-	bs, err := store.NewBundle(bundleInf, multiStore, nil)
-	require.NoError(t, err)
-	resourceInfs := apitypes.ResourceInformers(mainClient, scClient, meta_v1.NamespaceAll, 0)
-
-	crdStore, err := store.NewCrd(crdInf)
-	require.NoError(t, err)
+	restMapper := restMapperFromScheme(scheme)
 
 	tc.logger = smith_testing.DevelopmentLogger(t)
 	defer tc.logger.Sync()
 
-	// Ready Checker
-	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
-	if tc.enableServiceCatalog {
-		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
-	}
-	rc := readychecker.New(crdStore, readyTypes...)
-
-	// Object cleanup
-	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}
-	if tc.enableServiceCatalog {
-		cleanupTypes = append(cleanupTypes, clean_types.ServiceCatalogKnownTypes)
-	}
-	oc := cleanup.New(cleanupTypes...)
-
-	// Spec check
-	specCheck := &speccheck.SpecCheck{
-		Logger:  tc.logger,
-		Cleaner: oc,
-	}
-
 	// Look at k8s.io/kubernetes/pkg/controller/garbagecollector/garbagecollector_test.go for inspiration
 	srv, clientConfig := testServerAndClientConfig(&tc.testHandler)
 	defer srv.Close()
-
-	restMapper := restMapperFromScheme(scheme)
-
-	sc := &smart.DynamicClient{
-		ClientPool: dynamic.NewClientPool(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc),
-		Mapper:     restMapper,
-	}
-
-	pluginContainers := make(map[smith_v1.PluginName]plugin.PluginContainer, len(tc.plugins))
-	for name, factory := range tc.plugins {
-		pluginInstance := factory(t)
-		pluginContainers[name], err = plugin.NewPluginContainer(
-			func() (plugin.Plugin, error) { return pluginInstance, nil })
-		require.NoError(t, err)
-		tc.pluginsConstructed = append(tc.pluginsConstructed, pluginInstance)
-	}
-
-	cntrlr := &bundlec.Controller{
-		Logger:           tc.logger,
-		BundleInf:        bundleInf,
-		BundleClient:     smithClient.SmithV1(),
-		BundleStore:      bs,
-		SmartClient:      sc,
-		Rc:               rc,
-		Store:            multiStore,
-		SpecCheck:        specCheck,
-		Queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle"),
-		Workers:          2,
-		Namespace:        tc.namespace,
-		PluginContainers: pluginContainers,
-		Scheme:           scheme,
-		Catalog:          catalog,
-	}
-	cntrlr.Prepare(crdInf, resourceInfs)
-
-	defer tc.verifyActions(t)
-	defer tc.verifyPlugins(t)
 
 	stgr := stager.New()
 	defer stgr.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
-
-	resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
-	resourceInfs[smith_v1.BundleGVK] = bundleInf
 	stage := stgr.NextStage()
 
-	// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
-	for gvk, inf := range resourceInfs {
-		err = multiStore.AddInformer(gvk, inf)
-		require.NoError(t, err)
-		infs = append(infs, inf)
+	// Controller
+	config := &controller.Config{
+		Logger:       tc.logger,
+		Namespace:    tc.namespace,
+		MainClient:   mainClient,
+		ApiExtClient: apiExtClient,
+		ScClient:     scClient,
+		SmithClient:  smithClient,
+		SmartClient: &smart.DynamicClient{
+			ClientPool: dynamic.NewClientPool(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc),
+			Mapper:     restMapper,
+		},
 	}
-
+	bundleConstr := app.BundleControllerConstructor{
+		Plugins:               plugins,
+		Workers:               2,
+		ServiceCatalogSupport: tc.enableServiceCatalog,
+	}
+	cntrlr, err := bundleConstr.New(config)
+	require.NoError(t, err)
 	// Start all informers then wait on them
-	for _, inf := range infs {
+	for _, inf := range config.Informers {
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
 	}
-	for _, inf := range infs {
+	for _, inf := range config.Informers {
 		require.True(t, cache.WaitForCacheSync(ctx.Done(), inf.HasSynced))
 	}
+
+	defer tc.verifyActions(t)
+	defer tc.verifyPlugins(t)
+
 	if tc.testTimeout != 0 {
 		testCtx, testCancel := context.WithTimeout(ctx, tc.testTimeout)
 		defer testCancel()
@@ -343,9 +278,9 @@ func (tc *testCase) run(t *testing.T) {
 	}
 
 	if tc.test == nil {
-		tc.defaultTest(t, ctx, cntrlr)
+		tc.defaultTest(t, ctx, cntrlr.(*bundlec.Controller))
 	} else {
-		tc.test(t, ctx, cntrlr, tc)
+		tc.test(t, ctx, cntrlr.(*bundlec.Controller), tc)
 	}
 }
 
