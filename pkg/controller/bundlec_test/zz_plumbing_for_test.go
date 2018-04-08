@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/rest"
 	kube_testing "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 )
 
 type reaction struct {
@@ -253,18 +254,21 @@ func (tc *testCase) run(t *testing.T) {
 			Mapper:     restMapper,
 		},
 	}
-	bundleConstr := app.BundleControllerConstructor{
+	bundleConstr := &app.BundleControllerConstructor{
 		Plugins:               plugins,
-		Workers:               2,
 		ServiceCatalogSupport: tc.enableServiceCatalog,
 	}
-	cntrlr, err := bundleConstr.New(config)
+	generic, err := controller.NewGeneric(config, tc.logger,
+		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multiqueue"),
+		2, bundleConstr)
 	require.NoError(t, err)
+	cntrlr := generic.Controllers[smith_v1.BundleGVK].(*bundlec.Controller)
+
 	// Start all informers then wait on them
-	for _, inf := range config.Informers {
+	for _, inf := range generic.Informers {
 		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
 	}
-	for _, inf := range config.Informers {
+	for _, inf := range generic.Informers {
 		require.True(t, cache.WaitForCacheSync(ctx.Done(), inf.HasSynced))
 	}
 
@@ -278,9 +282,9 @@ func (tc *testCase) run(t *testing.T) {
 	}
 
 	if tc.test == nil {
-		tc.defaultTest(t, ctx, cntrlr.(*bundlec.Controller))
+		tc.defaultTest(t, ctx, cntrlr)
 	} else {
-		tc.test(t, ctx, cntrlr.(*bundlec.Controller), tc)
+		tc.test(t, ctx, cntrlr, tc)
 	}
 }
 

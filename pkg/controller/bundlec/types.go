@@ -39,8 +39,3 @@ type BundleStore interface {
 type SmartClient interface {
 	ForGVK(gvk schema.GroupVersionKind, namespace string) (dynamic.ResourceInterface, error)
 }
-
-type queueKey struct {
-	namespace string
-	name      string
-}

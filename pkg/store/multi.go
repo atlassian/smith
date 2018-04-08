@@ -34,11 +34,15 @@ func (s *Multi) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIn
 	if _, ok := s.informers[gvk]; ok {
 		return errors.New("informer is already registered")
 	}
-	err := informer.AddIndexers(cache.Indexers{
-		ByNamespaceAndControllerUidIndex: byNamespaceAndControllerUidIndex,
-	})
-	if err != nil {
-		return errors.WithStack(err)
+	f := informer.GetIndexer().GetIndexers()[ByNamespaceAndControllerUidIndex]
+	if f == nil {
+		// Informer does not have this index yet i.e. this is the first/sole multistore it is added to.
+		err := informer.AddIndexers(cache.Indexers{
+			ByNamespaceAndControllerUidIndex: byNamespaceAndControllerUidIndex,
+		})
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 	s.informers[gvk] = informer
 	return nil

@@ -30,16 +30,14 @@ import (
 	ext_v1b1inf "k8s.io/client-go/informers/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 )
 
 type BundleControllerConstructor struct {
 	Plugins               []plugin.NewFunc
-	Workers               int
 	ServiceCatalogSupport bool
 }
 
-func (c *BundleControllerConstructor) New(config *controller.Config) (controller.Interface, error) {
+func (c *BundleControllerConstructor) New(config *controller.Config, cctx *controller.Context) (controller.Interface, error) {
 	// Plugins
 	pluginContainers, err := c.loadPlugins()
 	if err != nil {
@@ -53,11 +51,11 @@ func (c *BundleControllerConstructor) New(config *controller.Config) (controller
 		return nil, err
 	}
 	// Informers
-	bundleInf, err := controller.SmithInformer(config, smith_v1.BundleGVK, client.BundleInformer)
+	bundleInf, err := cctx.SmithInformer(config, smith_v1.BundleGVK, client.BundleInformer)
 	if err != nil {
 		return nil, err
 	}
-	crdInf, err := controller.ApiExtensionsInformer(config,
+	crdInf, err := cctx.ApiExtensionsInformer(config,
 		apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
 		apiext_v1b1inf.NewCustomResourceDefinitionInformer)
 	if err != nil {
@@ -70,13 +68,13 @@ func (c *BundleControllerConstructor) New(config *controller.Config) (controller
 
 	var catalog *store.Catalog
 	if c.ServiceCatalogSupport {
-		serviceClassInf, err := controller.SvcCatClusterInformer(config,
+		serviceClassInf, err := cctx.SvcCatClusterInformer(config,
 			sc_v1b1.SchemeGroupVersion.WithKind("ClusterServiceClass"),
 			sc_v1b1inf.NewClusterServiceClassInformer)
 		if err != nil {
 			return nil, err
 		}
-		servicePlanInf, err := controller.SvcCatClusterInformer(config,
+		servicePlanInf, err := cctx.SvcCatClusterInformer(config,
 			sc_v1b1.SchemeGroupVersion.WithKind("ClusterServicePlan"),
 			sc_v1b1inf.NewClusterServicePlanInformer)
 		if err != nil {
@@ -117,7 +115,7 @@ func (c *BundleControllerConstructor) New(config *controller.Config) (controller
 	}
 
 	// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
-	resourceInfs, err := resourceInformers(config)
+	resourceInfs, err := resourceInformers(config, cctx)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +137,7 @@ func (c *BundleControllerConstructor) New(config *controller.Config) (controller
 		Rc:               rc,
 		Store:            multiStore,
 		SpecCheck:        specCheck,
-		Queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle"),
-		Workers:          c.Workers,
+		WorkQueue:        cctx.WorkQueue,
 		CrdResyncPeriod:  config.ResyncPeriod,
 		Namespace:        config.Namespace,
 		PluginContainers: pluginContainers,
@@ -154,7 +151,7 @@ func (c *BundleControllerConstructor) New(config *controller.Config) (controller
 
 func (c *BundleControllerConstructor) Describe() controller.Descriptor {
 	return controller.Descriptor{
-		GVK: smith_v1.BundleGVK,
+		Gvk: smith_v1.BundleGVK,
 	}
 }
 
@@ -174,7 +171,7 @@ func (c *BundleControllerConstructor) loadPlugins() (map[smith_v1.PluginName]plu
 	return pluginContainers, nil
 }
 
-func resourceInformers(config *controller.Config) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
+func resourceInformers(config *controller.Config, cctx *controller.Context) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
 	coreInfs := map[schema.GroupVersionKind]func(kubernetes.Interface, string, time.Duration, cache.Indexers) cache.SharedIndexInformer{
 		// Core API types
 		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):       ext_v1b1inf.NewIngressInformer,
@@ -186,7 +183,7 @@ func resourceInformers(config *controller.Config) (map[schema.GroupVersionKind]c
 	}
 	infs := make(map[schema.GroupVersionKind]cache.SharedIndexInformer, len(coreInfs)+2)
 	for gvk, coreInf := range coreInfs {
-		inf, err := controller.MainInformer(config, gvk, coreInf)
+		inf, err := cctx.MainInformer(config, gvk, coreInf)
 		if err != nil {
 			return nil, err
 		}
@@ -201,7 +198,7 @@ func resourceInformers(config *controller.Config) (map[schema.GroupVersionKind]c
 			sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"): sc_v1b1inf.NewServiceInstanceInformer,
 		}
 		for gvk, scInf := range scInfs {
-			inf, err := controller.SvcCatInformer(config, gvk, scInf)
+			inf, err := cctx.SvcCatInformer(config, gvk, scInf)
 			if err != nil {
 				return nil, err
 			}

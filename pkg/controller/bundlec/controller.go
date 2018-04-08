@@ -8,19 +8,13 @@ import (
 	"github.com/ash2k/stager/wait"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
+	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/store"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
-)
-
-const (
-	// Work queue deduplicates scheduled keys. This is the period it waits for duplicate keys before letting the work
-	// to be dequeued.
-	workDeduplicationPeriod = 50 * time.Millisecond
 )
 
 type Controller struct {
@@ -44,9 +38,7 @@ type Controller struct {
 	Rc           ReadyChecker
 	Store        Store
 	SpecCheck    SpecCheck
-	// Bundle objects that need to be synced.
-	Queue   workqueue.RateLimitingInterface
-	Workers int
+	WorkQueue    controller.WorkQueueProducer
 
 	// CRD
 	CrdResyncPeriod time.Duration
@@ -92,25 +84,15 @@ func (c *Controller) Run(ctx context.Context) {
 		defer c.wgLock.Unlock()
 		c.stopping = true
 	}()
-	defer c.Queue.ShutDown()
 
 	c.Logger.Info("Starting Bundle controller")
 	defer c.Logger.Info("Shutting down Bundle controller")
 
-	for i := 0; i < c.Workers; i++ {
-		c.wg.Start(c.worker)
-	}
-
 	<-ctx.Done()
 }
-
 func (c *Controller) enqueue(bundle *smith_v1.Bundle) {
-	c.enqueueKey(queueKey{
-		namespace: bundle.Namespace,
-		name:      bundle.Name,
+	c.WorkQueue.Add(controller.QueueKey{
+		Namespace: bundle.Namespace,
+		Name:      bundle.Name,
 	})
-}
-
-func (c *Controller) enqueueKey(key queueKey) {
-	c.Queue.AddAfter(key, workDeduplicationPeriod)
 }

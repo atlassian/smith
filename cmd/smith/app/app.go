@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ash2k/stager"
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
@@ -28,11 +27,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	core_v1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 )
 
 const (
@@ -110,10 +109,11 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	bundleConstr := &BundleControllerConstructor{
 		Plugins:               a.Plugins,
-		Workers:               a.Workers,
 		ServiceCatalogSupport: a.ServiceCatalogSupport,
 	}
-	generic, err := controller.NewGeneric(config, bundleConstr)
+	generic, err := controller.NewGeneric(config, a.Logger,
+		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multiqueue"),
+		a.Workers, bundleConstr)
 	if err != nil {
 		return err
 	}
@@ -148,23 +148,6 @@ func (a *App) Run(ctx context.Context) error {
 		case <-startedLeading:
 		}
 	}
-
-	// Stager will perform ordered, graceful shutdown
-	stgr := stager.New()
-	defer stgr.Shutdown()
-	stage := stgr.NextStage()
-
-	// Start all informers then wait on them
-	for _, inf := range config.Informers {
-		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
-	}
-	a.Logger.Info("Waiting for informers to sync")
-	for _, inf := range config.Informers {
-		if !cache.WaitForCacheSync(ctx.Done(), inf.HasSynced) {
-			return ctx.Err()
-		}
-	}
-	a.Logger.Info("Informers synced")
 
 	generic.Run(ctx)
 	return ctx.Err()
