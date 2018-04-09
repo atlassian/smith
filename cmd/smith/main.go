@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/atlassian/smith/cmd/smith/app"
+	"github.com/atlassian/smith/pkg/controller"
 )
 
 func main() {
@@ -26,7 +27,10 @@ func run() error {
 }
 
 func runWithContext(ctx context.Context) error {
-	a, err := app.NewFromFlags(flag.CommandLine, os.Args[1:])
+	controllers := []controller.Constructor{
+		&app.BundleControllerConstructor{},
+	}
+	a, err := app.NewFromFlags(controllers, flag.CommandLine, os.Args[1:])
 	if err != nil {
 		return err
 	}

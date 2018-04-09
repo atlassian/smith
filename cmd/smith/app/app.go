@@ -9,38 +9,23 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ash2k/stager"
-	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/cleanup"
-	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
-	"github.com/atlassian/smith/pkg/plugin"
-	"github.com/atlassian/smith/pkg/readychecker"
-	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
-	"github.com/atlassian/smith/pkg/resources/apitypes"
-	"github.com/atlassian/smith/pkg/speccheck"
-	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util/logz"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
-	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
-	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	core_v1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
@@ -67,26 +52,17 @@ type LeaderElectionConfig struct {
 }
 
 type App struct {
-	Logger                *zap.Logger
-	RestConfig            *rest.Config
-	ResyncPeriod          time.Duration
-	Namespace             string
-	Plugins               []plugin.NewFunc
-	Workers               int
-	ServiceCatalogSupport bool
-	LeaderElectionConfig  LeaderElectionConfig
+	Logger               *zap.Logger
+	RestConfig           *rest.Config
+	ResyncPeriod         time.Duration
+	Namespace            string
+	Controllers          []controller.Constructor
+	Workers              int
+	LeaderElectionConfig LeaderElectionConfig
 }
 
 func (a *App) Run(ctx context.Context) error {
 	defer a.Logger.Sync()
-	// Plugins
-	pluginContainers, err := a.loadPlugins()
-	if err != nil {
-		return err
-	}
-	for pluginName := range pluginContainers {
-		a.Logger.Sugar().Infof("Loaded plugin: %q", pluginName)
-	}
 
 	// Clients
 	mainClient, err := kubernetes.NewForConfig(a.RestConfig)
@@ -97,79 +73,56 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var scClient scClientset.Interface
-	if a.ServiceCatalogSupport {
-		scClient, err = scClientset.NewForConfig(a.RestConfig)
-		if err != nil {
-			return err
-		}
+	scClient, err := scClientset.NewForConfig(a.RestConfig)
+	if err != nil {
+		return err
 	}
 	apiExtClient, err := apiExtClientset.NewForConfig(a.RestConfig)
 	if err != nil {
 		return err
 	}
-	scheme, err := apitypes.FullScheme(a.ServiceCatalogSupport)
-	if err != nil {
-		return err
-	}
+	rm := discovery.NewDeferredDiscoveryRESTMapper(
+		&smart.CachedDiscoveryClient{
+			DiscoveryInterface: mainClient.Discovery(),
+		},
+		meta.InterfacesForUnstructured,
+	)
+	// Controller
+	config := &controller.Config{
+		Logger:       a.Logger,
+		Namespace:    a.Namespace,
+		ResyncPeriod: a.ResyncPeriod,
 
-	// Informers
-	var infs []cache.SharedIndexInformer
-	// We don't add these to 'infs' because they're added later as part of
-	// resourceInfs processing.
-	bundleInf := client.BundleInformer(smithClient.SmithV1(), a.Namespace, a.ResyncPeriod)
-	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(apiExtClient, a.ResyncPeriod, cache.Indexers{})
-	crdStore, err := store.NewCrd(crdInf)
-	if err != nil {
-		return err
+		MainClient:   mainClient,
+		ApiExtClient: apiExtClient,
+		ScClient:     scClient,
+		SmithClient:  smithClient,
+		SmartClient: &smart.DynamicClient{
+			ClientPool: dynamic.NewClientPool(a.RestConfig, rm, dynamic.LegacyAPIPathResolverFunc),
+			Mapper:     rm,
+		},
 	}
-	var catalog *store.Catalog
-	if a.ServiceCatalogSupport {
-		serviceClassInf := sc_v1b1inf.NewClusterServiceClassInformer(scClient, a.ResyncPeriod, cache.Indexers{})
-		infs = append(infs, serviceClassInf)
-		servicePlanInf := sc_v1b1inf.NewClusterServicePlanInformer(scClient, a.ResyncPeriod, cache.Indexers{})
-		infs = append(infs, servicePlanInf)
-		catalog, err = store.NewCatalog(serviceClassInf, servicePlanInf)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Ready Checker
-	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
-	if a.ServiceCatalogSupport {
-		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
-	}
-	rc := readychecker.New(crdStore, readyTypes...)
-
-	// Object cleanup
-	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}
-	if a.ServiceCatalogSupport {
-		cleanupTypes = append(cleanupTypes, clean_types.ServiceCatalogKnownTypes)
-	}
-	oc := cleanup.New(cleanupTypes...)
-
-	// Spec check
-	specCheck := &speccheck.SpecCheck{
-		Logger:  a.Logger,
-		Cleaner: oc,
-	}
-
-	// Multi store
-	multiStore := store.NewMulti()
-
-	bs, err := store.NewBundle(bundleInf, multiStore, pluginContainers)
+	generic, err := controller.NewGeneric(config, a.Logger,
+		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multiqueue"),
+		a.Workers, a.Controllers...)
 	if err != nil {
 		return err
 	}
 
 	// Events
+	eventsScheme := runtime.NewScheme()
+	// we use ConfigMapLock which emits events for ConfigMap and hence we need (only) core_v1 types for it
+	if err = core_v1.AddToScheme(eventsScheme); err != nil {
+		return err
+	}
+
+	// Start events recorder
 	eventBroadcaster := record.NewBroadcaster()
 	loggingWatch := eventBroadcaster.StartLogging(a.Logger.Sugar().Infof)
 	defer loggingWatch.Stop()
 	recordingWatch := eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: mainClient.CoreV1().Events(meta_v1.NamespaceNone)})
 	defer recordingWatch.Stop()
-	recorder := eventBroadcaster.NewRecorder(scheme, core_v1.EventSource{Component: "smith-controller"})
+	recorder := eventBroadcaster.NewRecorder(eventsScheme, core_v1.EventSource{Component: "smith-controller"})
 
 	// Leader election
 	if a.LeaderElectionConfig.LeaderElect {
@@ -187,67 +140,7 @@ func (a *App) Run(ctx context.Context) error {
 		}
 	}
 
-	resourceInfs := apitypes.ResourceInformers(mainClient, scClient, a.Namespace, a.ResyncPeriod)
-
-	// Controller
-	rm := discovery.NewDeferredDiscoveryRESTMapper(
-		&smart.CachedDiscoveryClient{
-			DiscoveryInterface: mainClient.Discovery(),
-		},
-		meta.InterfacesForUnstructured,
-	)
-	sc := &smart.DynamicClient{
-		ClientPool: dynamic.NewClientPool(a.RestConfig, rm, dynamic.LegacyAPIPathResolverFunc),
-		Mapper:     rm,
-	}
-	cntrlr := controller.BundleController{
-		Logger:           a.Logger,
-		BundleInf:        bundleInf,
-		BundleClient:     smithClient.SmithV1(),
-		BundleStore:      bs,
-		SmartClient:      sc,
-		Rc:               rc,
-		Store:            multiStore,
-		SpecCheck:        specCheck,
-		Queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bundle"),
-		Workers:          a.Workers,
-		CrdResyncPeriod:  a.ResyncPeriod,
-		Namespace:        a.Namespace,
-		PluginContainers: pluginContainers,
-		Scheme:           scheme,
-		Catalog:          catalog,
-	}
-	cntrlr.Prepare(crdInf, resourceInfs)
-
-	resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
-	resourceInfs[smith_v1.BundleGVK] = bundleInf
-
-	// Stager will perform ordered, graceful shutdown
-	stgr := stager.New()
-	defer stgr.Shutdown()
-	stage := stgr.NextStage()
-
-	// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
-	for gvk, inf := range resourceInfs {
-		err = multiStore.AddInformer(gvk, inf)
-		if err != nil {
-			return errors.Errorf("failed to add informer for %s", gvk)
-		}
-		infs = append(infs, inf)
-	}
-
-	// Start all informers then wait on them
-	for _, inf := range infs {
-		stage.StartWithChannel(inf.Run) // Must be after AddInformer()
-	}
-	a.Logger.Info("Waiting for informers to sync")
-	for _, inf := range infs {
-		if !cache.WaitForCacheSync(ctx.Done(), inf.HasSynced) {
-			return ctx.Err()
-		}
-	}
-
-	cntrlr.Run(ctx)
+	generic.Run(ctx)
 	return ctx.Err()
 }
 
@@ -292,22 +185,6 @@ func (a *App) startLeaderElection(ctx context.Context, configMapsGetter core_v1c
 	return ctxRet, startedLeading, nil
 }
 
-func (a *App) loadPlugins() (map[smith_v1.PluginName]plugin.PluginContainer, error) {
-	pluginContainers := make(map[smith_v1.PluginName]plugin.PluginContainer, len(a.Plugins))
-	for _, p := range a.Plugins {
-		pluginContainer, err := plugin.NewPluginContainer(p)
-		if err != nil {
-			return nil, err
-		}
-		description := pluginContainer.Plugin.Describe()
-		if _, ok := pluginContainers[description.Name]; ok {
-			return nil, errors.Wrapf(err, "plugins with same name found %q", description.Name)
-		}
-		pluginContainers[description.Name] = pluginContainer
-	}
-	return pluginContainers, nil
-}
-
 // CancelOnInterrupt calls f when os.Interrupt or SIGTERM is received.
 // It ignores subsequent interrupts on purpose - program should exit correctly after the first signal.
 func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
@@ -322,9 +199,14 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 	}()
 }
 
-func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
-	a := App{}
-	flagset.BoolVar(&a.ServiceCatalogSupport, "service-catalog", true, "Service Catalog support. Enabled by default.")
+func NewFromFlags(controllers []controller.Constructor, flagset *flag.FlagSet, arguments []string) (*App, error) {
+	a := App{
+		Controllers: controllers,
+	}
+	for _, cntrlr := range controllers {
+		cntrlr.AddFlags(flagset)
+	}
+
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")

@@ -15,6 +15,7 @@ import (
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
+	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
@@ -240,11 +241,15 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := app.App{
-			Logger:                logger,
-			RestConfig:            config,
-			ServiceCatalogSupport: serviceCatalog,
-			Namespace:             cfg.Namespace,
-			Workers:               2,
+			Logger:     logger,
+			RestConfig: config,
+			Namespace:  cfg.Namespace,
+			Controllers: []controller.Constructor{
+				&app.BundleControllerConstructor{
+					ServiceCatalogSupport: serviceCatalog,
+				},
+			},
+			Workers: 2,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)
