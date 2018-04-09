@@ -9,14 +9,10 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	core_v1 "k8s.io/api/core/v1"
-	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	apiext_v1b1list "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
@@ -32,15 +28,6 @@ type App struct {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	scheme := runtime.NewScheme()
-	scheme.AddUnversionedTypes(core_v1.SchemeGroupVersion, &meta_v1.Status{})
-	if err := sleeper_v1.AddToScheme(scheme); err != nil {
-		return err
-	}
-	if err := apiext_v1b1.SchemeBuilder.AddToScheme(scheme); err != nil {
-		return err
-	}
-
 	sClient, err := Client(a.RestConfig)
 	if err != nil {
 		return err
