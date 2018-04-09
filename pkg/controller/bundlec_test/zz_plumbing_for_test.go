@@ -20,7 +20,6 @@ import (
 	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
-	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/util"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
@@ -212,7 +211,7 @@ func (tc *testCase) run(t *testing.T) {
 		plugins = append(plugins, func() (plugin.Plugin, error) { return pluginInstance, nil })
 		tc.pluginsConstructed = append(tc.pluginsConstructed, pluginInstance)
 	}
-	scheme, err := apitypes.FullScheme(tc.enableServiceCatalog)
+	scheme, err := app.FullScheme(tc.enableServiceCatalog)
 	require.NoError(t, err)
 
 	for _, object := range tc.apiExtClientObjects {
@@ -412,13 +411,6 @@ func SleeperCrdWithStatus() *apiext_v1b1.CustomResourceDefinition {
 }
 
 func convertBundleResourcesToUnstrucutred(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog bool) {
-	scheme, err := apitypes.FullScheme(serviceCatalog)
-	require.NoError(t, err)
-	// We only add Sleeper here temporarily, it must not be in the main scheme.
-	// This enables us to use typed Sleeper object in test definitions.
-	err = sleeper_v1.AddToScheme(scheme)
-	require.NoError(t, err)
-
 	// Convert all typed objects into unstructured ones
 	for i, res := range bundle.Spec.Resources {
 		if res.Spec.Object != nil {

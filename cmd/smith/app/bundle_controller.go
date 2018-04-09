@@ -13,7 +13,6 @@ import (
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
-	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
@@ -25,6 +24,7 @@ import (
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apps_v1inf "k8s.io/client-go/informers/apps/v1"
 	core_v1inf "k8s.io/client-go/informers/core/v1"
@@ -51,7 +51,7 @@ func (c *BundleControllerConstructor) New(config *controller.Config, cctx *contr
 	for pluginName := range pluginContainers {
 		config.Logger.Sugar().Infof("Loaded plugin: %q", pluginName)
 	}
-	scheme, err := apitypes.FullScheme(c.ServiceCatalogSupport)
+	scheme, err := FullScheme(c.ServiceCatalogSupport)
 	if err != nil {
 		return nil, err
 	}
@@ -212,4 +212,21 @@ func (c *BundleControllerConstructor) resourceInformers(config *controller.Confi
 	}
 
 	return infs, nil
+}
+
+func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
+	scheme := runtime.NewScheme()
+	var sb runtime.SchemeBuilder
+	sb.Register(smith_v1.SchemeBuilder...)
+	sb.Register(ext_v1b1.SchemeBuilder...)
+	sb.Register(core_v1.SchemeBuilder...)
+	sb.Register(apps_v1.SchemeBuilder...)
+	sb.Register(apiext_v1b1.SchemeBuilder...)
+	if serviceCatalog {
+		sb.Register(sc_v1b1.SchemeBuilder...)
+	}
+	if err := sb.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+	return scheme, nil
 }

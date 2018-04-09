@@ -20,7 +20,6 @@ go_library(
         "//pkg/plugin:go_default_library",
         "//pkg/readychecker:go_default_library",
         "//pkg/readychecker/types:go_default_library",
-        "//pkg/resources/apitypes:go_default_library",
         "//pkg/speccheck:go_default_library",
         "//pkg/store:go_default_library",
         "//pkg/util/logz:go_default_library",
