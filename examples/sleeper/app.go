@@ -4,11 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/ash2k/stager"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	"github.com/atlassian/smith/pkg/resources"
-	"github.com/atlassian/smith/pkg/store"
-
-	"github.com/ash2k/stager"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
@@ -55,13 +53,7 @@ func (a *App) Run(ctx context.Context) error {
 	stgr := stager.New()
 	defer stgr.Shutdown()
 
-	multiStore := store.NewMulti()
-
 	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(apiExtClient, ResyncPeriod, cache.Indexers{})
-	err = multiStore.AddInformer(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), crdInf)
-	if err != nil {
-		return err
-	}
 	stage := stgr.NextStage()
 	stage.StartWithChannel(crdInf.Run) // Must be after multiStore.AddInformer()
 
