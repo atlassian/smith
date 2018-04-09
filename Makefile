@@ -104,7 +104,7 @@ run: fmt update-bazel
 	build/bazel-run.sh //cmd/smith:smith_race \
 		-- \
 		-log-encoding=console \
-		-service-catalog=false \
+		-bundle-service-catalog=false \
 		-leader-elect \
 		-client-config-from=file \
 		-client-config-file-name="$$HOME/.kube/config" \

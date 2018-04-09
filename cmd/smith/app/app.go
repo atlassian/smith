@@ -13,7 +13,6 @@ import (
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
-	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/util/logz"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"go.uber.org/zap"
@@ -53,14 +52,13 @@ type LeaderElectionConfig struct {
 }
 
 type App struct {
-	Logger                *zap.Logger
-	RestConfig            *rest.Config
-	ResyncPeriod          time.Duration
-	Namespace             string
-	Plugins               []plugin.NewFunc
-	Workers               int
-	ServiceCatalogSupport bool
-	LeaderElectionConfig  LeaderElectionConfig
+	Logger               *zap.Logger
+	RestConfig           *rest.Config
+	ResyncPeriod         time.Duration
+	Namespace            string
+	Controllers          []controller.Constructor
+	Workers              int
+	LeaderElectionConfig LeaderElectionConfig
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -75,12 +73,9 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var scClient scClientset.Interface
-	if a.ServiceCatalogSupport {
-		scClient, err = scClientset.NewForConfig(a.RestConfig)
-		if err != nil {
-			return err
-		}
+	scClient, err := scClientset.NewForConfig(a.RestConfig)
+	if err != nil {
+		return err
 	}
 	apiExtClient, err := apiExtClientset.NewForConfig(a.RestConfig)
 	if err != nil {
@@ -107,13 +102,9 @@ func (a *App) Run(ctx context.Context) error {
 			Mapper:     rm,
 		},
 	}
-	bundleConstr := &BundleControllerConstructor{
-		Plugins:               a.Plugins,
-		ServiceCatalogSupport: a.ServiceCatalogSupport,
-	}
 	generic, err := controller.NewGeneric(config, a.Logger,
 		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multiqueue"),
-		a.Workers, bundleConstr)
+		a.Workers, a.Controllers...)
 	if err != nil {
 		return err
 	}
@@ -208,9 +199,14 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 	}()
 }
 
-func NewFromFlags(flagset *flag.FlagSet, arguments []string) (*App, error) {
-	a := App{}
-	flagset.BoolVar(&a.ServiceCatalogSupport, "service-catalog", true, "Service Catalog support. Enabled by default.")
+func NewFromFlags(controllers []controller.Constructor, flagset *flag.FlagSet, arguments []string) (*App, error) {
+	a := App{
+		Controllers: controllers,
+	}
+	for _, cntrlr := range controllers {
+		cntrlr.AddFlags(flagset)
+	}
+
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")

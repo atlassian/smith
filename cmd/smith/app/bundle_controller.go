@@ -1,6 +1,7 @@
 package app
 
 import (
+	"flag"
 	"time"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
@@ -35,6 +36,10 @@ import (
 type BundleControllerConstructor struct {
 	Plugins               []plugin.NewFunc
 	ServiceCatalogSupport bool
+}
+
+func (c *BundleControllerConstructor) AddFlags(flagset *flag.FlagSet) {
+	flagset.BoolVar(&c.ServiceCatalogSupport, "bundle-service-catalog", true, "Service Catalog support in Bundle controller. Enabled by default.")
 }
 
 func (c *BundleControllerConstructor) New(config *controller.Config, cctx *controller.Context) (controller.Interface, error) {
@@ -115,7 +120,7 @@ func (c *BundleControllerConstructor) New(config *controller.Config, cctx *contr
 	}
 
 	// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
-	resourceInfs, err := resourceInformers(config, cctx)
+	resourceInfs, err := c.resourceInformers(config, cctx)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +176,7 @@ func (c *BundleControllerConstructor) loadPlugins() (map[smith_v1.PluginName]plu
 	return pluginContainers, nil
 }
 
-func resourceInformers(config *controller.Config, cctx *controller.Context) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
+func (c *BundleControllerConstructor) resourceInformers(config *controller.Config, cctx *controller.Context) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
 	coreInfs := map[schema.GroupVersionKind]func(kubernetes.Interface, string, time.Duration, cache.Indexers) cache.SharedIndexInformer{
 		// Core API types
 		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):       ext_v1b1inf.NewIngressInformer,
@@ -191,7 +196,7 @@ func resourceInformers(config *controller.Config, cctx *controller.Context) (map
 	}
 
 	// Service Catalog types
-	if config.ScClient != nil {
+	if c.ServiceCatalogSupport {
 		scInfs := map[schema.GroupVersionKind]func(scClientset.Interface, string, time.Duration, cache.Indexers) cache.SharedIndexInformer{
 			// Service Catalog types
 			sc_v1b1.SchemeGroupVersion.WithKind("ServiceBinding"):  sc_v1b1inf.NewServiceBindingInformer,

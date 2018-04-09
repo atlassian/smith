@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"flag"
 	"time"
 
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
@@ -75,6 +76,7 @@ type Descriptor struct {
 }
 
 type Constructor interface {
+	AddFlags(*flag.FlagSet)
 	New(*Config, *Context) (Interface, error)
 	Describe() Descriptor
 }

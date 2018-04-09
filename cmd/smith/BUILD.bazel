@@ -7,7 +7,10 @@ go_library(
     srcs = ["main.go"],
     importpath = "github.com/atlassian/smith/cmd/smith",
     visibility = ["//visibility:private"],
-    deps = ["//cmd/smith/app:go_default_library"],
+    deps = [
+        "//cmd/smith/app:go_default_library",
+        "//pkg/controller:go_default_library",
+    ],
 )
 
 go_binary(
