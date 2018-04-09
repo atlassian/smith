@@ -23,7 +23,7 @@ type Generic struct {
 	logger      *zap.Logger
 	queue       workQueue
 	workers     int
-	multi       *store.Multi
+	multi       *store.MultiBasic
 	Controllers map[schema.GroupVersionKind]Interface
 	Informers   map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
@@ -31,7 +31,7 @@ type Generic struct {
 func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimitingInterface, workers int, constructors ...Constructor) (*Generic, error) {
 	controllers := make(map[schema.GroupVersionKind]Interface, len(constructors))
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer)
-	multi := store.NewMulti()
+	multi := store.NewMultiBasic()
 	wq := workQueue{
 		queue: queue,
 		workDeduplicationPeriod: workDeduplicationPeriod,
