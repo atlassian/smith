@@ -4,14 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/ash2k/stager"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
-	"github.com/atlassian/smith/pkg/resources"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
-	apiext_v1b1list "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -32,35 +26,11 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	apiExtClient, err := apiExtClientset.NewForConfig(a.RestConfig)
-	if err != nil {
-		return err
-	}
 
-	stgr := stager.New()
-	defer stgr.Shutdown()
-
-	crdInf := apiext_v1b1inf.NewCustomResourceDefinitionInformer(apiExtClient, ResyncPeriod, cache.Indexers{})
-	stage := stgr.NextStage()
-	stage.StartWithChannel(crdInf.Run) // Must be after multiStore.AddInformer()
-
-	// 1. Ensure CRD Sleeper exists
-
-	// We must wait for crdInf to populate its cache to avoid reading from an empty cache
-	// in resources.EnsureCrdExists().
-	if !cache.WaitForCacheSync(ctx.Done(), crdInf.HasSynced) {
-		return errors.New("wait for CRD informer was cancelled")
-	}
-
-	crdLister := apiext_v1b1list.NewCustomResourceDefinitionLister(crdInf.GetIndexer())
-	if err = resources.EnsureCrdExistsAndIsEstablished(ctx, a.Logger, apiExtClient, crdLister, SleeperCrd()); err != nil {
-		return err
-	}
-
-	// 2. Create an Informer for Sleeper objects
+	// Create an Informer for Sleeper objects
 	sleeperInformer := a.sleeperInformer(ctx, sClient)
 
-	// 3. Run until a signal to stop
+	// Run until a signal to stop
 	sleeperInformer.Run(ctx.Done())
 	return ctx.Err()
 }
