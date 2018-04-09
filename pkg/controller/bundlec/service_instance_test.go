@@ -5,9 +5,7 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/resources/apitypes"
 	"github.com/atlassian/smith/pkg/util"
-
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -413,8 +411,8 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 }
 
 func scheme(t *testing.T) *runtime.Scheme {
-	scheme, err := apitypes.FullScheme(true)
-	require.NoError(t, err)
+	scheme := runtime.NewScheme()
+	require.NoError(t, sc_v1b1.AddToScheme(scheme))
 	return scheme
 }
 
