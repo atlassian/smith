@@ -17,6 +17,16 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+type Descriptor struct {
+	Gvk schema.GroupVersionKind
+}
+
+type Constructor interface {
+	AddFlags(*flag.FlagSet)
+	New(*Config, *Context) (Interface, error)
+	Describe() Descriptor
+}
+
 type Interface interface {
 	Run(context.Context)
 	Process(*ProcessContext) (retriable bool, err error)
@@ -69,16 +79,6 @@ func (c *Context) RegisterInformer(gvk schema.GroupVersionKind, inf cache.Shared
 	}
 	c.Informers[gvk] = inf
 	return nil
-}
-
-type Descriptor struct {
-	Gvk schema.GroupVersionKind
-}
-
-type Constructor interface {
-	AddFlags(*flag.FlagSet)
-	New(*Config, *Context) (Interface, error)
-	Describe() Descriptor
 }
 
 func (c *Context) MainInformer(config *Config, gvk schema.GroupVersionKind, f func(kubernetes.Interface, string, time.Duration, cache.Indexers) cache.SharedIndexInformer) (cache.SharedIndexInformer, error) {
