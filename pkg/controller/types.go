@@ -95,6 +95,18 @@ func (c *Context) MainInformer(config *Config, gvk schema.GroupVersionKind, f fu
 	return inf, nil
 }
 
+func (c *Context) MainClusterInformer(config *Config, gvk schema.GroupVersionKind, f func(kubernetes.Interface, time.Duration, cache.Indexers) cache.SharedIndexInformer) (cache.SharedIndexInformer, error) {
+	inf := c.Informers[gvk]
+	if inf == nil {
+		inf = f(config.MainClient, config.ResyncPeriod, cache.Indexers{})
+		err := c.RegisterInformer(gvk, inf)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return inf, nil
+}
+
 func (c *Context) SmithInformer(config *Config, gvk schema.GroupVersionKind, f func(smithClientset.Interface, string, time.Duration) cache.SharedIndexInformer) (cache.SharedIndexInformer, error) {
 	inf := c.Informers[gvk]
 	if inf == nil {
