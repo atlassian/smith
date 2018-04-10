@@ -244,6 +244,7 @@ func (tc *testCase) run(t *testing.T) {
 	config := &controller.Config{
 		Logger:       tc.logger,
 		Namespace:    tc.namespace,
+		RestConfig:   clientConfig,
 		MainClient:   mainClient,
 		ApiExtClient: apiExtClient,
 		ScClient:     scClient,
