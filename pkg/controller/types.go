@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -56,6 +57,7 @@ type Config struct {
 	Namespace    string
 	ResyncPeriod time.Duration
 
+	RestConfig   *rest.Config
 	MainClient   kubernetes.Interface
 	ApiExtClient apiExtClientset.Interface
 	ScClient     scClientset.Interface

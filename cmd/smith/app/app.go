@@ -93,6 +93,7 @@ func (a *App) Run(ctx context.Context) error {
 		Namespace:    a.Namespace,
 		ResyncPeriod: a.ResyncPeriod,
 
+		RestConfig:   a.RestConfig,
 		MainClient:   mainClient,
 		ApiExtClient: apiExtClient,
 		ScClient:     scClient,
