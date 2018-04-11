@@ -9,6 +9,4 @@ const (
 	CrdSupportEnabled      = Domain + "/SupportEnabled"
 
 	BundleNameLabel = Domain + "/BundleName"
-
-	ReferenceModifierBindSecret = "bindsecret"
 )

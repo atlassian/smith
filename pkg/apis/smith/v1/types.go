@@ -68,6 +68,8 @@ const (
 	BundleResourceGroupVersion = smith.GroupName + "/" + BundleResourceVersion
 
 	BundleResourceName = BundleResourcePlural + "." + smith.GroupName
+
+	ReferenceModifierBindSecret = "bindsecret"
 )
 
 var BundleGVK = SchemeGroupVersion.WithKind(BundleResourceKind)
