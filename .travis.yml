@@ -34,16 +34,16 @@ before_install:
     rm -f install.sh
     mv .bazelrc.travis .bazelrc
   - |
-    curl -Lo kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-    chmod +x kubectl
-    sudo mv kubectl /usr/local/bin/
-  - |
-    curl -Lo minikube https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64
-    chmod +x minikube
-    sudo mv minikube /usr/local/bin/
-  - minikube config set WantReportErrorPrompt false
-  - sudo minikube start --vm-driver=none --kubernetes-version=v1.10.0
-  - minikube update-context
+#    curl -Lo kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+#    chmod +x kubectl
+#    sudo mv kubectl /usr/local/bin/
+#  - |
+#    curl -Lo minikube https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64
+#    chmod +x minikube
+#    sudo mv minikube /usr/local/bin/
+#  - minikube config set WantReportErrorPrompt false
+#  - sudo minikube start --vm-driver=none --kubernetes-version=v1.10.0
+#  - minikube update-context
 
 install:
   - make setup-base
@@ -53,11 +53,11 @@ script:
   - make update-bazel
   - make test-ci
   - make build-ci
-  - |
-    until kubectl get nodes -o jsonpath='{range .items[*]}{@.metadata.name}:{range @.status.conditions[*]}{@.type}={@.status};{end}{end}' 2>&1 | grep -q "Ready=True"; do
-      sleep 1
-    done
-  - make integration-test-ci
+#  - |
+#    until kubectl get nodes -o jsonpath='{range .items[*]}{@.metadata.name}:{range @.status.conditions[*]}{@.type}={@.status};{end}{end}' 2>&1 | grep -q "Ready=True"; do
+#      sleep 1
+#    done
+#  - make integration-test-ci
   - make docker
 
 after_success:
