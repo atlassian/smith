@@ -146,7 +146,6 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 	reference := apiext_v1b1.JSONSchemaProps{
 		Description: "A reference to a path in another resource",
 		Type:        "object",
-		Required:    []string{"resource"},
 		Properties: map[string]apiext_v1b1.JSONSchemaProps{
 			"name":     DNS_SUBDOMAIN,
 			"resource": resourceName,
@@ -159,6 +158,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 				Type:        "string",
 			},
 		},
+		Required: []string{"resource"},
 	}
 	resource := apiext_v1b1.JSONSchemaProps{
 		Description: "Resource describes an object that should be provisioned",
