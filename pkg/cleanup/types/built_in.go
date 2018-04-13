@@ -158,7 +158,7 @@ func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (runtime.
 
 	instanceSpec.Spec.ExternalID = instanceActual.Spec.ExternalID
 	if instanceActual.Spec.UserInfo != nil {
-		instanceSpec.Spec.UserInfo = instanceActual.Spec.UserInfo.DeepCopy()
+		instanceSpec.Spec.UserInfo = instanceActual.Spec.UserInfo
 	}
 
 	return &instanceSpec, nil
