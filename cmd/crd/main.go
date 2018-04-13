@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/atlassian/smith/pkg/resources"
-
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 )

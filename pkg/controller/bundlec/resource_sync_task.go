@@ -1,15 +1,12 @@
 package bundlec
 
 import (
-	"encoding/json"
-
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/atlassian/smith/pkg/util/logz"
-
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -20,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	k8s_json "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -321,7 +319,7 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 
 			if serviceInstance.Spec.Parameters != nil {
 				var parameters map[string]interface{}
-				if err := json.Unmarshal(serviceInstance.Spec.Parameters.Raw, &parameters); err != nil {
+				if err := k8s_json.Unmarshal(serviceInstance.Spec.Parameters.Raw, &parameters); err != nil {
 					return errors.Wrap(err, "unable to unmarshal ServiceInstance resource parameters as object")
 				}
 
@@ -329,7 +327,7 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 					return err
 				}
 
-				serviceInstance.Spec.Parameters.Raw, err = json.Marshal(parameters)
+				serviceInstance.Spec.Parameters.Raw, err = k8s_json.Marshal(parameters)
 				if err != nil {
 					return errors.WithStack(err)
 				}
