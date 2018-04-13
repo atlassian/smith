@@ -101,7 +101,8 @@ integration-test-sc-ci:
 run: fmt update-bazel
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	build/bazel-run.sh //cmd/smith:smith_race \
+	bazel run //cmd/smith:smith_race \
+		--direct_run \
 		-- \
 		-log-encoding=console \
 		-bundle-service-catalog=false \
@@ -114,7 +115,8 @@ run: fmt update-bazel
 run-sc: fmt update-bazel
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	build/bazel-run.sh //cmd/smith:smith_race \
+	bazel run //cmd/smith:smith_race \
+		--direct_run \
 		-- \
 		-log-encoding=console \
 		-leader-elect \
@@ -127,7 +129,8 @@ sleeper-run: fmt update-bazel
 	bazel build //examples/sleeper/main:main_race
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
-	build/bazel-run.sh //examples/sleeper/main:main_race \
+	bazel run //examples/sleeper/main:main_race \
+		--direct_run \
 		-- \
 		-client-config-from=file \
 		-client-config-file-name="$$HOME/.kube/config" \
