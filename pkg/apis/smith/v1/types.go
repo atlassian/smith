@@ -246,6 +246,7 @@ func (rs *ResourceSpec) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// +k8s:deepcopy-gen=true
 // PluginSpec holds the specification for a plugin.
 type PluginSpec struct {
 	Name       PluginName             `json:"name"`
@@ -257,16 +258,6 @@ type PluginSpec struct {
 func (in *PluginSpec) DeepCopyInto(out *PluginSpec) {
 	*out = *in
 	out.Spec = runtime.DeepCopyJSON(in.Spec)
-}
-
-// DeepCopy is an deepcopy function, copying the receiver, creating a new PluginSpec.
-func (in *PluginSpec) DeepCopy() *PluginSpec {
-	if in == nil {
-		return nil
-	}
-	out := new(PluginSpec)
-	in.DeepCopyInto(out)
-	return out
 }
 
 // +k8s:deepcopy-gen=true
