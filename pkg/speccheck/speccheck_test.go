@@ -6,10 +6,10 @@ import (
 
 	"github.com/atlassian/smith/pkg/cleanup"
 	"github.com/atlassian/smith/pkg/cleanup/types"
-	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
 	"k8s.io/apimachinery/pkg/api/equality"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -70,7 +70,7 @@ func TestEqualityCheck(t *testing.T) {
 			},
 		},
 	}
-	logger := smith_testing.DevelopmentLogger(t)
+	logger := zaptest.NewLogger(t)
 	defer logger.Sync()
 
 	for _, input := range inputs {
@@ -96,7 +96,7 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 		"missing": missingMap,
 		"nil":     nilMap,
 	}
-	logger := smith_testing.DevelopmentLogger(t)
+	logger := zaptest.NewLogger(t)
 	defer logger.Sync()
 
 	for kind1, input1 := range inputs {

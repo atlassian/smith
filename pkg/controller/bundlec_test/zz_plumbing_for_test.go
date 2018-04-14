@@ -21,7 +21,6 @@ import (
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/util"
-	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	scFake "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake"
@@ -29,6 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiExtFake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
@@ -226,7 +226,7 @@ func (tc *testCase) run(t *testing.T) {
 	}
 	restMapper := restMapperFromScheme(scheme)
 
-	tc.logger = smith_testing.DevelopmentLogger(t)
+	tc.logger = zaptest.NewLogger(t)
 	defer tc.logger.Sync()
 
 	// Look at k8s.io/kubernetes/pkg/controller/garbagecollector/garbagecollector_test.go for inspiration

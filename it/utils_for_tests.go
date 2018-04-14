@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 	core_v1 "k8s.io/api/core/v1"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
@@ -189,7 +190,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 		Mapper:     rm,
 	}
 
-	logger := smith_testing.DevelopmentLogger(t)
+	logger := zaptest.NewLogger(t)
 	defer logger.Sync()
 
 	cfg := &Config{
