@@ -2,7 +2,6 @@ package cleanup
 
 import (
 	"github.com/atlassian/smith/pkg/util"
-
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
