@@ -25,7 +25,6 @@ func (c *Controller) Process(pctx *controller.ProcessContext) (retriableRet bool
 
 // ProcessBundle is only visible for testing purposes. Should not be called directly.
 func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) (retriableRet bool, errRet error) {
-	logger = logger.With(logz.Bundle(bundle))
 	startTime := time.Now()
 	logger.Info("Started syncing Bundle")
 	defer func() {

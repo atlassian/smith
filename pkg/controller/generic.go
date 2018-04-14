@@ -24,12 +24,13 @@ type Generic struct {
 	queue       workQueue
 	workers     int
 	multi       *store.MultiBasic
-	Controllers map[schema.GroupVersionKind]Interface
+	Controllers map[schema.GroupVersionKind]ControllerHolder
 	Informers   map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
 func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimitingInterface, workers int, constructors ...Constructor) (*Generic, error) {
 	controllers := make(map[schema.GroupVersionKind]Interface, len(constructors))
+	holders := make(map[schema.GroupVersionKind]ControllerHolder, len(constructors))
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer)
 	multi := store.NewMultiBasic()
 	wq := workQueue{
@@ -41,10 +42,11 @@ func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimiting
 		if _, ok := controllers[descr.Gvk]; ok {
 			return nil, errors.Errorf("duplicate controller for GVK %s", descr.Gvk)
 		}
+		queueGvk := wq.NewQueueForGvk(descr.Gvk)
 		iface, err := constr.New(config, &Context{
 			Informers:   informers,
 			Controllers: controllers,
-			WorkQueue:   wq.NewQueueForGvk(descr.Gvk),
+			WorkQueue:   queueGvk,
 		})
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to construct controller for GVK %s", descr.Gvk)
@@ -57,14 +59,23 @@ func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimiting
 		if err != nil {
 			return nil, errors.Errorf("failed to register informer for GVK %s in multistore", descr.Gvk)
 		}
+		inf.AddEventHandler(&handler{
+			logger:       logger,
+			queue:        queueGvk,
+			zapNameField: descr.ZapNameField,
+		})
 		controllers[descr.Gvk] = iface
+		holders[descr.Gvk] = ControllerHolder{
+			Cntrlr:       iface,
+			ZapNameField: descr.ZapNameField,
+		}
 	}
 	return &Generic{
 		logger:      logger,
 		queue:       wq,
 		workers:     workers,
 		multi:       multi,
-		Controllers: controllers,
+		Controllers: holders,
 		Informers:   informers,
 	}, nil
 }
@@ -90,7 +101,7 @@ func (g *Generic) Run(ctx context.Context) {
 	// Stage: start all controllers
 	stage = stgr.NextStage()
 	for _, c := range g.Controllers {
-		stage.StartWithContext(c.Run)
+		stage.StartWithContext(c.Cntrlr.Run)
 	}
 
 	// Stage: start workers
@@ -101,4 +112,9 @@ func (g *Generic) Run(ctx context.Context) {
 	}
 
 	<-ctx.Done()
+}
+
+type ControllerHolder struct {
+	Cntrlr       Interface
+	ZapNameField ZapNameField
 }

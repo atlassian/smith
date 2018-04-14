@@ -262,7 +262,7 @@ func (tc *testCase) run(t *testing.T) {
 		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multiqueue"),
 		2, bundleConstr)
 	require.NoError(t, err)
-	cntrlr := generic.Controllers[smith_v1.BundleGVK].(*bundlec.Controller)
+	cntrlr := generic.Controllers[smith_v1.BundleGVK].Cntrlr.(*bundlec.Controller)
 
 	// Start all informers then wait on them
 	for _, inf := range generic.Informers {

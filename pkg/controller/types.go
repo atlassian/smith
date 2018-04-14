@@ -18,12 +18,19 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// ZapNameField is a function that can be used to obtain structured logging field for an object's name.
+type ZapNameField func(name string) zap.Field
+
 type Descriptor struct {
-	Gvk schema.GroupVersionKind
+	// Group Version Kind of objects a controller can process.
+	Gvk          schema.GroupVersionKind
+	ZapNameField ZapNameField
 }
 
 type Constructor interface {
 	AddFlags(*flag.FlagSet)
+	// New constructs a new controller.
+	// It must register an informer for the GVK controller handles via Context.RegisterInformer().
 	New(*Config, *Context) (Interface, error)
 	Describe() Descriptor
 }
