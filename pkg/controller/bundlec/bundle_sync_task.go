@@ -413,6 +413,11 @@ func (st *bundleSyncTask) isBundleReady() bool {
 	return true
 }
 
+type objectRef struct {
+	schema.GroupVersionKind
+	Name string
+}
+
 // updateBundleCondition updates passed condition by fetching information from an existing resource condition if present.
 // Sets LastTransitionTime to now if the status has changed.
 // Returns true if resource condition in the bundle does not match and needs to be updated.

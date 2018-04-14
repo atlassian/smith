@@ -7,13 +7,7 @@ import (
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-type objectRef struct {
-	schema.GroupVersionKind
-	Name string
-}
 
 func (c *Controller) Process(pctx *controller.ProcessContext) (retriableRet bool, errRet error) {
 	return c.ProcessBundle(pctx.Logger, pctx.Object.(*smith_v1.Bundle))
