@@ -1,9 +1,12 @@
 package controller
 
 import (
+	"time"
+
 	"github.com/atlassian/smith/pkg/util/logz"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	api_errors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
@@ -51,7 +54,7 @@ func (g *Generic) handleErr(logger *zap.Logger, retriable bool, err error, key g
 	g.queue.Forget(key)
 }
 
-func (g *Generic) processKey(logger *zap.Logger, cntrlr Interface, key gvkQueueKey) (retriableRet bool, errRet error) {
+func (g *Generic) processKey(logger *zap.Logger, cntrlr Interface, key gvkQueueKey) (bool /*retriable*/, error) {
 	obj, exists, err := g.multi.Get(key.gvk, key.Namespace, key.Name)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to get object by key %s", key)
@@ -60,8 +63,17 @@ func (g *Generic) processKey(logger *zap.Logger, cntrlr Interface, key gvkQueueK
 		logger.Debug("Object not in cache. Was deleted?")
 		return false, nil
 	}
-	return cntrlr.Process(&ProcessContext{
+	startTime := time.Now()
+	logger.Info("Started syncing")
+	retriable, err := cntrlr.Process(&ProcessContext{
 		Logger: logger,
 		Object: obj,
 	})
+	msg := ""
+	if err != nil && api_errors.IsConflict(errors.Cause(err)) {
+		msg = " (conflict)"
+		err = nil
+	}
+	logger.Sugar().Infof("Synced in %v%s", time.Since(startTime), msg)
+	return retriable, err
 }

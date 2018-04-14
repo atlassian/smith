@@ -1,14 +1,10 @@
 package bundlec
 
 import (
-	"time"
-
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/util/logz"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,17 +21,6 @@ func (c *Controller) Process(pctx *controller.ProcessContext) (retriableRet bool
 
 // ProcessBundle is only visible for testing purposes. Should not be called directly.
 func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) (retriableRet bool, errRet error) {
-	startTime := time.Now()
-	logger.Info("Started syncing Bundle")
-	defer func() {
-		msg := ""
-		if errRet != nil && api_errors.IsConflict(errors.Cause(errRet)) {
-			msg = " (conflict)"
-			errRet = nil
-		}
-		logger.Sugar().Infof("Synced Bundle in %v%s", time.Since(startTime), msg)
-	}()
-
 	st := bundleSyncTask{
 		logger:           logger,
 		bundleClient:     c.BundleClient,
