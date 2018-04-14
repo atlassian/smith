@@ -19,7 +19,7 @@ func addDeleteResourcesFinalizer(finalizers []string) []string {
 }
 
 func removeDeleteResourcesFinalizer(finalizers []string) []string {
-	newFinalizers := []string{}
+	newFinalizers := make([]string, 0, len(finalizers))
 	for _, finalizer := range finalizers {
 		if finalizer == FinalizerDeleteResources {
 			continue
