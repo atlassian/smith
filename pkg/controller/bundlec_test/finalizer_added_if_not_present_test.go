@@ -6,6 +6,7 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
+	"github.com/atlassian/smith/pkg/resources"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -84,7 +85,7 @@ func TestFinalizerAdded(t *testing.T) {
 			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 			// Make sure that the "deleteResources" finalizer was added
-			assert.True(t, bundlec.HasFinalizer(updateBundle, bundlec.FinalizerDeleteResources))
+			assert.True(t, resources.HasFinalizer(updateBundle, bundlec.FinalizerDeleteResources))
 		},
 	}
 	tc.run(t)

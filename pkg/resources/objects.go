@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/pkg/errors"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/jsonpath"
 )
 
@@ -47,4 +48,14 @@ func GetJsonPathValue(obj interface{}, path string, allowMissingKeys bool) (inte
 		return nil, nil
 	}
 	return values[0][0].Interface(), nil
+}
+
+func HasFinalizer(accessor meta_v1.Object, finalizer string) bool {
+	finalizers := accessor.GetFinalizers()
+	for _, f := range finalizers {
+		if f == finalizer {
+			return true
+		}
+	}
+	return false
 }

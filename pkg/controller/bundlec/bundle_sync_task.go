@@ -7,10 +7,10 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util/graph"
 	"github.com/atlassian/smith/pkg/util/logz"
-
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -113,7 +113,7 @@ func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
 // TODO: remove this method after https://github.com/kubernetes/kubernetes/issues/59850 is fixed
 func (st *bundleSyncTask) processDeleted() (retriableError bool, e error) {
 	if hasDeleteResourcesFinalizer(st.bundle) {
-		if !HasFinalizer(st.bundle, meta_v1.FinalizerDeleteDependents) {
+		if !resources.HasFinalizer(st.bundle, meta_v1.FinalizerDeleteDependents) {
 			// If "foregroundDeletion" finalizer was not set, perform manual cascade deletion
 			retrieable, err := st.deleteAllResources()
 			if err != nil {

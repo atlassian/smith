@@ -7,6 +7,7 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
+	"github.com/atlassian/smith/pkg/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
@@ -93,7 +94,7 @@ func TestDeleteResourcesManuallyWithoutForegroundDeletion(t *testing.T) {
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 			// Make sure that the "deleteResources" finalizer was removed and
 			// the "foregroundDeletion" finalizer is still present
-			assert.False(t, bundlec.HasFinalizer(updateBundle, bundlec.FinalizerDeleteResources))
+			assert.False(t, resources.HasFinalizer(updateBundle, bundlec.FinalizerDeleteResources))
 			assert.Equal(t, 0, len(updateBundle.GetFinalizers()))
 		},
 	}

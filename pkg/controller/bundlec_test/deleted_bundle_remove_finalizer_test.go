@@ -6,6 +6,7 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
+	"github.com/atlassian/smith/pkg/resources"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,8 +92,8 @@ func TestRemoveFinalizerWhenForegroundDeletion(t *testing.T) {
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 			// Make sure that the "deleteResources" finalizer was removed and
 			// the "foregroundDeletion" finalizer is still present
-			assert.False(t, bundlec.HasFinalizer(updateBundle, bundlec.FinalizerDeleteResources))
-			assert.True(t, bundlec.HasFinalizer(updateBundle, meta_v1.FinalizerDeleteDependents))
+			assert.False(t, resources.HasFinalizer(updateBundle, bundlec.FinalizerDeleteResources))
+			assert.True(t, resources.HasFinalizer(updateBundle, meta_v1.FinalizerDeleteDependents))
 		},
 	}
 	tc.run(t)
