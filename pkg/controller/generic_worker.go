@@ -27,9 +27,10 @@ func (g *Generic) processNextWorkItem() bool {
 	}
 	defer g.queue.Done(key)
 
-	logger := g.logger.With(logz.NamespaceName(key.Namespace))
+	holder := g.Controllers[key.gvk]
+	logger := g.logger.With(logz.NamespaceName(key.Namespace), holder.ZapNameField(key.Name))
 
-	retriable, err := g.processKey(logger, key)
+	retriable, err := g.processKey(logger, holder.Cntrlr, key)
 	g.handleErr(logger, retriable, err, key)
 
 	return true
@@ -50,16 +51,15 @@ func (g *Generic) handleErr(logger *zap.Logger, retriable bool, err error, key g
 	g.queue.Forget(key)
 }
 
-func (g *Generic) processKey(logger *zap.Logger, key gvkQueueKey) (retriableRet bool, errRet error) {
+func (g *Generic) processKey(logger *zap.Logger, cntrlr Interface, key gvkQueueKey) (retriableRet bool, errRet error) {
 	obj, exists, err := g.multi.Get(key.gvk, key.Namespace, key.Name)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to get object by key %s", key)
 	}
 	if !exists {
-		logger.Info("Object not in cache. Was deleted?")
+		logger.Debug("Object not in cache. Was deleted?")
 		return false, nil
 	}
-	cntrlr := g.Controllers[key.gvk]
 	return cntrlr.Process(&ProcessContext{
 		Logger: logger,
 		Object: obj,

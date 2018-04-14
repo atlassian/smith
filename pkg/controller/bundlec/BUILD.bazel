@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "bundle_sync_task.go",
         "controller.go",
-        "controller_bundle_event_handler.go",
         "controller_crd_event_handler.go",
         "controller_resource_event_handler.go",
         "controller_worker.go",

@@ -31,7 +31,6 @@ type Controller struct {
 
 	Logger *zap.Logger
 
-	BundleInf    cache.SharedIndexInformer
 	BundleClient smithClient_v1.BundlesGetter
 	BundleStore  BundleStore
 	SmartClient  SmartClient
@@ -59,11 +58,6 @@ func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[
 		UpdateFunc: c.onResourceUpdate,
 		DeleteFunc: c.onResourceDelete,
 	}
-	c.BundleInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.onBundleAdd,
-		UpdateFunc: c.onBundleUpdate,
-		DeleteFunc: c.onBundleDelete,
-	})
 	crdInf.AddEventHandler(&crdEventHandler{
 		Controller: c,
 		watchers:   make(map[string]watchState),
