@@ -5,12 +5,88 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith/pkg/cleanup"
+	"github.com/atlassian/smith/pkg/cleanup/types"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/equality"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
+
+func TestEqualityCheck(t *testing.T) {
+	t.Parallel()
+
+	inputs := []struct {
+		name   string
+		spec   runtime.Object
+		actual runtime.Object
+	}{
+		{
+			name: "Service Catalog",
+			spec: &sc_v1b1.ServiceInstance{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ServiceInstance",
+					APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+				},
+				Spec: sc_v1b1.ServiceInstanceSpec{
+					PlanReference: sc_v1b1.PlanReference{
+						ClusterServiceClassExternalName: "ClusterServiceClassExternalName",
+						ClusterServicePlanExternalName:  "ClusterServicePlanExternalName",
+					},
+				},
+			},
+			actual: &sc_v1b1.ServiceInstance{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ServiceInstance",
+					APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+				},
+				Spec: sc_v1b1.ServiceInstanceSpec{
+					PlanReference: sc_v1b1.PlanReference{
+						ClusterServiceClassExternalName: "ClusterServiceClassExternalName",
+						ClusterServicePlanExternalName:  "ClusterServicePlanExternalName",
+						ClusterServiceClassName:         "ClusterServiceClassName",
+						ClusterServicePlanName:          "ClusterServicePlanName",
+					},
+					ClusterServiceClassRef: &sc_v1b1.ClusterObjectReference{
+						Name: "ClusterObjectReference",
+					},
+					ClusterServicePlanRef: &sc_v1b1.ClusterObjectReference{
+						Name: "ClusterServicePlanRef",
+					},
+					ExternalID: "ExternalID",
+					UserInfo: &sc_v1b1.UserInfo{
+						Username: "Username",
+						UID:      "UID",
+						Groups:   []string{"group1"},
+						Extra: map[string]sc_v1b1.ExtraValue{
+							"value1": {"v1"},
+						},
+					},
+					UpdateRequests: 1,
+				},
+			},
+		},
+	}
+	logger := smith_testing.DevelopmentLogger(t)
+	defer logger.Sync()
+
+	for _, input := range inputs {
+		input := input
+		t.Run(input.name, func(t *testing.T) {
+			t.Parallel()
+			sc := SpecCheck{
+				Logger:  logger,
+				Cleaner: cleanup.New(types.ServiceCatalogKnownTypes, types.MainKnownTypes),
+			}
+			_, match, err := sc.CompareActualVsSpec(input.spec, input.actual)
+			require.NoError(t, err)
+			assert.True(t, match)
+		})
+	}
+}
 
 func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 	t.Parallel()

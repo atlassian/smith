@@ -3,7 +3,6 @@ package speccheck
 import (
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/atlassian/smith/pkg/util/logz"
-
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
