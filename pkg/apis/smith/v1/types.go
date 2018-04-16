@@ -220,6 +220,11 @@ func (in *Reference) DeepCopyInto(out *Reference) {
 	out.Example = runtime.DeepCopyJSONValue(in.Example)
 }
 
+// Ref returns string representation of the reference that can be used to pull in the referred entity.
+func (in *Reference) Ref() string {
+	return "!{" + string(in.Name) + "}"
+}
+
 // +k8s:deepcopy-gen=true
 // ResourceSpec is a union type - either object of plugin can be specified.
 type ResourceSpec struct {
