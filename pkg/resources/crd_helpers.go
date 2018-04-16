@@ -9,7 +9,6 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/atlassian/smith/pkg/util/logz"
-
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -147,27 +146,17 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 	reference := apiext_v1b1.JSONSchemaProps{
 		Description: "A reference to a path in another resource",
 		Type:        "object",
-		OneOf: []apiext_v1b1.JSONSchemaProps{
-			{
-				Required: []string{"resource"},
-				Properties: map[string]apiext_v1b1.JSONSchemaProps{
-					"resource": resourceName,
-				},
+		Required:    []string{"resource"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"name":     DNS_SUBDOMAIN,
+			"resource": resourceName,
+			"example": {
+				Description: "example of how we expect reference to resolve. Used for validation",
 			},
-			{
-				Required: []string{"name", "resource", "path"},
-				Properties: map[string]apiext_v1b1.JSONSchemaProps{
-					"name":     DNS_SUBDOMAIN,
-					"resource": resourceName,
-					"example": {
-						Description: "example of how we expect reference to resolve. Used for validation",
-					},
-					"modifier": DNS_SUBDOMAIN,
-					"path": {
-						Description: "JSONPath expression used to extract data from resource",
-						Type:        "string",
-					},
-				},
+			"modifier": DNS_SUBDOMAIN,
+			"path": {
+				Description: "JSONPath expression used to extract data from resource",
+				Type:        "string",
 			},
 		},
 	}
