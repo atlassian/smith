@@ -83,6 +83,8 @@ func TestNoActionsForResourcesWhenForegroundDeletion(t *testing.T) {
 			require.Len(t, actions, 2)
 			assert.Implements(t, (*kube_testing.ListAction)(nil), actions[0])
 			assert.Implements(t, (*kube_testing.WatchAction)(nil), actions[1])
+
+			assert.Empty(t, tc.bundle.Status.ObjectsToDelete)
 		},
 	}
 	tc.run(t)

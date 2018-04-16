@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/atlassian/smith/pkg/apis/smith"
-
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -155,6 +154,7 @@ func (bc *BundleCondition) String() string {
 type BundleStatus struct {
 	Conditions       []BundleCondition `json:"conditions,omitempty"`
 	ResourceStatuses []ResourceStatus  `json:"resourceStatuses,omitempty"`
+	ObjectsToDelete  []ObjectToDelete  `json:"objectsToDelete,omitempty"`
 }
 
 func (bs *BundleStatus) String() string {
@@ -274,6 +274,16 @@ func (rs *ResourceStatus) GetCondition(conditionType ResourceConditionType) (int
 		}
 	}
 	return -1, nil
+}
+
+type ObjectToDelete struct {
+	// GVK of the object.
+
+	Group   string `json:"group"`
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
+	// Name of the object.
+	Name string `json:"name"`
 }
 
 // +k8s:deepcopy-gen=true

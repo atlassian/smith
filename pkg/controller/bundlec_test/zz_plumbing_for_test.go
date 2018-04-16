@@ -115,6 +115,9 @@ const (
 	mapNeedsDelete    = "map-not-in-the-bundle-anymore-needs-delete"
 	mapNeedsDeleteUid = "map-needs-delete-uid"
 
+	mapMarkedForDeletion    = "map-not-in-the-bundle-anymore-marked-for-deletetion"
+	mapMarkedForDeletionUid = "map-deleted-uid"
+
 	pluginSimpleConfigMap   = "simpleConfigMap"
 	pluginConfigMapWithDeps = "configMapWithDeps"
 
@@ -291,7 +294,7 @@ func (tc *testCase) run(t *testing.T) {
 func (tc *testCase) defaultTest(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller) {
 	require.NotNil(t, tc.bundle)
 	_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func (tc *testCase) verifyActions(t *testing.T) {
@@ -316,6 +319,21 @@ func (tc *testCase) verifyPlugins(t *testing.T) {
 	unexpectedInvocations := invokedPlugins.Difference(tc.pluginsShouldBeInvoked)
 	assert.Empty(t, missingPlugins, "expected plugin invocations that were not observed")
 	assert.Empty(t, unexpectedInvocations, "observed plugin invocations that were not expected")
+}
+
+func (tc *testCase) assertObjectsToBeDeleted(t *testing.T, objs ...runtime.Object) {
+	// Must be in same order
+	expected := make([]smith_v1.ObjectToDelete, 0, len(objs))
+	for _, obj := range objs {
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		expected = append(expected, smith_v1.ObjectToDelete{
+			Group:   gvk.Group,
+			Version: gvk.Version,
+			Kind:    gvk.Kind,
+			Name:    obj.(meta_v1.Object).GetName(),
+		})
+	}
+	assert.Equal(t, expected, tc.bundle.Status.ObjectsToDelete)
 }
 
 // testServerAndClientConfig returns a server that listens and a config that can reference it
@@ -774,6 +792,35 @@ func configMapNeedsDelete() *core_v1.ConfigMap {
 			Name:      mapNeedsDelete,
 			Namespace: testNamespace,
 			UID:       mapNeedsDeleteUid,
+			Labels: map[string]string{
+				smith.BundleNameLabel: bundle1,
+			},
+			OwnerReferences: []meta_v1.OwnerReference{
+				{
+					APIVersion:         smith_v1.BundleResourceGroupVersion,
+					Kind:               smith_v1.BundleResourceKind,
+					Name:               bundle1,
+					UID:                bundle1uid,
+					Controller:         &tr,
+					BlockOwnerDeletion: &tr,
+				},
+			},
+		},
+	}
+}
+func configMapMarkedForDeletion() *core_v1.ConfigMap {
+	tr := true
+	now := meta_v1.Now()
+	return &core_v1.ConfigMap{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: core_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name:              mapMarkedForDeletion,
+			Namespace:         testNamespace,
+			UID:               mapMarkedForDeletionUid,
+			DeletionTimestamp: &now,
 			Labels: map[string]string{
 				smith.BundleNameLabel: bundle1,
 			},
