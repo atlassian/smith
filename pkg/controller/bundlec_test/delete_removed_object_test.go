@@ -1,12 +1,12 @@
 package bundlec_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
-
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -15,9 +15,12 @@ import (
 // Should delete controlled object that is not in the bundle
 func TestDeleteRemovedObject(t *testing.T) {
 	t.Parallel()
+	m1 := configMapNeedsUpdate()
+	m2 := configMapMarkedForDeletion()
 	tc := testCase{
 		mainClientObjects: []runtime.Object{
-			configMapNeedsUpdate(),
+			m1,
+			m2,
 		},
 		bundle: &smith_v1.Bundle{
 			ObjectMeta: meta_v1.ObjectMeta{
@@ -38,6 +41,10 @@ func TestDeleteRemovedObject(t *testing.T) {
 					statusCode: http.StatusOK,
 				},
 			},
+		},
+		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
+			tc.defaultTest(t, ctx, cntrlr)
+			tc.assertObjectsToBeDeleted(t, m1, m2)
 		},
 	}
 	tc.run(t)

@@ -129,6 +129,11 @@ func (in *BundleStatus) DeepCopyInto(out *BundleStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ObjectsToDelete != nil {
+		in, out := &in.ObjectsToDelete, &out.ObjectsToDelete
+		*out = make([]ObjectToDelete, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

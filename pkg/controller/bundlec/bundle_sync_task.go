@@ -3,6 +3,8 @@ package bundlec
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"sort"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
@@ -17,22 +19,28 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 type bundleSyncTask struct {
-	logger             *zap.Logger
-	bundleClient       smithClient_v1.BundlesGetter
-	smartClient        SmartClient
-	rc                 ReadyChecker
-	store              Store
-	specCheck          SpecCheck
-	bundle             *smith_v1.Bundle
+
+	// Inputs
+
+	logger           *zap.Logger
+	bundleClient     smithClient_v1.BundlesGetter
+	smartClient      SmartClient
+	rc               ReadyChecker
+	store            Store
+	specCheck        SpecCheck
+	bundle           *smith_v1.Bundle
+	pluginContainers map[smith_v1.PluginName]plugin.PluginContainer
+	scheme           *runtime.Scheme
+	catalog          *store.Catalog
+
+	// Outputs
+
 	processedResources map[smith_v1.ResourceName]*resourceInfo
+	objectsToDelete    map[objectRef]runtime.Object
 	newFinalizers      []string
-	pluginContainers   map[smith_v1.PluginName]plugin.PluginContainer
-	scheme             *runtime.Scheme
-	catalog            *store.Catalog
 }
 
 // Parse bundle, build resource graph, traverse graph, assert each resource exists.
@@ -98,6 +106,10 @@ func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
 		}
 		st.processedResources[resourceName] = &resInfo
 	}
+	err := st.findObjectsToDelete()
+	if err != nil {
+		return false, err
+	}
 	if st.isBundleReady() {
 		// Delete objects which were removed from the bundle
 		retriable, err := st.deleteRemovedResources()
@@ -133,28 +145,36 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 	if err != nil {
 		return false, err
 	}
+	st.objectsToDelete = make(map[objectRef]runtime.Object, len(objs))
 
 	var firstErr error
 	retriable := true
 	policy := meta_v1.DeletePropagationForeground
 	for _, obj := range objs {
 		m := obj.(meta_v1.Object)
-		if m.GetDeletionTimestamp() != nil {
-			// Object is marked for deletion already
-			continue
-		}
 		gvk := obj.GetObjectKind().GroupVersionKind()
 		name := m.GetName()
+		ref := objectRef{
+			GroupVersionKind: gvk,
+			Name:             name,
+		}
+		st.objectsToDelete[ref] = obj
+
+		logger := st.logger.With(logz.Gvk(gvk), logz.ObjectName(name))
+		if m.GetDeletionTimestamp() != nil {
+			logger.Debug("Object is marked for deletion already")
+			continue
+		}
 		uid := m.GetUID()
 
-		st.logger.Info("Deleting object", logz.Gvk(gvk), logz.ObjectName(name))
+		logger.Info("Deleting object")
 		resClient, err := st.smartClient.ForGVK(gvk, st.bundle.Namespace)
 		if err != nil {
 			if firstErr == nil {
 				retriable = false
 				firstErr = err
 			} else {
-				st.logger.Error("Failed to get client for object", logz.Gvk(gvk), zap.Error(err))
+				logger.Error("Failed to get client for object", zap.Error(err))
 			}
 			continue
 		}
@@ -171,7 +191,7 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 			if firstErr == nil {
 				firstErr = err
 			} else {
-				st.logger.Warn("Failed to delete object", logz.Gvk(gvk), logz.ObjectName(name), zap.Error(err))
+				logger.Warn("Failed to delete object", zap.Error(err))
 			}
 			continue
 		}
@@ -179,23 +199,21 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 	return retriable, firstErr
 }
 
-func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error) {
+// findObjectsToDelete initializes objectsToDelete field with objects that have controller owner references to
+// the Bundle being processed but are not defined in it.
+func (st *bundleSyncTask) findObjectsToDelete() error {
 	objs, err := st.store.ObjectsControlledBy(st.bundle.Namespace, st.bundle.UID)
 	if err != nil {
-		return false, err
+		return err
 	}
-	existingObjs := make(map[objectRef]types.UID, len(objs))
+	st.objectsToDelete = make(map[objectRef]runtime.Object, len(objs))
 	for _, obj := range objs {
 		m := obj.(meta_v1.Object)
-		if m.GetDeletionTimestamp() != nil {
-			// Object is marked for deletion already
-			continue
-		}
 		ref := objectRef{
 			GroupVersionKind: obj.GetObjectKind().GroupVersionKind(),
 			Name:             m.GetName(),
 		}
-		existingObjs[ref] = m.GetUID()
+		st.objectsToDelete[ref] = obj
 	}
 	for _, res := range st.bundle.Spec.Resources {
 		var gvk schema.GroupVersionKind
@@ -207,30 +225,43 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			gvk = st.pluginContainers[res.Spec.Plugin.Name].Plugin.Describe().GVK
 			name = res.Spec.Plugin.ObjectName
 		} else {
-			return false, errors.New(`neither "object" nor "plugin" field is specified`)
+			// neither "object" nor "plugin" field is specified. This shouldn't really happen (schema), but we
+			// ignore the error and continue collecting objects. Even if not caught by the schema, this error
+			// must have been reported earlier while processing this resource.
+			continue
 		}
-		ref := objectRef{
+		delete(st.objectsToDelete, objectRef{
 			GroupVersionKind: gvk,
 			Name:             name,
-		}
-		delete(existingObjs, ref)
+		})
 	}
+	return nil
+}
+
+func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error) {
 	var firstErr error
 	retriable := true
 	policy := meta_v1.DeletePropagationForeground
-	for ref, uid := range existingObjs {
-		st.logger.Info("Deleting object", logz.Gvk(ref.GroupVersionKind), logz.ObjectName(ref.Name))
+	for ref, obj := range st.objectsToDelete {
+		logger := st.logger.With(logz.Gvk(ref.GroupVersionKind), logz.ObjectName(ref.Name))
+		m := obj.(meta_v1.Object)
+		if m.GetDeletionTimestamp() != nil {
+			logger.Debug("Object is marked for deletion already")
+			continue
+		}
+		logger.Info("Deleting object")
 		resClient, err := st.smartClient.ForGVK(ref.GroupVersionKind, st.bundle.Namespace)
 		if err != nil {
 			if firstErr == nil {
 				retriable = false
 				firstErr = err
 			} else {
-				st.logger.Error("Failed to get client for object", logz.Gvk(ref.GroupVersionKind), zap.Error(err))
+				logger.Error("Failed to get client for object", zap.Error(err))
 			}
 			continue
 		}
 
+		uid := m.GetUID()
 		err = resClient.Delete(ref.Name, &meta_v1.DeleteOptions{
 			Preconditions: &meta_v1.Preconditions{
 				UID: &uid,
@@ -243,7 +274,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			if firstErr == nil {
 				firstErr = err
 			} else {
-				st.logger.Warn("Failed to delete object", logz.Gvk(ref.GroupVersionKind), logz.ObjectName(ref.Name), zap.Error(err))
+				logger.Warn("Failed to delete object", zap.Error(err))
 			}
 			continue
 		}
@@ -292,6 +323,11 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 			{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionTrue},
 			{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse},
 			{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse},
+		}
+		_, err := st.updateObjectsToDeleteStatus()
+		if err != nil {
+			// Just log the error and continue. Bundle will be reprocessed anyway.
+			st.logger.Error("Error updating ObjectsToDelete status field", zap.Error(err))
 		}
 		bundleUpdated = true
 	} else if st.bundle.DeletionTimestamp == nil {
@@ -390,6 +426,14 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 			st.bundle.Status.ResourceStatuses = resourceStatuses
 			st.bundle.Status.Conditions = []smith_v1.BundleCondition{inProgressCond, readyCond, errorCond}
 		}
+
+		obj2deleteUpdated, err := st.updateObjectsToDeleteStatus()
+		if err != nil {
+			// Just log the error and continue
+			st.logger.Error("Error updating ObjectsToDelete status field", zap.Error(err))
+		} else {
+			bundleUpdated = obj2deleteUpdated || bundleUpdated
+		}
 	}
 
 	if bundleUpdated {
@@ -401,6 +445,60 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 	}
 
 	return retriable, processErr
+}
+
+func (st *bundleSyncTask) updateObjectsToDeleteStatus() (bool /* bundleUpdated */, error) {
+	if st.objectsToDelete == nil {
+		err := st.findObjectsToDelete()
+		if err != nil {
+			return false, err
+		}
+	}
+	newToDelete := make([]smith_v1.ObjectToDelete, 0, len(st.objectsToDelete))
+	for ref := range st.objectsToDelete {
+		newToDelete = append(newToDelete, smith_v1.ObjectToDelete{
+			Group:   ref.Group,
+			Version: ref.Version,
+			Kind:    ref.Kind,
+			Name:    ref.Name,
+		})
+	}
+	// Sort them to ensure map iteration order and the order of informers we got the date from does not influence the result.
+	sort.Slice(newToDelete, func(i, j int) bool {
+		a := newToDelete[i]
+		b := newToDelete[j]
+		if a.Group < b.Group {
+			return true
+		}
+		if a.Group > b.Group {
+			return false
+		}
+		if a.Version < b.Version {
+			return true
+		}
+		if a.Version > b.Version {
+			return false
+		}
+		if a.Kind < b.Kind {
+			return true
+		}
+		if a.Kind > b.Kind {
+			return false
+		}
+		if a.Name < b.Name {
+			return true
+		}
+		if a.Name > b.Name {
+			return false
+		}
+		// Should be unreachable because data is coming from map keys
+		return false
+	})
+	if !reflect.DeepEqual(st.bundle.Status.ObjectsToDelete, newToDelete) {
+		st.bundle.Status.ObjectsToDelete = newToDelete
+		return true, nil
+	}
+	return false, nil
 }
 
 func (st *bundleSyncTask) isBundleReady() bool {

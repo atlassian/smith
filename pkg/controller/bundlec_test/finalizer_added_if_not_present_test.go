@@ -19,9 +19,10 @@ import (
 // Should add a "deleteResources" finalizer if it's missing
 func TestFinalizerAdded(t *testing.T) {
 	t.Parallel()
+	m1 := configMapNeedsDelete()
 	tc := testCase{
 		mainClientObjects: []runtime.Object{
-			configMapNeedsDelete(),
+			m1,
 			configMapNeedsUpdate(),
 		},
 		scClientObjects: []runtime.Object{
@@ -86,6 +87,8 @@ func TestFinalizerAdded(t *testing.T) {
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 			// Make sure that the "deleteResources" finalizer was added
 			assert.True(t, resources.HasFinalizer(updateBundle, bundlec.FinalizerDeleteResources))
+
+			tc.assertObjectsToBeDeleted(t, m1)
 		},
 	}
 	tc.run(t)
