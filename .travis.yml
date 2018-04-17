@@ -6,7 +6,7 @@ cache:
     - $GOPATH/pkg/dep
 
 go:
-  - 1.10.x
+  - 1.10.1
 
 os:
   - linux
@@ -14,7 +14,7 @@ env:
   global:
     - CHANGE_MINIKUBE_NONE_USER=true
     - DEP_VERSION=v0.4.1
-    - BAZEL_VERSION=0.11.1
+    - BAZEL_VERSION=0.12.0
     - KUBECTL_VERSION=v1.10.0
     - MINIKUBE_VERSION=v0.26.0
     # DOCKER_USERNAME and DOCKER_PASSWORD
