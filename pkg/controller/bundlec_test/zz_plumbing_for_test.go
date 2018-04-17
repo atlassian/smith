@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	mainFake "k8s.io/client-go/kubernetes/fake"
@@ -83,40 +84,40 @@ type testCase struct {
 const (
 	testNamespace = "test-namespace"
 
-	resSb1 = "resSb1"
-	sb1    = "sb1"
-	sb1uid = "sb1-uid"
+	resSb1           = "resSb1"
+	sb1              = "sb1"
+	sb1uid types.UID = "sb1-uid"
 
-	resSi1 = "resSi1"
-	si1    = "si1"
-	si1uid = "si1-uid"
-	resSi2 = "resSi2"
-	si2    = "si2"
-	si2uid = "si2-uid"
+	resSi1           = "resSi1"
+	si1              = "si1"
+	si1uid types.UID = "si1-uid"
+	resSi2           = "resSi2"
+	si2              = "si2"
+	si2uid types.UID = "si2-uid"
 
-	s1    = "s1"
-	s1uid = "s1-uid"
+	s1              = "s1"
+	s1uid types.UID = "s1-uid"
 
 	m1 = "m1"
 
 	resP1 = "resP1"
 
-	resSleeper1 = "resSleeper1"
-	sleeper1    = "sleeper1"
-	sleeper1uid = "sleeper1-uid"
+	resSleeper1           = "resSleeper1"
+	sleeper1              = "sleeper1"
+	sleeper1uid types.UID = "sleeper1-uid"
 
-	bundle1    = "bundle1"
-	bundle1uid = "bundle1-uid"
+	bundle1              = "bundle1"
+	bundle1uid types.UID = "bundle1-uid"
 
-	resMapNeedsAnUpdate = "res-map-needs-update"
-	mapNeedsAnUpdate    = "map-needs-update"
-	mapNeedsAnUpdateUid = "map-needs-update-uid"
+	resMapNeedsAnUpdate           = "res-map-needs-update"
+	mapNeedsAnUpdate              = "map-needs-update"
+	mapNeedsAnUpdateUid types.UID = "map-needs-update-uid"
 
-	mapNeedsDelete    = "map-not-in-the-bundle-anymore-needs-delete"
-	mapNeedsDeleteUid = "map-needs-delete-uid"
+	mapNeedsDelete              = "map-not-in-the-bundle-anymore-needs-delete"
+	mapNeedsDeleteUid types.UID = "map-needs-delete-uid"
 
-	mapMarkedForDeletion    = "map-not-in-the-bundle-anymore-marked-for-deletetion"
-	mapMarkedForDeletionUid = "map-deleted-uid"
+	mapMarkedForDeletion              = "map-not-in-the-bundle-anymore-marked-for-deletetion"
+	mapMarkedForDeletionUid types.UID = "map-deleted-uid"
 
 	pluginSimpleConfigMap   = "simpleConfigMap"
 	pluginConfigMapWithDeps = "configMapWithDeps"
@@ -756,7 +757,7 @@ func configMapNeedsUpdate() *core_v1.ConfigMap {
 	}
 }
 
-func configMapNeedsUpdateResponse(bundleName, bundleUid string) fakeResponse {
+func configMapNeedsUpdateResponse(bundleName string, bundleUid types.UID) fakeResponse {
 	return fakeResponse{
 		statusCode: http.StatusOK,
 		content: []byte(`{
@@ -765,7 +766,7 @@ func configMapNeedsUpdateResponse(bundleName, bundleUid string) fakeResponse {
 							"metadata": {
 								"name": "` + mapNeedsAnUpdate + `",
 								"namespace": "` + testNamespace + `",
-								"uid": "` + mapNeedsAnUpdateUid + `",
+								"uid": "` + string(mapNeedsAnUpdateUid) + `",
 								"labels": {
 									"` + smith.BundleNameLabel + `": "` + bundleName + `"
 								},
@@ -773,7 +774,7 @@ func configMapNeedsUpdateResponse(bundleName, bundleUid string) fakeResponse {
 									"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
 									"kind": "` + smith_v1.BundleResourceKind + `",
 									"name": "` + bundleName + `",
-									"uid": "` + bundleUid + `",
+									"uid": "` + string(bundleUid) + `",
 									"controller": true,
 									"blockOwnerDeletion": true
 								}] }

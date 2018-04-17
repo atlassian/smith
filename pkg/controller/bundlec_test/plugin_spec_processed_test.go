@@ -8,7 +8,6 @@ import (
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
-
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -157,7 +156,7 @@ func TestPluginSpecProcessed(t *testing.T) {
 							"metadata": {
 								"name": "` + m1 + `",
 								"namespace": "` + testNamespace + `",
-								"uid": "` + mapNeedsAnUpdateUid + `",
+								"uid": "` + string(mapNeedsAnUpdateUid) + `",
 								"labels": {
 									"` + smith.BundleNameLabel + `": "` + bundle1 + `"
 								},
@@ -166,7 +165,7 @@ func TestPluginSpecProcessed(t *testing.T) {
 										"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
 										"kind": "` + smith_v1.BundleResourceKind + `",
 										"name": "` + bundle1 + `",
-										"uid": "` + bundle1uid + `",
+										"uid": "` + string(bundle1uid) + `",
 										"controller": true,
 										"blockOwnerDeletion": true
 									},
@@ -174,14 +173,14 @@ func TestPluginSpecProcessed(t *testing.T) {
 										"apiVersion": "` + sc_v1b1.SchemeGroupVersion.String() + `",
 										"kind": "ServiceBinding",
 										"name": "` + sb1 + `",
-										"uid": "` + sb1uid + `",
+										"uid": "` + string(sb1uid) + `",
 										"blockOwnerDeletion": true
 									},
 									{
 										"apiVersion": "` + sleeper_v1.SleeperResourceGroupVersion + `",
 										"kind": "` + sleeper_v1.SleeperResourceKind + `",
 										"name": "` + sleeper1 + `",
-										"uid": "` + sleeper1uid + `",
+										"uid": "` + string(sleeper1uid) + `",
 										"blockOwnerDeletion": true
 									}
 								] }
