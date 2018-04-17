@@ -285,14 +285,6 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 func (st *bundleSyncTask) updateBundle() error {
 	bundleUpdated, err := st.bundleClient.Bundles(st.bundle.Namespace).Update(st.bundle)
 	if err != nil {
-		if api_errors.IsConflict(err) {
-			// Something updated the bundle concurrently.
-			// It is possible that it was us in previous iteration but we haven't observed the
-			// resulting update event for the bundle and this iteration was triggered by something
-			// else e.g. resource update.
-			// It is safe to ignore this conflict because we will reiterate because of the update event.
-			return nil
-		}
 		return errors.Wrap(err, "failed to update bundle")
 	}
 	st.logger.Sugar().Debugf("Set bundle status to %s", &bundleUpdated.Status)
