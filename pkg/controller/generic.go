@@ -89,6 +89,7 @@ func (g *Generic) Run(ctx context.Context) {
 	// Stager will perform ordered, graceful shutdown
 	stgr := stager.New()
 	defer stgr.Shutdown()
+	defer g.queue.ShutDown()
 
 	// Stage: start all informers then wait on them
 	stage := stgr.NextStage()
@@ -119,7 +120,6 @@ func (g *Generic) Run(ctx context.Context) {
 
 	// Stage: start workers
 	stage = stgr.NextStage()
-	defer g.queue.ShutDown()
 	for i := 0; i < g.workers; i++ {
 		stage.Start(g.worker)
 	}
