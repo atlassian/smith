@@ -136,6 +136,7 @@ func (c *BundleControllerConstructor) New(config *controller.Config, cctx *contr
 	// Controller
 	cntrlr := &bundlec.Controller{
 		Logger:           config.Logger,
+		ReadyForWork:     cctx.ReadyForWork,
 		BundleClient:     config.SmithClient.SmithV1(),
 		BundleStore:      bs,
 		SmartClient:      config.SmartClient,

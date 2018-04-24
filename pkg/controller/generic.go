@@ -42,8 +42,12 @@ func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimiting
 		if _, ok := controllers[descr.Gvk]; ok {
 			return nil, errors.Errorf("duplicate controller for GVK %s", descr.Gvk)
 		}
+		readyForWork := make(chan struct{})
 		queueGvk := wq.NewQueueForGvk(descr.Gvk)
 		iface, err := constr.New(config, &Context{
+			ReadyForWork: func() {
+				close(readyForWork)
+			},
 			Informers:   informers,
 			Controllers: controllers,
 			WorkQueue:   queueGvk,
@@ -68,6 +72,7 @@ func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimiting
 		holders[descr.Gvk] = ControllerHolder{
 			Cntrlr:       iface,
 			ZapNameField: descr.ZapNameField,
+			ReadyForWork: readyForWork,
 		}
 	}
 	return &Generic{
@@ -98,10 +103,18 @@ func (g *Generic) Run(ctx context.Context) {
 	}
 	g.logger.Info("Informers synced")
 
-	// Stage: start all controllers
+	// Stage: start all controllers then wait for them to signal ready for work
 	stage = stgr.NextStage()
 	for _, c := range g.Controllers {
 		stage.StartWithContext(c.Cntrlr.Run)
+	}
+	for gvk, c := range g.Controllers {
+		select {
+		case <-ctx.Done():
+			g.logger.Sugar().Infof("Was waiting for the controller for %s to become ready for processing", gvk)
+			return
+		case <-c.ReadyForWork:
+		}
 	}
 
 	// Stage: start workers
@@ -117,4 +130,5 @@ func (g *Generic) Run(ctx context.Context) {
 type ControllerHolder struct {
 	Cntrlr       Interface
 	ZapNameField ZapNameField
+	ReadyForWork <-chan struct{}
 }

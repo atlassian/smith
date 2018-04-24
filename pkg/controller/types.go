@@ -73,8 +73,15 @@ type Config struct {
 }
 
 type Context struct {
+	// ReadyForWork is a function that the controller must call from its Run() method once it is ready to
+	// process work using it's Process() method. This should be used to delay processing while some initialization
+	// is being performed.
+	ReadyForWork func()
+	// Will contain all informers once Generic controller constructs all controllers.
+	// This is a read only field, must not be modified.
 	Informers map[schema.GroupVersionKind]cache.SharedIndexInformer
-	// Will contain all controllers once Generic controller constructs them
+	// Will contain all controllers once Generic controller constructs them.
+	// This is a read only field, must not be modified.
 	Controllers map[schema.GroupVersionKind]Interface
 	WorkQueue   WorkQueueProducer
 }

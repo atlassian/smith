@@ -31,6 +31,7 @@ type Controller struct {
 
 	Logger *zap.Logger
 
+	ReadyForWork func()
 	BundleClient smithClient_v1.BundlesGetter
 	BundleStore  BundleStore
 	SmartClient  SmartClient
@@ -69,7 +70,7 @@ func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[
 }
 
 // Run begins watching and syncing.
-// All informers must be synched before this method is invoked.
+// All informers must be synced before this method is invoked.
 func (c *Controller) Run(ctx context.Context) {
 	defer c.wg.Wait()
 	defer c.crdContextCancel() // should be executed after stopping is set to true
@@ -81,6 +82,8 @@ func (c *Controller) Run(ctx context.Context) {
 
 	c.Logger.Info("Starting Bundle controller")
 	defer c.Logger.Info("Shutting down Bundle controller")
+
+	c.ReadyForWork()
 
 	<-ctx.Done()
 }
