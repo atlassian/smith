@@ -84,9 +84,3 @@ func (c *Controller) Run(ctx context.Context) {
 
 	<-ctx.Done()
 }
-func (c *Controller) enqueue(bundle *smith_v1.Bundle) {
-	c.WorkQueue.Add(controller.QueueKey{
-		Namespace: bundle.Namespace,
-		Name:      bundle.Name,
-	})
-}

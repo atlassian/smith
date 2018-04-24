@@ -2,8 +2,8 @@ package bundlec
 
 import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/util/logz"
-
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,11 +69,9 @@ func (c *Controller) rebuildByName(logger *zap.Logger, namespace, bundleName, ad
 	logger.
 		With(logz.BundleName(bundleName)).
 		Sugar().Infof("Rebuilding Bundle because object was %s", addUpdateDelete)
-	c.enqueue(&smith_v1.Bundle{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name:      bundleName,
-			Namespace: namespace,
-		},
+	c.WorkQueue.Add(controller.QueueKey{
+		Namespace: namespace,
+		Name:      bundleName,
 	})
 }
 
