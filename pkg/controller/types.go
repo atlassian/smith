@@ -8,6 +8,7 @@ import (
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,6 +64,7 @@ type Config struct {
 	Logger       *zap.Logger
 	Namespace    string
 	ResyncPeriod time.Duration
+	Registry     prometheus.Registerer
 
 	RestConfig   *rest.Config
 	MainClient   kubernetes.Interface

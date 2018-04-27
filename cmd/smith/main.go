@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	_ "net/http/pprof" // This is here to avoid adding pprof handler in app package. It may not be always desired.
 	"os"
 
 	"github.com/atlassian/smith/cmd/smith/app"

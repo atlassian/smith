@@ -3,18 +3,19 @@ package app
 import (
 	"context"
 	"flag"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/ash2k/stager"
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/util/logz"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -38,6 +39,7 @@ const (
 	defaultLeaseDuration = 15 * time.Second
 	defaultRenewDeadline = 10 * time.Second
 	defaultRetryPeriod   = 2 * time.Second
+	defaultAuxServerAddr = ":9090"
 )
 
 // See kubernetes/kubernetes/pkg/apis/componentconfig/types.go LeaderElectionConfiguration
@@ -59,9 +61,11 @@ type App struct {
 	Controllers          []controller.Constructor
 	Workers              int
 	LeaderElectionConfig LeaderElectionConfig
+	AuxListenOn          string
+	EnableDebug          bool
 }
 
-func (a *App) Run(ctx context.Context) error {
+func (a *App) Run(ctx context.Context) (retErr error) {
 	defer a.Logger.Sync()
 
 	// Clients
@@ -88,10 +92,12 @@ func (a *App) Run(ctx context.Context) error {
 		meta.InterfacesForUnstructured,
 	)
 	// Controller
+	registry := prometheus.NewPedanticRegistry()
 	config := &controller.Config{
 		Logger:       a.Logger,
 		Namespace:    a.Namespace,
 		ResyncPeriod: a.ResyncPeriod,
+		Registry:     registry,
 
 		RestConfig:   a.RestConfig,
 		MainClient:   mainClient,
@@ -110,6 +116,12 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Auxiliary server
+	auxSrv, err := NewAuxServer(a.Logger, a.AuxListenOn, registry, a.EnableDebug)
+	if err != nil {
+		return err
+	}
+
 	// Events
 	eventsScheme := runtime.NewScheme()
 	// we use ConfigMapLock which emits events for ConfigMap and hence we need (only) core_v1 types for it
@@ -123,11 +135,30 @@ func (a *App) Run(ctx context.Context) error {
 	defer loggingWatch.Stop()
 	recordingWatch := eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: mainClient.CoreV1().Events(meta_v1.NamespaceNone)})
 	defer recordingWatch.Stop()
-	recorder := eventBroadcaster.NewRecorder(eventsScheme, core_v1.EventSource{Component: "smith-controller"})
+	recorder := eventBroadcaster.NewRecorder(eventsScheme, core_v1.EventSource{Component: "smith"})
+
+	var metricsErr error
+	defer func() {
+		if metricsErr != nil && (retErr == context.DeadlineExceeded || retErr == context.Canceled) {
+			retErr = metricsErr
+		}
+	}()
+
+	stgr := stager.New()
+	defer stgr.Shutdown()
+	stage := stgr.NextStage()
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	stage.StartWithContext(func(metricsCtx context.Context) {
+		defer cancel() // if auxSrv fails to start it signals the whole program that it should shut down
+		metricsErr = auxSrv.Run(metricsCtx)
+	})
 
 	// Leader election
 	if a.LeaderElectionConfig.LeaderElect {
-		a.Logger.Info("Starting leader election", zap.String("namespace", a.LeaderElectionConfig.ConfigMapNamespace))
+		a.Logger.Info("Starting leader election", logz.NamespaceName(a.LeaderElectionConfig.ConfigMapNamespace))
 
 		var startedLeading <-chan struct{}
 		ctx, startedLeading, err = a.startLeaderElection(ctx, mainClient.CoreV1(), recorder)
@@ -211,7 +242,8 @@ func NewFromFlags(controllers []controller.Constructor, flagset *flag.FlagSet, a
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
-	pprofAddr := flagset.String("pprof-address", "", "Address for pprof to listen on")
+	flagset.BoolVar(&a.EnableDebug, "debug", false, "Enables pprof and prefetcher dump endpoints")
+	flagset.StringVar(&a.AuxListenOn, "aux-listen-on", defaultAuxServerAddr, "Auxiliary address to listen on. Used for Prometheus metrics server and pprof endpoint. Empty to disable")
 	qps := flagset.Float64("api-qps", 5, "Maximum queries per second when talking to Kubernetes API")
 
 	// This flag is off by default only because leader election package says it is ALPHA API.
@@ -260,11 +292,5 @@ func NewFromFlags(controllers []controller.Constructor, flagset *flag.FlagSet, a
 
 	a.Logger = logz.Logger(*loggingLevel, *logEncoding)
 
-	if *pprofAddr != "" {
-		go func() {
-			err := http.ListenAndServe(*pprofAddr, nil)
-			a.Logger.Fatal("pprof server failed", zap.Error(err))
-		}()
-	}
 	return &a, nil
 }
