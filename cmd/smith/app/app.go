@@ -62,7 +62,7 @@ type App struct {
 	Workers              int
 	LeaderElectionConfig LeaderElectionConfig
 	AuxListenOn          string
-	EnableDebug          bool
+	Debug                bool
 }
 
 func (a *App) Run(ctx context.Context) (retErr error) {
@@ -91,8 +91,19 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 		},
 		meta.InterfacesForUnstructured,
 	)
-	// Controller
+
+	// Metrics
 	registry := prometheus.NewPedanticRegistry()
+	err = registry.Register(prometheus.NewProcessCollector(os.Getpid(), ""))
+	if err != nil {
+		return err
+	}
+	err = registry.Register(prometheus.NewGoCollector())
+	if err != nil {
+		return err
+	}
+
+	// Controller
 	config := &controller.Config{
 		Logger:       a.Logger,
 		Namespace:    a.Namespace,
@@ -117,9 +128,11 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 	}
 
 	// Auxiliary server
-	auxSrv, err := NewAuxServer(a.Logger, a.AuxListenOn, registry, a.EnableDebug)
-	if err != nil {
-		return err
+	auxSrv := AuxServer{
+		Logger:   a.Logger,
+		Addr:     a.AuxListenOn,
+		Gatherer: registry,
+		Debug:    a.Debug,
 	}
 
 	// Events
@@ -242,7 +255,7 @@ func NewFromFlags(controllers []controller.Constructor, flagset *flag.FlagSet, a
 	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
 	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
 	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
-	flagset.BoolVar(&a.EnableDebug, "debug", false, "Enables pprof and prefetcher dump endpoints")
+	flagset.BoolVar(&a.Debug, "debug", false, "Enables pprof and prefetcher dump endpoints")
 	flagset.StringVar(&a.AuxListenOn, "aux-listen-on", defaultAuxServerAddr, "Auxiliary address to listen on. Used for Prometheus metrics server and pprof endpoint. Empty to disable")
 	qps := flagset.Float64("api-qps", 5, "Maximum queries per second when talking to Kubernetes API")
 

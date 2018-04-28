@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/pprof"
-	"os"
 	"sync"
 	"time"
 
@@ -23,42 +22,20 @@ const (
 	idleTimeout               = 1 * time.Minute
 )
 
-type Registry interface {
-	prometheus.Gatherer
-	prometheus.Registerer
-}
-
 type AuxServer struct {
-	logger   *zap.Logger
-	addr     string // TCP address to listen on, ":http" if empty
-	gatherer prometheus.Gatherer
-	debug    bool
-}
-
-func NewAuxServer(logger *zap.Logger, addr string, registry Registry, debug bool) (*AuxServer, error) {
-	err := registry.Register(prometheus.NewProcessCollector(os.Getpid(), ""))
-	if err != nil {
-		return nil, err
-	}
-	err = registry.Register(prometheus.NewGoCollector())
-	if err != nil {
-		return nil, err
-	}
-	return &AuxServer{
-		logger:   logger,
-		addr:     addr,
-		gatherer: registry,
-		debug:    debug,
-	}, nil
+	Logger   *zap.Logger
+	Addr     string // TCP address to listen on, ":http" if empty
+	Gatherer prometheus.Gatherer
+	Debug    bool
 }
 
 func (a *AuxServer) Run(ctx context.Context) error {
-	if a.addr == "" {
+	if a.Addr == "" {
 		<-ctx.Done()
 		return nil
 	}
 	srv := http.Server{
-		Addr:         a.addr,
+		Addr:         a.Addr,
 		Handler:      a.constructHandler(),
 		WriteTimeout: writeTimeout,
 		ReadTimeout:  readTimeout,
@@ -72,10 +49,10 @@ func (a *AuxServer) constructHandler() *chi.Mux {
 	router.Use(middleware.Timeout(defaultMaxRequestDuration), setServerHeader)
 	router.NotFound(pageNotFound)
 
-	router.Method(http.MethodGet, "/metrics", promhttp.HandlerFor(a.gatherer, promhttp.HandlerOpts{}))
+	router.Method(http.MethodGet, "/metrics", promhttp.HandlerFor(a.Gatherer, promhttp.HandlerOpts{}))
 	router.Get("/healthz/ping", func(_ http.ResponseWriter, _ *http.Request) {})
 
-	if a.debug {
+	if a.Debug {
 		// Enable debug endpoints
 		router.HandleFunc("/debug/pprof/", pprof.Index)
 		router.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
