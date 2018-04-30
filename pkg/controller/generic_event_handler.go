@@ -7,15 +7,15 @@ import (
 )
 
 type GenericHandler struct {
-	logger       *zap.Logger
-	queue        WorkQueueProducer
-	zapNameField ZapNameField
+	Logger       *zap.Logger
+	Queue        WorkQueueProducer
+	ZapNameField ZapNameField
 }
 
 func (g *GenericHandler) OnAdd(obj interface{}) {
 	metaObj := obj.(meta_v1.Object)
-	g.logger.Info("Enqueuing object because it was added", logz.NamespaceName(metaObj.GetNamespace()), g.zapNameField(metaObj.GetName()))
-	g.queue.Add(QueueKey{
+	g.Logger.Info("Enqueuing object because it was added", logz.NamespaceName(metaObj.GetNamespace()), g.ZapNameField(metaObj.GetName()))
+	g.Queue.Add(QueueKey{
 		Namespace: metaObj.GetNamespace(),
 		Name:      metaObj.GetName(),
 	})
@@ -23,8 +23,8 @@ func (g *GenericHandler) OnAdd(obj interface{}) {
 
 func (g *GenericHandler) OnUpdate(oldObj, newObj interface{}) {
 	metaObj := newObj.(meta_v1.Object)
-	g.logger.Info("Enqueuing object because it was updated", logz.NamespaceName(metaObj.GetNamespace()), g.zapNameField(metaObj.GetName()))
-	g.queue.Add(QueueKey{
+	g.Logger.Info("Enqueuing object because it was updated", logz.NamespaceName(metaObj.GetNamespace()), g.ZapNameField(metaObj.GetName()))
+	g.Queue.Add(QueueKey{
 		Namespace: metaObj.GetNamespace(),
 		Name:      metaObj.GetName(),
 	})
@@ -32,5 +32,5 @@ func (g *GenericHandler) OnUpdate(oldObj, newObj interface{}) {
 
 func (g *GenericHandler) OnDelete(obj interface{}) {
 	metaObj := obj.(meta_v1.Object)
-	g.logger.Info("Object was deleted", logz.NamespaceName(metaObj.GetNamespace()), g.zapNameField(metaObj.GetName()))
+	g.Logger.Info("Object was deleted", logz.NamespaceName(metaObj.GetNamespace()), g.ZapNameField(metaObj.GetName()))
 }

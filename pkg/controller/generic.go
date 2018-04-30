@@ -64,9 +64,9 @@ func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimiting
 			return nil, errors.Errorf("failed to register informer for GVK %s in multistore", descr.Gvk)
 		}
 		inf.AddEventHandler(&GenericHandler{
-			logger:       logger,
-			queue:        queueGvk,
-			zapNameField: descr.ZapNameField,
+			Logger:       logger,
+			Queue:        queueGvk,
+			ZapNameField: descr.ZapNameField,
 		})
 		controllers[descr.Gvk] = iface
 		holders[descr.Gvk] = Holder{
