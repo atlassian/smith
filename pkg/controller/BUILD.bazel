@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "generic.go",
         "generic_event_handler.go",
+        "generic_resource_event_handler.go",
         "generic_worker.go",
         "types.go",
         "work_queue.go",

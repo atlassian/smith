@@ -11,6 +11,7 @@ import (
 	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/store"
+	"github.com/atlassian/smith/pkg/util/logz"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -54,10 +55,12 @@ type Controller struct {
 // Prepare prepares the controller to be run.
 func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
 	c.crdContext, c.crdContextCancel = context.WithCancel(context.Background())
-	c.resourceHandler = cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.onResourceAdd,
-		UpdateFunc: c.onResourceUpdate,
-		DeleteFunc: c.onResourceDelete,
+	c.resourceHandler = &controller.GenericResourceHandler{
+		Logger:       c.Logger,
+		Queue:        c.WorkQueue,
+		ZapNameField: logz.BundleName,
+		CreatorIndex: &creatorIndexAdapter{bundleStore: c.BundleStore},
+		Gvk:          smith_v1.BundleGVK,
 	}
 	crdInf.AddEventHandler(&crdEventHandler{
 		Controller: c,
@@ -86,4 +89,20 @@ func (c *Controller) Run(ctx context.Context) {
 	c.ReadyForWork()
 
 	<-ctx.Done()
+}
+
+type creatorIndexAdapter struct {
+	bundleStore BundleStore
+}
+
+func (c *creatorIndexAdapter) CreatorByObject(gk schema.GroupKind, namespace, name string) ([]runtime.Object, error) {
+	bundles, err := c.bundleStore.GetBundlesByObject(gk, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+	objs := make([]runtime.Object, 0, len(bundles))
+	for _, bundle := range bundles {
+		objs = append(objs, bundle)
+	}
+	return objs, nil
 }
