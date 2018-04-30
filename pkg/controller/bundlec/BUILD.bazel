@@ -27,6 +27,7 @@ go_library(
         "//pkg/util/logz:go_default_library",
         "//vendor/github.com/ash2k/stager/wait:go_default_library",
         "//vendor/github.com/atlassian/ctrl:go_default_library",
+        "//vendor/github.com/atlassian/ctrl/logz:go_default_library",
         "//vendor/github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/go.uber.org/zap:go_default_library",

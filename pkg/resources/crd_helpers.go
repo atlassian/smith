@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"time"
 
+	ctrlLogz "github.com/atlassian/ctrl/logz"
 	"github.com/atlassian/smith/pkg/apis/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util"
-	"github.com/atlassian/smith/pkg/util/logz"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -239,7 +239,7 @@ func EnsureCrdExistsAndIsEstablished(ctx context.Context, logger *zap.Logger, ap
 	if err != nil {
 		return err
 	}
-	logger.Info("Waiting for CustomResourceDefinition to become established", logz.Object(crd))
+	logger.Info("Waiting for CustomResourceDefinition to become established", ctrlLogz.Object(crd))
 	return WaitForCrdToBecomeEstablished(ctx, crdLister, crd)
 }
 
@@ -251,21 +251,21 @@ func EnsureCrdExists(ctx context.Context, logger *zap.Logger, apiExtClient apiEx
 			return err
 		}
 		if notFound {
-			logger.Info("Creating CustomResourceDefinition", logz.Object(crd))
+			logger.Info("Creating CustomResourceDefinition", ctrlLogz.Object(crd))
 			_, err = apiExtClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 			if err == nil {
-				logger.Info("CustomResourceDefinition created", logz.Object(crd))
+				logger.Info("CustomResourceDefinition created", ctrlLogz.Object(crd))
 				return nil
 			}
 			if !api_errors.IsAlreadyExists(err) {
 				return errors.Wrapf(err, "failed to create %s CustomResourceDefinition", crd.Name)
 			}
-			logger.Info("CustomResourceDefinition was created concurrently", logz.Object(crd))
+			logger.Info("CustomResourceDefinition was created concurrently", ctrlLogz.Object(crd))
 		} else {
 			if IsEqualCrd(crd, obj) {
 				return nil
 			}
-			logger.Info("Updating CustomResourceDefinition", logz.Object(crd))
+			logger.Info("Updating CustomResourceDefinition", ctrlLogz.Object(crd))
 			obj = obj.DeepCopy()
 			obj.Spec = crd.Spec
 			obj.Annotations = crd.Annotations
@@ -274,13 +274,13 @@ func EnsureCrdExists(ctx context.Context, logger *zap.Logger, apiExtClient apiEx
 			obj.Status = apiext_v1b1.CustomResourceDefinitionStatus{}
 			_, err = apiExtClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(obj) // This is a CAS
 			if err == nil {
-				logger.Info("CustomResourceDefinition updated", logz.Object(crd))
+				logger.Info("CustomResourceDefinition updated", ctrlLogz.Object(crd))
 				return nil
 			}
 			if !api_errors.IsConflict(err) {
 				return errors.Wrapf(err, "failed to update CustomResourceDefinition %s", crd.Name)
 			}
-			logger.Info("Conflict updating CustomResourceDefinition, retrying", logz.Object(crd))
+			logger.Info("Conflict updating CustomResourceDefinition, retrying", ctrlLogz.Object(crd))
 		}
 		// wait for store to pick up the object and re-iterate
 		if err = util.Sleep(ctx, time.Second); err != nil {

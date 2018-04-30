@@ -1,12 +1,12 @@
 package bundlec
 
 import (
+	ctrlLogz "github.com/atlassian/ctrl/logz"
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util"
-	"github.com/atlassian/smith/pkg/util/logz"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -545,10 +545,10 @@ func (st *resourceSyncTask) createOrUpdate(spec *unstructured.Unstructured, actu
 		return nil, false, errors.Wrapf(err, "failed to get the client for %q", gvk)
 	}
 	if actual != nil {
-		st.logger.Info("Object found, checking spec", logz.Gvk(gvk), logz.Object(spec))
+		st.logger.Info("Object found, checking spec", ctrlLogz.Gvk(gvk), ctrlLogz.Object(spec))
 		return st.updateResource(resClient, spec, actual)
 	}
-	st.logger.Info("Object not found, creating", logz.Gvk(gvk), logz.Object(spec))
+	st.logger.Info("Object not found, creating", ctrlLogz.Gvk(gvk), ctrlLogz.Object(spec))
 	return st.createResource(resClient, spec)
 }
 
@@ -556,7 +556,7 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 	gvk := spec.GroupVersionKind()
 	response, err := resClient.Create(spec)
 	if err == nil {
-		st.logger.Info("Object created", logz.Gvk(gvk), logz.Object(spec))
+		st.logger.Info("Object created", ctrlLogz.Gvk(gvk), ctrlLogz.Object(spec))
 		return response, false, nil
 	}
 	if api_errors.IsAlreadyExists(err) {
@@ -576,7 +576,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 		return nil, false, errors.Wrap(err, "specification check failed")
 	}
 	if match {
-		st.logger.Info("Object has correct spec", logz.Object(spec))
+		st.logger.Info("Object has correct spec", ctrlLogz.Object(spec))
 		return updated, false, nil
 	}
 
@@ -590,7 +590,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 		// Unexpected error, will retry
 		return nil, true, err
 	}
-	st.logger.Info("Object updated", logz.Object(spec))
+	st.logger.Info("Object updated", ctrlLogz.Object(spec))
 	return updated, false, nil
 }
 

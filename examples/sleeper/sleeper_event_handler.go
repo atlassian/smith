@@ -4,9 +4,8 @@ import (
 	"context"
 	"time"
 
+	ctrlLogz "github.com/atlassian/ctrl/logz"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
-	"github.com/atlassian/smith/pkg/util/logz"
-
 	"go.uber.org/zap"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
@@ -35,7 +34,7 @@ func (h *SleeperEventHandler) OnDelete(obj interface{}) {
 func (h *SleeperEventHandler) handle(obj interface{}) {
 	in := obj.(*sleeper_v1.Sleeper).DeepCopy()
 	msg := in.Spec.WakeupMessage
-	logger := h.logger.With(logz.Namespace(in), logz.Object(in))
+	logger := h.logger.With(ctrlLogz.Namespace(in), ctrlLogz.Object(in))
 	logger.Sugar().Infof("Sleeper was added/updated. Setting Status to %q and falling asleep for %d seconds... ZZzzzz", sleeper_v1.Sleeping, in.Spec.SleepFor)
 	err := h.retryUpdate(in, sleeper_v1.Sleeping, "")
 	if err != nil {

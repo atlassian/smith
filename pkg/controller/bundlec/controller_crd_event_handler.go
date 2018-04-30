@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/atlassian/ctrl"
+	ctrlLogz "github.com/atlassian/ctrl/logz"
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
@@ -167,7 +168,7 @@ func (h *crdEventHandler) rebuildBundles(logger *zap.Logger, crd *apiext_v1b1.Cu
 	}
 	for _, bundle := range bundles {
 		logger.
-			With(logz.Namespace(bundle), logz.Bundle(bundle)).
+			With(ctrlLogz.Namespace(bundle), logz.Bundle(bundle)).
 			Sugar().Infof("Rebuilding bundle because CRD was %s", addUpdateDelete)
 		h.WorkQueue.Add(ctrl.QueueKey{
 			Namespace: bundle.Namespace,

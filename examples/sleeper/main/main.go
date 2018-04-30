@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	ctrlLogz "github.com/atlassian/ctrl/logz"
 	"github.com/atlassian/smith/examples/sleeper"
 	"github.com/atlassian/smith/pkg/client"
-	"github.com/atlassian/smith/pkg/util/logz"
 	"k8s.io/client-go/rest"
 )
 
@@ -50,7 +50,7 @@ func runWithContext(ctx context.Context) error {
 
 func runWithConfig(ctx context.Context, config *rest.Config) error {
 	a := sleeper.App{
-		Logger:     logz.Logger("debug", "console"),
+		Logger:     ctrlLogz.Logger("debug", "console"),
 		RestConfig: config,
 	}
 	return a.Run(ctx)

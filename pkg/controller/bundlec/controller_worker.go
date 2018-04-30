@@ -2,8 +2,8 @@ package bundlec
 
 import (
 	"github.com/atlassian/ctrl"
+	ctrlLogz "github.com/atlassian/ctrl/logz"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/util/logz"
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,7 +42,7 @@ func (c *Controller) loggerForObj(obj interface{}) *zap.Logger {
 	logger := c.Logger
 	metaObj, ok := obj.(meta_v1.Object)
 	if ok {
-		logger = logger.With(logz.Namespace(metaObj), logz.Object(metaObj))
+		logger = logger.With(ctrlLogz.Namespace(metaObj), ctrlLogz.Object(metaObj))
 	}
 	runtimeObj, ok := metaObj.(runtime.Object)
 	if ok {
@@ -57,7 +57,7 @@ func (c *Controller) loggerForObj(obj interface{}) *zap.Logger {
 			}
 			gvk = gvks[0]
 		}
-		logger = logger.With(logz.Gvk(gvk))
+		logger = logger.With(ctrlLogz.Gvk(gvk))
 	}
 	return logger
 }
