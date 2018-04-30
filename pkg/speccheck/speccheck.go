@@ -1,8 +1,8 @@
 package speccheck
 
 import (
+	ctrlLogz "github.com/atlassian/ctrl/logz"
 	"github.com/atlassian/smith/pkg/util"
-	"github.com/atlassian/smith/pkg/util/logz"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
@@ -92,7 +92,7 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 		gvk := spec.GroupVersionKind()
 
 		if gvk.Group == core_v1.GroupName && gvk.Kind == "Secret" {
-			sc.Logger.Info("Objects are different: Secret object has changed", logz.Object(spec))
+			sc.Logger.Info("Objects are different: Secret object has changed", ctrlLogz.Object(spec))
 			return updated, false, nil
 		}
 
