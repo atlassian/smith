@@ -6,7 +6,6 @@ go_library(
         "bundle_sync_task.go",
         "controller.go",
         "controller_crd_event_handler.go",
-        "controller_resource_event_handler.go",
         "controller_worker.go",
         "finalizers.go",
         "resource_sync_task.go",
