@@ -1,15 +1,15 @@
 package bundlec
 
 import (
+	"github.com/atlassian/ctrl"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/util/logz"
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (c *Controller) Process(pctx *controller.ProcessContext) (retriableRet bool, errRet error) {
+func (c *Controller) Process(pctx *ctrl.ProcessContext) (retriableRet bool, errRet error) {
 	return c.ProcessBundle(pctx.Logger, pctx.Object.(*smith_v1.Bundle))
 }
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ash2k/stager"
+	"github.com/atlassian/ctrl"
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
@@ -17,7 +18,6 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithFake "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/fake"
 	"github.com/atlassian/smith/pkg/client/smart"
-	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/util"
@@ -245,24 +245,24 @@ func (tc *testCase) run(t *testing.T) {
 	stage := stgr.NextStage()
 
 	// Controller
-	config := &controller.Config{
-		Logger:       tc.logger,
-		Namespace:    tc.namespace,
-		RestConfig:   clientConfig,
-		MainClient:   mainClient,
-		ApiExtClient: apiExtClient,
-		ScClient:     scClient,
-		SmithClient:  smithClient,
+	config := &ctrl.Config{
+		Logger:     tc.logger,
+		Namespace:  tc.namespace,
+		RestConfig: clientConfig,
+		MainClient: mainClient,
+	}
+	bundleConstr := &app.BundleControllerConstructor{
+		Plugins:               plugins,
+		ServiceCatalogSupport: tc.enableServiceCatalog,
+		SmithClient:           smithClient,
+		ScClient:              scClient,
+		ApiExtClient:          apiExtClient,
 		SmartClient: &smart.DynamicClient{
 			ClientPool: dynamic.NewClientPool(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc),
 			Mapper:     restMapper,
 		},
 	}
-	bundleConstr := &app.BundleControllerConstructor{
-		Plugins:               plugins,
-		ServiceCatalogSupport: tc.enableServiceCatalog,
-	}
-	generic, err := controller.NewGeneric(config, tc.logger,
+	generic, err := ctrl.NewGeneric(config, tc.logger,
 		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multiqueue"),
 		2, bundleConstr)
 	require.NoError(t, err)

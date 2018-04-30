@@ -4,11 +4,13 @@ import (
 	"flag"
 	"time"
 
+	"github.com/atlassian/ctrl"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/cleanup"
 	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
 	"github.com/atlassian/smith/pkg/client"
-	"github.com/atlassian/smith/pkg/controller"
+	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
+	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/readychecker"
@@ -24,9 +26,13 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	apps_v1inf "k8s.io/client-go/informers/apps/v1"
 	core_v1inf "k8s.io/client-go/informers/core/v1"
 	ext_v1b1inf "k8s.io/client-go/informers/extensions/v1beta1"
@@ -37,13 +43,19 @@ import (
 type BundleControllerConstructor struct {
 	Plugins               []plugin.NewFunc
 	ServiceCatalogSupport bool
+
+	// To override things constructed by default. And for tests.
+	SmithClient  smithClientset.Interface
+	ScClient     scClientset.Interface
+	ApiExtClient apiExtClientset.Interface
+	SmartClient  bundlec.SmartClient
 }
 
 func (c *BundleControllerConstructor) AddFlags(flagset *flag.FlagSet) {
 	flagset.BoolVar(&c.ServiceCatalogSupport, "bundle-service-catalog", true, "Service Catalog support in Bundle controller. Enabled by default.")
 }
 
-func (c *BundleControllerConstructor) New(config *controller.Config, cctx *controller.Context) (controller.Interface, error) {
+func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Context) (ctrl.Interface, error) {
 	// Plugins
 	pluginContainers, err := c.loadPlugins()
 	if err != nil {
@@ -56,12 +68,49 @@ func (c *BundleControllerConstructor) New(config *controller.Config, cctx *contr
 	if err != nil {
 		return nil, err
 	}
+
+	// Clients
+	smithClient := c.SmithClient
+	if smithClient == nil {
+		smithClient, err = smithClientset.NewForConfig(config.RestConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+	scClient := c.ScClient
+	if scClient == nil {
+		scClient, err = scClientset.NewForConfig(config.RestConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+	apiExtClient := c.ApiExtClient
+	if apiExtClient == nil {
+		apiExtClient, err = apiExtClientset.NewForConfig(config.RestConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+	smartClient := c.SmartClient
+	if smartClient == nil {
+		rm := discovery.NewDeferredDiscoveryRESTMapper(
+			&smart.CachedDiscoveryClient{
+				DiscoveryInterface: config.MainClient.Discovery(),
+			},
+			meta.InterfacesForUnstructured,
+		)
+		smartClient = &smart.DynamicClient{
+			ClientPool: dynamic.NewClientPool(config.RestConfig, rm, dynamic.LegacyAPIPathResolverFunc),
+			Mapper:     rm,
+		}
+	}
+
 	// Informers
-	bundleInf, err := cctx.SmithInformer(config, smith_v1.BundleGVK, client.BundleInformer)
+	bundleInf, err := smithInformer(config, cctx, smithClient, smith_v1.BundleGVK, client.BundleInformer)
 	if err != nil {
 		return nil, err
 	}
-	crdInf, err := cctx.ApiExtensionsInformer(config,
+	crdInf, err := apiExtensionsInformer(config, cctx, apiExtClient,
 		apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
 		apiext_v1b1inf.NewCustomResourceDefinitionInformer)
 	if err != nil {
@@ -74,13 +123,13 @@ func (c *BundleControllerConstructor) New(config *controller.Config, cctx *contr
 
 	var catalog *store.Catalog
 	if c.ServiceCatalogSupport {
-		serviceClassInf, err := cctx.SvcCatClusterInformer(config,
+		serviceClassInf, err := svcCatClusterInformer(config, cctx, scClient,
 			sc_v1b1.SchemeGroupVersion.WithKind("ClusterServiceClass"),
 			sc_v1b1inf.NewClusterServiceClassInformer)
 		if err != nil {
 			return nil, err
 		}
-		servicePlanInf, err := cctx.SvcCatClusterInformer(config,
+		servicePlanInf, err := svcCatClusterInformer(config, cctx, scClient,
 			sc_v1b1.SchemeGroupVersion.WithKind("ClusterServicePlan"),
 			sc_v1b1inf.NewClusterServicePlanInformer)
 		if err != nil {
@@ -121,7 +170,7 @@ func (c *BundleControllerConstructor) New(config *controller.Config, cctx *contr
 	}
 
 	// Add resource informers to Multi store (not ServiceClass/Plan informers, ...)
-	resourceInfs, err := c.resourceInformers(config, cctx)
+	resourceInfs, err := c.resourceInformers(config, cctx, scClient)
 	if err != nil {
 		return nil, err
 	}
@@ -137,9 +186,9 @@ func (c *BundleControllerConstructor) New(config *controller.Config, cctx *contr
 	cntrlr := &bundlec.Controller{
 		Logger:           config.Logger,
 		ReadyForWork:     cctx.ReadyForWork,
-		BundleClient:     config.SmithClient.SmithV1(),
+		BundleClient:     smithClient.SmithV1(),
 		BundleStore:      bs,
-		SmartClient:      config.SmartClient,
+		SmartClient:      smartClient,
 		Rc:               rc,
 		Store:            multiStore,
 		SpecCheck:        specCheck,
@@ -155,8 +204,8 @@ func (c *BundleControllerConstructor) New(config *controller.Config, cctx *contr
 	return cntrlr, nil
 }
 
-func (c *BundleControllerConstructor) Describe() controller.Descriptor {
-	return controller.Descriptor{
+func (c *BundleControllerConstructor) Describe() ctrl.Descriptor {
+	return ctrl.Descriptor{
 		Gvk:          smith_v1.BundleGVK,
 		ZapNameField: logz.BundleName,
 	}
@@ -178,7 +227,7 @@ func (c *BundleControllerConstructor) loadPlugins() (map[smith_v1.PluginName]plu
 	return pluginContainers, nil
 }
 
-func (c *BundleControllerConstructor) resourceInformers(config *controller.Config, cctx *controller.Context) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
+func (c *BundleControllerConstructor) resourceInformers(config *ctrl.Config, cctx *ctrl.Context, scClient scClientset.Interface) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
 	coreInfs := map[schema.GroupVersionKind]func(kubernetes.Interface, string, time.Duration, cache.Indexers) cache.SharedIndexInformer{
 		// Core API types
 		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):       ext_v1b1inf.NewIngressInformer,
@@ -205,7 +254,7 @@ func (c *BundleControllerConstructor) resourceInformers(config *controller.Confi
 			sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"): sc_v1b1inf.NewServiceInstanceInformer,
 		}
 		for gvk, scInf := range scInfs {
-			inf, err := cctx.SvcCatInformer(config, gvk, scInf)
+			inf, err := svcCatInformer(config, cctx, scClient, gvk, scInf)
 			if err != nil {
 				return nil, err
 			}
@@ -231,4 +280,52 @@ func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
 		return nil, err
 	}
 	return scheme, nil
+}
+
+func smithInformer(config *ctrl.Config, cctx *ctrl.Context, smithClient smithClientset.Interface, gvk schema.GroupVersionKind, f func(smithClientset.Interface, string, time.Duration) cache.SharedIndexInformer) (cache.SharedIndexInformer, error) {
+	inf := cctx.Informers[gvk]
+	if inf == nil {
+		inf = f(smithClient, config.Namespace, config.ResyncPeriod)
+		err := cctx.RegisterInformer(gvk, inf)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return inf, nil
+}
+
+func apiExtensionsInformer(config *ctrl.Config, cctx *ctrl.Context, apiExtClient apiExtClientset.Interface, gvk schema.GroupVersionKind, f func(apiExtClientset.Interface, time.Duration, cache.Indexers) cache.SharedIndexInformer) (cache.SharedIndexInformer, error) {
+	inf := cctx.Informers[gvk]
+	if inf == nil {
+		inf = f(apiExtClient, config.ResyncPeriod, cache.Indexers{})
+		err := cctx.RegisterInformer(gvk, inf)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return inf, nil
+}
+
+func svcCatClusterInformer(config *ctrl.Config, cctx *ctrl.Context, scClient scClientset.Interface, gvk schema.GroupVersionKind, f func(scClientset.Interface, time.Duration, cache.Indexers) cache.SharedIndexInformer) (cache.SharedIndexInformer, error) {
+	inf := cctx.Informers[gvk]
+	if inf == nil {
+		inf = f(scClient, config.ResyncPeriod, cache.Indexers{})
+		err := cctx.RegisterInformer(gvk, inf)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return inf, nil
+}
+
+func svcCatInformer(config *ctrl.Config, cctx *ctrl.Context, scClient scClientset.Interface, gvk schema.GroupVersionKind, f func(scClientset.Interface, string, time.Duration, cache.Indexers) cache.SharedIndexInformer) (cache.SharedIndexInformer, error) {
+	inf := cctx.Informers[gvk]
+	if inf == nil {
+		inf = f(scClient, config.Namespace, config.ResyncPeriod, cache.Indexers{})
+		err := cctx.RegisterInformer(gvk, inf)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return inf, nil
 }

@@ -3,9 +3,9 @@ package bundlec
 import (
 	"context"
 
+	"github.com/atlassian/ctrl"
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util/logz"
 	"go.uber.org/zap"
@@ -169,7 +169,7 @@ func (h *crdEventHandler) rebuildBundles(logger *zap.Logger, crd *apiext_v1b1.Cu
 		logger.
 			With(logz.Namespace(bundle), logz.Bundle(bundle)).
 			Sugar().Infof("Rebuilding bundle because CRD was %s", addUpdateDelete)
-		h.WorkQueue.Add(controller.QueueKey{
+		h.WorkQueue.Add(ctrl.QueueKey{
 			Namespace: bundle.Namespace,
 			Name:      bundle.Name,
 		})
