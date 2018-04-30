@@ -24,13 +24,13 @@ type Generic struct {
 	queue       workQueue
 	workers     int
 	multi       *store.MultiBasic
-	Controllers map[schema.GroupVersionKind]ControllerHolder
+	Controllers map[schema.GroupVersionKind]Holder
 	Informers   map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
 func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimitingInterface, workers int, constructors ...Constructor) (*Generic, error) {
 	controllers := make(map[schema.GroupVersionKind]Interface, len(constructors))
-	holders := make(map[schema.GroupVersionKind]ControllerHolder, len(constructors))
+	holders := make(map[schema.GroupVersionKind]Holder, len(constructors))
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer)
 	multi := store.NewMultiBasic()
 	wq := workQueue{
@@ -69,7 +69,7 @@ func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimiting
 			zapNameField: descr.ZapNameField,
 		})
 		controllers[descr.Gvk] = iface
-		holders[descr.Gvk] = ControllerHolder{
+		holders[descr.Gvk] = Holder{
 			Cntrlr:       iface,
 			ZapNameField: descr.ZapNameField,
 			ReadyForWork: readyForWork,
@@ -127,7 +127,7 @@ func (g *Generic) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-type ControllerHolder struct {
+type Holder struct {
 	Cntrlr       Interface
 	ZapNameField ZapNameField
 	ReadyForWork <-chan struct{}
