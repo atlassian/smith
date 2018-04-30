@@ -150,10 +150,10 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 	defer recordingWatch.Stop()
 	recorder := eventBroadcaster.NewRecorder(eventsScheme, core_v1.EventSource{Component: "smith"})
 
-	var metricsErr error
+	var auxErr error
 	defer func() {
-		if metricsErr != nil && (retErr == context.DeadlineExceeded || retErr == context.Canceled) {
-			retErr = metricsErr
+		if auxErr != nil && (retErr == context.DeadlineExceeded || retErr == context.Canceled) {
+			retErr = auxErr
 		}
 	}()
 
@@ -166,7 +166,7 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 
 	stage.StartWithContext(func(metricsCtx context.Context) {
 		defer cancel() // if auxSrv fails to start it signals the whole program that it should shut down
-		metricsErr = auxSrv.Run(metricsCtx)
+		auxErr = auxSrv.Run(metricsCtx)
 	})
 
 	// Leader election
