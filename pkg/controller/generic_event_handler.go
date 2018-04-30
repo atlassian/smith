@@ -6,13 +6,13 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type handler struct {
+type GenericHandler struct {
 	logger       *zap.Logger
 	queue        WorkQueueProducer
 	zapNameField ZapNameField
 }
 
-func (g *handler) OnAdd(obj interface{}) {
+func (g *GenericHandler) OnAdd(obj interface{}) {
 	metaObj := obj.(meta_v1.Object)
 	g.logger.Info("Enqueuing object because it was added", logz.NamespaceName(metaObj.GetNamespace()), g.zapNameField(metaObj.GetName()))
 	g.queue.Add(QueueKey{
@@ -21,7 +21,7 @@ func (g *handler) OnAdd(obj interface{}) {
 	})
 }
 
-func (g *handler) OnUpdate(oldObj, newObj interface{}) {
+func (g *GenericHandler) OnUpdate(oldObj, newObj interface{}) {
 	metaObj := newObj.(meta_v1.Object)
 	g.logger.Info("Enqueuing object because it was updated", logz.NamespaceName(metaObj.GetNamespace()), g.zapNameField(metaObj.GetName()))
 	g.queue.Add(QueueKey{
@@ -30,7 +30,7 @@ func (g *handler) OnUpdate(oldObj, newObj interface{}) {
 	})
 }
 
-func (g *handler) OnDelete(obj interface{}) {
+func (g *GenericHandler) OnDelete(obj interface{}) {
 	metaObj := obj.(meta_v1.Object)
 	g.logger.Info("Object was deleted", logz.NamespaceName(metaObj.GetNamespace()), g.zapNameField(metaObj.GetName()))
 }
