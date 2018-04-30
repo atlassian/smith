@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/ash2k/stager/wait"
+	"github.com/atlassian/ctrl"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
-	"github.com/atlassian/smith/pkg/controller"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util/logz"
@@ -39,7 +39,7 @@ type Controller struct {
 	Rc           ReadyChecker
 	Store        Store
 	SpecCheck    SpecCheck
-	WorkQueue    controller.WorkQueueProducer
+	WorkQueue    ctrl.WorkQueueProducer
 
 	// CRD
 	CrdResyncPeriod time.Duration
@@ -55,7 +55,7 @@ type Controller struct {
 // Prepare prepares the controller to be run.
 func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
 	c.crdContext, c.crdContextCancel = context.WithCancel(context.Background())
-	c.resourceHandler = &controller.GenericResourceHandler{
+	c.resourceHandler = &ctrl.GenericResourceHandler{
 		Logger:       c.Logger,
 		Queue:        c.WorkQueue,
 		ZapNameField: logz.BundleName,

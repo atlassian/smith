@@ -47,10 +47,6 @@ required = [
   branch = "master" # I want the latest commit from this branch, not just the latest tag or the version used by client-go.
   name = "github.com/stretchr/testify"
 
-[[constraint]]
-  branch = "master" # pick up 1.9 migration
-  name = "github.com/kubernetes-incubator/service-catalog"
-
 [[override]]
   name = "k8s.io/apiextensions-apiserver"
   branch = "release-1.10" # correct branch

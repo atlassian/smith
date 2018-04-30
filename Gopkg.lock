@@ -12,6 +12,17 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/atlassian/ctrl"
+  packages = [
+    ".",
+    "app",
+    "client",
+    "logz"
+  ]
+  revision = "5cf0398511cfe56ada0b2b020cb0483a20fda322"
+
+[[projects]]
+  branch = "master"
   name = "github.com/bazelbuild/buildtools"
   packages = [
     "api_proto",
@@ -26,7 +37,7 @@
     "tables",
     "wspace"
   ]
-  revision = "61a831f4d2e43944b5847a396a1191a7ba15949e"
+  revision = "fd9878fd5de921e0bbab3dcdcb932c2627812ee1"
 
 [[projects]]
   branch = "master"
@@ -151,7 +162,7 @@
     "pkg/client/listers_generated/servicecatalog/v1beta1",
     "pkg/filter"
   ]
-  revision = "5c43dec9f1cb3966d2dc2e643511371d2458b858"
+  revision = "ac7360d7b3e2378e7628893eb17a3ab62090566c"
 
 [[projects]]
   name = "github.com/matttproud/golang_protobuf_extensions"
@@ -293,7 +304,7 @@
     "blowfish",
     "ssh/terminal"
   ]
-  revision = "2b6c08872f4b66da917bb4ce98df4f0307330f78"
+  revision = "db7d12313a59cd5b727192a287195e2cdfa40049"
 
 [[projects]]
   branch = "master"
@@ -315,7 +326,7 @@
     "unix",
     "windows"
   ]
-  revision = "79b0c6888797020a994db17c8510466c72fe75d9"
+  revision = "f67ecc163a74fbeea4cb1db0a101dcd07201464a"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -352,7 +363,7 @@
     "imports",
     "internal/fastwalk"
   ]
-  revision = "c1def519f03ddf76f16b3e444ee1095d73afa01b"
+  revision = "8e070db38e5c55da6a85c81878ab769bf5667848"
 
 [[projects]]
   name = "gopkg.in/inf.v0"
@@ -416,7 +427,7 @@
     "pkg/client/informers/externalversions/internalinterfaces",
     "pkg/client/listers/apiextensions/v1beta1"
   ]
-  revision = "4d24700986a916b7d3e2f040cf35051bfbe285c0"
+  revision = "e8ab413e0ae1e19df66d60088a1e11c97b73fdd9"
 
 [[projects]]
   branch = "release-1.10"
@@ -571,7 +582,7 @@
     "util/retry",
     "util/workqueue"
   ]
-  revision = "27ca8df00321648f57856d9dcb0e7f8ba37badc7"
+  revision = "33f2870a2b83179c823ddc90e5513f9e5fe43b38"
 
 [[projects]]
   branch = "release-1.10"
@@ -608,11 +619,11 @@
   branch = "master"
   name = "k8s.io/kube-openapi"
   packages = ["pkg/util/proto"]
-  revision = "1e45fb05b06309c0d807d0930e1a81fe0a1cd4b8"
+  revision = "3a0c53868c9444e4224c3dd5dc2caa9b5107ff7b"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d7362f354cd72b1846ec7472b53877b6ad5133f11fbc015d865bf939d6a60a02"
+  inputs-digest = "6774d763848f16ae70d62b7ed80b3906e43999cb0f7193cec1bc7063e1ab2e67"
   solver-name = "gps-cdcl"
   solver-version = 1
