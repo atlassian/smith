@@ -57,7 +57,7 @@ func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[
 	c.crdContext, c.crdContextCancel = context.WithCancel(context.Background())
 	c.resourceHandler = &ctrl.GenericResourceHandler{
 		Logger:       c.Logger,
-		Queue:        c.WorkQueue,
+		WorkQueue:    c.WorkQueue,
 		ZapNameField: logz.BundleName,
 		CreatorIndex: &creatorIndexAdapter{bundleStore: c.BundleStore},
 		Gvk:          smith_v1.BundleGVK,
