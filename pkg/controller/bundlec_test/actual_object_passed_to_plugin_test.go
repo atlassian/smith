@@ -41,6 +41,7 @@ func TestActualObjectPassedToPlugin(t *testing.T) {
 				},
 			},
 		},
+		appName:         testAppName,
 		namespace:       testNamespace,
 		expectedActions: sets.NewString("PUT=/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate),
 		testHandler: fakeActionHandler{

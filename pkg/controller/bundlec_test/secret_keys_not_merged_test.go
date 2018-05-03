@@ -71,6 +71,7 @@ func TestSecretKeysNotMerged(t *testing.T) {
 				},
 			},
 		},
+		appName:         testAppName,
 		namespace:       testNamespace,
 		expectedActions: sets.NewString("PUT=/api/v1/namespaces/" + testNamespace + "/secrets/" + s1),
 		testHandler: fakeActionHandler{

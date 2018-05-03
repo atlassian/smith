@@ -25,6 +25,7 @@ import (
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	scFake "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -65,6 +66,7 @@ type testCase struct {
 	scReactors          []reaction
 	bundle              *smith_v1.Bundle
 	namespace           string
+	appName             string
 
 	expectedActions        sets.String
 	enableServiceCatalog   bool
@@ -82,6 +84,7 @@ type testCase struct {
 }
 
 const (
+	testAppName   = "testapp"
 	testNamespace = "test-namespace"
 
 	resSb1           = "resSb1"
@@ -245,11 +248,14 @@ func (tc *testCase) run(t *testing.T) {
 	stage := stgr.NextStage()
 
 	// Controller
+	prometheusRegistry := prometheus.NewPedanticRegistry()
 	config := &ctrl.Config{
 		Logger:     tc.logger,
 		Namespace:  tc.namespace,
 		RestConfig: clientConfig,
 		MainClient: mainClient,
+		AppName:    tc.appName,
+		Registry:   prometheusRegistry,
 	}
 	bundleConstr := &app.BundleControllerConstructor{
 		Plugins:               plugins,
@@ -262,7 +268,7 @@ func (tc *testCase) run(t *testing.T) {
 			Mapper:     restMapper,
 		},
 	}
-	generic, err := ctrl.NewGeneric(config, tc.logger,
+	generic, err := ctrl.NewGeneric(config,
 		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multiqueue"),
 		2, bundleConstr)
 	require.NoError(t, err)

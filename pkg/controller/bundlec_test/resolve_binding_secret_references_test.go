@@ -158,6 +158,7 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 				},
 			},
 		},
+		appName:              testAppName,
 		namespace:            testNamespace,
 		enableServiceCatalog: true,
 	}

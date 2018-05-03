@@ -31,6 +31,7 @@ func TestDeleteRemovedObject(t *testing.T) {
 			},
 		},
 		expectedActions: sets.NewString("DELETE=/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate),
+		appName:         testAppName,
 		namespace:       meta_v1.NamespaceAll,
 		testHandler: fakeActionHandler{
 			response: map[path]fakeResponse{

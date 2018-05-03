@@ -55,12 +55,12 @@ type Controller struct {
 // Prepare prepares the controller to be run.
 func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
 	c.crdContext, c.crdContextCancel = context.WithCancel(context.Background())
-	c.resourceHandler = &ctrl.GenericResourceHandler{
-		Logger:       c.Logger,
-		WorkQueue:    c.WorkQueue,
-		ZapNameField: logz.BundleName,
-		CreatorIndex: &creatorIndexAdapter{bundleStore: c.BundleStore},
-		Gvk:          smith_v1.BundleGVK,
+	c.resourceHandler = &ctrl.ControlledResourceHandler{
+		Logger:        c.Logger,
+		WorkQueue:     c.WorkQueue,
+		ZapNameField:  logz.BundleName,
+		CreatorIndex:  &creatorIndexAdapter{bundleStore: c.BundleStore},
+		ControllerGvk: smith_v1.BundleGVK,
 	}
 	crdInf.AddEventHandler(&crdEventHandler{
 		Controller: c,
