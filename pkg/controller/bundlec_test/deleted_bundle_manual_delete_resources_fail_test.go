@@ -77,6 +77,7 @@ func TestKeepFinalizerWhenResourceDeletionFails(t *testing.T) {
 				},
 			},
 		},
+		appName:              testAppName,
 		namespace:            testNamespace,
 		enableServiceCatalog: false,
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {

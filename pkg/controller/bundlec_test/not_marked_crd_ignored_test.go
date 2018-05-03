@@ -29,6 +29,7 @@ func TestNotMarkedCrdIgnored(t *testing.T) {
 					Finalizers: []string{bundlec.FinalizerDeleteResources},
 				},
 			},
+			appName:   testAppName,
 			namespace: testNamespace,
 		}
 		tc.run(t)
@@ -49,6 +50,7 @@ func TestNotMarkedCrdIgnored(t *testing.T) {
 					Finalizers: []string{bundlec.FinalizerDeleteResources},
 				},
 			},
+			appName:   testAppName,
 			namespace: testNamespace,
 		}
 		tc.run(t)

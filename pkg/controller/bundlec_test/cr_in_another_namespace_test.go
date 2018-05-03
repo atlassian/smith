@@ -25,6 +25,7 @@ func TestCrInAnotherNamespace(t *testing.T) {
 			"GET=/apis/"+sleeper_v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+sleeper_v1.SleeperResourcePlural+
 				"=watch",
 		),
+		appName:   testAppName,
 		namespace: testNamespace,
 		test: func(t *testing.T, ctx context.Context, bundleController *bundlec.Controller, testcase *testCase) {
 			bundleController.Run(ctx)

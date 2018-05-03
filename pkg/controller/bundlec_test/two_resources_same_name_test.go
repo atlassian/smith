@@ -47,6 +47,7 @@ func TestTwoResourcesWithSameName(t *testing.T) {
 				},
 			},
 		},
+		appName:   testAppName,
 		namespace: testNamespace,
 		plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
 			pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),

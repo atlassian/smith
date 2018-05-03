@@ -133,6 +133,7 @@ func TestPluginSpecProcessed(t *testing.T) {
 				},
 			},
 		},
+		appName:   testAppName,
 		namespace: testNamespace,
 		expectedActions: sets.NewString(
 			"POST=/api/v1/namespaces/"+testNamespace+"/configmaps",

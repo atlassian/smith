@@ -47,6 +47,7 @@ go_test(
         "//vendor/github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset:go_default_library",
         "//vendor/github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/go.uber.org/zap:go_default_library",
