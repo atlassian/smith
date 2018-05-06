@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	core_v1 "k8s.io/api/core/v1"
@@ -88,9 +87,6 @@ func TestSecretKeysNotMerged(t *testing.T) {
 								"name": "` + s1 + `",
 								"namespace": "` + testNamespace + `",
 								"uid": "` + s1uid + `",
-								"labels": {
-									"` + smith.BundleNameLabel + `": "` + bundle1 + `"
-								},
 								"creationTimestamp": null,
 								"ownerReferences": [
 									{

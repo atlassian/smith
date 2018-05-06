@@ -7,6 +7,4 @@ const (
 	CrFieldPathAnnotation  = Domain + "/CrReadyWhenFieldPath"
 	CrFieldValueAnnotation = Domain + "/CrReadyWhenFieldValue"
 	CrdSupportEnabled      = Domain + "/SupportEnabled"
-
-	BundleNameLabel = Domain + "/BundleName"
 )

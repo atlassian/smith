@@ -5,12 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/atlassian/smith"
+	"github.com/ash2k/stager"
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-
-	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,8 +84,6 @@ func testCrdAttribute(ctxTest context.Context, t *testing.T, cfg *Config, args .
 		Do().
 		Into(&sleeperObj))
 
-	assert.Equal(t, map[string]string{
-		smith.BundleNameLabel: cfg.Bundle.Name,
-	}, sleeperObj.Labels)
+	assert.Equal(t, map[string]string{}, sleeperObj.Labels)
 	assert.Equal(t, sleeper_v1.Awake, sleeperObj.Status.State)
 }
