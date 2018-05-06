@@ -2,7 +2,6 @@ package bundlec
 
 import (
 	ctrlLogz "github.com/atlassian/ctrl/logz"
-	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/store"
@@ -401,10 +400,7 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 	}
 
 	// Update label to point at the parent bundle
-	obj.SetLabels(mergeLabels(
-		st.bundle.Labels,
-		obj.GetLabels(),
-		map[string]string{smith.BundleNameLabel: st.bundle.Name}))
+	obj.SetLabels(mergeLabels(st.bundle.Labels, obj.GetLabels()))
 
 	// Update OwnerReferences
 	trueRef := true

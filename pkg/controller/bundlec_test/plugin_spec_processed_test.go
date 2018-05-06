@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/atlassian/smith"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
@@ -158,9 +157,6 @@ func TestPluginSpecProcessed(t *testing.T) {
 								"name": "` + m1 + `",
 								"namespace": "` + testNamespace + `",
 								"uid": "` + string(mapNeedsAnUpdateUid) + `",
-								"labels": {
-									"` + smith.BundleNameLabel + `": "` + bundle1 + `"
-								},
 								"ownerReferences": [
 									{
 										"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
@@ -213,9 +209,6 @@ func TestPluginSpecProcessed(t *testing.T) {
 								"name": "` + sleeper1 + `",
 								"namespace": "` + testNamespace + `",
 								"uid": "` + sleeper1uid + `",
-								"labels": {
-									"` + smith.BundleNameLabel + `": "` + bundle1 + `"
-								},
 								"ownerReferences": [
 									{
 										"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",

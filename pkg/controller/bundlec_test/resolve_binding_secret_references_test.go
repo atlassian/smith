@@ -3,7 +3,6 @@ package bundlec_test
 import (
 	"testing"
 
-	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
@@ -53,9 +52,6 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 					Name:      si2,
 					Namespace: testNamespace,
 					UID:       si2uid,
-					Labels: map[string]string{
-						smith.BundleNameLabel: bundle1,
-					},
 					Annotations: map[string]string{
 						"Secret": "bla",
 					},

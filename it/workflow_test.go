@@ -4,9 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
@@ -23,9 +21,8 @@ func TestWorkflow(t *testing.T) {
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "config1",
 			Labels: map[string]string{
-				"configLabel":         "configValue",
-				"overlappingLabel":    "overlappingConfigValue",
-				smith.BundleNameLabel: "configLabel123",
+				"configLabel":      "configValue",
+				"overlappingLabel": "overlappingConfigValue",
 			},
 		},
 		Data: map[string]string{
@@ -61,9 +58,8 @@ func TestWorkflow(t *testing.T) {
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: "bundle1",
 			Labels: map[string]string{
-				"bundleLabel":         "bundleValue",
-				"overlappingLabel":    "overlappingBundleValue",
-				smith.BundleNameLabel: "bundleLabel123",
+				"bundleLabel":      "bundleValue",
+				"overlappingLabel": "overlappingBundleValue",
 			},
 		},
 		Spec: smith_v1.BundleSpec{
@@ -101,10 +97,9 @@ func testWorkflow(ctx context.Context, t *testing.T, cfg *Config, args ...interf
 	cfMap, err := cfg.MainClient.CoreV1().ConfigMaps(cfg.Namespace).Get("config1", meta_v1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
-		"configLabel":         "configValue",
-		"bundleLabel":         "bundleValue",
-		"overlappingLabel":    "overlappingConfigValue",
-		smith.BundleNameLabel: bundleRes.Name,
+		"configLabel":      "configValue",
+		"bundleLabel":      "bundleValue",
+		"overlappingLabel": "overlappingConfigValue",
 	}, cfMap.GetLabels())
 
 	secret, err := cfg.MainClient.CoreV1().Secrets(cfg.Namespace).Get("secret1", meta_v1.GetOptions{})

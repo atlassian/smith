@@ -11,7 +11,6 @@ import (
 
 	"github.com/ash2k/stager"
 	"github.com/atlassian/ctrl"
-	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
@@ -650,9 +649,6 @@ func serviceInstance(ready, inProgress, error bool) *sc_v1b1.ServiceInstance {
 			Name:      si1,
 			Namespace: testNamespace,
 			UID:       si1uid,
-			Labels: map[string]string{
-				smith.BundleNameLabel: bundle1,
-			},
 			OwnerReferences: []meta_v1.OwnerReference{
 				{
 					APIVersion:         smith_v1.BundleResourceGroupVersion,
@@ -703,9 +699,6 @@ func serviceBinding(ready, inProgress, error bool) *sc_v1b1.ServiceBinding {
 			Name:      sb1,
 			Namespace: testNamespace,
 			UID:       sb1uid,
-			Labels: map[string]string{
-				smith.BundleNameLabel: bundle1,
-			},
 			OwnerReferences: []meta_v1.OwnerReference{
 				{
 					APIVersion:         smith_v1.BundleResourceGroupVersion,
@@ -745,15 +738,14 @@ func configMapNeedsUpdate() *core_v1.ConfigMap {
 			Name:      mapNeedsAnUpdate,
 			Namespace: testNamespace,
 			UID:       mapNeedsAnUpdateUid,
-			// Labels missing - needs an update
 			OwnerReferences: []meta_v1.OwnerReference{
 				{
-					APIVersion:         smith_v1.BundleResourceGroupVersion,
-					Kind:               smith_v1.BundleResourceKind,
-					Name:               bundle1,
-					UID:                bundle1uid,
-					Controller:         &tr,
-					BlockOwnerDeletion: &tr,
+					APIVersion: smith_v1.BundleResourceGroupVersion,
+					Kind:       smith_v1.BundleResourceKind,
+					Name:       bundle1,
+					UID:        bundle1uid,
+					Controller: &tr,
+					//BlockOwnerDeletion is missing - needs an update
 				},
 			},
 		},
@@ -773,9 +765,6 @@ func configMapNeedsUpdateResponse(bundleName string, bundleUid types.UID) fakeRe
 								"name": "` + mapNeedsAnUpdate + `",
 								"namespace": "` + testNamespace + `",
 								"uid": "` + string(mapNeedsAnUpdateUid) + `",
-								"labels": {
-									"` + smith.BundleNameLabel + `": "` + bundleName + `"
-								},
 								"ownerReferences": [{
 									"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
 									"kind": "` + smith_v1.BundleResourceKind + `",
@@ -799,9 +788,6 @@ func configMapNeedsDelete() *core_v1.ConfigMap {
 			Name:      mapNeedsDelete,
 			Namespace: testNamespace,
 			UID:       mapNeedsDeleteUid,
-			Labels: map[string]string{
-				smith.BundleNameLabel: bundle1,
-			},
 			OwnerReferences: []meta_v1.OwnerReference{
 				{
 					APIVersion:         smith_v1.BundleResourceGroupVersion,
@@ -815,6 +801,7 @@ func configMapNeedsDelete() *core_v1.ConfigMap {
 		},
 	}
 }
+
 func configMapMarkedForDeletion() *core_v1.ConfigMap {
 	tr := true
 	now := meta_v1.Now()
@@ -828,9 +815,6 @@ func configMapMarkedForDeletion() *core_v1.ConfigMap {
 			Namespace:         testNamespace,
 			UID:               mapMarkedForDeletionUid,
 			DeletionTimestamp: &now,
-			Labels: map[string]string{
-				smith.BundleNameLabel: bundle1,
-			},
 			OwnerReferences: []meta_v1.OwnerReference{
 				{
 					APIVersion:         smith_v1.BundleResourceGroupVersion,
