@@ -55,7 +55,7 @@ func (c *BundleControllerConstructor) AddFlags(flagset *flag.FlagSet) {
 	flagset.BoolVar(&c.ServiceCatalogSupport, "bundle-service-catalog", true, "Service Catalog support in Bundle controller. Enabled by default.")
 }
 
-func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Context) (ctrl.Interface, error) {
+func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Context) (*ctrl.Constructed, error) {
 	// Plugins
 	pluginContainers, err := c.loadPlugins()
 	if err != nil {
@@ -201,7 +201,9 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 	}
 	cntrlr.Prepare(crdInf, resourceInfs)
 
-	return cntrlr, nil
+	return &ctrl.Constructed{
+		Interface: cntrlr,
+	}, nil
 }
 
 func (c *BundleControllerConstructor) Describe() ctrl.Descriptor {

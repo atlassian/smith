@@ -19,6 +19,7 @@ go_library(
         "//vendor/github.com/atlassian/ctrl:go_default_library",
         "//vendor/github.com/atlassian/ctrl/app:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/go.uber.org/zap:go_default_library",

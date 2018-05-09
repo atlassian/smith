@@ -21,6 +21,7 @@ import (
 	"github.com/atlassian/smith/pkg/util"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -242,11 +243,13 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, apiExtClient, crdLister, resources.BundleCrd()))
 
 	stage.StartWithContext(func(ctx context.Context) {
-		apl := ctrlApp.App{
-			Logger:     logger,
-			Name:       "smith",
-			RestConfig: config,
-			Namespace:  cfg.Namespace,
+		apl := &ctrlApp.App{
+			Logger:             logger,
+			MainClient:         mainClient,
+			PrometheusRegistry: prometheus.NewPedanticRegistry(),
+			Name:               "smith",
+			RestConfig:         config,
+			Namespace:          cfg.Namespace,
 			Controllers: []ctrl.Constructor{
 				&app.BundleControllerConstructor{
 					ServiceCatalogSupport: serviceCatalog,

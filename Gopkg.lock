@@ -19,7 +19,7 @@
     "client",
     "logz"
   ]
-  revision = "7fb33f63394b823554b7bec598072c6133b8f5bd"
+  revision = "411fce8b5a3b4b2976bd46e53e6160daff84c15a"
 
 [[projects]]
   branch = "master"
@@ -37,7 +37,7 @@
     "tables",
     "wspace"
   ]
-  revision = "fd9878fd5de921e0bbab3dcdcb932c2627812ee1"
+  revision = "65f8b27d37b680871b3b50532ee76564afc32bdb"
 
 [[projects]]
   branch = "master"
@@ -161,8 +161,8 @@
     "pkg/client/listers_generated/servicecatalog/v1beta1",
     "pkg/filter"
   ]
-  revision = "d486469fd163fadf92e0a9223fbc52b96adc3e10"
-  version = "v0.1.16"
+  revision = "f6d2d8359867655572dae20e6566c0db968327a8"
+  version = "v0.1.17"
 
 [[projects]]
   name = "github.com/matttproud/golang_protobuf_extensions"
@@ -272,8 +272,8 @@
 [[projects]]
   name = "go.uber.org/atomic"
   packages = ["."]
-  revision = "8474b86a5a6f79c443ce4b2992817ff32cf208b8"
-  version = "v1.3.1"
+  revision = "1ea20fb1cbb1cc08cbd0d913a96dead89aa18289"
+  version = "v1.3.2"
 
 [[projects]]
   name = "go.uber.org/multierr"
@@ -304,7 +304,7 @@
     "blowfish",
     "ssh/terminal"
   ]
-  revision = "ae8bce0030810cf999bb2b9868ae5c7c58e6343b"
+  revision = "21052ae46654ecf18dfdba0f7c12701a1e2b3164"
 
 [[projects]]
   branch = "master"
@@ -314,10 +314,15 @@
     "http/httpguts",
     "http2",
     "http2/hpack",
-    "idna",
-    "lex/httplex"
+    "idna"
   ]
-  revision = "5f9ae10d9af5b1c89ae6904293b14b064d4ada23"
+  revision = "f73e4c9ed3b7ebdd5f699a16a880c2b1994e50dd"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sync"
+  packages = ["errgroup"]
+  revision = "1d60e4601c6fd243af51cc01ddf169918a5407ca"
 
 [[projects]]
   branch = "master"
@@ -326,7 +331,7 @@
     "unix",
     "windows"
   ]
-  revision = "4adea008a5e5f820b6028611ae0b6b3fbcec534b"
+  revision = "7db1c3b1a98089d0071c84f646ff5c96aad43682"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -363,7 +368,7 @@
     "imports",
     "internal/fastwalk"
   ]
-  revision = "836e0f611e69f12657ca7b4ff1d5747865308e2d"
+  revision = "48418e5732e1b1e2a10207c8007a5f959e422f20"
 
 [[projects]]
   name = "gopkg.in/inf.v0"
@@ -410,7 +415,7 @@
     "storage/v1alpha1",
     "storage/v1beta1"
   ]
-  revision = "edd5e319fc45211023fffb41c7aa5555229c4179"
+  revision = "590a9173e3b65d74e907fcfd94b78465cf314760"
 
 [[projects]]
   branch = "release-1.10"
@@ -619,7 +624,7 @@
   branch = "master"
   name = "k8s.io/kube-openapi"
   packages = ["pkg/util/proto"]
-  revision = "3a0c53868c9444e4224c3dd5dc2caa9b5107ff7b"
+  revision = "61db125d227fc9d4e373819a059516f32f7f23c7"
 
 [solve-meta]
   analyzer-name = "dep"
