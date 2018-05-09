@@ -84,6 +84,6 @@ func testCrdAttribute(ctxTest context.Context, t *testing.T, cfg *Config, args .
 		Do().
 		Into(&sleeperObj))
 
-	assert.Equal(t, map[string]string{}, sleeperObj.Labels)
+	assert.Empty(t, sleeperObj.Labels)
 	assert.Equal(t, sleeper_v1.Awake, sleeperObj.Status.State)
 }
