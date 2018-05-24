@@ -8,7 +8,6 @@ import (
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/resources"
-	"github.com/atlassian/smith/pkg/util/logz"
 	"go.uber.org/zap"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +34,7 @@ type crdEventHandler struct {
 // This is necessary to wait until a CRD has been processed by the CRD controller. Also see OnUpdate.
 func (h *crdEventHandler) OnAdd(obj interface{}) {
 	crd := obj.(*apiext_v1b1.CustomResourceDefinition)
-	logger := h.loggerForObj(crd)
+	logger := h.loggerForCRD(crd)
 	if !supportEnabled(crd) {
 		logger.Sugar().Debugf("Not setting up watch for CRD because %s annotation is not set to 'true'", smith.CrdSupportEnabled)
 		return
@@ -54,7 +53,7 @@ func (h *crdEventHandler) OnAdd(obj interface{}) {
 // to pick up fixes for invalid/conflicting CRDs.
 func (h *crdEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	newCrd := newObj.(*apiext_v1b1.CustomResourceDefinition)
-	logger := h.loggerForObj(newCrd)
+	logger := h.loggerForCRD(newCrd)
 	if !supportEnabled(newCrd) {
 		h.ensureNoWatch(logger, newCrd)
 		return
@@ -65,21 +64,20 @@ func (h *crdEventHandler) OnUpdate(oldObj, newObj interface{}) {
 }
 
 func (h *crdEventHandler) OnDelete(obj interface{}) {
-	logger := h.loggerForObj(obj)
 	crd, ok := obj.(*apiext_v1b1.CustomResourceDefinition)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
+			h.Logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
 			return
 		}
 		crd, ok = tombstone.Obj.(*apiext_v1b1.CustomResourceDefinition)
 		if !ok {
-			logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			h.Logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
 		}
-		logger = h.loggerForObj(crd)
 	}
+	logger := h.loggerForCRD(crd)
 	if h.ensureNoWatch(logger, crd) {
 		// Rebuild only if the watch was removed. Otherwise it is pointless.
 		h.rebuildBundles(logger, crd, "deleted")
@@ -168,7 +166,7 @@ func (h *crdEventHandler) rebuildBundles(logger *zap.Logger, crd *apiext_v1b1.Cu
 	}
 	for _, bundle := range bundles {
 		logger.
-			With(ctrlLogz.Namespace(bundle), logz.Bundle(bundle)).
+			With(ctrlLogz.Namespace(bundle), ctrlLogz.Controller(bundle)).
 			Sugar().Infof("Rebuilding bundle because CRD was %s", addUpdateDelete)
 		h.WorkQueue.Add(ctrl.QueueKey{
 			Namespace: bundle.Namespace,
@@ -179,4 +177,10 @@ func (h *crdEventHandler) rebuildBundles(logger *zap.Logger, crd *apiext_v1b1.Cu
 
 func supportEnabled(crd *apiext_v1b1.CustomResourceDefinition) bool {
 	return crd.Annotations[smith.CrdSupportEnabled] == "true"
+}
+
+func (h *crdEventHandler) loggerForCRD(obj *apiext_v1b1.CustomResourceDefinition) *zap.Logger {
+	// No namespace
+	return h.Logger.With(ctrlLogz.Object(obj),
+		ctrlLogz.ObjectGk(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition").GroupKind()))
 }

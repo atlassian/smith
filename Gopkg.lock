@@ -19,7 +19,7 @@
     "client",
     "logz"
   ]
-  revision = "411fce8b5a3b4b2976bd46e53e6160daff84c15a"
+  revision = "455433684a09f33c2248a80c7cf08189c352e972"
 
 [[projects]]
   branch = "master"
@@ -37,7 +37,7 @@
     "tables",
     "wspace"
   ]
-  revision = "65f8b27d37b680871b3b50532ee76564afc32bdb"
+  revision = "331d283a59329fee6ca033fbaf8f7560b2be3718"
 
 [[projects]]
   branch = "master"
@@ -85,7 +85,7 @@
   branch = "master"
   name = "github.com/golang/groupcache"
   packages = ["lru"]
-  revision = "66deaeb636dff1ac7d938ce666d090556056a4b0"
+  revision = "24b0969c4cb722950103eed87108c8d291a8df00"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -112,8 +112,8 @@
     "compiler",
     "extensions"
   ]
-  revision = "ee43cbb60db7bd22502942cccbc39059117352ab"
-  version = "v0.1.0"
+  revision = "7c663266750e7d82587642f65e60bc4083f1f84e"
+  version = "v0.2.0"
 
 [[projects]]
   branch = "master"
@@ -161,8 +161,8 @@
     "pkg/client/listers_generated/servicecatalog/v1beta1",
     "pkg/filter"
   ]
-  revision = "f6d2d8359867655572dae20e6566c0db968327a8"
-  version = "v0.1.17"
+  revision = "e2e850fe4cc2d679cf1d7989e0feccb4d388a27c"
+  version = "v0.1.20"
 
 [[projects]]
   name = "github.com/matttproud/golang_protobuf_extensions"
@@ -181,12 +181,6 @@
   packages = ["."]
   revision = "1df9eeb2bb81f327b96228865c5687bc2194af3f"
   version = "1.0.0"
-
-[[projects]]
-  name = "github.com/pborman/uuid"
-  packages = ["."]
-  revision = "e790cca94e6cc75c7064b1332e63811d4aae1a53"
-  version = "v1.1"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -223,7 +217,7 @@
     "internal/bitbucket.org/ww/goautoneg",
     "model"
   ]
-  revision = "d811d2e9bf898806ecfb6ef6296774b13ffc314c"
+  revision = "7600349dcfe1abd18d72d3a1770870d9800a7801"
 
 [[projects]]
   branch = "master"
@@ -304,7 +298,7 @@
     "blowfish",
     "ssh/terminal"
   ]
-  revision = "21052ae46654ecf18dfdba0f7c12701a1e2b3164"
+  revision = "75e913eb8a8e3d31a97b216de09de106a7b07681"
 
 [[projects]]
   branch = "master"
@@ -316,7 +310,7 @@
     "http2/hpack",
     "idna"
   ]
-  revision = "f73e4c9ed3b7ebdd5f699a16a880c2b1994e50dd"
+  revision = "9ef9f5bb98a1fdc41f8cf6c250a4404b4085e389"
 
 [[projects]]
   branch = "master"
@@ -331,7 +325,7 @@
     "unix",
     "windows"
   ]
-  revision = "7db1c3b1a98089d0071c84f646ff5c96aad43682"
+  revision = "77b0e4315053a57ed2962443614bdb28db152054"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -368,7 +362,7 @@
     "imports",
     "internal/fastwalk"
   ]
-  revision = "48418e5732e1b1e2a10207c8007a5f959e422f20"
+  revision = "1937f90a1bb43667aff4059b1bab13eb15121e8e"
 
 [[projects]]
   name = "gopkg.in/inf.v0"
@@ -432,7 +426,7 @@
     "pkg/client/informers/externalversions/internalinterfaces",
     "pkg/client/listers/apiextensions/v1beta1"
   ]
-  revision = "e8ab413e0ae1e19df66d60088a1e11c97b73fdd9"
+  revision = "7fbced0db3c3378efac13578ef9d75512c582b03"
 
 [[projects]]
   branch = "release-1.10"
@@ -472,7 +466,6 @@
     "pkg/util/runtime",
     "pkg/util/sets",
     "pkg/util/strategicpatch",
-    "pkg/util/uuid",
     "pkg/util/validation",
     "pkg/util/validation/field",
     "pkg/util/wait",
@@ -482,7 +475,7 @@
     "third_party/forked/golang/json",
     "third_party/forked/golang/reflect"
   ]
-  revision = "01bc873149a1802eb74df583613872d126449ed5"
+  revision = "31dade610c053669d8054bfd847da657251e8c1a"
 
 [[projects]]
   branch = "release-7.0"
@@ -587,7 +580,7 @@
     "util/retry",
     "util/workqueue"
   ]
-  revision = "33f2870a2b83179c823ddc90e5513f9e5fe43b38"
+  revision = "0be17c78bfcc74e0b455bf0fa1ec14e207f0fa64"
 
 [[projects]]
   branch = "release-1.10"
@@ -605,7 +598,7 @@
     "cmd/deepcopy-gen/args",
     "pkg/util"
   ]
-  revision = "cbd9dba38c3d8e0035d4bb554bd321e2c190e629"
+  revision = "69d88fb997c52c32288a40f5efb62add0a7c8e04"
 
 [[projects]]
   name = "k8s.io/gengo"
@@ -624,7 +617,7 @@
   branch = "master"
   name = "k8s.io/kube-openapi"
   packages = ["pkg/util/proto"]
-  revision = "61db125d227fc9d4e373819a059516f32f7f23c7"
+  revision = "67793630244cabba12e91ce1ec8d0d0b40802b56"
 
 [solve-meta]
   analyzer-name = "dep"
