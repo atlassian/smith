@@ -2,11 +2,8 @@ package bundlec
 
 import (
 	"github.com/atlassian/ctrl"
-	ctrlLogz "github.com/atlassian/ctrl/logz"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"go.uber.org/zap"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func (c *Controller) Process(pctx *ctrl.ProcessContext) (retriableRet bool, errRet error) {
@@ -36,28 +33,4 @@ func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) 
 		retriable, err = st.processNormal()
 	}
 	return st.handleProcessResult(retriable, err)
-}
-
-func (c *Controller) loggerForObj(obj interface{}) *zap.Logger {
-	logger := c.Logger
-	metaObj, ok := obj.(meta_v1.Object)
-	if ok {
-		logger = logger.With(ctrlLogz.Namespace(metaObj), ctrlLogz.Object(metaObj))
-	}
-	runtimeObj, ok := metaObj.(runtime.Object)
-	if ok {
-		gvk := runtimeObj.GetObjectKind().GroupVersionKind()
-		if gvk.Kind == "" || gvk.Version == "" {
-			gvks, _, err := c.Scheme.ObjectKinds(runtimeObj)
-			if err != nil {
-				if !runtime.IsNotRegisteredError(err) {
-					logger.With(zap.Error(err)).Sugar().Warnf("Cannot get object's GVK. Type %T", runtimeObj)
-				}
-				return logger
-			}
-			gvk = gvks[0]
-		}
-		logger = logger.With(ctrlLogz.Gvk(gvk))
-	}
-	return logger
 }

@@ -161,7 +161,7 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 		}
 		st.objectsToDelete[ref] = obj
 
-		logger := st.logger.With(ctrlLogz.Gvk(gvk), ctrlLogz.ObjectName(name))
+		logger := st.logger.With(ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.ObjectName(name))
 		if m.GetDeletionTimestamp() != nil {
 			logger.Debug("Object is marked for deletion already")
 			continue
@@ -244,7 +244,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 	retriable := true
 	policy := meta_v1.DeletePropagationForeground
 	for ref, obj := range st.objectsToDelete {
-		logger := st.logger.With(ctrlLogz.Gvk(ref.GroupVersionKind), ctrlLogz.ObjectName(ref.Name))
+		logger := st.logger.With(ctrlLogz.ObjectGk(ref.GroupVersionKind.GroupKind()), ctrlLogz.ObjectName(ref.Name))
 		m := obj.(meta_v1.Object)
 		if m.GetDeletionTimestamp() != nil {
 			logger.Debug("Object is marked for deletion already")

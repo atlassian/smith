@@ -11,7 +11,6 @@ import (
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/store"
-	"github.com/atlassian/smith/pkg/util/logz"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -56,11 +55,10 @@ type Controller struct {
 func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
 	c.crdContext, c.crdContextCancel = context.WithCancel(context.Background())
 	c.resourceHandler = &ctrl.ControlledResourceHandler{
-		Logger:        c.Logger,
-		WorkQueue:     c.WorkQueue,
-		ZapNameField:  logz.BundleName,
-		CreatorIndex:  &creatorIndexAdapter{bundleStore: c.BundleStore},
-		ControllerGvk: smith_v1.BundleGVK,
+		Logger:          c.Logger,
+		WorkQueue:       c.WorkQueue,
+		ControllerIndex: &controllerIndexAdapter{bundleStore: c.BundleStore},
+		ControllerGvk:   smith_v1.BundleGVK,
 	}
 	crdInf.AddEventHandler(&crdEventHandler{
 		Controller: c,
@@ -91,11 +89,11 @@ func (c *Controller) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-type creatorIndexAdapter struct {
+type controllerIndexAdapter struct {
 	bundleStore BundleStore
 }
 
-func (c *creatorIndexAdapter) CreatorByObject(gk schema.GroupKind, namespace, name string) ([]runtime.Object, error) {
+func (c *controllerIndexAdapter) ControllerByObject(gk schema.GroupKind, namespace, name string) ([]runtime.Object, error) {
 	bundles, err := c.bundleStore.GetBundlesByObject(gk, namespace, name)
 	if err != nil {
 		return nil, err

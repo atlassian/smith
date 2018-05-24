@@ -541,10 +541,10 @@ func (st *resourceSyncTask) createOrUpdate(spec *unstructured.Unstructured, actu
 		return nil, false, errors.Wrapf(err, "failed to get the client for %q", gvk)
 	}
 	if actual != nil {
-		st.logger.Info("Object found, checking spec", ctrlLogz.Gvk(gvk), ctrlLogz.Object(spec))
+		st.logger.Info("Object found, checking spec", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
 		return st.updateResource(resClient, spec, actual)
 	}
-	st.logger.Info("Object not found, creating", ctrlLogz.Gvk(gvk), ctrlLogz.Object(spec))
+	st.logger.Info("Object not found, creating", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
 	return st.createResource(resClient, spec)
 }
 
@@ -552,7 +552,7 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 	gvk := spec.GroupVersionKind()
 	response, err := resClient.Create(spec)
 	if err == nil {
-		st.logger.Info("Object created", ctrlLogz.Gvk(gvk), ctrlLogz.Object(spec))
+		st.logger.Info("Object created", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
 		return response, false, nil
 	}
 	if api_errors.IsAlreadyExists(err) {

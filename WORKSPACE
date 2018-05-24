@@ -18,7 +18,7 @@ http_archive(
     url = "https://github.com/bazelbuild/rules_docker/archive/452878d665648ada0aaf816931611fdd9c683a97.zip",
 )
 
-load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains")
+load("@io_bazel_rules_go//go:def.bzl", "go_register_toolchains", "go_rules_dependencies")
 load(
     "@io_bazel_rules_docker//go:image.bzl",
     go_image_repositories = "repositories",

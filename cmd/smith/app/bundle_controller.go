@@ -17,7 +17,6 @@ import (
 	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/store"
-	"github.com/atlassian/smith/pkg/util/logz"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
@@ -208,8 +207,7 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 
 func (c *BundleControllerConstructor) Describe() ctrl.Descriptor {
 	return ctrl.Descriptor{
-		Gvk:          smith_v1.BundleGVK,
-		ZapNameField: logz.BundleName,
+		Gvk: smith_v1.BundleGVK,
 	}
 }
 
