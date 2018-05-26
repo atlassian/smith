@@ -250,7 +250,6 @@ func TestSpecProcessorExamples(t *testing.T) {
 func TestSpecProcessorErrors(t *testing.T) {
 	t.Parallel()
 	inputs := []struct {
-		obj          map[string]interface{}
 		reference    smith_v1.Reference
 		err          string
 		examplesOnly bool
