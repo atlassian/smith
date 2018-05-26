@@ -351,7 +351,7 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 		}
 		err := pluginContainer.ValidateSpec(res.Spec.Plugin.Spec)
 		if err != nil {
-			return errors.Wrapf(err, "invalid spec")
+			return errors.Wrap(err, "invalid spec")
 		}
 	}
 

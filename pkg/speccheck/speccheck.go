@@ -57,7 +57,7 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	// 2. Ignore fields managed by server, pre-process spec, etc
 	spec, err := sc.Cleaner.Cleanup(spec, actualClone)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "cleanup failed")
+		return nil, false, errors.Wrap(err, "cleanup failed")
 	}
 
 	// 3. Copy data from the spec
