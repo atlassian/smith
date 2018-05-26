@@ -14,7 +14,7 @@ env:
   global:
     - CHANGE_MINIKUBE_NONE_USER=true
     - DEP_VERSION=v0.4.1
-    - BAZEL_VERSION=0.13.0
+    - BAZEL_VERSION=0.13.1
     - KUBECTL_VERSION=v1.10.0
     - MINIKUBE_VERSION=v0.26.0
     # DOCKER_USERNAME and DOCKER_PASSWORD
@@ -49,10 +49,9 @@ install:
   - make setup-base
 
 script:
-  - make verify
   - make update-bazel
+  - make verify
   - make test-ci
-  - make build-ci
 #  - |
 #    until kubectl get nodes -o jsonpath='{range .items[*]}{@.metadata.name}:{range @.status.conditions[*]}{@.type}={@.status};{end}{end}' 2>&1 | grep -q "Ready=True"; do
 #      sleep 1

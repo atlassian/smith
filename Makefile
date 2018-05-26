@@ -13,7 +13,6 @@ setup-dev: setup-base
 .PHONY: setup-base
 setup-base:
 	dep ensure
-	bazel run //:gazelle_fix
 
 .PHONY: fmt-bazel
 fmt-bazel:
@@ -31,13 +30,6 @@ fmt-bazel:
 .PHONY: update-bazel
 update-bazel:
 	bazel run //:gazelle
-
-.PHONY: build
-build: fmt update-bazel build-ci
-
-.PHONY: build-ci
-build-ci:
-	bazel build //cmd/smith
 
 .PHONY: fmt
 fmt:
