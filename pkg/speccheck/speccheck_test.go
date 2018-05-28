@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
+	apps_v1 "k8s.io/api/apps/v1"
+	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -24,6 +26,62 @@ func TestEqualityCheck(t *testing.T) {
 		spec   runtime.Object
 		actual runtime.Object
 	}{
+		{
+			name: "Deployment",
+			spec: &apps_v1.Deployment{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Deployment",
+					APIVersion: apps_v1.SchemeGroupVersion.String(),
+				},
+				Spec: apps_v1.DeploymentSpec{
+					Template: core_v1.PodTemplateSpec{
+						Spec: core_v1.PodSpec{
+							Containers: []core_v1.Container{
+								{
+									Name:  "c1",
+									Image: "ima.ge",
+									Ports: []core_v1.ContainerPort{
+										{
+											Name:          "http",
+											ContainerPort: 8080,
+											Protocol:      core_v1.ProtocolTCP,
+										},
+									},
+								},
+							},
+							ServiceAccountName: "abc",
+						},
+					},
+				},
+			},
+			actual: &apps_v1.Deployment{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Deployment",
+					APIVersion: apps_v1.SchemeGroupVersion.String(),
+				},
+				Spec: apps_v1.DeploymentSpec{
+					Template: core_v1.PodTemplateSpec{
+						Spec: core_v1.PodSpec{
+							Containers: []core_v1.Container{
+								{
+									Name:  "c1",
+									Image: "ima.ge",
+									Ports: []core_v1.ContainerPort{
+										{
+											Name:          "http",
+											ContainerPort: 8080,
+											Protocol:      core_v1.ProtocolTCP,
+										},
+									},
+								},
+							},
+							ServiceAccountName:       "abc",
+							DeprecatedServiceAccount: "abc",
+						},
+					},
+				},
+			},
+		},
 		{
 			name: "Service Catalog",
 			spec: &sc_v1b1.ServiceInstance{
