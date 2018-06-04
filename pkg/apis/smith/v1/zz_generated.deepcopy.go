@@ -134,6 +134,11 @@ func (in *BundleStatus) DeepCopyInto(out *BundleStatus) {
 		*out = make([]ObjectToDelete, len(*in))
 		copy(*out, *in)
 	}
+	if in.PluginStatuses != nil {
+		in, out := &in.PluginStatuses, &out.PluginStatuses
+		*out = make([]PluginStatus, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

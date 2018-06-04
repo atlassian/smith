@@ -95,12 +95,12 @@ func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
 			catalog:            st.catalog,
 		}
 		resInfo := rst.processResource(&res)
-		if retriable, err := resInfo.fetchError(); err != nil && api_errors.IsConflict(errors.Cause(err)) {
-			// Short circuit on conflict
-			return retriable, err
-		}
-		_, resErr := resInfo.fetchError()
+		retriable, resErr := resInfo.fetchError()
 		if resErr != nil {
+			if api_errors.IsConflict(errors.Cause(resErr)) {
+				// Short circuit on conflict
+				return retriable, resErr
+			}
 			logger.Error("Done processing resource", zap.Bool("ready", resInfo.isReady()), zap.Error(resErr))
 		} else {
 			logger.Info("Done processing resource", zap.Bool("ready", resInfo.isReady()))
@@ -413,6 +413,41 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		bundleUpdated = updateBundleCondition(st.bundle, &inProgressCond) || bundleUpdated
 		bundleUpdated = updateBundleCondition(st.bundle, &readyCond) || bundleUpdated
 		bundleUpdated = updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
+
+		// Plugin statuses
+		name2status := make(map[smith_v1.PluginName]struct{})
+		// most likely will be of the same size as before
+		pluginStatuses := make([]smith_v1.PluginStatus, 0, len(st.bundle.Status.PluginStatuses))
+		for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
+			if res.Spec.Plugin == nil {
+				continue // Not a plugin
+			}
+			pluginName := res.Spec.Plugin.Name
+			if _, ok := name2status[pluginName]; ok {
+				continue // Already reported
+			}
+			name2status[pluginName] = struct{}{}
+			var pluginStatus smith_v1.PluginStatus
+			pluginContainer, ok := st.pluginContainers[pluginName]
+			if ok {
+				describe := pluginContainer.Plugin.Describe()
+				pluginStatus = smith_v1.PluginStatus{
+					Name:    pluginName,
+					Group:   describe.GVK.Group,
+					Version: describe.GVK.Version,
+					Kind:    describe.GVK.Kind,
+					Status:  smith_v1.PluginStatusOk,
+				}
+			} else {
+				pluginStatus = smith_v1.PluginStatus{
+					Name:   pluginName,
+					Status: smith_v1.PluginStatusNoSuchPlugin,
+				}
+			}
+			pluginStatuses = append(pluginStatuses, pluginStatus)
+		}
+		bundleUpdated = bundleUpdated || !reflect.DeepEqual(st.bundle.Status.PluginStatuses, pluginStatuses)
+		st.bundle.Status.PluginStatuses = pluginStatuses
 
 		// Update the bundle status
 		if bundleUpdated {

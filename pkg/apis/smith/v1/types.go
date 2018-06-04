@@ -58,6 +58,13 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
+type PluginStatusStr string
+
+const (
+	PluginStatusOk           PluginStatusStr = "Ok"
+	PluginStatusNoSuchPlugin PluginStatusStr = "NoSuchPlugin"
+)
+
 const (
 	BundleResourceSingular = "bundle"
 	BundleResourcePlural   = "bundles"
@@ -149,12 +156,21 @@ func (bc *BundleCondition) String() string {
 	return buf.String()
 }
 
+type PluginStatus struct {
+	Name    PluginName      `json:"name"`
+	Group   string          `json:"group"`
+	Version string          `json:"version"`
+	Kind    string          `json:"kind"`
+	Status  PluginStatusStr `json:"status,omitempty"`
+}
+
 // +k8s:deepcopy-gen=true
 // BundleStatus represents the latest available observations of a Bundle's current state.
 type BundleStatus struct {
 	Conditions       []BundleCondition `json:"conditions,omitempty"`
 	ResourceStatuses []ResourceStatus  `json:"resourceStatuses,omitempty"`
 	ObjectsToDelete  []ObjectToDelete  `json:"objectsToDelete,omitempty"`
+	PluginStatuses   []PluginStatus    `json:"pluginStatuses,omitempty"`
 }
 
 func (bs *BundleStatus) String() string {
