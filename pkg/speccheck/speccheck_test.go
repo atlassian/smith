@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"encoding/json"
+
 	"github.com/atlassian/smith/pkg/cleanup"
 	"github.com/atlassian/smith/pkg/cleanup/types"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
@@ -144,6 +146,28 @@ func TestEqualityCheck(t *testing.T) {
 			assert.True(t, match)
 		})
 	}
+}
+
+func TestDoNotPanicWhenLoggingDiff(t *testing.T) {
+	t.Parallel()
+
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync()
+
+	var expected, actual unstructured.Unstructured
+
+	err := json.Unmarshal([]byte(`{ "kind": "Bundle", "environment": {} }`), &expected)
+	require.NoError(t, err)
+
+	err = json.Unmarshal([]byte(`{ "kind": "Bundle", "environment": "test" }`), &actual)
+	require.NoError(t, err)
+
+	sc := SpecCheck{
+		Logger:  logger,
+		Cleaner: cleanup.New(types.ServiceCatalogKnownTypes, types.MainKnownTypes),
+	}
+	_, _, err = sc.compareActualVsSpec(&expected, &actual)
+	require.NoError(t, err)
 }
 
 func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
