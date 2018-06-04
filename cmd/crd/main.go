@@ -13,7 +13,8 @@ import (
 
 func main() {
 	if err := innerMain(); err != nil {
-		fmt.Fprintf(os.Stderr, "%#v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "%#v", err) // nolint: gas
+		// not handling above error, if we can't output to stderr, what can we do?
 		os.Exit(1)
 	}
 }

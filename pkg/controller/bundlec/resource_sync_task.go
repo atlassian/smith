@@ -164,7 +164,8 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Check if resource is ready
-	if ready, retriable, err := st.rc.IsReady(resUpdated); err != nil {
+	var ready bool
+	if ready, retriable, err = st.rc.IsReady(resUpdated); err != nil {
 		return resourceInfo{
 			actual: resUpdated,
 			status: resourceStatusError{
@@ -318,11 +319,11 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 
 			if serviceInstance.Spec.Parameters != nil {
 				var parameters map[string]interface{}
-				if err := k8s_json.Unmarshal(serviceInstance.Spec.Parameters.Raw, &parameters); err != nil {
+				if err = k8s_json.Unmarshal(serviceInstance.Spec.Parameters.Raw, &parameters); err != nil {
 					return errors.Wrap(err, "unable to unmarshal ServiceInstance resource parameters as object")
 				}
 
-				if err := sp.ProcessObject(parameters); err != nil {
+				if err = sp.ProcessObject(parameters); err != nil {
 					return err
 				}
 

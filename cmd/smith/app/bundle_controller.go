@@ -122,19 +122,7 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 
 	var catalog *store.Catalog
 	if c.ServiceCatalogSupport {
-		serviceClassInf, err := svcCatClusterInformer(config, cctx, scClient,
-			sc_v1b1.SchemeGroupVersion.WithKind("ClusterServiceClass"),
-			sc_v1b1inf.NewClusterServiceClassInformer)
-		if err != nil {
-			return nil, err
-		}
-		servicePlanInf, err := svcCatClusterInformer(config, cctx, scClient,
-			sc_v1b1.SchemeGroupVersion.WithKind("ClusterServicePlan"),
-			sc_v1b1inf.NewClusterServicePlanInformer)
-		if err != nil {
-			return nil, err
-		}
-		catalog, err = store.NewCatalog(serviceClassInf, servicePlanInf)
+		catalog, err = svcCatalog(config, cctx, scClient)
 		if err != nil {
 			return nil, err
 		}
@@ -328,4 +316,20 @@ func svcCatInformer(config *ctrl.Config, cctx *ctrl.Context, scClient scClientse
 		}
 	}
 	return inf, nil
+}
+
+func svcCatalog(config *ctrl.Config, cctx *ctrl.Context, scClient scClientset.Interface) (*store.Catalog, error) {
+	serviceClassInf, err := svcCatClusterInformer(config, cctx, scClient,
+		sc_v1b1.SchemeGroupVersion.WithKind("ClusterServiceClass"),
+		sc_v1b1inf.NewClusterServiceClassInformer)
+	if err != nil {
+		return nil, err
+	}
+	servicePlanInf, err := svcCatClusterInformer(config, cctx, scClient,
+		sc_v1b1.SchemeGroupVersion.WithKind("ClusterServicePlan"),
+		sc_v1b1inf.NewClusterServicePlanInformer)
+	if err != nil {
+		return nil, err
+	}
+	return store.NewCatalog(serviceClassInf, servicePlanInf)
 }
