@@ -96,8 +96,7 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 			return updated, false, nil
 		}
 
-		sc.Logger.Sugar().Infof("Objects are different: %s",
-			diff.ObjectReflectDiff(updated.Object, actualClone.Object))
+		sc.Logger.Sugar().Infof("Objects are different: %s", diff.ObjectDiff(updated.Object, actualClone.Object))
 		return updated, false, nil
 	}
 	return actual, true, nil
