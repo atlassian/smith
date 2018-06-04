@@ -156,16 +156,13 @@ quick-test:
 
 .PHONY: check
 check:
-	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... \
-		--vendor --skip=pkg/client/clientset_generated --exclude=zz_generated \
-		--linter='errcheck:errcheck:-ignore=net:Close' --cyclo-over=30 \
-		--disable=interfacer --disable=golint --dupl-threshold=200
+	gometalinter --concurrency=$(METALINTER_CONCURRENCY) ./... \
+		--linter='errcheck:errcheck:-ignore=net:Close' \
+		--disable=interfacer --disable=golint
 
 .PHONY: check-all
 check-all:
-	gometalinter --concurrency=$(METALINTER_CONCURRENCY) --deadline=800s ./... \
-		--vendor --skip=pkg/client/clientset_generated --exclude=zz_generated \
-		--cyclo-over=30 --dupl-threshold=65
+	gometalinter --concurrency=$(METALINTER_CONCURRENCY) ./...
 
 .PHONY: docker
 docker:

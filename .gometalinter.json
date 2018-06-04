@@ -1,0 +1,12 @@
+{
+  "Cyclo": 30,
+  "Deadline": "800s",
+  "DuplThreshold": 65,
+  "Exclude": [
+    "zz_generated"
+  ],
+  "Skip": [
+    "pkg/client/clientset_generated"
+  ],
+  "Vendor": true
+}
