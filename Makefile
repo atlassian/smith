@@ -5,8 +5,11 @@ BINARY_PREFIX_DIRECTORY=$(OS)_amd64_stripped
 KUBE_CONTEXT ?= minikube
 
 .PHONY: setup-dev
-setup-dev: setup-base
+setup-dev: setup-ci
 	go get -u golang.org/x/tools/cmd/goimports
+
+.PHONY: setup-ci
+setup-ci: setup-base
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
 

@@ -46,7 +46,7 @@ before_install:
 #  - minikube update-context
 
 install:
-  - make setup-dev
+  - make setup-ci
 
 script:
   - make check
