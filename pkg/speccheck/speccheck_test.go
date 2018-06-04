@@ -1,10 +1,9 @@
 package speccheck
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
-
-	"encoding/json"
 
 	"github.com/atlassian/smith/pkg/cleanup"
 	"github.com/atlassian/smith/pkg/cleanup/types"
