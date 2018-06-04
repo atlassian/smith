@@ -282,6 +282,7 @@ func (tc *testCase) run(t *testing.T) {
 	}
 
 	defer tc.verifyActions(t)
+	defer tc.verifyPluginStatuses(t)
 	defer tc.verifyPlugins(t)
 
 	if tc.testTimeout != 0 {
@@ -325,6 +326,47 @@ func (tc *testCase) verifyPlugins(t *testing.T) {
 	unexpectedInvocations := invokedPlugins.Difference(tc.pluginsShouldBeInvoked)
 	assert.Empty(t, missingPlugins, "expected plugin invocations that were not observed")
 	assert.Empty(t, unexpectedInvocations, "observed plugin invocations that were not expected")
+}
+
+func (tc *testCase) verifyPluginStatuses(t *testing.T) {
+	var bundle *smith_v1.Bundle
+	for _, action := range tc.smithFake.Actions() {
+		bundleUpdate, ok := action.(kube_testing.UpdateAction)
+		if !ok {
+			continue
+		}
+		bundle = bundleUpdate.GetObject().(*smith_v1.Bundle)
+		// Keep iterating to get the latest action (should be only one actually)
+	}
+	if bundle == nil {
+		t.Log("No Bundle updates found, not checking plugin statuses")
+		return
+	}
+	pluginNames := map[smith_v1.PluginName]struct{}{}
+	for _, res := range tc.bundle.Spec.Resources {
+		if res.Spec.Plugin == nil {
+			continue
+		}
+		pluginNames[res.Spec.Plugin.Name] = struct{}{}
+	}
+	assert.Len(t, bundle.Status.PluginStatuses, len(pluginNames))
+nextPlugin:
+	for _, pluginStatus := range bundle.Status.PluginStatuses {
+		for _, constructedPlugin := range tc.pluginsConstructed {
+			describe := constructedPlugin.Describe()
+			if pluginStatus.Name != describe.Name {
+				continue
+			}
+			assert.Equal(t, smith_v1.PluginStatusOk, pluginStatus.Status)
+			assert.Equal(t, describe.GVK, schema.GroupVersionKind{
+				Group:   pluginStatus.Group,
+				Version: pluginStatus.Version,
+				Kind:    pluginStatus.Kind,
+			})
+			continue nextPlugin
+		}
+		t.Errorf("plugin status for %s that has not been constructed", pluginStatus.Name)
+	}
 }
 
 func (tc *testCase) assertObjectsToBeDeleted(t *testing.T, objs ...runtime.Object) {
