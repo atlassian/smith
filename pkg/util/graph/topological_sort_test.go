@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,6 +94,27 @@ func TestSortMissingVertexError(t *testing.T) {
 	g := initGraph()
 
 	require.Error(t, g.AddEdge("a", "x"), "vertex \"x\" not found")
+}
+
+func TestSortIsDeterministic(t *testing.T) {
+	t.Parallel()
+
+	for n := 0; n <= 100; n++ {
+		t.Run(fmt.Sprintf("Case%v", n), sortIsDeterministic)
+	}
+}
+
+func sortIsDeterministic(t *testing.T) {
+	g := initGraph()
+
+	// a -> b
+	// a -> c
+	// a -> d
+	require.NoError(t, g.AddEdge("a", "b"))
+	require.NoError(t, g.AddEdge("a", "c"))
+	require.NoError(t, g.AddEdge("a", "d"))
+
+	assertSortResult(t, g, []V{"b", "c", "d", "a"})
 }
 
 func initGraph() *Graph {
