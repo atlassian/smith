@@ -11,7 +11,7 @@ setup-dev: setup-ci
 .PHONY: setup-ci
 setup-ci: setup-base
 	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install
+	gometalinter --install --force
 
 .PHONY: setup-base
 setup-base:
