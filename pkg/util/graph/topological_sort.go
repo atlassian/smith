@@ -27,7 +27,7 @@ func (g *Graph) visit(name V, results *orderedset, visited *orderedset) error {
 	}
 
 	n := g.Vertices[name]
-	for _, edge := range n.Edges() {
+	for _, edge := range n.OutgoingEdges {
 		err := g.visit(edge, results, visited.clone())
 		if err != nil {
 			return err
