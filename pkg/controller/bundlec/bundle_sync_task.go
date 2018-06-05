@@ -378,37 +378,7 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		bundleUpdated = updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
 
 		// Plugin statuses
-		name2status := make(map[smith_v1.PluginName]struct{})
-		// most likely will be of the same size as before
-		pluginStatuses := make([]smith_v1.PluginStatus, 0, len(st.bundle.Status.PluginStatuses))
-		for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
-			if res.Spec.Plugin == nil {
-				continue // Not a plugin
-			}
-			pluginName := res.Spec.Plugin.Name
-			if _, ok := name2status[pluginName]; ok {
-				continue // Already reported
-			}
-			name2status[pluginName] = struct{}{}
-			var pluginStatus smith_v1.PluginStatus
-			pluginContainer, ok := st.pluginContainers[pluginName]
-			if ok {
-				describe := pluginContainer.Plugin.Describe()
-				pluginStatus = smith_v1.PluginStatus{
-					Name:    pluginName,
-					Group:   describe.GVK.Group,
-					Version: describe.GVK.Version,
-					Kind:    describe.GVK.Kind,
-					Status:  smith_v1.PluginStatusOk,
-				}
-			} else {
-				pluginStatus = smith_v1.PluginStatus{
-					Name:   pluginName,
-					Status: smith_v1.PluginStatusNoSuchPlugin,
-				}
-			}
-			pluginStatuses = append(pluginStatuses, pluginStatus)
-		}
+		pluginStatuses := st.pluginStatuses()
 		bundleUpdated = bundleUpdated || !reflect.DeepEqual(st.bundle.Status.PluginStatuses, pluginStatuses)
 		st.bundle.Status.PluginStatuses = pluginStatuses
 
@@ -505,6 +475,43 @@ func (st *bundleSyncTask) isBundleReady() bool {
 type objectRef struct {
 	schema.GroupVersionKind
 	Name string
+}
+
+// pluginStatuses visits each valid Plugin just once, collecting its PluginStatus.
+func (st *bundleSyncTask) pluginStatuses() []smith_v1.PluginStatus {
+	// Plugin statuses
+	name2status := make(map[smith_v1.PluginName]struct{})
+	// most likely will be of the same size as before
+	pluginStatuses := make([]smith_v1.PluginStatus, 0, len(st.bundle.Status.PluginStatuses))
+	for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
+		if res.Spec.Plugin == nil {
+			continue // Not a plugin
+		}
+		pluginName := res.Spec.Plugin.Name
+		if _, ok := name2status[pluginName]; ok {
+			continue // Already reported
+		}
+		name2status[pluginName] = struct{}{}
+		var pluginStatus smith_v1.PluginStatus
+		pluginContainer, ok := st.pluginContainers[pluginName]
+		if ok {
+			describe := pluginContainer.Plugin.Describe()
+			pluginStatus = smith_v1.PluginStatus{
+				Name:    pluginName,
+				Group:   describe.GVK.Group,
+				Version: describe.GVK.Version,
+				Kind:    describe.GVK.Kind,
+				Status:  smith_v1.PluginStatusOk,
+			}
+		} else {
+			pluginStatus = smith_v1.PluginStatus{
+				Name:   pluginName,
+				Status: smith_v1.PluginStatusNoSuchPlugin,
+			}
+		}
+		pluginStatuses = append(pluginStatuses, pluginStatus)
+	}
+	return pluginStatuses
 }
 
 // resourceConditions calculates conditions for a given Resource,
