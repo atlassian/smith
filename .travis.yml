@@ -46,7 +46,7 @@ before_install:
 #  - minikube update-context
 
 install:
-  - make setup-base
+  - make setup-ci
 
 script:
   - make update-bazel
@@ -58,6 +58,7 @@ script:
 #    done
 #  - make integration-test-ci
   - make docker
+  - make check
 
 after_success:
   - if [ "$TRAVIS_OS_NAME" == "linux" -a ! -z "$TRAVIS_TAG" ]; then

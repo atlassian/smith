@@ -329,50 +329,13 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		var failedResources []smith_v1.ResourceName
 		retriableResourceErr := true
 		for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
-			blockedCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceBlocked, Status: smith_v1.ConditionFalse}
-			inProgressCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceInProgress, Status: smith_v1.ConditionFalse}
-			readyCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceReady, Status: smith_v1.ConditionFalse}
-			errorCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceError, Status: smith_v1.ConditionFalse}
+			blockedCond, inProgressCond, readyCond, errorCond := st.resourceConditions(res)
 
-			if resInfo, ok := st.processedResources[res.Name]; ok {
-				// Resource was processed
-				switch resStatus := resInfo.status.(type) {
-				case resourceStatusDependenciesNotReady:
-					blockedCond.Status = smith_v1.ConditionTrue
-					blockedCond.Reason = smith_v1.ResourceReasonDependenciesNotReady
-					blockedCond.Message = fmt.Sprintf("Not ready: %q", resStatus.dependencies)
-				case resourceStatusInProgress:
-					inProgressCond.Status = smith_v1.ConditionTrue
-				case resourceStatusReady:
-					readyCond.Status = smith_v1.ConditionTrue
-				case resourceStatusError:
-					errorCond.Status = smith_v1.ConditionTrue
-					errorCond.Message = resStatus.err.Error()
-					if resStatus.isRetriableError {
-						errorCond.Reason = smith_v1.ResourceReasonRetriableError
-						inProgressCond.Status = smith_v1.ConditionTrue
-					} else {
-						errorCond.Reason = smith_v1.ResourceReasonTerminalError
-					}
-					failedResources = append(failedResources, res.Name)
-					retriableResourceErr = retriableResourceErr && resStatus.isRetriableError // Must not continue if at least one error is not retriable
-				default:
-					blockedCond.Status = smith_v1.ConditionUnknown
-					inProgressCond.Status = smith_v1.ConditionUnknown
-					readyCond.Status = smith_v1.ConditionUnknown
-					errorCond.Status = smith_v1.ConditionTrue
-					errorCond.Reason = smith_v1.ResourceReasonTerminalError
-					errorCond.Message = fmt.Sprintf("internal error - unknown resource status type %T", resInfo.status)
-					failedResources = append(failedResources, res.Name)
-					retriableResourceErr = false
-				}
-			} else {
-				// Resource was not processed
-				blockedCond.Status = smith_v1.ConditionUnknown
-				inProgressCond.Status = smith_v1.ConditionUnknown
-				readyCond.Status = smith_v1.ConditionUnknown
-				errorCond.Status = smith_v1.ConditionUnknown
+			if errorCond.Status == smith_v1.ConditionTrue {
+				failedResources = append(failedResources, res.Name)
+				retriableResourceErr = retriableResourceErr && errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must not continue if at least one error is not retriable
 			}
+
 			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &blockedCond) || bundleUpdated
 			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &inProgressCond) || bundleUpdated
 			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &readyCond) || bundleUpdated
@@ -415,37 +378,7 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		bundleUpdated = updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
 
 		// Plugin statuses
-		name2status := make(map[smith_v1.PluginName]struct{})
-		// most likely will be of the same size as before
-		pluginStatuses := make([]smith_v1.PluginStatus, 0, len(st.bundle.Status.PluginStatuses))
-		for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
-			if res.Spec.Plugin == nil {
-				continue // Not a plugin
-			}
-			pluginName := res.Spec.Plugin.Name
-			if _, ok := name2status[pluginName]; ok {
-				continue // Already reported
-			}
-			name2status[pluginName] = struct{}{}
-			var pluginStatus smith_v1.PluginStatus
-			pluginContainer, ok := st.pluginContainers[pluginName]
-			if ok {
-				describe := pluginContainer.Plugin.Describe()
-				pluginStatus = smith_v1.PluginStatus{
-					Name:    pluginName,
-					Group:   describe.GVK.Group,
-					Version: describe.GVK.Version,
-					Kind:    describe.GVK.Kind,
-					Status:  smith_v1.PluginStatusOk,
-				}
-			} else {
-				pluginStatus = smith_v1.PluginStatus{
-					Name:   pluginName,
-					Status: smith_v1.PluginStatusNoSuchPlugin,
-				}
-			}
-			pluginStatuses = append(pluginStatuses, pluginStatus)
-		}
+		pluginStatuses := st.pluginStatuses()
 		bundleUpdated = bundleUpdated || !reflect.DeepEqual(st.bundle.Status.PluginStatuses, pluginStatuses)
 		st.bundle.Status.PluginStatuses = pluginStatuses
 
@@ -542,6 +475,95 @@ func (st *bundleSyncTask) isBundleReady() bool {
 type objectRef struct {
 	schema.GroupVersionKind
 	Name string
+}
+
+// pluginStatuses visits each valid Plugin just once, collecting its PluginStatus.
+func (st *bundleSyncTask) pluginStatuses() []smith_v1.PluginStatus {
+	// Plugin statuses
+	name2status := make(map[smith_v1.PluginName]struct{})
+	// most likely will be of the same size as before
+	pluginStatuses := make([]smith_v1.PluginStatus, 0, len(st.bundle.Status.PluginStatuses))
+	for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
+		if res.Spec.Plugin == nil {
+			continue // Not a plugin
+		}
+		pluginName := res.Spec.Plugin.Name
+		if _, ok := name2status[pluginName]; ok {
+			continue // Already reported
+		}
+		name2status[pluginName] = struct{}{}
+		var pluginStatus smith_v1.PluginStatus
+		pluginContainer, ok := st.pluginContainers[pluginName]
+		if ok {
+			describe := pluginContainer.Plugin.Describe()
+			pluginStatus = smith_v1.PluginStatus{
+				Name:    pluginName,
+				Group:   describe.GVK.Group,
+				Version: describe.GVK.Version,
+				Kind:    describe.GVK.Kind,
+				Status:  smith_v1.PluginStatusOk,
+			}
+		} else {
+			pluginStatus = smith_v1.PluginStatus{
+				Name:   pluginName,
+				Status: smith_v1.PluginStatusNoSuchPlugin,
+			}
+		}
+		pluginStatuses = append(pluginStatuses, pluginStatus)
+	}
+	return pluginStatuses
+}
+
+// resourceConditions calculates conditions for a given Resource,
+// which can be useful when determining whether to retry or not.
+func (st *bundleSyncTask) resourceConditions(res smith_v1.Resource) (
+	smith_v1.ResourceCondition, /* blockedCond */
+	smith_v1.ResourceCondition, /* inProgressCond */
+	smith_v1.ResourceCondition, /* readyCond */
+	smith_v1.ResourceCondition, /* errorCond */
+) {
+	blockedCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceBlocked, Status: smith_v1.ConditionFalse}
+	inProgressCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceInProgress, Status: smith_v1.ConditionFalse}
+	readyCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceReady, Status: smith_v1.ConditionFalse}
+	errorCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceError, Status: smith_v1.ConditionFalse}
+
+	if resInfo, ok := st.processedResources[res.Name]; ok {
+		// Resource was processed
+		switch resStatus := resInfo.status.(type) {
+		case resourceStatusDependenciesNotReady:
+			blockedCond.Status = smith_v1.ConditionTrue
+			blockedCond.Reason = smith_v1.ResourceReasonDependenciesNotReady
+			blockedCond.Message = fmt.Sprintf("Not ready: %q", resStatus.dependencies)
+		case resourceStatusInProgress:
+			inProgressCond.Status = smith_v1.ConditionTrue
+		case resourceStatusReady:
+			readyCond.Status = smith_v1.ConditionTrue
+		case resourceStatusError:
+			errorCond.Status = smith_v1.ConditionTrue
+			errorCond.Message = resStatus.err.Error()
+			if resStatus.isRetriableError {
+				errorCond.Reason = smith_v1.ResourceReasonRetriableError
+				inProgressCond.Status = smith_v1.ConditionTrue
+			} else {
+				errorCond.Reason = smith_v1.ResourceReasonTerminalError
+			}
+		default:
+			blockedCond.Status = smith_v1.ConditionUnknown
+			inProgressCond.Status = smith_v1.ConditionUnknown
+			readyCond.Status = smith_v1.ConditionUnknown
+			errorCond.Status = smith_v1.ConditionTrue
+			errorCond.Reason = smith_v1.ResourceReasonTerminalError
+			errorCond.Message = fmt.Sprintf("internal error - unknown resource status type %T", resInfo.status)
+		}
+	} else {
+		// Resource was not processed
+		blockedCond.Status = smith_v1.ConditionUnknown
+		inProgressCond.Status = smith_v1.ConditionUnknown
+		readyCond.Status = smith_v1.ConditionUnknown
+		errorCond.Status = smith_v1.ConditionUnknown
+	}
+
+	return blockedCond, inProgressCond, readyCond, errorCond
 }
 
 // updateBundleCondition updates passed condition by fetching information from an existing resource condition if present.
