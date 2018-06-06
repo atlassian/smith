@@ -8,8 +8,8 @@ setup-dev: setup-ci
 
 .PHONY: setup-ci
 setup-ci: setup-base
-	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install --force
+	go get -u gopkg.in/alecthomas/gometalinter.v2
+	gometalinter.v2 --install --force
 
 .PHONY: setup-base
 setup-base:
@@ -147,13 +147,13 @@ quick-test:
 
 .PHONY: check
 check:
-	gometalinter --concurrency=$(METALINTER_CONCURRENCY) ./... \
+	gometalinter.v2 --concurrency=$(METALINTER_CONCURRENCY) ./... \
 		--linter='errcheck:errcheck:-ignore=net:Close' \
 		--disable=interfacer --disable=golint
 
 .PHONY: check-all
 check-all:
-	gometalinter --concurrency=$(METALINTER_CONCURRENCY) ./...
+	gometalinter.v2 --concurrency=$(METALINTER_CONCURRENCY) ./...
 
 .PHONY: docker
 docker:
