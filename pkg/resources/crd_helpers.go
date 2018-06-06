@@ -28,7 +28,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 
 	// definitions are not supported, do what we can :)
 
-	DNS_SUBDOMAIN := apiext_v1b1.JSONSchemaProps{
+	dnsSubdomain := apiext_v1b1.JSONSchemaProps{
 		Type:      "string",
 		MinLength: int64ptr(1),
 		MaxLength: int64ptr(253),
@@ -40,7 +40,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 		MaxLength: int64ptr(253),
 		Pattern:   `^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?)*$`,
 	}
-	resourceName := DNS_SUBDOMAIN
+	resourceName := dnsSubdomain
 	apiVersion := apiext_v1b1.JSONSchemaProps{
 		Type:      "string",
 		MinLength: int64ptr(1),
@@ -55,7 +55,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 		Properties: map[string]apiext_v1b1.JSONSchemaProps{
 			"kind":       kind,
 			"apiVersion": apiVersion,
-			"name":       DNS_SUBDOMAIN,
+			"name":       dnsSubdomain,
 			"blockOwnerDeletion": {
 				Type: "boolean",
 			},
@@ -77,7 +77,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 		Description: "Schema for some fields of ObjectMeta",
 		Type:        "object",
 		Properties: map[string]apiext_v1b1.JSONSchemaProps{
-			"name": DNS_SUBDOMAIN,
+			"name": dnsSubdomain,
 			"labels": {
 				Type: "object",
 				// TODO there is a bug in marshling/unmarshaling of AdditionalProperties
@@ -142,8 +142,8 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 		Type:        "object",
 		Required:    []string{"name", "objectName"},
 		Properties: map[string]apiext_v1b1.JSONSchemaProps{
-			"name":       DNS_SUBDOMAIN,
-			"objectName": DNS_SUBDOMAIN,
+			"name":       dnsSubdomain,
+			"objectName": dnsSubdomain,
 			"spec": {
 				Type: "object",
 			},
@@ -159,7 +159,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			"example": {
 				Description: "example of how we expect reference to resolve. Used for validation",
 			},
-			"modifier": DNS_SUBDOMAIN,
+			"modifier": dnsSubdomain,
 			"path": {
 				Description: "JSONPath expression used to extract data from resource",
 				Type:        "string",

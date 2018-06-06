@@ -33,7 +33,7 @@ type bundleSyncTask struct {
 	store            Store
 	specCheck        SpecCheck
 	bundle           *smith_v1.Bundle
-	pluginContainers map[smith_v1.PluginName]plugin.PluginContainer
+	pluginContainers map[smith_v1.PluginName]plugin.Container
 	scheme           *runtime.Scheme
 	catalog          *store.Catalog
 

@@ -83,7 +83,7 @@ func (rc *ReadyChecker) checkPathValue(gk schema.GroupKind, obj *unstructured.Un
 	if len(path) == 0 || len(value) == 0 {
 		return false, false, nil
 	}
-	actualValue, err := resources.GetJsonPathString(obj.Object, path)
+	actualValue, err := resources.GetJSONPathString(obj.Object, path)
 	if err != nil {
 		return false, false, err
 	}

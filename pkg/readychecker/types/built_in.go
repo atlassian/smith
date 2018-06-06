@@ -26,16 +26,16 @@ var (
 		{Group: sc_v1b1.GroupName, Kind: "ServiceBinding"}:  isScServiceBindingReady,
 		{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: isScServiceInstanceReady,
 	}
-	apps_v1_scheme = runtime.NewScheme()
-	sc_v1b1_scheme = runtime.NewScheme()
+	appsV1Scheme = runtime.NewScheme()
+	scV1B1Scheme = runtime.NewScheme()
 )
 
 func init() {
-	err := apps_v1.SchemeBuilder.AddToScheme(apps_v1_scheme)
+	err := apps_v1.SchemeBuilder.AddToScheme(appsV1Scheme)
 	if err != nil {
 		panic(err)
 	}
-	err = sc_v1b1.SchemeBuilder.AddToScheme(sc_v1b1_scheme)
+	err = sc_v1b1.SchemeBuilder.AddToScheme(scV1B1Scheme)
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +49,7 @@ func alwaysReady(_ runtime.Object) (isReady, retriableError bool, e error) {
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
 func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e error) {
 	var deployment apps_v1.Deployment
-	if err := util.ConvertType(apps_v1_scheme, obj, &deployment); err != nil {
+	if err := util.ConvertType(appsV1Scheme, obj, &deployment); err != nil {
 		return false, false, err
 	}
 
@@ -64,7 +64,7 @@ func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e erro
 
 func isScServiceBindingReady(obj runtime.Object) (isReady, retriableError bool, e error) {
 	var sic sc_v1b1.ServiceBinding
-	if err := util.ConvertType(sc_v1b1_scheme, obj, &sic); err != nil {
+	if err := util.ConvertType(scV1B1Scheme, obj, &sic); err != nil {
 		return false, false, err
 	}
 	readyCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionReady)
@@ -82,7 +82,7 @@ func isScServiceBindingReady(obj runtime.Object) (isReady, retriableError bool, 
 
 func isScServiceInstanceReady(obj runtime.Object) (isReady, retriableError bool, e error) {
 	var instance sc_v1b1.ServiceInstance
-	if err := util.ConvertType(sc_v1b1_scheme, obj, &instance); err != nil {
+	if err := util.ConvertType(scV1B1Scheme, obj, &instance); err != nil {
 		return false, false, err
 	}
 	readyCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionReady)

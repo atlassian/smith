@@ -239,7 +239,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	}
 
 	crdLister := apiext_v1b1list.NewCustomResourceDefinitionLister(crdInf.GetIndexer())
-	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, apiExtClient, crdLister, sleeper.SleeperCrd()))
+	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, apiExtClient, crdLister, sleeper.Crd()))
 	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, apiExtClient, crdLister, resources.BundleCrd()))
 
 	stage.StartWithContext(func(ctx context.Context) {

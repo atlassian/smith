@@ -8,9 +8,9 @@ import (
 	"k8s.io/client-go/util/jsonpath"
 )
 
-// GetJsonPathString extracts the value from the object using given JsonPath template, in a string format
-func GetJsonPathString(obj interface{}, path string) (string, error) {
-	j := jsonpath.New("GetJsonPathString")
+// GetJSONPathString extracts the value from the object using given JsonPath template, in a string format
+func GetJSONPathString(obj interface{}, path string) (string, error) {
+	j := jsonpath.New("GetJSONPathString")
 	// If the key is missing, return an empty string without errors
 	j.AllowMissingKeys(true)
 	err := j.Parse(path)
@@ -25,9 +25,9 @@ func GetJsonPathString(obj interface{}, path string) (string, error) {
 	return buf.String(), nil
 }
 
-// GetJsonPathValue extracts the value from the object using given JsonPath template
-func GetJsonPathValue(obj interface{}, path string, allowMissingKeys bool) (interface{}, error) {
-	j := jsonpath.New("GetJsonPathValue")
+// GetJSONPathValue extracts the value from the object using given JsonPath template
+func GetJSONPathValue(obj interface{}, path string, allowMissingKeys bool) (interface{}, error) {
+	j := jsonpath.New("GetJSONPathValue")
 	// If the key is missing, return an empty string without errors
 	j.AllowMissingKeys(allowMissingKeys)
 	err := j.Parse(path)

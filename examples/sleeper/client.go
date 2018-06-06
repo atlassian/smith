@@ -35,7 +35,7 @@ func Client(cfg *rest.Config) (*rest.RESTClient, error) {
 	return rest.RESTClientFor(&config)
 }
 
-func SleeperCrd() *apiext_v1b1.CustomResourceDefinition {
+func Crd() *apiext_v1b1.CustomResourceDefinition {
 	return &apiext_v1b1.CustomResourceDefinition{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: sleeper_v1.SleeperResourceName,

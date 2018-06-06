@@ -45,7 +45,7 @@ type Controller struct {
 	resourceHandler cache.ResourceEventHandler
 	Namespace       string
 
-	PluginContainers map[smith_v1.PluginName]plugin.PluginContainer
+	PluginContainers map[smith_v1.PluginName]plugin.Container
 	Scheme           *runtime.Scheme
 
 	Catalog *store.Catalog

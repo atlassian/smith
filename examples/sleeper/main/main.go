@@ -15,7 +15,7 @@ import (
 
 func main() {
 	if err := run(); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-		fmt.Fprintf(os.Stderr, "%#v", err)
+		fmt.Fprintf(os.Stderr, "%#v", err) // nolint: gas
 		os.Exit(1)
 	}
 }

@@ -11,27 +11,27 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type SleeperEventHandler struct {
+type EventHandler struct {
 	ctx    context.Context
 	logger *zap.Logger
 	client rest.Interface
 }
 
-func (h *SleeperEventHandler) OnAdd(obj interface{}) {
+func (h *EventHandler) OnAdd(obj interface{}) {
 	h.handle(obj)
 }
 
-func (h *SleeperEventHandler) OnUpdate(oldObj, newObj interface{}) {
+func (h *EventHandler) OnUpdate(oldObj, newObj interface{}) {
 	in := *newObj.(*sleeper_v1.Sleeper)
 	if in.Status.State == sleeper_v1.New {
 		h.handle(newObj)
 	}
 }
 
-func (h *SleeperEventHandler) OnDelete(obj interface{}) {
+func (h *EventHandler) OnDelete(obj interface{}) {
 }
 
-func (h *SleeperEventHandler) handle(obj interface{}) {
+func (h *EventHandler) handle(obj interface{}) {
 	in := obj.(*sleeper_v1.Sleeper).DeepCopy()
 	msg := in.Spec.WakeupMessage
 	logger := h.logger.With(ctrlLogz.Namespace(in), ctrlLogz.Object(in))
@@ -55,7 +55,7 @@ func (h *SleeperEventHandler) handle(obj interface{}) {
 	}()
 }
 
-func (h *SleeperEventHandler) retryUpdate(sleeper *sleeper_v1.Sleeper, state sleeper_v1.SleeperState, message string) error {
+func (h *EventHandler) retryUpdate(sleeper *sleeper_v1.Sleeper, state sleeper_v1.SleeperState, message string) error {
 	for {
 		sleeper.Status.State = state
 		sleeper.Status.Message = message

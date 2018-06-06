@@ -186,7 +186,7 @@ func resolveReference(resInfos map[smith_v1.ResourceName]*resourceInfo, referenc
 	// To avoid overcomplicated format of reference like this: {{res1#{$.a.string}}}
 	// And have something like this instead: {{res1#a.string}}
 	jsonPath := fmt.Sprintf("{$.%s}", reference.Path)
-	fieldValue, err := resources.GetJsonPathValue(objToTraverse, jsonPath, false)
+	fieldValue, err := resources.GetJSONPathValue(objToTraverse, jsonPath, false)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to process reference %q", reference.Name)
 	}

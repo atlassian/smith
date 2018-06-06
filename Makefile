@@ -149,7 +149,7 @@ quick-test:
 check:
 	gometalinter.v2 --concurrency=$(METALINTER_CONCURRENCY) ./... \
 		--linter='errcheck:errcheck:-ignore=net:Close' \
-		--disable=interfacer --disable=golint
+		--disable=interfacer
 
 .PHONY: check-all
 check-all:

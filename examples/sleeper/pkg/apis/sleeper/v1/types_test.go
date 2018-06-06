@@ -30,7 +30,7 @@ func TestGetJsonPathStringSleeper(t *testing.T) {
 	unstructured := make(map[string]interface{})
 	err = json.Unmarshal(bytes, &unstructured)
 	require.NoError(t, err)
-	status, err := resources.GetJsonPathString(unstructured, SleeperReadyStatePath)
+	status, err := resources.GetJSONPathString(unstructured, SleeperReadyStatePath)
 	require.NoError(t, err)
 	assert.Equal(t, string(SleeperReadyStateValue), status)
 }

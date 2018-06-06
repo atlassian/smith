@@ -39,12 +39,12 @@ func LoadConfig(configFileFrom, configFileName, configContext string) (*rest.Con
 	case "environment":
 		config, err = ConfigFromEnv()
 	case "file":
-		var configApi *clientcmdapi.Config
-		configApi, err = clientcmd.LoadFromFile(configFileName)
+		var configAPI *clientcmdapi.Config
+		configAPI, err = clientcmd.LoadFromFile(configFileName)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to load REST client configuration from file %q", configFileName)
 		}
-		config, err = clientcmd.NewDefaultClientConfig(*configApi, &clientcmd.ConfigOverrides{
+		config, err = clientcmd.NewDefaultClientConfig(*configAPI, &clientcmd.ConfigOverrides{
 			CurrentContext: configContext,
 		}).ClientConfig()
 	default:

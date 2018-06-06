@@ -40,13 +40,13 @@ func (a *App) sleeperInformer(ctx context.Context, sClient rest.Interface) cache
 		cache.NewListWatchFromClient(sClient, sleeper_v1.SleeperResourcePlural, a.Namespace, fields.Everything()),
 		&sleeper_v1.Sleeper{}, ResyncPeriod)
 
-	seh := &SleeperEventHandler{
+	eh := &EventHandler{
 		ctx:    ctx,
 		logger: a.Logger,
 		client: sClient,
 	}
 
-	sleeperInf.AddEventHandler(seh)
+	sleeperInf.AddEventHandler(eh)
 
 	return sleeperInf
 }
