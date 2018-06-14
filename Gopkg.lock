@@ -23,24 +23,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/bazelbuild/buildtools"
-  packages = [
-    "api_proto",
-    "build",
-    "build_proto",
-    "buildifier",
-    "buildozer",
-    "differ",
-    "edit",
-    "file",
-    "lang",
-    "tables",
-    "wspace"
-  ]
-  revision = "331d283a59329fee6ca033fbaf8f7560b2be3718"
-
-[[projects]]
-  branch = "master"
   name = "github.com/beorn7/perks"
   packages = ["quantile"]
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
@@ -622,6 +604,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4d8037251c060b0ca05bf6e9c23d9968d805159155e435819a954ab29497706b"
+  inputs-digest = "1e8755d41a5c2cf73b9ae2127eafe52d970ca5db7f925668f9cc83c11d3738b3"
   solver-name = "gps-cdcl"
   solver-version = 1

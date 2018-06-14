@@ -23,8 +23,6 @@
 required = [
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",
-    "github.com/bazelbuild/buildtools/buildozer",
-    "github.com/bazelbuild/buildtools/buildifier"
 ]
 
 [prune]
@@ -34,10 +32,6 @@ required = [
 [[override]]
   branch = "release-1.10" # correct branch
   name = "k8s.io/code-generator"
-
-[[constraint]]
-  branch = "master" # latest
-  name = "github.com/bazelbuild/buildtools"
 
 [[override]]
   revision = "01a732e01d00cb9a81bb0ca050d3e6d2b947927b" # from 1.10 branch

@@ -8,6 +8,8 @@
 
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
+load("@com_github_atlassian_bazel_tools//buildozer:def.bzl", "buildozer")
 
 gazelle(
     name = "gazelle",
@@ -27,4 +29,20 @@ go_library(
     srcs = ["api.go"],
     importpath = "github.com/atlassian/smith",
     visibility = ["//visibility:public"],
+)
+
+buildifier(
+    name = "buildifier",
+    exclude_patterns = ["./vendor/*"],
+)
+
+buildifier(
+    name = "buildifier_check",
+    exclude_patterns = ["./vendor/*"],
+    mode = "check",
+)
+
+buildozer(
+    name = "buildozer",
+    commands = "//build:buildozer_commands.txt",
 )

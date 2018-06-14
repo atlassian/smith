@@ -1,0 +1,3 @@
+set race "on"|//...:%go_test
+add tags exclude_from_tests|//...:%go_image
+fix unusedLoads|//...:__pkg__

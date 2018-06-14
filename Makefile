@@ -19,16 +19,8 @@ setup-base:
 
 .PHONY: fmt-bazel
 fmt-bazel:
-	bazel build //vendor/github.com/bazelbuild/buildtools/buildifier //vendor/github.com/bazelbuild/buildtools/buildozer
-	-bazel-bin/vendor/github.com/bazelbuild/buildtools/buildozer/$(BINARY_PREFIX_DIRECTORY)/buildozer \
-		'set race "on"' \
-		//:%go_test \
-		//cmd/...:%go_test \
-		//examples/...:%go_test \
-		//it/...:%go_test \
-		//pkg/...:%go_test
-	find . -not -path "./vendor/*" -and \( -name '*.bzl' -or -name 'BUILD.bazel' -or -name 'WORKSPACE' \) -exec \
-		bazel-bin/vendor/github.com/bazelbuild/buildtools/buildifier/$(BINARY_PREFIX_DIRECTORY)/buildifier {} +
+	-bazel run //:buildozer
+	-bazel run //:buildifier
 
 .PHONY: update-bazel
 update-bazel:
@@ -136,9 +128,7 @@ test: fmt update-bazel test-ci
 
 .PHONY: verify
 verify:
-	bazel build //vendor/github.com/bazelbuild/buildtools/buildifier
-	find . -not -path "./vendor/*" -and \( -name '*.bzl' -or -name 'BUILD.bazel' -or -name 'WORKSPACE' \) -exec \
-		bazel-bin/vendor/github.com/bazelbuild/buildtools/buildifier/$(BINARY_PREFIX_DIRECTORY)/buildifier -showlog -mode=check {} +
+	bazel run //:buildifier_check
 	VERIFY_CODE=--verify-only make generate
 	# TODO verify BUILD.bazel files are up to date
 
