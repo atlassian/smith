@@ -30,9 +30,9 @@ http_archive(
 
 http_archive(
     name = "com_github_atlassian_bazel_tools",
-    sha256 = "0e73051b2ee35fccf7100bc58169fd95653d57b33d3ae2c27f87d5391af40a01",
-    strip_prefix = "bazel-tools-5ecaf1b6a74c0375dcc62c763d5350b3abe64fea",
-    urls = ["https://github.com/atlassian/bazel-tools/archive/5ecaf1b6a74c0375dcc62c763d5350b3abe64fea.zip"],
+    sha256 = "c6abcc19e65707a0232e4523d68c0d320f780db9f3eb0e36adea4fcd1055463b",
+    strip_prefix = "bazel-tools-06d357a7c08ab0854821e106f0891aa80d130b35",
+    urls = ["https://github.com/atlassian/bazel-tools/archive/06d357a7c08ab0854821e106f0891aa80d130b35.tar.gz"],
 )
 
 load("@io_bazel_rules_go//go:def.bzl", "go_register_toolchains", "go_rules_dependencies")
@@ -43,6 +43,7 @@ load(
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 load("@com_github_bazelbuild_buildtools//buildifier:deps.bzl", "buildifier_dependencies")
 load("@com_github_atlassian_bazel_tools//buildozer:deps.bzl", "buildozer_dependencies")
+load("@com_github_atlassian_bazel_tools//goimports:deps.bzl", "goimports_dependencies")
 
 go_rules_dependencies()
 
@@ -55,3 +56,5 @@ gazelle_dependencies()
 buildifier_dependencies()
 
 buildozer_dependencies()
+
+goimports_dependencies()
