@@ -1,12 +1,10 @@
 METALINTER_CONCURRENCY ?= 4
-ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./build/*" -not -path './pkg/client/clientset_generated/*' -not -name 'zz_generated.*')
 OS = $$(uname -s | tr A-Z a-z)
 BINARY_PREFIX_DIRECTORY=$(OS)_amd64_stripped
 KUBE_CONTEXT ?= minikube
 
 .PHONY: setup-dev
 setup-dev: setup-ci
-	go get -u golang.org/x/tools/cmd/goimports
 
 .PHONY: setup-ci
 setup-ci: setup-base
@@ -28,7 +26,7 @@ update-bazel:
 
 .PHONY: fmt
 fmt:
-	goimports -w=true -d $(ALL_GO_FILES)
+	bazel run //:goimports
 
 .PHONY: print-bundle-crd
 print-bundle-crd: fmt update-bazel
