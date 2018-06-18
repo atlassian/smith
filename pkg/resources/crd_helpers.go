@@ -34,6 +34,12 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 		MaxLength: int64ptr(253),
 		Pattern:   `^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`,
 	}
+	referenceName := apiext_v1b1.JSONSchemaProps{
+		Type:      "string",
+		MinLength: int64ptr(1),
+		MaxLength: int64ptr(253),
+		Pattern:   `^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?)*$`,
+	}
 	resourceName := DNS_SUBDOMAIN
 	apiVersion := apiext_v1b1.JSONSchemaProps{
 		Type:      "string",
@@ -148,7 +154,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 		Type:        "object",
 		Required:    []string{"resource"},
 		Properties: map[string]apiext_v1b1.JSONSchemaProps{
-			"name":     DNS_SUBDOMAIN,
+			"name":     referenceName,
 			"resource": resourceName,
 			"example": {
 				Description: "example of how we expect reference to resolve. Used for validation",
