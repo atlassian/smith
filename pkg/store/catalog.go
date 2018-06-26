@@ -19,7 +19,9 @@ type planSchemaKey string
 
 const (
 	serviceClassExternalNameIndex        = "ServiceClassExternalNameIndex"
+	serviceClassExternalIDIndex          = "ServiceClassExternalIDIndex"
 	serviceClassAndPlanExternalNameIndex = "ServiceClassAndPlanExternalNameIndex"
+	servicePlanExternalIDIndex           = "ServicePlanExternalIDIndex"
 	instanceCreateAction                 = planSchemaAction("instanceCreate")
 	instanceUpdateAction                 = planSchemaAction("instanceUpdate")
 	bindingCreateAction                  = planSchemaAction("bindingCreate")
@@ -51,6 +53,10 @@ func NewCatalog(serviceClassInf cache.SharedIndexInformer, servicePlanInf cache.
 			serviceClass := obj.(*sc_v1b1.ClusterServiceClass)
 			return []string{serviceClass.Spec.ExternalName}, nil
 		},
+		serviceClassExternalIDIndex: func(obj interface{}) ([]string, error) {
+			serviceClass := obj.(*sc_v1b1.ClusterServiceClass)
+			return []string{serviceClass.Spec.ExternalID}, nil
+		},
 	})
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -59,6 +65,10 @@ func NewCatalog(serviceClassInf cache.SharedIndexInformer, servicePlanInf cache.
 		serviceClassAndPlanExternalNameIndex: func(obj interface{}) ([]string, error) {
 			servicePlan := obj.(*sc_v1b1.ClusterServicePlan)
 			return []string{serviceClassAndPlanExternalNameIndexKey(servicePlan.Spec.ClusterServiceClassRef.Name, servicePlan.Spec.ExternalName)}, nil
+		},
+		servicePlanExternalIDIndex: func(obj interface{}) ([]string, error) {
+			servicePlan := obj.(*sc_v1b1.ClusterServicePlan)
+			return []string{servicePlan.Spec.ExternalID}, nil
 		},
 	})
 	if err != nil {
@@ -77,80 +87,109 @@ func serviceClassAndPlanExternalNameIndexKey(serviceClassName string, servicePla
 }
 
 func (c *Catalog) GetClassOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (*sc_v1b1.ClusterServiceClass, error) {
-	if serviceInstanceSpec.ClusterServiceClassName == "" && serviceInstanceSpec.ClusterServiceClassExternalName == "" {
-		return nil, errors.Errorf("ServiceInstance must have at least ClusterServiceClassName or ClusterServiceExternalName")
+	switch {
+	case serviceInstanceSpec.ClusterServiceClassName != "" && serviceInstanceSpec.ClusterServiceClassExternalName != "":
+		fallthrough
+	case serviceInstanceSpec.ClusterServiceClassName != "" && serviceInstanceSpec.ClusterServiceClassExternalID != "":
+		fallthrough
+	case serviceInstanceSpec.ClusterServiceClassExternalName != "" && serviceInstanceSpec.ClusterServiceClassExternalID != "":
+		return nil, errors.Errorf("ServiceInstance must have only one of ClusterServiceClassName or ClusterServiceClassExternalName or ClusterServiceClassExternalID")
 	}
-	if serviceInstanceSpec.ClusterServiceClassName != "" && serviceInstanceSpec.ClusterServiceClassExternalName != "" {
-		// Not sure if this is true. Maybe ok if they match? But silly.
-		return nil, errors.Errorf("ServiceInstance must have only one of ClusterServiceClassName or ClusterServiceExternalName")
-	}
-
-	if serviceInstanceSpec.ClusterServiceClassName != "" {
+	switch {
+	case serviceInstanceSpec.ClusterServiceClassName != "":
 		item, exists, err := c.serviceClassInfIndexer.GetByKey(serviceInstanceSpec.ClusterServiceClassName)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
 		if !exists {
-			return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServiceClass %q", serviceInstanceSpec.ClusterServiceClassName)
+			return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServiceClass Name=%q", serviceInstanceSpec.ClusterServiceClassName)
 		}
 		return item.(*sc_v1b1.ClusterServiceClass), nil
-	}
-
-	items, err := c.serviceClassInfIndexer.ByIndex(serviceClassExternalNameIndex, serviceInstanceSpec.ClusterServiceClassExternalName)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	switch len(items) {
-	case 0:
-		return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServiceClass %q", serviceInstanceSpec.ClusterServiceClassExternalName)
-	case 1:
-		return items[0].(*sc_v1b1.ClusterServiceClass), nil
+	case serviceInstanceSpec.ClusterServiceClassExternalID != "":
+		items, err := c.serviceClassInfIndexer.ByIndex(serviceClassExternalIDIndex, serviceInstanceSpec.ClusterServiceClassExternalID)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		switch len(items) {
+		case 0:
+			return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServiceClass ExternalID=%q", serviceInstanceSpec.ClusterServiceClassExternalID)
+		case 1:
+			return items[0].(*sc_v1b1.ClusterServiceClass), nil
+		default:
+			return nil, errors.Errorf("informer reported multiple instances for ClusterServiceClass ExternalID=%q", serviceInstanceSpec.ClusterServiceClassExternalID)
+		}
+	case serviceInstanceSpec.ClusterServiceClassExternalName != "":
+		items, err := c.serviceClassInfIndexer.ByIndex(serviceClassExternalNameIndex, serviceInstanceSpec.ClusterServiceClassExternalName)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		switch len(items) {
+		case 0:
+			return nil, errors.Errorf("ServiceInstance refers to non-existent ClusterServiceClass ExternalName=%q", serviceInstanceSpec.ClusterServiceClassExternalName)
+		case 1:
+			return items[0].(*sc_v1b1.ClusterServiceClass), nil
+		default:
+			return nil, errors.Errorf("informer reported multiple instances for ClusterServiceClass ExternalName=%q", serviceInstanceSpec.ClusterServiceClassExternalName)
+		}
 	default:
-		return nil, errors.Errorf("informer reported multiple instances for ClusterServiceClass %q", serviceInstanceSpec.ClusterServiceClassExternalName)
+		return nil, errors.Errorf("ServiceInstance must have at least ClusterServiceClassName or ClusterServiceExternalName or ClusterServiceClassExternalID")
 	}
-
 }
 
 func (c *Catalog) GetPlanOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (*sc_v1b1.ClusterServicePlan, error) {
-	if serviceInstanceSpec.ClusterServicePlanName == "" && serviceInstanceSpec.ClusterServicePlanExternalName == "" {
-		// TODO actually, this is ok according to Service Catalog if there is only one plan.
-		// This is annoying to do well, though, because I think we have to setup another index.
-		return nil, errors.Errorf("ServiceInstance must have at least ClusterServicePlanName or ClusterServiceExternalName")
+	switch {
+	case serviceInstanceSpec.ClusterServicePlanName != "" && serviceInstanceSpec.ClusterServicePlanExternalName != "":
+		fallthrough
+	case serviceInstanceSpec.ClusterServicePlanName != "" && serviceInstanceSpec.ClusterServicePlanExternalID != "":
+		fallthrough
+	case serviceInstanceSpec.ClusterServicePlanExternalName != "" && serviceInstanceSpec.ClusterServicePlanExternalID != "":
+		return nil, errors.Errorf("ServiceInstance must have only one of ClusterServicePlanName or ClusterServicePlanExternalName or ClusterServicePlanExternalID")
 	}
-	if serviceInstanceSpec.ClusterServicePlanName != "" && serviceInstanceSpec.ClusterServicePlanExternalName != "" {
-		// Not sure if this is true. Maybe ok if they match? But silly.
-		return nil, errors.Errorf("ServiceInstance must have only one of ClusterServicePlanName or ClusterServiceExternalName")
-	}
-
-	if serviceInstanceSpec.ClusterServicePlanName != "" {
+	switch {
+	case serviceInstanceSpec.ClusterServicePlanName != "":
 		item, exists, err := c.servicePlanInfIndexer.GetByKey(serviceInstanceSpec.ClusterServicePlanName)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
 		if !exists {
-			return nil, errors.Errorf("ServiceInstance refers to non-existant plan %q", serviceInstanceSpec.ClusterServicePlanName)
+			return nil, errors.Errorf("ServiceInstance refers to non-existent ClusterServicePlan Name=%q", serviceInstanceSpec.ClusterServicePlanName)
 		}
 		return item.(*sc_v1b1.ClusterServicePlan), nil
-	}
+	case serviceInstanceSpec.ClusterServicePlanExternalID != "":
+		items, err := c.servicePlanInfIndexer.ByIndex(servicePlanExternalIDIndex, serviceInstanceSpec.ClusterServicePlanExternalID)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		switch len(items) {
+		case 0:
+			return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServicePlan ExternalID=%q", serviceInstanceSpec.ClusterServicePlanExternalID)
+		case 1:
+			return items[0].(*sc_v1b1.ClusterServicePlan), nil
+		default:
+			return nil, errors.Errorf("informer reported multiple instances for ClusterServicePlan ExternalID=%q", serviceInstanceSpec.ClusterServicePlanExternalID)
+		}
+	case serviceInstanceSpec.ClusterServicePlanExternalName != "":
+		// If we don't have the plan UUID, we need to look up the class to find its UUID
+		serviceClass, err := c.GetClassOf(serviceInstanceSpec)
+		if err != nil {
+			return nil, err
+		}
 
-	// If we don't have the plan UUID, we need to look up the class to find its UUID
-	serviceClass, err := c.GetClassOf(serviceInstanceSpec)
-	if err != nil {
-		return nil, err
-	}
-
-	planKey := serviceClassAndPlanExternalNameIndexKey(serviceClass.Name, serviceInstanceSpec.ClusterServicePlanExternalName)
-	items, err := c.servicePlanInfIndexer.ByIndex(serviceClassAndPlanExternalNameIndex, planKey)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	switch len(items) {
-	case 0:
-		return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServicePlan %q", planKey)
-	case 1:
-		return items[0].(*sc_v1b1.ClusterServicePlan), nil
+		planKey := serviceClassAndPlanExternalNameIndexKey(serviceClass.Name, serviceInstanceSpec.ClusterServicePlanExternalName)
+		items, err := c.servicePlanInfIndexer.ByIndex(serviceClassAndPlanExternalNameIndex, planKey)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		switch len(items) {
+		case 0:
+			return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServicePlan %q", planKey)
+		case 1:
+			return items[0].(*sc_v1b1.ClusterServicePlan), nil
+		default:
+			return nil, errors.Errorf("informer reported multiple instances for ClusterServicePlan %q", planKey)
+		}
 	default:
-		return nil, errors.Errorf("informer reported multiple instances for ClusterServicePlan %q", planKey)
+		return nil, errors.Errorf("ServiceInstance must have at least ClusterServiceClassName or ClusterServiceExternalName or ClusterServiceClassExternalID")
 	}
 }
 

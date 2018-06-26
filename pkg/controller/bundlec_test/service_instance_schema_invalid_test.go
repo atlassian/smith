@@ -53,6 +53,27 @@ func TestServiceInstanceSchemaInvalid(t *testing.T) {
 							},
 						},
 					},
+					{
+						Name: resSi2,
+						Spec: smith_v1.ResourceSpec{
+							Object: &sc_v1b1.ServiceInstance{
+								TypeMeta: meta_v1.TypeMeta{
+									Kind:       "ServiceInstance",
+									APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+								},
+								ObjectMeta: meta_v1.ObjectMeta{
+									Name: si2,
+								},
+								Spec: sc_v1b1.ServiceInstanceSpec{
+									Parameters: &runtime.RawExtension{Raw: []byte(`{"testSchema": "invalid"}`)},
+									PlanReference: sc_v1b1.PlanReference{
+										ClusterServiceClassExternalID: serviceClassNameAndID,
+										ClusterServicePlanExternalID:  servicePlanNameAndID,
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -62,7 +83,7 @@ func TestServiceInstanceSchemaInvalid(t *testing.T) {
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
 			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.False(t, retriable)
-			assert.EqualError(t, err, `error processing resource(s): ["`+resSi1+`"]`)
+			assert.EqualError(t, err, `error processing resource(s): ["`+resSi1+`" "`+resSi2+`"]`)
 
 			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 3)
@@ -71,6 +92,11 @@ func TestServiceInstanceSchemaInvalid(t *testing.T) {
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 
 			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceError, smith_v1.ConditionTrue)
+			if resCond != nil {
+				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+				assert.Equal(t, "spec failed validation against schema: testSchema: Invalid type. Expected: boolean, given: string", resCond.Message)
+			}
+			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resSi2, smith_v1.ResourceError, smith_v1.ConditionTrue)
 			if resCond != nil {
 				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
 				assert.Equal(t, "spec failed validation against schema: testSchema: Invalid type. Expected: boolean, given: string", resCond.Message)
