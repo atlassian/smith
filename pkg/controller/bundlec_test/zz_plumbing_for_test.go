@@ -124,9 +124,9 @@ const (
 	pluginSimpleConfigMap   = "simpleConfigMap"
 	pluginConfigMapWithDeps = "configMapWithDeps"
 
-	serviceClassName         = "uid-1"
+	serviceClassNameAndID    = "uid-1"
 	serviceClassExternalName = "database"
-	servicePlanName          = "uid-2"
+	servicePlanNameAndID     = "uid-2"
 	servicePlanExternalName  = "default"
 )
 
@@ -171,12 +171,12 @@ func (tc *testCase) run(t *testing.T) {
 						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: meta_v1.ObjectMeta{
-						Name: serviceClassName,
+						Name: serviceClassNameAndID,
 					},
 					Spec: sc_v1b1.ClusterServiceClassSpec{
 						CommonServiceClassSpec: sc_v1b1.CommonServiceClassSpec{
 							ExternalName: serviceClassExternalName,
-							ExternalID:   serviceClassName,
+							ExternalID:   serviceClassNameAndID,
 						},
 					},
 				},
@@ -186,15 +186,15 @@ func (tc *testCase) run(t *testing.T) {
 						APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 					},
 					ObjectMeta: meta_v1.ObjectMeta{
-						Name: servicePlanName,
+						Name: servicePlanNameAndID,
 					},
 					Spec: sc_v1b1.ClusterServicePlanSpec{
 						ClusterServiceClassRef: sc_v1b1.ClusterObjectReference{
-							Name: serviceClassName,
+							Name: serviceClassNameAndID,
 						},
 						CommonServicePlanSpec: sc_v1b1.CommonServicePlanSpec{
 							ExternalName: servicePlanExternalName,
-							ExternalID:   servicePlanName,
+							ExternalID:   servicePlanNameAndID,
 							ServiceInstanceCreateParameterSchema: &runtime.RawExtension{Raw: []byte(`
 {"type": "object", "properties": {"testSchema": {"type": "boolean"}}}
 `)},
