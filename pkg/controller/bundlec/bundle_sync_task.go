@@ -15,6 +15,7 @@ import (
 	"github.com/atlassian/smith/pkg/util/graph"
 	"github.com/atlassian/smith/pkg/util/logz"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +43,9 @@ type bundleSyncTask struct {
 	processedResources map[smith_v1.ResourceName]*resourceInfo
 	objectsToDelete    map[objectRef]runtime.Object
 	newFinalizers      []string
+
+	bundleTransitionCounter         *prometheus.CounterVec
+	bundleResourceTransitionCounter *prometheus.CounterVec
 }
 
 // Parse bundle, build resource graph, traverse graph, assert each resource exists.
@@ -336,10 +340,34 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 				retriableResourceErr = retriableResourceErr && errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must not continue if at least one error is not retriable
 			}
 
-			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &blockedCond) || bundleUpdated
-			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &inProgressCond) || bundleUpdated
-			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &readyCond) || bundleUpdated
-			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &errorCond) || bundleUpdated
+			blockedUpdated := updateResourceCondition(st.bundle, res.Name, &blockedCond) || bundleUpdated
+			inProgressUpdated := updateResourceCondition(st.bundle, res.Name, &inProgressCond) || bundleUpdated
+			readyUpdated := updateResourceCondition(st.bundle, res.Name, &readyCond) || bundleUpdated
+			errorUpdated := updateResourceCondition(st.bundle, res.Name, &errorCond) || bundleUpdated
+
+			if blockedUpdated && blockedCond.Status == smith_v1.ConditionTrue {
+				st.bundleResourceTransitionCounter.
+					WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(res.Name), string(blockedCond.Type), blockedCond.Reason).
+					Inc()
+			}
+			if inProgressUpdated && inProgressCond.Status == smith_v1.ConditionTrue {
+				st.bundleResourceTransitionCounter.
+					WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(res.Name), string(inProgressCond.Type), inProgressCond.Reason).
+					Inc()
+			}
+			if readyUpdated && readyCond.Status == smith_v1.ConditionTrue {
+				st.bundleResourceTransitionCounter.
+					WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(res.Name), string(readyCond.Type), readyCond.Reason).
+					Inc()
+			}
+			if errorUpdated && errorCond.Status == smith_v1.ConditionTrue {
+				st.bundleResourceTransitionCounter.
+					WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(res.Name), string(errorCond.Type), errorCond.Reason).
+					Inc()
+			}
+
+			bundleUpdated = blockedUpdated || inProgressUpdated || readyUpdated || errorUpdated || bundleUpdated
+
 			resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
 				Name:       res.Name,
 				Conditions: []smith_v1.ResourceCondition{blockedCond, inProgressCond, readyCond, errorCond},
@@ -373,9 +401,27 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 			}
 		}
 
-		bundleUpdated = updateBundleCondition(st.bundle, &inProgressCond) || bundleUpdated
-		bundleUpdated = updateBundleCondition(st.bundle, &readyCond) || bundleUpdated
-		bundleUpdated = updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
+		inProgressUpdated := updateBundleCondition(st.bundle, &inProgressCond) || bundleUpdated
+		readyUpdated := updateBundleCondition(st.bundle, &readyCond) || bundleUpdated
+		errorUpdated := updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
+
+		if inProgressUpdated && inProgressCond.Status == smith_v1.ConditionTrue {
+			st.bundleTransitionCounter.
+				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(inProgressCond.Type), inProgressCond.Reason).
+				Inc()
+		}
+		if readyUpdated && readyCond.Status == smith_v1.ConditionTrue {
+			st.bundleTransitionCounter.
+				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(readyCond.Type), readyCond.Reason).
+				Inc()
+		}
+		if errorUpdated && errorCond.Status == smith_v1.ConditionTrue {
+			st.bundleTransitionCounter.
+				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(errorCond.Type), errorCond.Reason).
+				Inc()
+		}
+
+		bundleUpdated = inProgressUpdated || readyUpdated || errorUpdated || bundleUpdated
 
 		// Plugin statuses
 		pluginStatuses := st.pluginStatuses()

@@ -11,6 +11,7 @@ import (
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/store"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -49,6 +50,10 @@ type Controller struct {
 	Scheme           *runtime.Scheme
 
 	Catalog *store.Catalog
+
+	// Metrics
+	BundleTransitionCounter         *prometheus.CounterVec
+	BundleResourceTransitionCounter *prometheus.CounterVec
 }
 
 // Prepare prepares the controller to be run.
