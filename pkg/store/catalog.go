@@ -204,10 +204,9 @@ func (c *Catalog) getSchemaCache(plan *sc_v1b1.ClusterServicePlan, action planSc
 	defer c.schemasRWMutex.RUnlock()
 	if schemaWithRv, ok := c.schemas[key]; ok && schemaWithRv.resourceVersion == plan.ResourceVersion {
 		return schemaWithRv.schema, true
-	} else {
-		// nil is a valid entry in the cache
-		return nil, false
 	}
+	// nil is a valid entry in the cache
+	return nil, false
 }
 
 func (c *Catalog) setSchemaCache(plan *sc_v1b1.ClusterServicePlan, action planSchemaAction, schema *gojsonschema.Schema) {

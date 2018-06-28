@@ -26,10 +26,10 @@ type ByNameStore interface {
 type BundleStore struct {
 	store            ByNameStore
 	bundleByIndex    func(indexName, indexKey string) ([]interface{}, error)
-	pluginContainers map[smith_v1.PluginName]plugin.PluginContainer
+	pluginContainers map[smith_v1.PluginName]plugin.Container
 }
 
-func NewBundle(bundleInf cache.SharedIndexInformer, store ByNameStore, pluginContainers map[smith_v1.PluginName]plugin.PluginContainer) (*BundleStore, error) {
+func NewBundle(bundleInf cache.SharedIndexInformer, store ByNameStore, pluginContainers map[smith_v1.PluginName]plugin.Container) (*BundleStore, error) {
 	bs := &BundleStore{
 		store:            store,
 		bundleByIndex:    bundleInf.GetIndexer().ByIndex,

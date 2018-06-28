@@ -35,7 +35,7 @@ func TestGetJsonPathStringBundle(t *testing.T) {
 	unstructured := make(map[string]interface{})
 	err = json.Unmarshal(bytes, &unstructured)
 	require.NoError(t, err)
-	status, err := GetJsonPathString(unstructured, `{$.status.conditions[?(@.type=="Ready")].status}`)
+	status, err := GetJSONPathString(unstructured, `{$.status.conditions[?(@.type=="Ready")].status}`)
 	require.NoError(t, err)
 	assert.Equal(t, string(smith_v1.ConditionTrue), status)
 }
@@ -49,7 +49,7 @@ func TestGetJsonPathStringMissing(t *testing.T) {
 	unstructured := make(map[string]interface{})
 	err = json.Unmarshal(bytes, &unstructured)
 	require.NoError(t, err)
-	status, err := GetJsonPathString(unstructured, `{$.status.conditions[?(@.type=="Ready")].status}`)
+	status, err := GetJSONPathString(unstructured, `{$.status.conditions[?(@.type=="Ready")].status}`)
 	// Should return empty string without errors
 	require.NoError(t, err)
 	require.Equal(t, "", status)
@@ -73,6 +73,6 @@ func TestGetJsonPathStringInvalid(t *testing.T) {
 	err = json.Unmarshal(bytes, &unstructured)
 	require.NoError(t, err)
 	// Invalid JsonPath format: missing quotes around "Ready"
-	_, err = GetJsonPathString(unstructured, `{$.status.conditions[?(@.type==Ready)].status}`)
+	_, err = GetJSONPathString(unstructured, `{$.status.conditions[?(@.type==Ready)].status}`)
 	require.EqualError(t, err, "JsonPath execute error: unrecognized identifier Ready")
 }

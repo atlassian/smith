@@ -71,7 +71,7 @@ type resourceSyncTask struct {
 	specCheck          SpecCheck
 	bundle             *smith_v1.Bundle
 	processedResources map[smith_v1.ResourceName]*resourceInfo
-	pluginContainers   map[smith_v1.PluginName]plugin.PluginContainer
+	pluginContainers   map[smith_v1.PluginName]plugin.Container
 	scheme             *runtime.Scheme
 	catalog            *store.Catalog
 }

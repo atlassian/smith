@@ -7,32 +7,32 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-type PluginContainer struct {
+type Container struct {
 	Plugin Plugin
 	schema *gojsonschema.Schema
 }
 
-func NewPluginContainer(newPlugin NewFunc) (PluginContainer, error) {
+func NewContainer(newPlugin NewFunc) (Container, error) {
 	plugin, err := newPlugin()
 	if err != nil {
-		return PluginContainer{}, errors.Wrap(err, "failed to instantiate plugin")
+		return Container{}, errors.Wrap(err, "failed to instantiate plugin")
 	}
 	description := plugin.Describe()
 	var schema *gojsonschema.Schema
 	if description.SpecSchema != nil {
 		schema, err = gojsonschema.NewSchema(gojsonschema.NewBytesLoader(description.SpecSchema))
 		if err != nil {
-			return PluginContainer{}, errors.Wrapf(err, "can't use plugin %q due to invalid schema", description.Name)
+			return Container{}, errors.Wrapf(err, "can't use plugin %q due to invalid schema", description.Name)
 		}
 	}
 
-	return PluginContainer{
+	return Container{
 		Plugin: plugin,
 		schema: schema,
 	}, nil
 }
 
-func (pc *PluginContainer) ValidateSpec(pluginSpec map[string]interface{}) error {
+func (pc *Container) ValidateSpec(pluginSpec map[string]interface{}) error {
 	if pc.schema == nil {
 		return nil
 	}

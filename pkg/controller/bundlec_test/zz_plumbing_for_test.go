@@ -260,8 +260,8 @@ func (tc *testCase) run(t *testing.T) {
 		Plugins:               plugins,
 		ServiceCatalogSupport: tc.enableServiceCatalog,
 		SmithClient:           smithClient,
-		ScClient:              scClient,
-		ApiExtClient:          apiExtClient,
+		SCClient:              scClient,
+		APIExtClient:          apiExtClient,
 		SmartClient: &smart.DynamicClient{
 			ClientPool: dynamic.NewClientPool(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc),
 			Mapper:     restMapper,
@@ -467,7 +467,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 }
 
 func SleeperCrdWithStatus() *apiext_v1b1.CustomResourceDefinition {
-	crd := sleeper.SleeperCrd()
+	crd := sleeper.Crd()
 	crd.Status = apiext_v1b1.CustomResourceDefinitionStatus{
 		Conditions: []apiext_v1b1.CustomResourceDefinitionCondition{
 			{Type: apiext_v1b1.Established, Status: apiext_v1b1.ConditionTrue},

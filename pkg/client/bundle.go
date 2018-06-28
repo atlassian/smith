@@ -12,14 +12,14 @@ import (
 )
 
 func BundleInformer(smithClient smithClientset.Interface, namespace string, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	bundlesApi := smithClient.SmithV1().Bundles(namespace)
+	bundlesAPI := smithClient.SmithV1().Bundles(namespace)
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return bundlesApi.List(options)
+				return bundlesAPI.List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return bundlesApi.Watch(options)
+				return bundlesAPI.Watch(options)
 			},
 		},
 		&smith_v1.Bundle{},

@@ -1,7 +1,8 @@
 {
   "Cyclo": 30,
-  "Deadline": "800s",
+  "Deadline": "20m",
   "Exclude": [
+    "comment",
     "zz_generated"
   ],
   "Skip": [

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	ByNamespaceAndControllerUidIndex = "NamespaceUidIndex"
+	ByNamespaceAndControllerUIDIndex = "NamespaceUidIndex"
 )
 
 type Multi struct {
@@ -31,11 +31,11 @@ func (s *Multi) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIn
 	if _, ok := s.informers[gvk]; ok {
 		return errors.New("informer is already registered")
 	}
-	f := informer.GetIndexer().GetIndexers()[ByNamespaceAndControllerUidIndex]
+	f := informer.GetIndexer().GetIndexers()[ByNamespaceAndControllerUIDIndex]
 	if f == nil {
 		// Informer does not have this index yet i.e. this is the first/sole multistore it is added to.
 		err := informer.AddIndexers(cache.Indexers{
-			ByNamespaceAndControllerUidIndex: byNamespaceAndControllerUidIndex,
+			ByNamespaceAndControllerUIDIndex: byNamespaceAndControllerUIDIndex,
 		})
 		if err != nil {
 			return errors.WithStack(err)
@@ -47,9 +47,9 @@ func (s *Multi) AddInformer(gvk schema.GroupVersionKind, informer cache.SharedIn
 
 func (s *Multi) ObjectsControlledBy(namespace string, uid types.UID) ([]runtime.Object, error) {
 	var result []runtime.Object
-	indexKey := ByNamespaceAndControllerUidIndexKey(namespace, uid)
+	indexKey := ByNamespaceAndControllerUIDIndexKey(namespace, uid)
 	for gvk, inf := range s.GetInformers() {
-		objs, err := inf.GetIndexer().ByIndex(ByNamespaceAndControllerUidIndex, indexKey)
+		objs, err := inf.GetIndexer().ByIndex(ByNamespaceAndControllerUIDIndex, indexKey)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get objects for bundle from %s informer", gvk)
 		}
@@ -62,19 +62,19 @@ func (s *Multi) ObjectsControlledBy(namespace string, uid types.UID) ([]runtime.
 	return result, nil
 }
 
-func byNamespaceAndControllerUidIndex(obj interface{}) ([]string, error) {
+func byNamespaceAndControllerUIDIndex(obj interface{}) ([]string, error) {
 	if key, ok := obj.(cache.ExplicitKey); ok {
 		return []string{string(key)}, nil
 	}
 	m := obj.(meta_v1.Object)
 	ref := meta_v1.GetControllerOf(m)
 	if ref != nil {
-		return []string{ByNamespaceAndControllerUidIndexKey(m.GetNamespace(), ref.UID)}, nil
+		return []string{ByNamespaceAndControllerUIDIndexKey(m.GetNamespace(), ref.UID)}, nil
 	}
 	return nil, nil
 }
 
-func ByNamespaceAndControllerUidIndexKey(namespace string, uid types.UID) string {
+func ByNamespaceAndControllerUIDIndexKey(namespace string, uid types.UID) string {
 	if namespace == meta_v1.NamespaceNone {
 		return string(uid)
 	}

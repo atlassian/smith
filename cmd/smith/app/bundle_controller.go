@@ -45,8 +45,8 @@ type BundleControllerConstructor struct {
 
 	// To override things constructed by default. And for tests.
 	SmithClient  smithClientset.Interface
-	ScClient     scClientset.Interface
-	ApiExtClient apiExtClientset.Interface
+	SCClient     scClientset.Interface
+	APIExtClient apiExtClientset.Interface
 	SmartClient  bundlec.SmartClient
 }
 
@@ -76,14 +76,14 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 			return nil, err
 		}
 	}
-	scClient := c.ScClient
+	scClient := c.SCClient
 	if scClient == nil {
 		scClient, err = scClientset.NewForConfig(config.RestConfig)
 		if err != nil {
 			return nil, err
 		}
 	}
-	apiExtClient := c.ApiExtClient
+	apiExtClient := c.APIExtClient
 	if apiExtClient == nil {
 		apiExtClient, err = apiExtClientset.NewForConfig(config.RestConfig)
 		if err != nil {
@@ -199,10 +199,10 @@ func (c *BundleControllerConstructor) Describe() ctrl.Descriptor {
 	}
 }
 
-func (c *BundleControllerConstructor) loadPlugins() (map[smith_v1.PluginName]plugin.PluginContainer, error) {
-	pluginContainers := make(map[smith_v1.PluginName]plugin.PluginContainer, len(c.Plugins))
+func (c *BundleControllerConstructor) loadPlugins() (map[smith_v1.PluginName]plugin.Container, error) {
+	pluginContainers := make(map[smith_v1.PluginName]plugin.Container, len(c.Plugins))
 	for _, p := range c.Plugins {
-		pluginContainer, err := plugin.NewPluginContainer(p)
+		pluginContainer, err := plugin.NewContainer(p)
 		if err != nil {
 			return nil, err
 		}
