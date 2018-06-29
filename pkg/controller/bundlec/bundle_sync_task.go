@@ -340,33 +340,10 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 				retriableResourceErr = retriableResourceErr && errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must not continue if at least one error is not retriable
 			}
 
-			blockedUpdated := updateResourceCondition(st.bundle, res.Name, &blockedCond) || bundleUpdated
-			inProgressUpdated := updateResourceCondition(st.bundle, res.Name, &inProgressCond) || bundleUpdated
-			readyUpdated := updateResourceCondition(st.bundle, res.Name, &readyCond) || bundleUpdated
-			errorUpdated := updateResourceCondition(st.bundle, res.Name, &errorCond) || bundleUpdated
-
-			if blockedUpdated && blockedCond.Status == smith_v1.ConditionTrue {
-				st.bundleResourceTransitionCounter.
-					WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(res.Name), string(blockedCond.Type), blockedCond.Reason).
-					Inc()
-			}
-			if inProgressUpdated && inProgressCond.Status == smith_v1.ConditionTrue {
-				st.bundleResourceTransitionCounter.
-					WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(res.Name), string(inProgressCond.Type), inProgressCond.Reason).
-					Inc()
-			}
-			if readyUpdated && readyCond.Status == smith_v1.ConditionTrue {
-				st.bundleResourceTransitionCounter.
-					WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(res.Name), string(readyCond.Type), readyCond.Reason).
-					Inc()
-			}
-			if errorUpdated && errorCond.Status == smith_v1.ConditionTrue {
-				st.bundleResourceTransitionCounter.
-					WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(res.Name), string(errorCond.Type), errorCond.Reason).
-					Inc()
-			}
-
-			bundleUpdated = blockedUpdated || inProgressUpdated || readyUpdated || errorUpdated || bundleUpdated
+			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &blockedCond) || bundleUpdated
+			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &inProgressCond) || bundleUpdated
+			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &readyCond) || bundleUpdated
+			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &errorCond) || bundleUpdated
 
 			resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
 				Name:       res.Name,
@@ -401,27 +378,9 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 			}
 		}
 
-		inProgressUpdated := updateBundleCondition(st.bundle, &inProgressCond) || bundleUpdated
-		readyUpdated := updateBundleCondition(st.bundle, &readyCond) || bundleUpdated
-		errorUpdated := updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
-
-		if inProgressUpdated && inProgressCond.Status == smith_v1.ConditionTrue {
-			st.bundleTransitionCounter.
-				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(inProgressCond.Type), inProgressCond.Reason).
-				Inc()
-		}
-		if readyUpdated && readyCond.Status == smith_v1.ConditionTrue {
-			st.bundleTransitionCounter.
-				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(readyCond.Type), readyCond.Reason).
-				Inc()
-		}
-		if errorUpdated && errorCond.Status == smith_v1.ConditionTrue {
-			st.bundleTransitionCounter.
-				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(errorCond.Type), errorCond.Reason).
-				Inc()
-		}
-
-		bundleUpdated = inProgressUpdated || readyUpdated || errorUpdated || bundleUpdated
+		bundleUpdated = st.updateBundleCondition(st.bundle, &inProgressCond) || bundleUpdated
+		bundleUpdated = st.updateBundleCondition(st.bundle, &readyCond) || bundleUpdated
+		bundleUpdated = st.updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
 
 		// Plugin statuses
 		pluginStatuses := st.pluginStatuses()
@@ -615,7 +574,7 @@ func (st *bundleSyncTask) resourceConditions(res smith_v1.Resource) (
 // updateBundleCondition updates passed condition by fetching information from an existing resource condition if present.
 // Sets LastTransitionTime to now if the status has changed.
 // Returns true if resource condition in the bundle does not match and needs to be updated.
-func updateBundleCondition(b *smith_v1.Bundle, condition *smith_v1.BundleCondition) bool {
+func (st *bundleSyncTask) updateBundleCondition(b *smith_v1.Bundle, condition *smith_v1.BundleCondition) bool {
 	now := meta_v1.Now()
 	condition.LastTransitionTime = now
 
@@ -639,6 +598,12 @@ func updateBundleCondition(b *smith_v1.Bundle, condition *smith_v1.BundleConditi
 
 	if !isEqual {
 		condition.LastUpdateTime = now
+
+		if condition.Status == smith_v1.ConditionTrue {
+			st.bundleTransitionCounter.
+				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(condition.Type), condition.Reason).
+				Inc()
+		}
 	}
 
 	// Return true if one of the fields have changed.
@@ -648,7 +613,7 @@ func updateBundleCondition(b *smith_v1.Bundle, condition *smith_v1.BundleConditi
 // updateResourceCondition updates passed condition by fetching information from an existing resource condition if present.
 // Sets LastTransitionTime to now if the status has changed.
 // Returns true if resource condition in the bundle does not match and needs to be updated.
-func updateResourceCondition(b *smith_v1.Bundle, resName smith_v1.ResourceName, condition *smith_v1.ResourceCondition) bool {
+func (st *bundleSyncTask) updateResourceCondition(b *smith_v1.Bundle, resName smith_v1.ResourceName, condition *smith_v1.ResourceCondition) bool {
 	now := meta_v1.Now()
 	condition.LastTransitionTime = now
 	// Try to find this resource status
@@ -679,6 +644,12 @@ func updateResourceCondition(b *smith_v1.Bundle, resName smith_v1.ResourceName, 
 
 	if !isEqual {
 		condition.LastUpdateTime = now
+
+		if condition.Status == smith_v1.ConditionTrue {
+			st.bundleResourceTransitionCounter.
+				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(resName), string(condition.Type), condition.Reason).
+				Inc()
+		}
 	}
 
 	// Return true if one of the fields have changed.
