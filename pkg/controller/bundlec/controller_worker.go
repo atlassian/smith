@@ -13,16 +13,18 @@ func (c *Controller) Process(pctx *ctrl.ProcessContext) (retriableRet bool, errR
 // ProcessBundle is only visible for testing purposes. Should not be called directly.
 func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) (retriableRet bool, errRet error) {
 	st := bundleSyncTask{
-		logger:           logger,
-		bundleClient:     c.BundleClient,
-		smartClient:      c.SmartClient,
-		rc:               c.Rc,
-		store:            c.Store,
-		specCheck:        c.SpecCheck,
-		bundle:           bundle,
-		pluginContainers: c.PluginContainers,
-		scheme:           c.Scheme,
-		catalog:          c.Catalog,
+		logger:                          logger,
+		bundleClient:                    c.BundleClient,
+		smartClient:                     c.SmartClient,
+		rc:                              c.Rc,
+		store:                           c.Store,
+		specCheck:                       c.SpecCheck,
+		bundle:                          bundle,
+		pluginContainers:                c.PluginContainers,
+		scheme:                          c.Scheme,
+		catalog:                         c.Catalog,
+		bundleTransitionCounter:         c.BundleTransitionCounter,
+		bundleResourceTransitionCounter: c.BundleResourceTransitionCounter,
 	}
 
 	var retriable bool

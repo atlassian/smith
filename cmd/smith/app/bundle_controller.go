@@ -21,6 +21,7 @@ import (
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
 	sc_v1b1inf "github.com/kubernetes-incubator/service-catalog/pkg/client/informers_generated/externalversions/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
@@ -169,22 +170,49 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 		}
 	}
 
+	bundleTransitionCounter := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: config.AppName,
+			Name:      "bundle_transitions",
+			Help:      "Records the number of times a Bundle transitions into a new condition",
+		},
+		[]string{"namespace", "name", "type", "reason"},
+	)
+	bundleResourceTransitionCounter := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: config.AppName,
+			Name:      "bundle_resource_transitions",
+			Help:      "Records the number of times a Bundle transitions into a new condition",
+		},
+		[]string{"namespace", "name", "resource", "type", "reason"},
+	)
+
+	allMetrics := []prometheus.Collector{bundleTransitionCounter, bundleResourceTransitionCounter}
+	for _, metric := range allMetrics {
+		err = config.Registry.Register(metric)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
 	// Controller
 	cntrlr := &bundlec.Controller{
-		Logger:           config.Logger,
-		ReadyForWork:     cctx.ReadyForWork,
-		BundleClient:     smithClient.SmithV1(),
-		BundleStore:      bs,
-		SmartClient:      smartClient,
-		Rc:               rc,
-		Store:            multiStore,
-		SpecCheck:        specCheck,
-		WorkQueue:        cctx.WorkQueue,
-		CrdResyncPeriod:  config.ResyncPeriod,
-		Namespace:        config.Namespace,
-		PluginContainers: pluginContainers,
-		Scheme:           scheme,
-		Catalog:          catalog,
+		Logger:                          config.Logger,
+		ReadyForWork:                    cctx.ReadyForWork,
+		BundleClient:                    smithClient.SmithV1(),
+		BundleStore:                     bs,
+		SmartClient:                     smartClient,
+		Rc:                              rc,
+		Store:                           multiStore,
+		SpecCheck:                       specCheck,
+		WorkQueue:                       cctx.WorkQueue,
+		CrdResyncPeriod:                 config.ResyncPeriod,
+		Namespace:                       config.Namespace,
+		PluginContainers:                pluginContainers,
+		Scheme:                          scheme,
+		Catalog:                         catalog,
+		BundleTransitionCounter:         bundleTransitionCounter,
+		BundleResourceTransitionCounter: bundleResourceTransitionCounter,
 	}
 	cntrlr.Prepare(crdInf, resourceInfs)
 

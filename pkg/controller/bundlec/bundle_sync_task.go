@@ -15,6 +15,7 @@ import (
 	"github.com/atlassian/smith/pkg/util/graph"
 	"github.com/atlassian/smith/pkg/util/logz"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +43,9 @@ type bundleSyncTask struct {
 	processedResources map[smith_v1.ResourceName]*resourceInfo
 	objectsToDelete    map[objectRef]runtime.Object
 	newFinalizers      []string
+
+	bundleTransitionCounter         *prometheus.CounterVec
+	bundleResourceTransitionCounter *prometheus.CounterVec
 }
 
 // Parse bundle, build resource graph, traverse graph, assert each resource exists.
@@ -336,10 +340,11 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 				retriableResourceErr = retriableResourceErr && errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must not continue if at least one error is not retriable
 			}
 
-			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &blockedCond) || bundleUpdated
-			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &inProgressCond) || bundleUpdated
-			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &readyCond) || bundleUpdated
-			bundleUpdated = updateResourceCondition(st.bundle, res.Name, &errorCond) || bundleUpdated
+			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &blockedCond) || bundleUpdated
+			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &inProgressCond) || bundleUpdated
+			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &readyCond) || bundleUpdated
+			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &errorCond) || bundleUpdated
+
 			resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
 				Name:       res.Name,
 				Conditions: []smith_v1.ResourceCondition{blockedCond, inProgressCond, readyCond, errorCond},
@@ -373,9 +378,9 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 			}
 		}
 
-		bundleUpdated = updateBundleCondition(st.bundle, &inProgressCond) || bundleUpdated
-		bundleUpdated = updateBundleCondition(st.bundle, &readyCond) || bundleUpdated
-		bundleUpdated = updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
+		bundleUpdated = st.updateBundleCondition(st.bundle, &inProgressCond) || bundleUpdated
+		bundleUpdated = st.updateBundleCondition(st.bundle, &readyCond) || bundleUpdated
+		bundleUpdated = st.updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
 
 		// Plugin statuses
 		pluginStatuses := st.pluginStatuses()
@@ -569,74 +574,90 @@ func (st *bundleSyncTask) resourceConditions(res smith_v1.Resource) (
 // updateBundleCondition updates passed condition by fetching information from an existing resource condition if present.
 // Sets LastTransitionTime to now if the status has changed.
 // Returns true if resource condition in the bundle does not match and needs to be updated.
-func updateBundleCondition(b *smith_v1.Bundle, condition *smith_v1.BundleCondition) bool {
+func (st *bundleSyncTask) updateBundleCondition(b *smith_v1.Bundle, condition *smith_v1.BundleCondition) bool {
 	now := meta_v1.Now()
 	condition.LastTransitionTime = now
+
+	needsUpdate := true
 
 	// Try to find resource condition
 	_, oldCondition := b.GetCondition(condition.Type)
 
-	if oldCondition == nil {
-		// New resource condition
-		return true
+	if oldCondition != nil {
+		// We are updating an existing condition, so we need to check if it has changed.
+		if condition.Status == oldCondition.Status {
+			condition.LastTransitionTime = oldCondition.LastTransitionTime
+		}
+
+		isEqual := condition.Status == oldCondition.Status &&
+			condition.Reason == oldCondition.Reason &&
+			condition.Message == oldCondition.Message &&
+			condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
+
+		needsUpdate = !isEqual
+		if needsUpdate {
+			condition.LastUpdateTime = now
+		}
 	}
 
-	// We are updating an existing condition, so we need to check if it has changed.
-	if condition.Status == oldCondition.Status {
-		condition.LastTransitionTime = oldCondition.LastTransitionTime
-	}
+	// Otherwise it's a new resource condition
 
-	isEqual := condition.Status == oldCondition.Status &&
-		condition.Reason == oldCondition.Reason &&
-		condition.Message == oldCondition.Message &&
-		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
-
-	if !isEqual {
-		condition.LastUpdateTime = now
+	if condition.Status == smith_v1.ConditionTrue {
+		st.bundleTransitionCounter.
+			WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(condition.Type), condition.Reason).
+			Inc()
 	}
 
 	// Return true if one of the fields have changed.
-	return !isEqual
+	return needsUpdate
 }
 
 // updateResourceCondition updates passed condition by fetching information from an existing resource condition if present.
 // Sets LastTransitionTime to now if the status has changed.
 // Returns true if resource condition in the bundle does not match and needs to be updated.
-func updateResourceCondition(b *smith_v1.Bundle, resName smith_v1.ResourceName, condition *smith_v1.ResourceCondition) bool {
+func (st *bundleSyncTask) updateResourceCondition(b *smith_v1.Bundle, resName smith_v1.ResourceName, condition *smith_v1.ResourceCondition) bool {
 	now := meta_v1.Now()
 	condition.LastTransitionTime = now
+
+	needsUpdate := true
+
 	// Try to find this resource status
 	_, status := b.Status.GetResourceStatus(resName)
 
-	if status == nil {
-		// No status for this resource, hence it's a new resource condition
-		return true
+	if status != nil {
+		// Try to find resource condition
+		_, oldCondition := status.GetCondition(condition.Type)
+
+		if oldCondition != nil {
+			// We are updating an existing condition, so we need to check if it has changed.
+			if condition.Status == oldCondition.Status {
+				condition.LastTransitionTime = oldCondition.LastTransitionTime
+			}
+
+			isEqual := condition.Status == oldCondition.Status &&
+				condition.Reason == oldCondition.Reason &&
+				condition.Message == oldCondition.Message &&
+				condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
+
+			needsUpdate = !isEqual
+			if needsUpdate {
+				condition.LastUpdateTime = now
+			}
+		}
+
+		// Otherwise it's a new resource condition
 	}
 
-	// Try to find resource condition
-	_, oldCondition := status.GetCondition(condition.Type)
+	// Otherwise, no status for this resource, hence it's a new resource condition
 
-	if oldCondition == nil {
-		// New resource condition
-		return true
-	}
-
-	// We are updating an existing condition, so we need to check if it has changed.
-	if condition.Status == oldCondition.Status {
-		condition.LastTransitionTime = oldCondition.LastTransitionTime
-	}
-
-	isEqual := condition.Status == oldCondition.Status &&
-		condition.Reason == oldCondition.Reason &&
-		condition.Message == oldCondition.Message &&
-		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
-
-	if !isEqual {
-		condition.LastUpdateTime = now
+	if needsUpdate && condition.Status == smith_v1.ConditionTrue {
+		st.bundleResourceTransitionCounter.
+			WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(resName), string(condition.Type), condition.Reason).
+			Inc()
 	}
 
 	// Return true if one of the fields have changed.
-	return !isEqual
+	return needsUpdate
 }
 
 func sortBundle(bundle *smith_v1.Bundle) (*graph.Graph, []graph.V, error) {
