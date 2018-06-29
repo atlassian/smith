@@ -583,6 +583,11 @@ func (st *bundleSyncTask) updateBundleCondition(b *smith_v1.Bundle, condition *s
 
 	if oldCondition == nil {
 		// New resource condition
+		if condition.Status == smith_v1.ConditionTrue {
+			st.bundleTransitionCounter.
+				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(condition.Type), condition.Reason).
+				Inc()
+		}
 		return true
 	}
 
@@ -621,6 +626,11 @@ func (st *bundleSyncTask) updateResourceCondition(b *smith_v1.Bundle, resName sm
 
 	if status == nil {
 		// No status for this resource, hence it's a new resource condition
+		if condition.Status == smith_v1.ConditionTrue {
+			st.bundleResourceTransitionCounter.
+				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(resName), string(condition.Type), condition.Reason).
+				Inc()
+		}
 		return true
 	}
 
@@ -629,6 +639,11 @@ func (st *bundleSyncTask) updateResourceCondition(b *smith_v1.Bundle, resName sm
 
 	if oldCondition == nil {
 		// New resource condition
+		if condition.Status == smith_v1.ConditionTrue {
+			st.bundleResourceTransitionCounter.
+				WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(resName), string(condition.Type), condition.Reason).
+				Inc()
+		}
 		return true
 	}
 
