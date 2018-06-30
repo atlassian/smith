@@ -87,7 +87,6 @@ run: fmt update-bazel
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	bazel run //cmd/smith:smith_race \
-		--direct_run \
 		-- \
 		-log-encoding=console \
 		-bundle-service-catalog=false \
@@ -101,7 +100,6 @@ run-sc: fmt update-bazel
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	bazel run //cmd/smith:smith_race \
-		--direct_run \
 		-- \
 		-log-encoding=console \
 		-leader-elect \
@@ -115,7 +113,6 @@ sleeper-run: fmt update-bazel
 	KUBE_PATCH_CONVERSION_DETECTOR=true \
 	KUBE_CACHE_MUTATION_DETECTOR=true \
 	bazel run //examples/sleeper/main:main_race \
-		--direct_run \
 		-- \
 		-client-config-from=file \
 		-client-config-file-name="$$HOME/.kube/config" \

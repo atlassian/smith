@@ -1,4 +1,4 @@
-# Disable build files generation for this directories
+# Disable build files generation for these directories
 # gazelle:exclude vendor/github.com/bazelbuild/buildtools/buildifier2
 # gazelle:exclude vendor/golang.org/x/tools/cmd/fiximports/testdata
 # gazelle:exclude vendor/golang.org/x/tools/go/gcimporter15/testdata
@@ -58,5 +58,6 @@ goimports(
         "./vendor/*",
         "./pkg/client/clientset_generated/*",
     ],
+    prefix = "github.com/atlassian/smith",
     write = True,
 )
