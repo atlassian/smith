@@ -16,24 +16,35 @@ http_archive(
 
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "8333642f283e73818fe14c744ca07ca168b78fe9fe5c7c0e9a37c295a8029b75",
-    strip_prefix = "rules_docker-452878d665648ada0aaf816931611fdd9c683a97",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/452878d665648ada0aaf816931611fdd9c683a97.zip"],
+    sha256 = "8795052cc537db8e0350ef6b5ad9d7a60079b9724359f43bf9f7287ca7704dee",
+    strip_prefix = "rules_docker-0d6d69a2a4bbc33fc61a8350897b0e8136491ad5",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/0d6d69a2a4bbc33fc61a8350897b0e8136491ad5.tar.gz"],
 )
 
 http_archive(
     name = "com_github_bazelbuild_buildtools",
-    sha256 = "d2755e7e16c087e6f841691d772cb89a1e9255ea16b6c52b33a119a07a9dd249",
-    strip_prefix = "buildtools-47728e38feb98d5f354ea1eb99e0e44f0e4d7a14",
-    urls = ["https://github.com/bazelbuild/buildtools/archive/47728e38feb98d5f354ea1eb99e0e44f0e4d7a14.zip"],
+    sha256 = "681130514b50ee640cd5eee9cbd192fd48072b4bc9abc6a17a1fba7a2817ec0e",
+    strip_prefix = "buildtools-5a4c4ca9753ad0f8f9eb3463d84bc89388846420",
+    urls = ["https://github.com/bazelbuild/buildtools/archive/5a4c4ca9753ad0f8f9eb3463d84bc89388846420.tar.gz"],
 )
 
 http_archive(
     name = "com_github_atlassian_bazel_tools",
-    sha256 = "c6abcc19e65707a0232e4523d68c0d320f780db9f3eb0e36adea4fcd1055463b",
-    strip_prefix = "bazel-tools-06d357a7c08ab0854821e106f0891aa80d130b35",
-    urls = ["https://github.com/atlassian/bazel-tools/archive/06d357a7c08ab0854821e106f0891aa80d130b35.tar.gz"],
+    sha256 = "016af5647946422b9314d1df988aa7bc48ac7c1d1bf5e578ade8cf08e0ecfffe",
+    strip_prefix = "bazel-tools-37f8cb882a0226bb1fd7baf84f70b826e14e9469",
+    urls = ["https://github.com/atlassian/bazel-tools/archive/37f8cb882a0226bb1fd7baf84f70b826e14e9469.tar.gz"],
 )
+
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7ce78541f",
+    strip_prefix = "bazel-skylib-0.5.0",
+    urls = ["https://github.com/bazelbuild/bazel-skylib/archive/0.5.0.tar.gz"],
+)
+
+load("@bazel_skylib//:lib.bzl", "versions")
+
+versions.check(minimum_bazel_version = "0.14.0")
 
 load("@io_bazel_rules_go//go:def.bzl", "go_register_toolchains", "go_rules_dependencies")
 load(
