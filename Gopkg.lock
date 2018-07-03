@@ -19,7 +19,7 @@
     "client",
     "logz"
   ]
-  revision = "455433684a09f33c2248a80c7cf08189c352e972"
+  revision = "be4200944e5119c1f03c9e52811a9b540993ebe3"
 
 [[projects]]
   branch = "master"
