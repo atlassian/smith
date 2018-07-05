@@ -11,6 +11,7 @@ load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
 load("@com_github_atlassian_bazel_tools//buildozer:def.bzl", "buildozer")
 load("@com_github_atlassian_bazel_tools//goimports:def.bzl", "goimports")
+load("@com_github_atlassian_bazel_tools//:multirun/def.bzl", "multirun")
 
 gazelle(
     name = "gazelle",
@@ -60,4 +61,21 @@ goimports(
     ],
     prefix = "github.com/atlassian/smith",
     write = True,
+)
+
+multirun(
+    name = "run_all",
+    commands = [
+        # Gazelle also does not work - uncomment to see
+        # ":gazelle",
+        # ":gazelle_fix",
+        ":buildifier",
+        ":buildifier_check",
+        # This one works, but it exits with 3 if there are no changes and "breaks the chain".
+        # ":buildozer",
+        ":goimports",
+        # This will fail - just silently exit with 1.
+        # See https://github.com/bazelbuild/rules_docker/issues/148 for more info
+        "//cmd/smith:push_docker",
+    ],
 )

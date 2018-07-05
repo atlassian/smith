@@ -43,4 +43,5 @@ container_push(
     repository = "atlassianlabs/smith",
     stamp = True,
     tag = "{STABLE_BUILD_GIT_TAG}-{STABLE_BUILD_GIT_COMMIT}",
+    visibility = ["//visibility:public"],
 )
