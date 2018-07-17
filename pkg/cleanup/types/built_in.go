@@ -1,6 +1,8 @@
 package types
 
 import (
+	"reflect"
+
 	"github.com/atlassian/smith/pkg/cleanup"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
@@ -114,11 +116,10 @@ func scServiceBindingCleanup(spec, actual *unstructured.Unstructured) (runtime.O
 		return nil, err
 	}
 
-	sbSpec.Spec.ExternalID = sbActual.Spec.ExternalID
-	if sbActual.Spec.UserInfo != nil {
-		sbSpec.Spec.UserInfo = sbActual.Spec.UserInfo.DeepCopy()
-	}
-	sbSpec.Status = sbActual.Status
+	setEmptyFieldsFromActual(&sbSpec.Spec, &sbActual.Spec, []string{
+		"ExternalID",
+		"UserInfo",
+	})
 
 	return &sbSpec, nil
 }
@@ -133,36 +134,52 @@ func scServiceInstanceCleanup(spec, actual *unstructured.Unstructured) (runtime.
 		return nil, err
 	}
 
-	if instanceSpec.Spec.ClusterServiceClassName != "" &&
-		instanceSpec.Spec.ClusterServiceClassName != instanceActual.Spec.ClusterServiceClassName {
-		return nil, errors.New("clusterServiceClassName has changed when it should be immutable")
-	}
-
-	if instanceSpec.Spec.ClusterServicePlanName != "" &&
-		instanceSpec.Spec.ClusterServicePlanName != instanceActual.Spec.ClusterServicePlanName {
-		return nil, errors.New("clusterServicePlanName has changed when it should be immutable")
-	}
-
-	if instanceActual.Spec.ClusterServiceClassExternalName == instanceSpec.Spec.ClusterServiceClassExternalName {
-		instanceSpec.Spec.ClusterServiceClassRef = instanceActual.Spec.ClusterServiceClassRef
-		instanceSpec.Spec.ClusterServiceClassName = instanceActual.Spec.ClusterServiceClassName
-	}
-
-	if instanceActual.Spec.ClusterServicePlanExternalName == instanceSpec.Spec.ClusterServicePlanExternalName {
-		instanceSpec.Spec.ClusterServicePlanRef = instanceActual.Spec.ClusterServicePlanRef
-		instanceSpec.Spec.ClusterServicePlanName = instanceActual.Spec.ClusterServicePlanName
-	}
-
 	instanceSpec.ObjectMeta.Finalizers = instanceActual.ObjectMeta.Finalizers
 
-	instanceSpec.Spec.ExternalID = instanceActual.Spec.ExternalID
-	if instanceActual.Spec.UserInfo != nil {
-		instanceSpec.Spec.UserInfo = instanceActual.Spec.UserInfo
-	}
+	setEmptyFieldsFromActual(&instanceSpec.Spec, &instanceActual.Spec, []string{
+		"ClusterServiceClassName",
+		"ClusterServiceClassRef",
+		"ClusterServiceClassExternalName",
+		"ClusterServiceClassExternalID",
 
-	if instanceSpec.Spec.UpdateRequests == 0 {
-		instanceSpec.Spec.UpdateRequests = instanceActual.Spec.UpdateRequests
-	}
+		"ClusterServicePlanName",
+		"ClusterServicePlanRef",
+		"ClusterServicePlanExternalName",
+		"ClusterServicePlanExternalID",
+
+		"ExternalID",
+		"UserInfo",
+		"UpdateRequests",
+	})
 
 	return &instanceSpec, nil
+}
+
+// setFieldsFromActual mutates the target with fields from the instantiated object,
+// iff that field was not set in the original object.
+func setEmptyFieldsFromActual(requested, actual interface{}, fields []string) error {
+	requestedValue := reflect.ValueOf(requested).Elem()
+	actualValue := reflect.ValueOf(actual).Elem()
+
+	if requestedValue.Type() != actualValue.Type() {
+		return errors.Errorf("attempted to set fields from different types: %q from %q",
+			requestedValue, actualValue)
+	}
+
+	for _, field := range fields {
+		requestedField := requestedValue.FieldByName(field)
+		if !requestedField.IsValid() {
+			return errors.Errorf("no such field %q to cleanup", field)
+		}
+		actualField := actualValue.FieldByName(field)
+		if !actualField.IsValid() {
+			return errors.Errorf("no such field %q to cleanup", field)
+		}
+
+		if reflect.DeepEqual(requestedField.Interface(), reflect.Zero(requestedField.Type()).Interface()) {
+			requestedField.Set(actualField)
+		}
+	}
+
+	return nil
 }
