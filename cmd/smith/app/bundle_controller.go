@@ -97,7 +97,7 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 				DiscoveryInterface: config.MainClient.Discovery(),
 			},
 		)
-		dynamicClient, err := dynamic.NewForConfig(config.RestConfig)
+		dynamicClient, err := dynamic.NewForConfig(config.RestConfig) // nolint: vetshadow
 		if err != nil {
 			return nil, err
 		}
