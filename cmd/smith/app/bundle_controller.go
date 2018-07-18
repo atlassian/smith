@@ -28,15 +28,14 @@ import (
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	apps_v1inf "k8s.io/client-go/informers/apps/v1"
 	core_v1inf "k8s.io/client-go/informers/core/v1"
 	ext_v1b1inf "k8s.io/client-go/informers/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -93,15 +92,18 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 	}
 	smartClient := c.SmartClient
 	if smartClient == nil {
-		rm := discovery.NewDeferredDiscoveryRESTMapper(
+		rm := restmapper.NewDeferredDiscoveryRESTMapper(
 			&smart.CachedDiscoveryClient{
 				DiscoveryInterface: config.MainClient.Discovery(),
 			},
-			meta.InterfacesForUnstructured,
 		)
+		dynamicClient, err := dynamic.NewForConfig(config.RestConfig)
+		if err != nil {
+			return nil, err
+		}
 		smartClient = &smart.DynamicClient{
-			ClientPool: dynamic.NewClientPool(config.RestConfig, rm, dynamic.LegacyAPIPathResolverFunc),
-			Mapper:     rm,
+			DynamicClient: dynamicClient,
+			RESTMapper:    rm,
 		}
 	}
 
