@@ -256,6 +256,8 @@ func (tc *testCase) run(t *testing.T) {
 		AppName:    tc.appName,
 		Registry:   prometheusRegistry,
 	}
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	require.NoError(t, err)
 	bundleConstr := &app.BundleControllerConstructor{
 		Plugins:               plugins,
 		ServiceCatalogSupport: tc.enableServiceCatalog,
@@ -263,8 +265,8 @@ func (tc *testCase) run(t *testing.T) {
 		SCClient:              scClient,
 		APIExtClient:          apiExtClient,
 		SmartClient: &smart.DynamicClient{
-			ClientPool: dynamic.NewClientPool(clientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc),
-			Mapper:     restMapper,
+			DynamicClient: dynamicClient,
+			RESTMapper:    restMapper,
 		},
 	}
 	generic, err := ctrl.NewGeneric(config,
@@ -394,7 +396,7 @@ func testServerAndClientConfig(handler http.Handler) (*httptest.Server, *rest.Co
 }
 
 func restMapperFromScheme(scheme *runtime.Scheme) meta.RESTMapper {
-	rm := meta.NewDefaultRESTMapper(nil, meta.InterfacesForUnstructured)
+	rm := meta.NewDefaultRESTMapper(nil)
 	for gvk := range scheme.AllKnownTypes() {
 		rm.Add(gvk, meta.RESTScopeNamespace)
 	}

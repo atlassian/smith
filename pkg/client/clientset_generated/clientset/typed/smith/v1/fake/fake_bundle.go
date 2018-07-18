@@ -48,7 +48,7 @@ func (c *FakeBundles) List(opts v1.ListOptions) (result *smith_v1.BundleList, er
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &smith_v1.BundleList{}
+	list := &smith_v1.BundleList{ListMeta: obj.(*smith_v1.BundleList).ListMeta}
 	for _, item := range obj.(*smith_v1.BundleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

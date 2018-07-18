@@ -30,11 +30,11 @@ required = [
   go-tests = true
 
 [[override]]
-  branch = "release-1.10" # correct branch
+  branch = "release-1.11" # correct branch
   name = "k8s.io/code-generator"
 
 [[override]]
-  revision = "01a732e01d00cb9a81bb0ca050d3e6d2b947927b" # from 1.10 branch
+  revision = "01a732e01d00cb9a81bb0ca050d3e6d2b947927b" # from 1.11 branch
   name = "k8s.io/gengo"
 
 [[constraint]]
@@ -43,16 +43,21 @@ required = [
 
 [[override]]
   name = "k8s.io/apiextensions-apiserver"
-  branch = "release-1.10" # correct branch
+  branch = "release-1.11" # correct branch
 
 [[override]]
   name = "k8s.io/apimachinery"
-  branch = "release-1.10" # correct branch
+  branch = "release-1.11" # correct branch
 
 [[override]]
   name = "k8s.io/client-go"
-  branch = "release-7.0" # correct branch
+  branch = "release-8.0" # correct branch
 
 [[override]]
   name = "k8s.io/api"
-  branch = "release-1.10" # correct branch
+  branch = "release-1.11" # correct branch
+
+[[override]]
+  name = "github.com/json-iterator/go"
+  revision = "f2b4162afba35581b6d4a50d3b8f34e33c144682" # from 1.11 branch
+

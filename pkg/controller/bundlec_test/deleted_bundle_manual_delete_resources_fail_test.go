@@ -82,7 +82,7 @@ func TestKeepFinalizerWhenResourceDeletionFails(t *testing.T) {
 		enableServiceCatalog: false,
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
 			_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
-			assert.EqualError(t, err, `an error on the server ("unknown") has prevented the request from succeeding (delete configmaps `+mapNeedsDelete+`)`)
+			assert.EqualError(t, err, `an error on the server ("unknown") has prevented the request from succeeding`)
 
 			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 2)
