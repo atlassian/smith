@@ -1,4 +1,3 @@
-METALINTER_CONCURRENCY ?= 4
 OS = $$(uname -s | tr A-Z a-z)
 BINARY_PREFIX_DIRECTORY=$(OS)_amd64_stripped
 KUBE_CONTEXT ?= minikube
@@ -8,8 +7,6 @@ setup-dev: setup-ci
 
 .PHONY: setup-ci
 setup-ci: setup-base
-	go get -u gopkg.in/alecthomas/gometalinter.v2
-	gometalinter.v2 --install --force
 
 .PHONY: setup-base
 setup-base:
@@ -144,13 +141,7 @@ quick-test:
 
 .PHONY: check
 check:
-	gometalinter.v2 --concurrency=$(METALINTER_CONCURRENCY) ./... \
-		--linter='errcheck:errcheck:-ignore=net:Close' \
-		--disable=interfacer
-
-.PHONY: check-all
-check-all:
-	gometalinter.v2 --concurrency=$(METALINTER_CONCURRENCY) ./...
+	bazel run //:gometalinter
 
 .PHONY: docker
 docker:

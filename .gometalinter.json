@@ -1,6 +1,9 @@
 {
+  "Concurrency": 2,
   "Cyclo": 30,
-  "Deadline": "20m",
+  "Deadline": "10m",
+  "Disable": ["interfacer"],
+  "EnableGC": true,
   "Exclude": [
     "comment",
     "zz_generated"

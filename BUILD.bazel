@@ -11,6 +11,7 @@ load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
 load("@com_github_atlassian_bazel_tools//buildozer:def.bzl", "buildozer")
 load("@com_github_atlassian_bazel_tools//goimports:def.bzl", "goimports")
+load("@com_github_atlassian_bazel_tools//gometalinter:def.bzl", "gometalinter")
 
 gazelle(
     name = "gazelle",
@@ -60,4 +61,17 @@ goimports(
     ],
     prefix = "github.com/atlassian/smith",
     write = True,
+)
+
+gometalinter(
+    name = "gometalinter",
+    config = "//:.gometalinter.json",
+    paths = [
+        ".",
+        "cmd/...",
+        "examples/...",
+        "it/...",
+        "pkg/...",
+    ],
+    prefix = "github.com/atlassian/smith",
 )

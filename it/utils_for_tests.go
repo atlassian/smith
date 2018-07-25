@@ -193,7 +193,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	}
 
 	logger := zaptest.NewLogger(t)
-	defer logger.Sync()
+	defer logger.Sync() // nolint: errcheck
 
 	cfg := &Config{
 		T:           t,
