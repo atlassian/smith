@@ -175,7 +175,7 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 	bundleTransitionCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: config.AppName,
-			Name:      "bundle_transitions",
+			Name:      "bundle_transitions_total",
 			Help:      "Records the number of times a Bundle transitions into a new condition",
 		},
 		[]string{"namespace", "name", "type", "reason"},
@@ -183,7 +183,7 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 	bundleResourceTransitionCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: config.AppName,
-			Name:      "bundle_resource_transitions",
+			Name:      "bundle_resource_transitions_total",
 			Help:      "Records the number of times a Bundle transitions into a new condition",
 		},
 		[]string{"namespace", "name", "resource", "type", "reason"},
