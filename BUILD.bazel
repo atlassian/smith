@@ -16,6 +16,7 @@ load("@com_github_atlassian_bazel_tools//gometalinter:def.bzl", "gometalinter")
 gazelle(
     name = "gazelle",
     external = "vendored",
+    gazelle = "@bazel_gazelle//cmd/gazelle:gazelle_pure",
     prefix = "github.com/atlassian/smith",
 )
 
@@ -23,6 +24,7 @@ gazelle(
     name = "gazelle_fix",
     command = "fix",
     external = "vendored",
+    gazelle = "@bazel_gazelle//cmd/gazelle:gazelle_pure",
     prefix = "github.com/atlassian/smith",
 )
 

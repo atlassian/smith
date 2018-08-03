@@ -51,7 +51,6 @@ load(
     "@io_bazel_rules_docker//go:image.bzl",
     go_image_repositories = "repositories",
 )
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 load("@com_github_bazelbuild_buildtools//buildifier:deps.bzl", "buildifier_dependencies")
 load("@com_github_atlassian_bazel_tools//buildozer:deps.bzl", "buildozer_dependencies")
 load("@com_github_atlassian_bazel_tools//goimports:deps.bzl", "goimports_dependencies")
@@ -61,9 +60,11 @@ go_rules_dependencies()
 
 go_register_toolchains()
 
-go_image_repositories()
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 
 gazelle_dependencies()
+
+go_image_repositories()
 
 buildifier_dependencies()
 
