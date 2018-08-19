@@ -55,8 +55,10 @@ spec:
             token: token
 
   - name: binding1
-    dependsOn:
-    - instance1
+    references:
+    - name: instance1-metadata-name
+      resource: instance1
+      path: metadata.name
     spec:
       apiVersion: servicecatalog.k8s.io/v1beta1
       kind: ServiceBinding
@@ -64,12 +66,14 @@ spec:
         name: binding1
       spec:
         instanceRef:
-          name: "{{instance1#metadata.name}}"
+          name: "!{instance1-metadata-name}"
         secretName: secret1
 
   - name: binding2
-    dependsOn:
-    - instance1
+    references:
+    - name: instance1-metadata-name
+      resource: instance1
+      path: metadata.name
     spec:
       apiVersion: servicecatalog.k8s.io/v1beta1
       kind: ServiceBinding
@@ -77,13 +81,17 @@ spec:
         name: binding2
       spec:
         instanceRef:
-          name: "{{instance1#metadata.name}}"
+          name: "!{instance1-metadata-name}"
         secretName: secret2
 
   - name: podpreset1
-    dependsOn:
-    - binding1
-    - binding2
+    references:
+    - name: binding1-secretName
+      resource: binding1
+      path: spec.secretName
+    - name: binding2-secretName
+      resource: binding2
+      path: spec.secretName
     spec:
       apiVersion: settings.k8s.io/v1alpha1
       kind: PodPreset
@@ -96,14 +104,16 @@ spec:
         envFrom:
         - prefix: BINDING1_
           secretRef:
-            name: "{{binding1#spec.secretName}}"
+            name: "!{binding1-secretName}"
         - prefix: BINDING2_
           secretRef:
-            name: "{{binding2#spec.secretName}}"
+            name: "!{binding2-secretName}"
 
   - name: deployment1
-    dependsOn:
-    - podpreset1
+    references:
+    - name: podpreset1-matchLabels
+      resource: podpreset1
+      path: spec.selector.matchLabels
     spec:
       apiVersion: apps/v1beta2
       kind: Deployment
@@ -113,7 +123,7 @@ spec:
         replicas: 2
         template:
           metadata:
-            labels: "{{podpreset1#spec.selector.matchLabels}}"
+            labels: "!{podpreset1-matchLabels}"
           spec:
             containers:
             - name: nginx
@@ -122,8 +132,10 @@ spec:
               - containerPort: 80
 
   - name: service1
-    dependsOn:
-    - deployment1
+    references:
+    - name: deployment1-labels
+      resource: deployment1
+      path: spec.template.metadata.labels
     spec:
       apiVersion: v1
       kind: Service
@@ -135,12 +147,17 @@ spec:
           protocol: TCP
           targetPort: 80
           nodePort: 30090
-        selector: "{{deployment1#spec.template.metadata.labels}}"
+        selector: "!{deployment1-labels}"
         type: NodePort
 
   - name: ingress1
-    dependsOn:
-    - service1
+    references:
+    - name: service1-metadata-name
+      resource: service1
+      path: metadata.name
+    - name: service1-port
+      resource: service1
+      path: spec.ports[?(@.protocol=="TCP")].port
     spec:
       apiVersion: extensions/v1beta1
       kind: Ingress
@@ -152,9 +169,8 @@ spec:
             paths:
             - path: /
               backend:
-                serviceName: "{{service1#metadata.name}}"
-                servicePort: "{{service1#spec.ports[?(@.protocol==\"TCP\")].port}}"
-
+                serviceName: "!{service1-metadata-name}"
+                servicePort: "!{service1-port}"
 ```
 
 ### Screencast

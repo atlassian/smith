@@ -1,22 +1,34 @@
 package bundlec_test
 
 import (
+	"context"
+	"net/http"
 	"testing"
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
+	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
+	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Should resolve ServiceBinding Secret references
 func TestResolveBindingSecretReferences(t *testing.T) {
-	tr := true
 	t.Parallel()
+	tr := true
+	sb1ref := smith_v1.Reference{
+		Name:     resSb1 + "-mysecret",
+		Resource: smith_v1.ResourceName(resSb1),
+		Path:     "Data.mysecret",
+		Modifier: smith_v1.ReferenceModifierBindSecret,
+	}
 	tc := testCase{
 		mainClientObjects: []runtime.Object{
+			configMapNeedsUpdate(),
 			&core_v1.Secret{
 				ObjectMeta: meta_v1.ObjectMeta{
 					Name:      s1,
@@ -43,52 +55,13 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 		scClientObjects: []runtime.Object{
 			serviceInstance(true, false, false),
 			serviceBinding(true, false, false),
-			&sc_v1b1.ServiceInstance{
-				TypeMeta: meta_v1.TypeMeta{
-					Kind:       "ServiceInstance",
-					APIVersion: sc_v1b1.SchemeGroupVersion.String(),
-				},
-				ObjectMeta: meta_v1.ObjectMeta{
-					Name:      si2,
-					Namespace: testNamespace,
-					UID:       si2uid,
-					Annotations: map[string]string{
-						"Secret": "bla",
-					},
-					OwnerReferences: []meta_v1.OwnerReference{
-						{
-							APIVersion:         smith_v1.BundleResourceGroupVersion,
-							Kind:               smith_v1.BundleResourceKind,
-							Name:               bundle1,
-							UID:                bundle1uid,
-							Controller:         &tr,
-							BlockOwnerDeletion: &tr,
-						},
-						{
-							APIVersion:         sc_v1b1.SchemeGroupVersion.String(),
-							Kind:               "ServiceBinding",
-							Name:               sb1,
-							UID:                sb1uid,
-							BlockOwnerDeletion: &tr,
-						},
-					},
-				},
-				Spec: serviceInstanceSpec,
-				Status: sc_v1b1.ServiceInstanceStatus{
-					Conditions: []sc_v1b1.ServiceInstanceCondition{
-						{
-							Type:   sc_v1b1.ServiceInstanceConditionReady,
-							Status: sc_v1b1.ConditionTrue,
-						},
-					},
-				},
-			},
 		},
 		bundle: &smith_v1.Bundle{
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name:      bundle1,
-				Namespace: testNamespace,
-				UID:       bundle1uid,
+				Name:       bundle1,
+				Namespace:  testNamespace,
+				UID:        bundle1uid,
+				Finalizers: []string{bundlec.FinalizerDeleteResources},
 			},
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{
@@ -131,32 +104,77 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 						},
 					},
 					{
-						Name: resSi2,
+						Name: "map-needs-update",
 						References: []smith_v1.Reference{
-							{Resource: smith_v1.ResourceName(resSb1)},
+							sb1ref,
 						},
 						Spec: smith_v1.ResourceSpec{
-							Object: &sc_v1b1.ServiceInstance{
+							Object: &core_v1.ConfigMap{
 								TypeMeta: meta_v1.TypeMeta{
-									Kind:       "ServiceInstance",
-									APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+									Kind:       "ConfigMap",
+									APIVersion: core_v1.SchemeGroupVersion.String(),
 								},
 								ObjectMeta: meta_v1.ObjectMeta{
-									Name: si2,
+									Name: mapNeedsAnUpdate,
 									Annotations: map[string]string{
-										"Secret": "{{" + resSb1 + ":bindsecret#Data.mysecret}}",
+										"Secret": sb1ref.Ref(),
 									},
 								},
-								Spec: serviceInstanceSpec,
 							},
 						},
 					},
 				},
 			},
 		},
-		appName:              testAppName,
-		namespace:            testNamespace,
-		enableServiceCatalog: true,
+		appName:         testAppName,
+		namespace:       testNamespace,
+		expectedActions: sets.NewString("PUT=/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate),
+		testHandler: fakeActionHandler{
+			response: map[path]fakeResponse{
+				{
+					method: "PUT",
+					path:   "/api/v1/namespaces/" + testNamespace + "/configmaps/" + mapNeedsAnUpdate,
+				}: {
+					statusCode: http.StatusOK,
+					content: []byte(`{
+							"apiVersion": "v1",
+							"kind": "ConfigMap",
+							"data":{"delete":"this key"},
+							"metadata": {
+								"name": "` + mapNeedsAnUpdate + `",
+								"namespace": "` + testNamespace + `",
+								"uid": "` + string(mapNeedsAnUpdateUid) + `",
+								"annotations": { "Secret":"bla" },
+								"ownerReferences": [
+								{
+									"apiVersion": "` + smith_v1.BundleResourceGroupVersion + `",
+									"kind": "` + smith_v1.BundleResourceKind + `",
+									"name": "` + bundle1 + `",
+									"uid": "` + string(bundle1uid) + `",
+									"controller": true,
+									"blockOwnerDeletion": true
+								},
+								{
+									"apiVersion": "` + sc_v1b1.SchemeGroupVersion.String() + `",
+									"kind": "ServiceBinding",
+									"name": "` + sb1 + `",
+									"uid": "` + string(sb1uid) + `",
+									"blockOwnerDeletion": true
+								}
+								] }
+							}`),
+				},
+			},
+		}, enableServiceCatalog: true,
+		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
+			tc.defaultTest(t, ctx, cntrlr)
+			bundle := tc.findBundleUpdate(t, true)
+			require.NotNil(t, bundle, "Bundle update action not found: %v", tc.smithFake.Actions())
+			smith_testing.AssertCondition(t, bundle, smith_v1.BundleReady, smith_v1.ConditionTrue)
+			smith_testing.AssertCondition(t, bundle, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
+			smith_testing.AssertCondition(t, bundle, smith_v1.BundleError, smith_v1.ConditionFalse)
+
+		},
 	}
 	tc.run(t)
 }

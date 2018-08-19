@@ -183,8 +183,8 @@ func resolveReference(resInfos map[smith_v1.ResourceName]*resourceInfo, referenc
 		return nil, errors.Errorf("reference modifier %q not understood for %q", reference.Modifier, reference.Resource)
 	}
 
-	// To avoid overcomplicated format of reference like this: {{res1#{$.a.string}}}
-	// And have something like this instead: {{res1#a.string}}
+	// To avoid overcomplicated format of path attribute in reference like this: {$.a.string}
+	// And have something like this instead: a.string
 	jsonPath := fmt.Sprintf("{$.%s}", reference.Path)
 	fieldValue, err := resources.GetJSONPathValue(objToTraverse, jsonPath, false)
 	if err != nil {

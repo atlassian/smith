@@ -10,7 +10,8 @@ import (
 func AssertCondition(t *testing.T, bundle *smith_v1.Bundle, conditionType smith_v1.BundleConditionType, status smith_v1.ConditionStatus) *smith_v1.BundleCondition {
 	_, condition := bundle.GetCondition(conditionType)
 	if assert.NotNil(t, condition) {
-		assert.Equal(t, status, condition.Status, "%s: %s: %s", conditionType, condition.Reason, condition.Message)
+		// TODO string casts are a workaround for https://github.com/stretchr/testify/issues/644
+		assert.Equal(t, string(status), string(condition.Status), "%s: %s: %s", conditionType, condition.Reason, condition.Message)
 	}
 	return condition
 }

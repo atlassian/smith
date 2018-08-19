@@ -13,8 +13,8 @@ import (
 	kube_testing "k8s.io/client-go/testing"
 )
 
-// Should detect invalid depends on
-func TestInvalidDependsOn(t *testing.T) {
+// Should detect invalid references
+func TestInvalidReferences(t *testing.T) {
 	t.Parallel()
 	tc := testCase{
 		bundle: &smith_v1.Bundle{

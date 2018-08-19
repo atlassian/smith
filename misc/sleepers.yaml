@@ -14,8 +14,10 @@ spec:
         sleepFor: 3
         wakeupMessage: Hello, Infravators!
   - name: sleeper2
-    dependsOn:
-    - sleeper1
+    references:
+    - name: sleeper1-status-message
+      resource: sleeper1
+      path: status.message
     spec:
       apiVersion: crd.atlassian.com/v1
       kind: Sleeper
@@ -23,13 +25,15 @@ spec:
         name: sleeper2
       spec:
         sleepFor: 4
-        wakeupMessage: "{{sleeper1#status/message}}"
+        wakeupMessage: "!{sleeper1-status-message}"
   - name: sleeper3
-    dependsOn:
-    - sleeper2
+    references:
+    - name: sleeper2-spec
+      resource: sleeper2
+      path: spec
     spec:
       apiVersion: crd.atlassian.com/v1
       kind: Sleeper
       metadata:
         name: sleeper3
-      spec: "{{sleeper2#spec}}"
+      spec: "!{sleeper2-spec}"
