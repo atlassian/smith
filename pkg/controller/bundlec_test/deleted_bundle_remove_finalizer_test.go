@@ -80,8 +80,7 @@ func TestRemoveFinalizerWhenForegroundDeletion(t *testing.T) {
 		namespace:            testNamespace,
 		enableServiceCatalog: false,
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
-			_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
-			assert.NoError(t, err)
+			tc.defaultTest(t, ctx, cntrlr)
 
 			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 3)

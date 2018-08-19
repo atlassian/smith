@@ -95,7 +95,6 @@ const (
 	si1uid types.UID = "si1-uid"
 	resSi2           = "resSi2"
 	si2              = "si2"
-	si2uid types.UID = "si2-uid"
 
 	s1              = "s1"
 	s1uid types.UID = "s1-uid"
@@ -330,16 +329,33 @@ func (tc *testCase) verifyPlugins(t *testing.T) {
 	assert.Empty(t, unexpectedInvocations, "observed plugin invocations that were not expected")
 }
 
-func (tc *testCase) verifyPluginStatuses(t *testing.T) {
+func (tc *testCase) findBundleUpdate(t *testing.T, onlyOne bool) *smith_v1.Bundle {
 	var bundle *smith_v1.Bundle
 	for _, action := range tc.smithFake.Actions() {
-		bundleUpdate, ok := action.(kube_testing.UpdateAction)
+		update, ok := action.(kube_testing.UpdateAction)
 		if !ok {
+			t.Logf("%T is not an update action", action)
 			continue
 		}
-		bundle = bundleUpdate.GetObject().(*smith_v1.Bundle)
-		// Keep iterating to get the latest action (should be only one actually)
+		if update.GetNamespace() != tc.namespace {
+			t.Logf("%q is not the test namespace %q", update.GetNamespace(), tc.namespace)
+			continue
+		}
+		updateBundle, ok := update.GetObject().(*smith_v1.Bundle)
+		if !ok {
+			t.Logf("%T is not a *Bundle", update.GetObject())
+			continue
+		}
+		if onlyOne {
+			assert.Nil(t, bundle, "Duplicate Bundle update found: %v", update)
+		}
+		bundle = updateBundle
 	}
+	return bundle
+}
+
+func (tc *testCase) verifyPluginStatuses(t *testing.T) {
+	bundle := tc.findBundleUpdate(t, true)
 	if bundle == nil {
 		t.Log("No Bundle updates found, not checking plugin statuses")
 		return

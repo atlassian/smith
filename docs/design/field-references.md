@@ -4,11 +4,16 @@ Cross-object field references are a way for an object to get output field(s) of 
 (or multiple dependencies) injected into it as a field (or multiple fields). References to only direct
 dependencies are supported.
 
-Syntax `"{{dependency1#fieldName}}"` means that value of `fieldName` will be injected instead
-of the placeholder. The existing type is maintained.
-
-The `fieldName` could be specified in JsonPath format (with `$.` prefix added by default), for example:
-`{{dependency1#status.conditions[?(@.type=="Ready")].status}}`
+References are defined as part of resource definition. Each reference should have a `resource` field that specifies
+the name of the referenced resource. A reference may also have:
+- a `name` that can be used as a substitution marker when wrapped in `!{reference-name-here}`. The existing type
+  is maintained. If `name` is not specified or is not used, the reference effectively becomes just an ordering
+  constraint
+- a `path` that can specify a JSON path expression to extract part(s) of the referenced resource
+- an `example` that can specify an example of the value that is extracted using that reference. It is used for schema
+  validation - see below for the detailed description
+- a `modifier` that can specify an additional bit of information for the reference processor. Currently the only
+  allowed value is `bindsecret` - see below for the detailed description
 
 ```yaml
 apiVersion: smith.atlassian.com/v1
@@ -32,8 +37,10 @@ spec:
       status:
         message: "Hello, Infravators!"
   - name: sleeper2
-    dependsOn:
-    - sleeper1
+    references:
+    - name: sleeper1-status-message
+      resource: sleeper1
+      path: status.message
     spec:
       object:
         apiVersion: crd.atlassian.com/v1
@@ -42,27 +49,30 @@ spec:
           name: sleeper2
         spec:
           sleepFor: 4
-          wakeupMessage: "{{sleeper1#status.message}}"
+          wakeupMessage: "!{sleeper1-status-message}"
   - name: sleeper3
-    dependsOn:
-    - sleeper2
+    references:
+    - name: sleeper2-spec
+      resource: sleeper2
+      path: spec
     spec:
       object:
         apiVersion: crd.atlassian.com/v1
         kind: Sleeper
         metadata:
           name: sleeper3
-        spec: "{{sleeper2#spec}}"
+        spec: "!{sleeper2-spec}"
 ```
 
 ## Referring to ServiceBinding outputs
 
-When Service Catalog processes a ServiceBinding, the output is placed in a Secret
+When Service Catalog processes a `ServiceBinding`, the output is placed in a `Secret`
 (since they might be secret). If they're not secret, it's convenient to directly
-reference them in the bundle. This can be done by using `dependency:bindsecret#data.secretkey`.
-Secrets inside data fields are stored base64 encoded in kubernetes, but when you refer to
+reference them in the bundle. This can be done by specifying `bindsecret` `modifier` attribute and then `path` as
+if referring to a `Secret` resource. E.g. `path` set to `data.secretkey` will fetch the value stored with `secretkey`
+key. Secrets inside data fields are stored base64 encoded in kubernetes, but when you refer to
 them in Smith they are plain. At the moment, `bindsecret` is the only parameterisation of
-the dependency that is allowed.
+the reference that is allowed.
 
 For example:
 
@@ -90,8 +100,10 @@ spec:
               host: http://google.com
 
   - name: a-binding
-    dependsOn:
-    - a
+    references:
+    - name: a-metadata-name
+      resource: a
+      path: metadata.name
     spec:
       object:
         metadata:
@@ -100,12 +112,19 @@ spec:
         kind: ServiceBinding
         spec:
           instanceRef:
-            name: "{{a#metadata.name}}"
+            name: "!{a-metadata-name}"
           secretName: a-binding-secret
 
   - name: b
-    dependsOn:
-    - a-binding
+    references:
+    - name: a-binding-host
+      resource: a-binding
+      path: data.host
+      modifier: bindsecret
+    - name: a-binding-password
+      resource: a-binding
+      path: data.password
+      modifier: bindsecret
     spec:
       object:
         metadata:
@@ -117,14 +136,14 @@ spec:
           clusterServicePlanExternalName: default
           parameters:
             important: true
-            host: "{{a-binding:bindsecret#data.host}}"
-            password: "{{a-binding:bindsecret#data.password}}"
+            host: "!{a-binding-host}"
+            password: "!{a-binding-password}"
 ```
 
 **Warning: it is not currently safe to have a truly secret field
-passed this way (cf `a-binding:bindsecret#data.password`) unless it's inserted
-into a secret, as it will be exposed in the parameters of the created object.**
-To do the example above correctly, we could instead construct a new secret object
+passed this way (cf `a-binding-password`) unless it's inserted
+into a `Secret`, as it will be exposed in the body of the created object.**
+To do the example above correctly, we could instead construct a new `Secret` object
 in the appropriate form for a `ServiceInstance` `parametersFrom` secret reference.
 In future, this [should be automatic](https://github.com/atlassian/smith/issues/233).
 
@@ -134,15 +153,24 @@ Having references inside an object or plugin means that the final
 shape of the object will only be known once the dependencies have
 been evaluated. However, because we would like to fail as quickly
 as possible if the user has entered invalid parameters, 'example'
-values can be specified (as placeholders) so that ServiceInstance
-objects and plugins can be evaluated against their json schemas.
+values can be specified (as placeholders) so that `ServiceInstance`
+objects and plugins can be evaluated against their JSON schemas.
 
 Modifying part of the example from the previous section:
 
 ```yaml
   - name: b
-    dependsOn:
-    - a-binding
+    references:
+    - name: a-binding-host
+      resource: a-binding
+      path: data.host
+      example: http://example.com
+      modifier: bindsecret
+    - name: a-binding-password
+      resource: a-binding
+      path: data.password
+      example: fakepassword
+      modifier: bindsecret
     spec:
       object:
         metadata:
@@ -154,15 +182,15 @@ Modifying part of the example from the previous section:
           clusterServicePlanExternalName: default
           parameters:
             important: true
-            host: '{{a-binding:bindsecret#data.host#"http://example.com"}}'
-            password: '{{a-binding:bindsecret#data.password#"fakepassword"}}'
+            host: "!{a-binding-host}"
+            password: "!{a-binding-password}"
 ```
 
-The difference here is that the `host` and `password` fields now have an additional
-`#`, following which there is a chunk of embedded JSON. This allows us
-to validate the parameters against the json schema exposed
+The difference here is that the `a-binding-host` and `a-binding-password` references now have an additional
+`example` attribute with a sample value. This allows us
+to validate the parameters against the JSON schema exposed
 by the OSB catalog endpoint (and currently accessible via a field on
-Service Catalog's ClusterServicePlan resources). Therefore the above
+Service Catalog's `ClusterServicePlan` objects). Therefore the above
 resource has the provisional `parameters` block for validation purposes
 of:
 

@@ -84,8 +84,8 @@ spec:
         spec:
           disk: 100GiB
   - name: app1
-    dependsOn:
-    - db1
+    references:
+    - resource: db1
     spec:
       object:
         apiVersion: apps/v1
@@ -113,7 +113,7 @@ Some resource types can have Outputs:
 Resources can reference outputs of other resources within the same bundle. [See what is supported](./docs/design/field-references.md).
 
 ### Dependencies
-Resources may depend on each other explicitly via `DependsOn` object references. Resources are created in the reverse dependency order.
+Resources may depend on each other explicitly via object references. Resources are created in the reverse dependency order.
 
 ### States
 READY is the state of a Resource when it can be considered created. E.g. if it is

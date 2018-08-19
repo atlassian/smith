@@ -32,8 +32,10 @@ spec:
               foo: bar
 
   - name: a-binding
-    dependsOn:
-    - a
+    references:
+    - name: a-metadata-name
+      resource: a
+      path: metadata.name
     spec:
       object:
         apiVersion: servicecatalog.k8s.io/v1beta1
@@ -42,12 +44,12 @@ spec:
           name: a-binding
         spec:
           instanceRef:
-            name: "{{a#metadata.name}}"
+            name: "!{a-metadata-name}"
           secretName: a-binding-secret
 
   - name: b
-    dependsOn:
-    - a-binding
+    references:
+    - resource: a-binding
     spec:
       object:
         apiVersion: servicecatalog.k8s.io/v1beta1
@@ -69,7 +71,7 @@ get an instance of a plugin.
 See types in `pkg/plugin` for more details.
 
 When Smith comes across a resource with `spec.plugin` field set and `spec.plugin.name: foobar` it invokes
-the plugin `foobar`. For each dependency (resources that are referenced in `dependsOn` attribute) of the
+the plugin `foobar`. For each dependency (resources that are referenced in `references` attribute) of the
 resource with plugin invocation Smith fetches its output objects (if any) and auxiliary objects (if any) to
 include in the plugin invocation along with the dependencies themselves.
 Smith needs to recognize resource group/version/kinds to be able to fetch the outputs and auxiliary objects.
@@ -183,8 +185,10 @@ spec:
               foo: bar
 
   - name: a-binding
-    dependsOn:
-    - a
+    references:
+    - name: a-metadata-name
+      resource: a
+      path: metadata.name
     spec:
       object:
         apiVersion: servicecatalog.k8s.io/v1beta1
@@ -193,12 +197,12 @@ spec:
           name: a-binding
         spec:
           instanceRef:
-            name: "{{a#metadata.name}}"
+            name: "!{a-metadata-name}"
           secretName: a-binding-secret
 
   - name: b
-    dependsOn:
-    - a-binding
+    references:
+    - resource: a-binding
     spec:
       plugin:
         name: filter
