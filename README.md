@@ -39,19 +39,7 @@ an label pointing at the origin Bundle.
 
 ### Example bundle
 CR definitions:
-```yaml
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  name: bundles.smith.atlassian.com
-spec:
-  group: smith.atlassian.com
-  version: v1
-  names:
-    kind: Bundle
-    plural: bundles
-    singular: bundle
-```
+For `Bundle` see [0-crd.yaml](docs/deployment/0-crd.yaml).
 ```yaml
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
