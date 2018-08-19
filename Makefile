@@ -14,7 +14,7 @@ setup-base:
 
 .PHONY: fmt-bazel
 fmt-bazel:
-	-bazel run //:buildozer
+	bazel run //:buildozer
 	-bazel run //:buildifier
 
 .PHONY: update-bazel
