@@ -106,10 +106,49 @@ func TestEqualityCheck(t *testing.T) {
 					PlanReference: sc_v1b1.PlanReference{
 						ClusterServiceClassExternalName: "ClusterServiceClassExternalName",
 						ClusterServicePlanExternalName:  "ClusterServicePlanExternalName",
-						ClusterServiceClassExternalID:   "ClusterServiceClassExternalName",
-						ClusterServicePlanExternalID:    "ClusterServicePlanExternalName",
-						ClusterServiceClassName:         "ClusterServiceClassName",
-						ClusterServicePlanName:          "ClusterServicePlanName",
+					},
+					ClusterServiceClassRef: &sc_v1b1.ClusterObjectReference{
+						Name: "ClusterObjectReference",
+					},
+					ClusterServicePlanRef: &sc_v1b1.ClusterObjectReference{
+						Name: "ClusterServicePlanRef",
+					},
+					ExternalID: "ExternalID",
+					UserInfo: &sc_v1b1.UserInfo{
+						Username: "Username",
+						UID:      "UID",
+						Groups:   []string{"group1"},
+						Extra: map[string]sc_v1b1.ExtraValue{
+							"value1": {"v1"},
+						},
+					},
+					UpdateRequests: 1,
+				},
+			},
+		},
+		{
+			name: "Service Catalog",
+			spec: &sc_v1b1.ServiceInstance{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ServiceInstance",
+					APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+				},
+				Spec: sc_v1b1.ServiceInstanceSpec{
+					PlanReference: sc_v1b1.PlanReference{
+						ServiceClassExternalName: "ServiceClassExternalName",
+						ServicePlanExternalName:  "ServicePlanExternalName",
+					},
+				},
+			},
+			actual: &sc_v1b1.ServiceInstance{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ServiceInstance",
+					APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+				},
+				Spec: sc_v1b1.ServiceInstanceSpec{
+					PlanReference: sc_v1b1.PlanReference{
+						ServiceClassExternalName: "ServiceClassExternalName",
+						ServicePlanExternalName:  "ServicePlanExternalName",
 					},
 					ClusterServiceClassRef: &sc_v1b1.ClusterObjectReference{
 						Name: "ClusterObjectReference",
@@ -181,8 +220,6 @@ func TestEqualityUnequal(t *testing.T) {
 					PlanReference: sc_v1b1.PlanReference{
 						ClusterServiceClassExternalName: "ClusterServiceClassExternalName",
 						ClusterServicePlanExternalName:  "ClusterServicePlanExternalName",
-						ClusterServiceClassName:         "ClusterServiceClassName",
-						ClusterServicePlanName:          "ClusterServicePlanName",
 					},
 					ClusterServiceClassRef: &sc_v1b1.ClusterObjectReference{
 						Name: "ClusterObjectReference",
