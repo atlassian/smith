@@ -106,8 +106,49 @@ func TestEqualityCheck(t *testing.T) {
 					PlanReference: sc_v1b1.PlanReference{
 						ClusterServiceClassExternalName: "ClusterServiceClassExternalName",
 						ClusterServicePlanExternalName:  "ClusterServicePlanExternalName",
-						ClusterServiceClassName:         "ClusterServiceClassName",
-						ClusterServicePlanName:          "ClusterServicePlanName",
+					},
+					ClusterServiceClassRef: &sc_v1b1.ClusterObjectReference{
+						Name: "ClusterObjectReference",
+					},
+					ClusterServicePlanRef: &sc_v1b1.ClusterObjectReference{
+						Name: "ClusterServicePlanRef",
+					},
+					ExternalID: "ExternalID",
+					UserInfo: &sc_v1b1.UserInfo{
+						Username: "Username",
+						UID:      "UID",
+						Groups:   []string{"group1"},
+						Extra: map[string]sc_v1b1.ExtraValue{
+							"value1": {"v1"},
+						},
+					},
+					UpdateRequests: 1,
+				},
+			},
+		},
+		{
+			name: "Service Catalog",
+			spec: &sc_v1b1.ServiceInstance{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ServiceInstance",
+					APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+				},
+				Spec: sc_v1b1.ServiceInstanceSpec{
+					PlanReference: sc_v1b1.PlanReference{
+						ServiceClassExternalName: "ServiceClassExternalName",
+						ServicePlanExternalName:  "ServicePlanExternalName",
+					},
+				},
+			},
+			actual: &sc_v1b1.ServiceInstance{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ServiceInstance",
+					APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+				},
+				Spec: sc_v1b1.ServiceInstanceSpec{
+					PlanReference: sc_v1b1.PlanReference{
+						ServiceClassExternalName: "ServiceClassExternalName",
+						ServicePlanExternalName:  "ServicePlanExternalName",
 					},
 					ClusterServiceClassRef: &sc_v1b1.ClusterObjectReference{
 						Name: "ClusterObjectReference",
@@ -143,6 +184,77 @@ func TestEqualityCheck(t *testing.T) {
 			_, match, err := sc.CompareActualVsSpec(input.spec, input.actual)
 			require.NoError(t, err)
 			assert.True(t, match)
+		})
+	}
+}
+
+func TestEqualityUnequal(t *testing.T) {
+	t.Parallel()
+
+	inputs := []struct {
+		name   string
+		spec   runtime.Object
+		actual runtime.Object
+	}{
+		{
+			name: "Service Catalog with set externalID",
+			spec: &sc_v1b1.ServiceInstance{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ServiceInstance",
+					APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+				},
+				Spec: sc_v1b1.ServiceInstanceSpec{
+					PlanReference: sc_v1b1.PlanReference{
+						ClusterServiceClassExternalName: "ClusterServiceClassExternalName",
+						ClusterServicePlanExternalName:  "ClusterServicePlanExternalName",
+					},
+					ExternalID: "foo",
+				},
+			},
+			actual: &sc_v1b1.ServiceInstance{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ServiceInstance",
+					APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+				},
+				Spec: sc_v1b1.ServiceInstanceSpec{
+					PlanReference: sc_v1b1.PlanReference{
+						ClusterServiceClassExternalName: "ClusterServiceClassExternalName",
+						ClusterServicePlanExternalName:  "ClusterServicePlanExternalName",
+					},
+					ClusterServiceClassRef: &sc_v1b1.ClusterObjectReference{
+						Name: "ClusterObjectReference",
+					},
+					ClusterServicePlanRef: &sc_v1b1.ClusterObjectReference{
+						Name: "ClusterServicePlanRef",
+					},
+					ExternalID: "ExternalID",
+					UserInfo: &sc_v1b1.UserInfo{
+						Username: "Username",
+						UID:      "UID",
+						Groups:   []string{"group1"},
+						Extra: map[string]sc_v1b1.ExtraValue{
+							"value1": {"v1"},
+						},
+					},
+					UpdateRequests: 1,
+				},
+			},
+		},
+	}
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync()
+
+	for _, input := range inputs {
+		input := input
+		t.Run(input.name, func(t *testing.T) {
+			t.Parallel()
+			sc := SpecCheck{
+				Logger:  logger,
+				Cleaner: cleanup.New(types.ServiceCatalogKnownTypes, types.MainKnownTypes),
+			}
+			_, match, err := sc.CompareActualVsSpec(input.spec, input.actual)
+			require.NoError(t, err)
+			assert.False(t, match)
 		})
 	}
 }
