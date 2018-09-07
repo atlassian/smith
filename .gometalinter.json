@@ -3,7 +3,6 @@
   "Cyclo": 30,
   "Deadline": "10m",
   "Disable": ["interfacer"],
-  "EnableGC": true,
   "Exclude": [
     "comment",
     "zz_generated"

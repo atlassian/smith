@@ -13,7 +13,7 @@ import (
 
 func main() {
 	if err := run(); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-		fmt.Fprintf(os.Stderr, "%#v\n", err) // nolint: gas
+		fmt.Fprintf(os.Stderr, "%#v\n", err) // nolint: gas, errcheck
 		os.Exit(1)
 	}
 }

@@ -5,6 +5,7 @@
 # gazelle:exclude vendor/golang.org/x/tools/go/internal/gccgoimporter/testdata
 # gazelle:exclude vendor/golang.org/x/tools/go/loader/testdata
 # gazelle:exclude vendor/golang.org/x/tools/go/internal/gcimporter/testdata
+# gazelle:proto disable_global
 
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("@bazel_gazelle//:def.bzl", "gazelle")
