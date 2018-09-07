@@ -14,16 +14,19 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:07b54a8209e6c4e839597ca49f86f0f7d06373f6aca34f1c1569b029f83602a2"
+  digest = "1:141b34eca7299dec1a968fd7655f1edf15c16f59b9d9aa8973b759443f8b171e"
   name = "github.com/atlassian/ctrl"
   packages = [
     ".",
     "app",
     "client",
+    "flagutil",
+    "handlers",
     "logz",
+    "process",
   ]
   pruneopts = "NT"
-  revision = "0afa6f9a330f33a47b34d394ab55657b53657b05"
+  revision = "97855bb44e7182f9b2baa3c8f10ae9c377327ab3"
 
 [[projects]]
   branch = "master"
@@ -741,7 +744,9 @@
     "github.com/ash2k/stager/wait",
     "github.com/atlassian/ctrl",
     "github.com/atlassian/ctrl/app",
+    "github.com/atlassian/ctrl/handlers",
     "github.com/atlassian/ctrl/logz",
+    "github.com/atlassian/ctrl/process",
     "github.com/ghodss/yaml",
     "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1",
     "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset",

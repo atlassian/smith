@@ -118,9 +118,7 @@ func (in *BundleStatus) DeepCopyInto(out *BundleStatus) {
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]BundleCondition, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
+		copy(*out, *in)
 	}
 	if in.ResourceStatuses != nil {
 		in, out := &in.ResourceStatuses, &out.ResourceStatuses
@@ -249,9 +247,7 @@ func (in *ResourceStatus) DeepCopyInto(out *ResourceStatus) {
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]ResourceCondition, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
+		copy(*out, *in)
 	}
 	return
 }
