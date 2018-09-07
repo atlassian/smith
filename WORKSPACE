@@ -4,14 +4,14 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "8b68d0630d63d95dacc0016c3bb4b76154fe34fca93efd65d1c366de3fcb4294",
-    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.12.1/rules_go-0.12.1.tar.gz"],
+    sha256 = "97cf62bdef33519412167fd1e4b0810a318a7c234f5f8dc4f53e2da86241c492",
+    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.15.3/rules_go-0.15.3.tar.gz"],
 )
 
 http_archive(
     name = "bazel_gazelle",
-    sha256 = "ddedc7aaeb61f2654d7d7d4fd7940052ea992ccdb031b8f9797ed143ac7e8d43",
-    urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.12.0/bazel-gazelle-0.12.0.tar.gz"],
+    sha256 = "c0a5739d12c6d05b6c1ad56f2200cb0b57c5a70e03ebd2f7b87ce88cabf09c7b",
+    urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.14.0/bazel-gazelle-0.14.0.tar.gz"],
 )
 
 http_archive(
@@ -23,16 +23,16 @@ http_archive(
 
 http_archive(
     name = "com_github_bazelbuild_buildtools",
-    sha256 = "681130514b50ee640cd5eee9cbd192fd48072b4bc9abc6a17a1fba7a2817ec0e",
-    strip_prefix = "buildtools-5a4c4ca9753ad0f8f9eb3463d84bc89388846420",
-    urls = ["https://github.com/bazelbuild/buildtools/archive/5a4c4ca9753ad0f8f9eb3463d84bc89388846420.tar.gz"],
+    sha256 = "a25411abad46673b35c2e3d59c53712d6e779800d1dffeed38e3fe3d05348a0b",
+    strip_prefix = "buildtools-ae772d29d07002dfd89ed1d9ff673a1721f1b8dd",
+    urls = ["https://github.com/bazelbuild/buildtools/archive/ae772d29d07002dfd89ed1d9ff673a1721f1b8dd.tar.gz"],
 )
 
 http_archive(
     name = "com_github_atlassian_bazel_tools",
-    sha256 = "bd3daaa2a928d0549ac0bb1c2571031b47ea09bed6802c9aca517cc662f0f51c",
-    strip_prefix = "bazel-tools-e0e575b8a809c4565ef189be871bb6b11cd91043",
-    urls = ["https://github.com/atlassian/bazel-tools/archive/e0e575b8a809c4565ef189be871bb6b11cd91043.tar.gz"],
+    sha256 = "15b3c0b43f29f802d4ec06ee2b8e175fac08c0e93f91950830e5ed3b4171dd3a",
+    strip_prefix = "bazel-tools-03b64959dd47b6d904de72cfdca5eaa3a3945bf1",
+    urls = ["https://github.com/atlassian/bazel-tools/archive/03b64959dd47b6d904de72cfdca5eaa3a3945bf1.tar.gz"],
 )
 
 http_archive(
