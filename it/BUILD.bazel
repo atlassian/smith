@@ -50,6 +50,7 @@ go_test(
     srcs = [
         "adoption_test.go",
         "crd_attribute_test.go",
+        "deployment_ready_test.go",
         "main_test.go",
         "resource_deletion_test.go",
         "update_test.go",
@@ -62,6 +63,7 @@ go_test(
         "manual",
     ],
     deps = [
+        "//:go_default_library",
         "//examples/sleeper:go_default_library",
         "//examples/sleeper/pkg/apis/sleeper/v1:go_default_library",
         "//pkg/apis/smith/v1:go_default_library",
@@ -70,9 +72,11 @@ go_test(
         "//vendor/github.com/atlassian/ctrl/apis/condition/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
 )
