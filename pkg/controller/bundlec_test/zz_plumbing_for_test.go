@@ -11,6 +11,7 @@ import (
 
 	"github.com/ash2k/stager"
 	"github.com/atlassian/ctrl"
+	"github.com/atlassian/ctrl/process"
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
@@ -268,7 +269,7 @@ func (tc *testCase) run(t *testing.T) {
 			RESTMapper:    restMapper,
 		},
 	}
-	generic, err := ctrl.NewGeneric(config,
+	generic, err := process.NewGeneric(config,
 		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multiqueue"),
 		2, bundleConstr)
 	require.NoError(t, err)

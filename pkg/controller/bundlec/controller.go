@@ -7,6 +7,7 @@ import (
 
 	"github.com/ash2k/stager/wait"
 	"github.com/atlassian/ctrl"
+	"github.com/atlassian/ctrl/handlers"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
@@ -43,7 +44,6 @@ type Controller struct {
 
 	// CRD
 	CrdResyncPeriod time.Duration
-	resourceHandler cache.ResourceEventHandler
 	Namespace       string
 
 	PluginContainers map[smith_v1.PluginName]plugin.Container
@@ -59,19 +59,20 @@ type Controller struct {
 // Prepare prepares the controller to be run.
 func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[schema.GroupVersionKind]cache.SharedIndexInformer) {
 	c.crdContext, c.crdContextCancel = context.WithCancel(context.Background())
-	c.resourceHandler = &ctrl.ControlledResourceHandler{
-		Logger:          c.Logger,
-		WorkQueue:       c.WorkQueue,
-		ControllerIndex: &controllerIndexAdapter{bundleStore: c.BundleStore},
-		ControllerGvk:   smith_v1.BundleGVK,
-	}
 	crdInf.AddEventHandler(&crdEventHandler{
-		Controller: c,
+		controller: c,
 		watchers:   make(map[string]watchState),
 	})
 
-	for _, resourceInf := range resourceInfs {
-		resourceInf.AddEventHandler(c.resourceHandler)
+	for gvk, resourceInf := range resourceInfs {
+		resourceHandler := &handlers.ControlledResourceHandler{
+			Logger:          c.Logger,
+			WorkQueue:       c.WorkQueue,
+			ControllerIndex: &controllerIndexAdapter{bundleStore: c.BundleStore},
+			ControllerGvk:   smith_v1.BundleGVK,
+			Gvk:             gvk,
+		}
+		resourceInf.AddEventHandler(resourceHandler)
 	}
 }
 
