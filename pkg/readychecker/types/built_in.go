@@ -11,6 +11,7 @@ import (
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	deployment_util "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 var (
@@ -53,13 +54,35 @@ func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e erro
 		return false, false, err
 	}
 
-	replicas := int32(1) // Default value if not specified
-	if deployment.Spec.Replicas != nil {
-		replicas = *deployment.Spec.Replicas
+	revision := int64(1)
+	if revision > 0 {
+		deploymentRev, err := deployment_util.Revision(&deployment)
+		if err != nil {
+			return false, true, errors.Errorf("cannot get the revision of deployment %q: %v", deployment.Name, err)
+		}
+		if revision != deploymentRev {
+			return false, false, errors.Errorf("desired revision (%d) is different from the running revision (%d)", revision, deploymentRev)
+		}
 	}
 
-	return deployment.Status.ObservedGeneration >= deployment.Generation &&
-		deployment.Status.UpdatedReplicas == replicas, false, nil
+	if deployment.Generation <= deployment.Status.ObservedGeneration {
+		cond := deployment_util.GetDeploymentCondition(deployment.Status, apps_v1.DeploymentProgressing)
+		if cond != nil && cond.Reason == deployment_util.TimedOutReason {
+			return false, false, errors.Errorf("deployment %q exceeded its progress deadline", name)
+		}
+		if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
+			return false, true, nil
+		}
+		if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
+			return false, true, nil
+		}
+		if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
+			return false, true, nil
+		}
+		return true, false, nil
+	}
+	return false, true, nil
+
 }
 
 func isScServiceBindingReady(obj runtime.Object) (isReady, retriableError bool, e error) {

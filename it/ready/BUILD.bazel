@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "deployment_ready_test.go",
+        "main_test.go",
+    ],
+    deps = [
+        "//it:go_default_library",
+        "//pkg/apis/smith/v1:go_default_library",
+        "//pkg/util/testing:go_default_library",
+        "//vendor/k8s.io/api/apps/v1:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+    ],
+)
