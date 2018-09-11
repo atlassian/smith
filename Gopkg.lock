@@ -45,17 +45,6 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:707c9f4ee70cc3bb941cf5803d9b8e725bc02277a96301ac8e537510a712ec7c"
-  name = "github.com/docker/distribution"
-  packages = [
-    "digest",
-    "reference",
-  ]
-  pruneopts = "NT"
-  revision = "48294d928ced5dd9b378f7fd7c6f5da3ff3f2c89"
-  version = "v2.6.2"
-
-[[projects]]
   digest = "1:81466b4218bf6adddac2572a30ac733a9255919bc2f470b4827a317bd4ee1756"
   name = "github.com/ghodss/yaml"
   packages = ["."]
@@ -387,9 +376,6 @@
   packages = [
     "bcrypt",
     "blowfish",
-    "ed25519",
-    "ed25519/internal/edwards25519",
-    "pbkdf2",
     "ssh/terminal",
   ]
   pruneopts = "NT"
@@ -480,19 +466,6 @@
   version = "v0.9.1"
 
 [[projects]]
-  digest = "1:48b1e45682d948fcc1c541028515cb475fd8c127daa03415a392ad398e5d5b5d"
-  name = "gopkg.in/square/go-jose.v2"
-  packages = [
-    ".",
-    "cipher",
-    "json",
-    "jwt",
-  ]
-  pruneopts = "NT"
-  revision = "8254d6c783765f38c8675fae4427a1fe73fbd09d"
-  version = "v2.1.8"
-
-[[projects]]
   digest = "1:7c95b35057a0ff2e19f707173cc1a947fa43a6eb5c4d300d196ece0334046082"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
@@ -553,7 +526,6 @@
     "pkg/client/informers/externalversions/apiextensions/v1beta1",
     "pkg/client/informers/externalversions/internalinterfaces",
     "pkg/client/listers/apiextensions/v1beta1",
-    "pkg/features",
   ]
   pruneopts = "NT"
   revision = "bbc52469f98bf18f81d6010a32c3377726cbfd84"
@@ -567,11 +539,9 @@
     "pkg/api/errors",
     "pkg/api/meta",
     "pkg/api/resource",
-    "pkg/api/validation",
     "pkg/apis/meta/internalversion",
     "pkg/apis/meta/v1",
     "pkg/apis/meta/v1/unstructured",
-    "pkg/apis/meta/v1/validation",
     "pkg/apis/meta/v1beta1",
     "pkg/conversion",
     "pkg/conversion/queryparams",
@@ -610,20 +580,6 @@
   ]
   pruneopts = "NT"
   revision = "103fd098999dc9c0c88536f5c9ad2e5da39373ae"
-
-[[projects]]
-  branch = "master"
-  digest = "1:b4cde591d3aa94854b26bebae1a1fa719ea26e0a3ed285b75c7432702e1cd465"
-  name = "k8s.io/apiserver"
-  packages = [
-    "pkg/authentication/authenticator",
-    "pkg/authentication/serviceaccount",
-    "pkg/authentication/user",
-    "pkg/features",
-    "pkg/util/feature",
-  ]
-  pruneopts = "NT"
-  revision = "e73ba2ce12ce3e93585fee9cb7c5233aa7c5eb56"
 
 [[projects]]
   branch = "release-8.0"
@@ -780,51 +736,6 @@
   pruneopts = "NT"
   revision = "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
 
-[[projects]]
-  digest = "1:6fe780bd6f60e3164143f55518908bc6ee594a4d4e175223ebad0bc7d57307d6"
-  name = "k8s.io/kubernetes"
-  packages = [
-    "pkg/api/legacyscheme",
-    "pkg/api/service",
-    "pkg/api/v1/pod",
-    "pkg/apis/autoscaling",
-    "pkg/apis/core",
-    "pkg/apis/core/helper",
-    "pkg/apis/core/install",
-    "pkg/apis/core/pods",
-    "pkg/apis/core/v1",
-    "pkg/apis/core/v1/helper",
-    "pkg/apis/core/validation",
-    "pkg/apis/extensions",
-    "pkg/apis/networking",
-    "pkg/apis/policy",
-    "pkg/apis/scheduling",
-    "pkg/capabilities",
-    "pkg/controller",
-    "pkg/controller/deployment/util",
-    "pkg/features",
-    "pkg/fieldpath",
-    "pkg/kubelet/types",
-    "pkg/master/ports",
-    "pkg/scheduler/algorithm",
-    "pkg/scheduler/algorithm/priorities/util",
-    "pkg/scheduler/api",
-    "pkg/scheduler/cache",
-    "pkg/scheduler/util",
-    "pkg/security/apparmor",
-    "pkg/serviceaccount",
-    "pkg/util/file",
-    "pkg/util/hash",
-    "pkg/util/labels",
-    "pkg/util/net/sets",
-    "pkg/util/parsers",
-    "pkg/util/pointer",
-    "pkg/util/taints",
-  ]
-  pruneopts = "NT"
-  revision = "a4529464e4629c21224b3d52edfe0ea91b072862"
-  version = "v1.11.3"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
@@ -895,7 +806,6 @@
     "k8s.io/client-go/util/workqueue",
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",
-    "k8s.io/kubernetes/pkg/controller/deployment/util",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

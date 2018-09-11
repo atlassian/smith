@@ -1,17 +1,24 @@
 package types
 
 import (
+	"strconv"
+
 	"github.com/atlassian/smith/pkg/readychecker"
 	"github.com/atlassian/smith/pkg/util"
-
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
+	apps "k8s.io/api/apps/v1"
 	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	deployment_util "k8s.io/kubernetes/pkg/controller/deployment/util"
+)
+
+const (
+	RevisionAnnotation = "deployment.kubernetes.io/revision"
+	TimedOutReason     = "ProgressDeadlineExceeded"
 )
 
 var (
@@ -46,6 +53,28 @@ func alwaysReady(_ runtime.Object) (isReady, retriableError bool, e error) {
 	return true, false, nil
 }
 
+func Revision(obj runtime.Object) (int64, error) {
+	acc, err := meta.Accessor(obj)
+	if err != nil {
+		return 0, err
+	}
+	v, ok := acc.GetAnnotations()[RevisionAnnotation]
+	if !ok {
+		return 0, nil
+	}
+	return strconv.ParseInt(v, 10, 64)
+}
+
+func GetDeploymentCondition(status apps.DeploymentStatus, condType apps.DeploymentConditionType) *apps.DeploymentCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
+}
+
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
 func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e error) {
@@ -56,7 +85,7 @@ func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e erro
 
 	revision := int64(1)
 	if revision > 0 {
-		deploymentRev, err := deployment_util.Revision(&deployment)
+		deploymentRev, err := Revision(&deployment)
 		if err != nil {
 			return false, true, errors.Errorf("cannot get the revision of deployment %q: %v", deployment.Name, err)
 		}
@@ -66,9 +95,9 @@ func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e erro
 	}
 
 	if deployment.Generation <= deployment.Status.ObservedGeneration {
-		cond := deployment_util.GetDeploymentCondition(deployment.Status, apps_v1.DeploymentProgressing)
-		if cond != nil && cond.Reason == deployment_util.TimedOutReason {
-			return false, false, errors.Errorf("deployment %q exceeded its progress deadline", name)
+		cond := GetDeploymentCondition(deployment.Status, apps_v1.DeploymentProgressing)
+		if cond != nil && cond.Reason == TimedOutReason {
+			return false, false, errors.Errorf("deployment %q exceeded its progress deadline", deployment.Name)
 		}
 		if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
 			return false, true, nil
