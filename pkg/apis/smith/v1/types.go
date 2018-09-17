@@ -144,14 +144,14 @@ type BundleCondition struct {
 
 func (bc *BundleCondition) String() string {
 	var buf bytes.Buffer
-	buf.WriteString(string(bc.Type))
-	buf.WriteByte(' ')
-	buf.WriteString(string(bc.Status))
+	buf.WriteString(string(bc.Type))   // nolint: gosec
+	buf.WriteByte(' ')                 // nolint: gosec
+	buf.WriteString(string(bc.Status)) // nolint: gosec
 	if bc.Reason != "" {
-		fmt.Fprintf(&buf, " %q", bc.Reason)
+		fmt.Fprintf(&buf, " %q", bc.Reason) // nolint: errcheck
 	}
 	if bc.Message != "" {
-		fmt.Fprintf(&buf, " %q", bc.Message)
+		fmt.Fprintf(&buf, " %q", bc.Message) // nolint: errcheck
 	}
 	return buf.String()
 }
@@ -176,16 +176,16 @@ type BundleStatus struct {
 func (bs *BundleStatus) String() string {
 	first := true
 	var buf bytes.Buffer
-	buf.WriteByte('[')
+	buf.WriteByte('[') // nolint: gosec
 	for _, cond := range bs.Conditions {
 		if first {
 			first = false
 		} else {
-			buf.WriteByte('|')
+			buf.WriteByte('|') // nolint: gosec
 		}
-		buf.WriteString(cond.String())
+		buf.WriteString(cond.String()) // nolint: gosec
 	}
-	buf.WriteByte(']')
+	buf.WriteByte(']') // nolint: gosec
 	return buf.String()
 }
 
@@ -326,14 +326,14 @@ type ResourceCondition struct {
 
 func (rc *ResourceCondition) String() string {
 	var buf bytes.Buffer
-	buf.WriteString(string(rc.Type))
-	buf.WriteByte(' ')
-	buf.WriteString(string(rc.Status))
+	buf.WriteString(string(rc.Type))   // nolint: gosec
+	buf.WriteByte(' ')                 // nolint: gosec
+	buf.WriteString(string(rc.Status)) // nolint: gosec
 	if rc.Reason != "" {
-		fmt.Fprintf(&buf, " %q", rc.Reason)
+		fmt.Fprintf(&buf, " %q", rc.Reason) // nolint: errcheck
 	}
 	if rc.Message != "" {
-		fmt.Fprintf(&buf, " %q", rc.Message)
+		fmt.Fprintf(&buf, " %q", rc.Message) // nolint: errcheck
 	}
 	return buf.String()
 }

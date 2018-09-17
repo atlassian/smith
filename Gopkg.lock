@@ -17,9 +17,12 @@
     ".",
     "app",
     "client",
-    "logz"
+    "flagutil",
+    "handlers",
+    "logz",
+    "process"
   ]
-  revision = "0afa6f9a330f33a47b34d394ab55657b53657b05"
+  revision = "97855bb44e7182f9b2baa3c8f10ae9c377327ab3"
 
 [[projects]]
   branch = "master"
@@ -632,6 +635,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6858544ad5055d1568215506cc8ff5e61a469aff8a74de99ed58aca38641c179"
+  inputs-digest = "8ca37b42b551357e1389c0437683451702a00b458236d86daeeb931d4d8c1889"
   solver-name = "gps-cdcl"
   solver-version = 1

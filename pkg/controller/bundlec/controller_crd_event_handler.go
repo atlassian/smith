@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/atlassian/ctrl"
+	"github.com/atlassian/ctrl/handlers"
 	ctrlLogz "github.com/atlassian/ctrl/logz"
 	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
@@ -25,8 +26,8 @@ type watchState struct {
 // crdEventHandler handles events for objects with Kind: CustomResourceDefinition.
 // For each object a new informer is started to watch for events.
 type crdEventHandler struct {
-	*Controller
-	watchers map[string]watchState // CRD name -> state
+	controller *Controller
+	watchers   map[string]watchState // CRD name -> state
 }
 
 // OnAdd handles just added CRDs and CRDs that existed before CRD informer was started.
@@ -68,12 +69,12 @@ func (h *crdEventHandler) OnDelete(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			h.Logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
+			h.controller.Logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
 			return
 		}
 		crd, ok = tombstone.Obj.(*apiext_v1b1.CustomResourceDefinition)
 		if !ok {
-			h.Logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			h.controller.Logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
 		}
 	}
@@ -108,7 +109,7 @@ func (h *crdEventHandler) ensureWatch(logger *zap.Logger, crd *apiext_v1b1.Custo
 		Kind:    crd.Spec.Names.Kind,
 	}
 	logger.Info("Configuring watch for CRD")
-	res, err := h.SmartClient.ForGVK(gvk, h.Namespace)
+	res, err := h.controller.SmartClient.ForGVK(gvk, h.controller.Namespace)
 	if err != nil {
 		logger.Error("Failed to get client for CRD", zap.Error(err))
 		return false
@@ -120,21 +121,28 @@ func (h *crdEventHandler) ensureWatch(logger *zap.Logger, crd *apiext_v1b1.Custo
 		WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
 			return res.Watch(options)
 		},
-	}, &unstructured.Unstructured{}, h.CrdResyncPeriod, cache.Indexers{})
-	h.wgLock.Lock()
-	defer h.wgLock.Unlock()
-	if h.stopping {
+	}, &unstructured.Unstructured{}, h.controller.CrdResyncPeriod, cache.Indexers{})
+	h.controller.wgLock.Lock()
+	defer h.controller.wgLock.Unlock()
+	if h.controller.stopping {
 		return false
 	}
-	crdInf.AddEventHandler(h.resourceHandler)
-	err = h.Store.AddInformer(gvk, crdInf)
+	resourceHandler := &handlers.ControlledResourceHandler{
+		Logger:          h.controller.Logger,
+		WorkQueue:       h.controller.WorkQueue,
+		ControllerIndex: &controllerIndexAdapter{bundleStore: h.controller.BundleStore},
+		ControllerGvk:   smith_v1.BundleGVK,
+		Gvk:             gvk,
+	}
+	crdInf.AddEventHandler(resourceHandler)
+	err = h.controller.Store.AddInformer(gvk, crdInf)
 	if err != nil {
 		logger.Error("Failed to add informer for CRD to multisore", zap.Error(err))
 		return false
 	}
-	ctx, cancel := context.WithCancel(h.crdContext)
+	ctx, cancel := context.WithCancel(h.controller.crdContext)
 	h.watchers[crd.Name] = watchState{cancel: cancel}
-	h.wg.StartWithChannel(ctx.Done(), crdInf.Run)
+	h.controller.wg.StartWithChannel(ctx.Done(), crdInf.Run)
 	return true
 }
 
@@ -154,21 +162,23 @@ func (h *crdEventHandler) ensureNoWatch(logger *zap.Logger, crd *apiext_v1b1.Cus
 		Version: crd.Spec.Version,
 		Kind:    crd.Spec.Names.Kind,
 	}
-	h.Store.RemoveInformer(gvk)
+	h.controller.Store.RemoveInformer(gvk)
 	return true
 }
 
 func (h *crdEventHandler) rebuildBundles(logger *zap.Logger, crd *apiext_v1b1.CustomResourceDefinition, addUpdateDelete string) {
-	bundles, err := h.BundleStore.GetBundlesByCrd(crd)
+	bundles, err := h.controller.BundleStore.GetBundlesByCrd(crd)
 	if err != nil {
 		logger.Error("Failed to get bundles by CRD name", zap.Error(err))
 		return
 	}
 	for _, bundle := range bundles {
-		logger.
-			With(ctrlLogz.Namespace(bundle), ctrlLogz.Controller(bundle)).
-			Sugar().Infof("Rebuilding bundle because CRD was %s", addUpdateDelete)
-		h.WorkQueue.Add(ctrl.QueueKey{
+		logger.With(
+			ctrlLogz.Namespace(bundle),
+			ctrlLogz.Object(bundle),
+			ctrlLogz.ObjectGk(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition").GroupKind()),
+		).Sugar().Infof("Rebuilding bundle because CRD was %s", addUpdateDelete)
+		h.controller.WorkQueue.Add(ctrl.QueueKey{
 			Namespace: bundle.Namespace,
 			Name:      bundle.Name,
 		})
@@ -181,6 +191,6 @@ func supportEnabled(crd *apiext_v1b1.CustomResourceDefinition) bool {
 
 func (h *crdEventHandler) loggerForCRD(obj *apiext_v1b1.CustomResourceDefinition) *zap.Logger {
 	// No namespace
-	return h.Logger.With(ctrlLogz.Object(obj),
+	return h.controller.Logger.With(ctrlLogz.Object(obj),
 		ctrlLogz.ObjectGk(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition").GroupKind()))
 }
