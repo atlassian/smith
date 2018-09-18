@@ -89,18 +89,24 @@ func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e erro
 		}
 	}
 
-	if deployment.Generation <= deployment.Status.ObservedGeneration {
+	generation := deployment.Generation
+	observedGeneration := deployment.Status.ObservedGeneration
+	replicas := deployment.Spec.Replicas
+	updatedReplicas := deployment.Status.UpdatedReplicas
+	availableReplicas := deployment.Status.AvailableReplicas
+
+	if generation <= observedGeneration {
 		progressingCond := getDeploymentCondition(deployment.Status, apps_v1.DeploymentProgressing)
 		if progressingCond != nil && progressingCond.Reason == TimedOutReason {
 			return false, false, errors.Errorf("deployment %q exceeded its progress deadline", deployment.Name)
 		}
-		if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
+		if replicas != nil && updatedReplicas < *replicas {
 			return false, true, nil
 		}
-		if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
+		if deployment.Status.Replicas > updatedReplicas {
 			return false, true, nil
 		}
-		if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
+		if availableReplicas < updatedReplicas {
 			return false, true, nil
 		}
 		return true, false, nil
