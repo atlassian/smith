@@ -16,10 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const (
-	RevisionAnnotation = "deployment.kubernetes.io/revision"
-	TimedOutReason     = "ProgressDeadlineExceeded"
-)
 
 var (
 	MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
@@ -54,6 +50,8 @@ func alwaysReady(_ runtime.Object) (isReady, retriableError bool, e error) {
 }
 
 func Revision(obj runtime.Object) (int64, error) {
+	const RevisionAnnotation = "deployment.kubernetes.io/revision"
+
 	acc, err := meta.Accessor(obj)
 	if err != nil {
 		return 0, err
@@ -78,6 +76,8 @@ func GetDeploymentCondition(status apps.DeploymentStatus, condType apps.Deployme
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
 func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e error) {
+	const TimedOutReason     = "ProgressDeadlineExceeded"
+
 	var deployment apps_v1.Deployment
 	if err := util.ConvertType(appsV1Scheme, obj, &deployment); err != nil {
 		return false, false, err
