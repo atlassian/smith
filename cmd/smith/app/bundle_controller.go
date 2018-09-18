@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	apps_v1 "k8s.io/api/apps/v1"
+	autoscaling_v2b1 "k8s.io/api/autoscaling/v2beta1"
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	apps_v1inf "k8s.io/client-go/informers/apps/v1"
+	autoscaling_v2b1inf "k8s.io/client-go/informers/autoscaling/v2beta1"
 	core_v1inf "k8s.io/client-go/informers/core/v1"
 	ext_v1b1inf "k8s.io/client-go/informers/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
@@ -248,12 +250,13 @@ func (c *BundleControllerConstructor) loadPlugins() (map[smith_v1.PluginName]plu
 func (c *BundleControllerConstructor) resourceInformers(config *ctrl.Config, cctx *ctrl.Context, scClient scClientset.Interface) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
 	coreInfs := map[schema.GroupVersionKind]func(kubernetes.Interface, string, time.Duration, cache.Indexers) cache.SharedIndexInformer{
 		// Core API types
-		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):       ext_v1b1inf.NewIngressInformer,
-		core_v1.SchemeGroupVersion.WithKind("Service"):        core_v1inf.NewServiceInformer,
-		core_v1.SchemeGroupVersion.WithKind("ConfigMap"):      core_v1inf.NewConfigMapInformer,
-		core_v1.SchemeGroupVersion.WithKind("Secret"):         core_v1inf.NewSecretInformer,
-		core_v1.SchemeGroupVersion.WithKind("ServiceAccount"): core_v1inf.NewServiceAccountInformer,
-		apps_v1.SchemeGroupVersion.WithKind("Deployment"):     apps_v1inf.NewDeploymentInformer,
+		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):                         ext_v1b1inf.NewIngressInformer,
+		core_v1.SchemeGroupVersion.WithKind("Service"):                          core_v1inf.NewServiceInformer,
+		core_v1.SchemeGroupVersion.WithKind("ConfigMap"):                        core_v1inf.NewConfigMapInformer,
+		core_v1.SchemeGroupVersion.WithKind("Secret"):                           core_v1inf.NewSecretInformer,
+		core_v1.SchemeGroupVersion.WithKind("ServiceAccount"):                   core_v1inf.NewServiceAccountInformer,
+		apps_v1.SchemeGroupVersion.WithKind("Deployment"):                       apps_v1inf.NewDeploymentInformer,
+		autoscaling_v2b1.SchemeGroupVersion.WithKind("HorizontalPodAutoScaler"): autoscaling_v2b1inf.NewHorizontalPodAutoscalerInformer,
 	}
 	infs := make(map[schema.GroupVersionKind]cache.SharedIndexInformer, len(coreInfs)+2)
 	for gvk, coreInf := range coreInfs {
@@ -291,6 +294,7 @@ func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
 	sb.Register(core_v1.SchemeBuilder...)
 	sb.Register(apps_v1.SchemeBuilder...)
 	sb.Register(apiext_v1b1.SchemeBuilder...)
+	sb.Register(autoscaling_v2b1.SchemeBuilder...)
 	if serviceCatalog {
 		sb.Register(sc_v1b1.SchemeBuilder...)
 	}
