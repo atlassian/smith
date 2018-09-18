@@ -49,14 +49,10 @@ func alwaysReady(_ runtime.Object) (isReady, retriableError bool, e error) {
 	return true, false, nil
 }
 
-func Revision(obj runtime.Object) (int64, error) {
+func Revision(deployment apps_v1.Deployment) (int64, error) {
 	const RevisionAnnotation = "deployment.kubernetes.io/revision"
 
-	acc, err := meta.Accessor(obj)
-	if err != nil {
-		return 0, err
-	}
-	v, ok := acc.GetAnnotations()[RevisionAnnotation]
+	v, ok := deployment.GetAnnotations()[RevisionAnnotation]
 	if !ok {
 		return 0, nil
 	}
