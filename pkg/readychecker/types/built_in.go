@@ -11,7 +11,6 @@ import (
 	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -49,7 +48,7 @@ func alwaysReady(_ runtime.Object) (isReady, retriableError bool, e error) {
 	return true, false, nil
 }
 
-func Revision(deployment apps_v1.Deployment) (int64, error) {
+func getDeploymentRevision(deployment *apps_v1.Deployment) (int64, error) {
 	const RevisionAnnotation = "deployment.kubernetes.io/revision"
 
 	v, ok := deployment.GetAnnotations()[RevisionAnnotation]
@@ -59,7 +58,7 @@ func Revision(deployment apps_v1.Deployment) (int64, error) {
 	return strconv.ParseInt(v, 10, 64)
 }
 
-func GetDeploymentCondition(status apps.DeploymentStatus, condType apps.DeploymentConditionType) *apps.DeploymentCondition {
+func getDeploymentCondition(status apps.DeploymentStatus, condType apps.DeploymentConditionType) *apps.DeploymentCondition {
 	for i := range status.Conditions {
 		c := status.Conditions[i]
 		if c.Type == condType {
@@ -81,7 +80,7 @@ func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e erro
 
 	revision := int64(1)
 	if revision > 0 {
-		deploymentRev, err := Revision(&deployment)
+		deploymentRev, err := getDeploymentRevision(&deployment)
 		if err != nil {
 			return false, true, errors.Errorf("cannot get the revision of deployment %q: %v", deployment.Name, err)
 		}
@@ -91,7 +90,7 @@ func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e erro
 	}
 
 	if deployment.Generation <= deployment.Status.ObservedGeneration {
-		cond := GetDeploymentCondition(deployment.Status, apps_v1.DeploymentProgressing)
+		cond := getDeploymentCondition(deployment.Status, apps_v1.DeploymentProgressing)
 		if cond != nil && cond.Reason == TimedOutReason {
 			return false, false, errors.Errorf("deployment %q exceeded its progress deadline", deployment.Name)
 		}
