@@ -69,7 +69,7 @@ func getDeploymentCondition(status apps.DeploymentStatus, condType apps.Deployme
 }
 
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
-// and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
+// and k8s.io/kubernetes/pkg/kubectl/rollout_status.go#L67 Status()
 func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e error) {
 	const TimedOutReason     = "ProgressDeadlineExceeded"
 
