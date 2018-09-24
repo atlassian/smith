@@ -70,6 +70,8 @@ spec:
                               description: Schema for some fields of ObjectMeta
                               properties:
                                 annotations:
+                                  additionalProperties:
+                                    type: string
                                   type: object
                                 finalizers:
                                   items:
@@ -91,6 +93,10 @@ spec:
                                   - pending
                                   type: object
                                 labels:
+                                  additionalProperties:
+                                    maxLength: 63
+                                    pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
+                                    type: string
                                   type: object
                                 name:
                                   maxLength: 253
