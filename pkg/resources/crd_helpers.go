@@ -80,23 +80,21 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			"name": dnsSubdomain,
 			"labels": {
 				Type: "object",
-				// TODO there is a bug in marshling/unmarshaling of AdditionalProperties
-				//AdditionalProperties: &apiext_v1b1.JSONSchemaPropsOrBool{
-				//	Schema: &apiext_v1b1.JSONSchemaProps{
-				//		Type:      "string",
-				//		MaxLength: int64ptr(63),
-				//		Pattern:   "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
-				//	},
-				//},
+				AdditionalProperties: &apiext_v1b1.JSONSchemaPropsOrBool{
+					Schema: &apiext_v1b1.JSONSchemaProps{
+						Type:      "string",
+						MaxLength: int64ptr(63),
+						Pattern:   "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
+					},
+				},
 			},
 			"annotations": {
 				Type: "object",
-				// TODO there is a bug in marshling/unmarshaling of AdditionalProperties
-				//AdditionalProperties: &apiext_v1b1.JSONSchemaPropsOrBool{
-				//	Schema: &apiext_v1b1.JSONSchemaProps{
-				//		Type: "string",
-				//	},
-				//},
+				AdditionalProperties: &apiext_v1b1.JSONSchemaPropsOrBool{
+					Schema: &apiext_v1b1.JSONSchemaProps{
+						Type: "string",
+					},
+				},
 			},
 			"ownerReferences": {
 				Type: "array",

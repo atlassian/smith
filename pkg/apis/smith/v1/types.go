@@ -122,7 +122,7 @@ func (b *Bundle) GetCondition(conditionType BundleConditionType) (int, *BundleCo
 
 // +k8s:deepcopy-gen=true
 type BundleSpec struct {
-	Resources []Resource `json:"resources,omitempty"`
+	Resources []Resource `json:"resources"`
 }
 
 // +k8s:deepcopy-gen=true
