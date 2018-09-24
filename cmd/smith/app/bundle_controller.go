@@ -256,7 +256,7 @@ func (c *BundleControllerConstructor) resourceInformers(config *ctrl.Config, cct
 		core_v1.SchemeGroupVersion.WithKind("Secret"):                           core_v1inf.NewSecretInformer,
 		core_v1.SchemeGroupVersion.WithKind("ServiceAccount"):                   core_v1inf.NewServiceAccountInformer,
 		apps_v1.SchemeGroupVersion.WithKind("Deployment"):                       apps_v1inf.NewDeploymentInformer,
-		autoscaling_v2b1.SchemeGroupVersion.WithKind("HorizontalPodAutoScaler"): autoscaling_v2b1inf.NewHorizontalPodAutoscalerInformer,
+		autoscaling_v2b1.SchemeGroupVersion.WithKind("HorizontalPodAutoscaler"): autoscaling_v2b1inf.NewHorizontalPodAutoscalerInformer,
 	}
 	infs := make(map[schema.GroupVersionKind]cache.SharedIndexInformer, len(coreInfs)+2)
 	for gvk, coreInf := range coreInfs {
