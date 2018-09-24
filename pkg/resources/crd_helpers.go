@@ -205,8 +205,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			Name: smith_v1.BundleResourceName,
 		},
 		Spec: apiext_v1b1.CustomResourceDefinitionSpec{
-			Group:   smith.GroupName,
-			Version: smith_v1.BundleResourceVersion,
+			Group: smith.GroupName,
 			Names: apiext_v1b1.CustomResourceDefinitionNames{
 				Plural:   smith_v1.BundleResourcePlural,
 				Singular: smith_v1.BundleResourceSingular,
@@ -228,6 +227,13 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 							},
 						},
 					},
+				},
+			},
+			Versions: []apiext_v1b1.CustomResourceDefinitionVersion{
+				{
+					Name:    smith_v1.BundleResourceVersion,
+					Served:  true,
+					Storage: true,
 				},
 			},
 		},
@@ -336,10 +342,8 @@ func IsCrdConditionPresentAndEqual(crd *apiext_v1b1.CustomResourceDefinition, co
 }
 
 func IsEqualCrd(a, b *apiext_v1b1.CustomResourceDefinition) bool {
-	aCopy := *a
-	bCopy := *b
-	a = &aCopy
-	b = &bCopy
+	a = a.DeepCopy()
+	b = b.DeepCopy()
 
 	apiext_v1b1.SetDefaults_CustomResourceDefinitionSpec(&a.Spec)
 	apiext_v1b1.SetDefaults_CustomResourceDefinitionSpec(&b.Spec)
@@ -348,37 +352,33 @@ func IsEqualCrd(a, b *apiext_v1b1.CustomResourceDefinition) bool {
 	as := a.Spec
 	bs := b.Spec
 	return as.Group == bs.Group &&
-		as.Version == bs.Version &&
 		isEqualCrdNames(as.Names, bs.Names) &&
-		a.Spec.Scope == b.Spec.Scope &&
+		as.Scope == bs.Scope &&
 		isEqualValidation(as.Validation, bs.Validation) &&
+		isEqualSubresources(as.Subresources, bs.Subresources) &&
+		isEqualVersions(as.Versions, bs.Versions) &&
+		isEqualAdditionalPrinterColumns(as.AdditionalPrinterColumns, bs.AdditionalPrinterColumns) &&
 		isEqualAnnotations(a.Annotations, b.Annotations)
 }
 
-func isEqualCrdNames(n1, n2 apiext_v1b1.CustomResourceDefinitionNames) bool {
-	return n1.Plural == n2.Plural &&
-		n1.Singular == n2.Singular &&
-		isEqualShortNames(n1.ShortNames, n2.ShortNames) &&
-		n1.Kind == n2.Kind &&
-		n1.ListKind == n2.ListKind
+func isEqualCrdNames(a, b apiext_v1b1.CustomResourceDefinitionNames) bool {
+	return reflect.DeepEqual(a, b)
 }
 
-func isEqualShortNames(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i, v := range a {
-		if v != b[i] {
-			return false
-		}
-	}
-
-	return true
+func isEqualValidation(a, b *apiext_v1b1.CustomResourceValidation) bool {
+	return reflect.DeepEqual(a, b)
 }
 
-func isEqualValidation(av, bv *apiext_v1b1.CustomResourceValidation) bool {
-	return reflect.DeepEqual(av, bv)
+func isEqualSubresources(a, b *apiext_v1b1.CustomResourceSubresources) bool {
+	return reflect.DeepEqual(a, b)
+}
+
+func isEqualVersions(a, b []apiext_v1b1.CustomResourceDefinitionVersion) bool {
+	return reflect.DeepEqual(a, b)
+}
+
+func isEqualAdditionalPrinterColumns(a, b []apiext_v1b1.CustomResourceColumnDefinition) bool {
+	return reflect.DeepEqual(a, b)
 }
 
 func isEqualAnnotations(a, b map[string]string) bool {
