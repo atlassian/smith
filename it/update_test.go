@@ -217,7 +217,7 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
 	defer cancel()
 
-	bundleRes1 := cfg.AssertBundle(ctxTimeout, cfg.Bundle, cfg.CreatedBundle.ResourceVersion)
+	bundleRes1 := cfg.AssertBundle(ctxTimeout, cfg.Bundle)
 
 	secret, err := secretClient.Get(s1.Name, meta_v1.GetOptions{})
 	require.NoError(t, err)
@@ -225,10 +225,10 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	assertSecretData(t, s1, secret)
 
 	bundle2.ResourceVersion = bundleRes1.ResourceVersion
-	res, err := cfg.SmithClient.SmithV1().Bundles(cfg.Namespace).Update(bundle2)
+	_, err = cfg.SmithClient.SmithV1().Bundles(cfg.Namespace).Update(bundle2)
 	require.NoError(t, err)
 
-	bundleRes2 := cfg.AssertBundle(ctxTimeout, bundle2, bundle2.ResourceVersion, res.ResourceVersion)
+	bundleRes2 := cfg.AssertBundle(ctxTimeout, bundle2)
 
 	cfMap, err := cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	require.NoError(t, err)
@@ -249,16 +249,16 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 		Do().
 		Into(&sleeperObj)
 	require.NoError(t, err)
-	assert.Equal(t, sleeper_v1.Awake, sleeperObj.Status.State)
+	assert.Equal(t, string(sleeper_v1.Awake), string(sleeperObj.Status.State)) // TODO workaround for https://github.com/stretchr/testify/issues/644
 	assert.Equal(t, sleeper2.Spec, sleeperObj.Spec)
 
-	emptyBundle := *cfg.Bundle
+	emptyBundle := cfg.Bundle.DeepCopy()
 	emptyBundle.Spec.Resources = []smith_v1.Resource{}
 	emptyBundle.ResourceVersion = bundleRes2.ResourceVersion
-	res, err = cfg.SmithClient.SmithV1().Bundles(cfg.Namespace).Update(&emptyBundle)
+	_, err = cfg.SmithClient.SmithV1().Bundles(cfg.Namespace).Update(emptyBundle)
 	require.NoError(t, err)
 
-	cfg.AssertBundleTimeout(ctxTest, &emptyBundle, emptyBundle.ResourceVersion, res.ResourceVersion)
+	cfg.AssertBundleTimeout(ctxTest, emptyBundle)
 
 	cfMap, err = cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	isOrWillBeDeleted(t, cfMap, err)
@@ -287,7 +287,7 @@ func isOrWillBeDeleted(t *testing.T, obj runtime.Object, err error) {
 func assertSecretData(t *testing.T, expected, actual *core_v1.Secret) bool {
 	expectedResultData := map[string][]byte{}
 	for k, v := range expected.Data {
-		expectedResultData[k] = []byte(v)
+		expectedResultData[k] = v
 	}
 	for k, v := range expected.StringData {
 		expectedResultData[k] = []byte(v)

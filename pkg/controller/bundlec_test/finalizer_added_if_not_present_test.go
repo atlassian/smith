@@ -87,8 +87,6 @@ func TestFinalizerAdded(t *testing.T) {
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 			// Make sure that the "deleteResources" finalizer was added
 			assert.True(t, resources.HasFinalizer(updateBundle, bundlec.FinalizerDeleteResources))
-
-			tc.assertObjectsToBeDeleted(t, m1)
 		},
 	}
 	tc.run(t)

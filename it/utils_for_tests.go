@@ -31,6 +31,7 @@ import (
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
 	apiext_v1b1list "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
+	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -70,6 +71,11 @@ func (cfg *Config) CreateObject(ctxTest context.Context, obj, res runtime.Object
 }
 
 func (cfg *Config) AwaitBundleCondition(conditions ...watch.ConditionFunc) *smith_v1.Bundle {
+	// Before checking any conditions, ensure that .status is up to date with .spec
+	generation := IsBundleObservedGenerationCond(cfg.Namespace, cfg.Bundle.Name)
+	for i, cond := range conditions {
+		conditions[i] = AndCond(generation, cond)
+	}
 	lw := cache.NewListWatchFromClient(cfg.SmithClient.SmithV1().RESTClient(), smith_v1.BundleResourcePlural, cfg.Namespace, fields.Everything())
 	event, err := cache.ListWatchUntil(20*time.Second, lw, conditions...)
 	require.NoError(cfg.T, err)
@@ -142,22 +148,14 @@ func IsBundleResourceCond(t *testing.T, namespace, name string, resource smith_v
 	}
 }
 
-func IsBundleNewerCond(namespace, name string, resourceVersions ...string) watch.ConditionFunc {
+func IsBundleObservedGenerationCond(namespace, name string) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		metaObj := event.Object.(meta_v1.Object)
 		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
 			return false, nil
 		}
 		b := event.Object.(*smith_v1.Bundle)
-		for _, rv := range resourceVersions {
-			if b.ResourceVersion == rv {
-				// TODO Should be using Generation here once it is available
-				// https://github.com/kubernetes/kubernetes/issues/7328
-				// https://github.com/kubernetes/features/issues/95
-				return false, nil
-			}
-		}
-		return true, nil
+		return b.Status.ObservedGeneration >= b.Generation, nil
 	}
 }
 
@@ -216,6 +214,18 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	require.NoError(t, err)
 
 	defer func() {
+		cli := smithClient.SmithV1().Bundles(cfg.Namespace)
+		b, err := cli.Get(bundle.Name, meta_v1.GetOptions{})
+		if err == nil {
+			if len(b.Finalizers) > 0 {
+				t.Logf("Removing finalizers from Bundle %q", bundle.Name)
+				b.Finalizers = nil
+				_, err = cli.Update(b)
+				assert.NoError(t, err)
+			}
+		} else if !api_errors.IsNotFound(err) {
+			assert.NoError(t, err) // unexpected error
+		}
 		t.Logf("Deleting namespace %q", cfg.Namespace)
 		assert.NoError(t, mainClient.CoreV1().Namespaces().Delete(cfg.Namespace, nil))
 	}()
@@ -272,8 +282,9 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	test(ctxTest, t, cfg, args...)
 }
 
-func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, resourceVersions ...string) *smith_v1.Bundle {
-	bundleRes := cfg.AwaitBundleCondition(IsBundleNewerCond(cfg.Namespace, bundle.Name, resourceVersions...), IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleReady, cond_v1.ConditionTrue))
+func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle) *smith_v1.Bundle {
+	bundleRes := cfg.AwaitBundleCondition(
+		IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleReady, cond_v1.ConditionTrue))
 
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleReady, cond_v1.ConditionTrue)
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleInProgress, cond_v1.ConditionFalse)
@@ -299,10 +310,10 @@ func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, re
 	return bundleRes
 }
 
-func (cfg *Config) AssertBundleTimeout(ctx context.Context, bundle *smith_v1.Bundle, resourceVersion ...string) *smith_v1.Bundle {
+func (cfg *Config) AssertBundleTimeout(ctx context.Context, bundle *smith_v1.Bundle) *smith_v1.Bundle {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	return cfg.AssertBundle(ctxTimeout, bundle, resourceVersion...)
+	return cfg.AssertBundle(ctxTimeout, bundle)
 }
 
 func convertBundleResourcesToUnstrucutred(t *testing.T, bundle *smith_v1.Bundle) {

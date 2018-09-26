@@ -23,6 +23,7 @@ type BundlesGetter interface {
 type BundleInterface interface {
 	Create(*v1.Bundle) (*v1.Bundle, error)
 	Update(*v1.Bundle) (*v1.Bundle, error)
+	UpdateStatus(*v1.Bundle) (*v1.Bundle, error)
 	Delete(name string, options *meta_v1.DeleteOptions) error
 	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Bundle, error)
@@ -100,6 +101,22 @@ func (c *bundles) Update(bundle *v1.Bundle) (result *v1.Bundle, err error) {
 		Namespace(c.ns).
 		Resource("bundles").
 		Name(bundle.Name).
+		Body(bundle).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+
+func (c *bundles) UpdateStatus(bundle *v1.Bundle) (result *v1.Bundle, err error) {
+	result = &v1.Bundle{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("bundles").
+		Name(bundle.Name).
+		SubResource("status").
 		Body(bundle).
 		Do().
 		Into(result)
