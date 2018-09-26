@@ -35,7 +35,7 @@ Smith watches for new instances of a Bundle (and events to existing ones), picks
 
 Processing involves parsing the bundle, building a dependency graph (which is implicitly defined in the bundle),
 walking the graph, and creating/updating necessary resources. Each created/referenced resource gets
-an label pointing at the origin Bundle.
+a controller owner reference pointing at the origin Bundle.
 
 ### Example bundle
 CR definitions:

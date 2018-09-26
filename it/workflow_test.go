@@ -96,11 +96,6 @@ func testWorkflow(ctx context.Context, t *testing.T, cfg *Config, args ...interf
 
 	cfMap, err := cfg.MainClient.CoreV1().ConfigMaps(cfg.Namespace).Get("config1", meta_v1.GetOptions{})
 	require.NoError(t, err)
-	assert.Equal(t, map[string]string{
-		"configLabel":      "configValue",
-		"bundleLabel":      "bundleValue",
-		"overlappingLabel": "overlappingConfigValue",
-	}, cfMap.GetLabels())
 
 	secret, err := cfg.MainClient.CoreV1().Secrets(cfg.Namespace).Get("secret1", meta_v1.GetOptions{})
 	require.NoError(t, err)
