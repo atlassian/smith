@@ -29,7 +29,7 @@ spec:
                       description: A reference to a path in another resource
                       properties:
                         example:
-                          description: example of how we expect reference to resolve.
+                          description: Example of how we expect reference to resolve.
                             Used for validation
                         modifier:
                           maxLength: 253
@@ -163,7 +163,104 @@ spec:
                 - spec
                 type: object
               type: array
+          required:
+          - resources
           type: object
+        status:
+          properties:
+            conditions:
+              items:
+                properties:
+                  message:
+                    type: string
+                  reason:
+                    type: string
+                  status:
+                    minLength: 1
+                    type: string
+                  type:
+                    minLength: 1
+                    type: string
+                required:
+                - type
+                - status
+                type: object
+              type: array
+            objectsToDelete:
+              items:
+                properties:
+                  group:
+                    type: string
+                  kind:
+                    minLength: 1
+                    type: string
+                  name:
+                    minLength: 1
+                    type: string
+                  version:
+                    minLength: 1
+                    type: string
+                required:
+                - group
+                - version
+                - kind
+                - name
+                type: object
+              type: array
+            pluginStatuses:
+              items:
+                properties:
+                  group:
+                    type: string
+                  kind:
+                    minLength: 1
+                    type: string
+                  name:
+                    minLength: 1
+                    type: string
+                  status:
+                    type: string
+                  version:
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                - group
+                - version
+                - kind
+                type: object
+              type: array
+            resourceStatuses:
+              items:
+                properties:
+                  conditions:
+                    items:
+                      properties:
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          minLength: 1
+                          type: string
+                        type:
+                          minLength: 1
+                          type: string
+                      required:
+                      - type
+                      - status
+                      type: object
+                    type: array
+                  name:
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              type: array
+          type: object
+      required:
+      - spec
   versions:
   - name: v1
     served: true

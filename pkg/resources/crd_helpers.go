@@ -155,7 +155,7 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			"name":     referenceName,
 			"resource": resourceName,
 			"example": {
-				Description: "example of how we expect reference to resolve. Used for validation",
+				Description: "Example of how we expect reference to resolve. Used for validation",
 			},
 			"modifier": dnsSubdomain,
 			"path": {
@@ -195,6 +195,129 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			},
 		},
 	}
+	bundleSpec := apiext_v1b1.JSONSchemaProps{
+		Type:     "object",
+		Required: []string{"resources"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"resources": {
+				Type: "array",
+				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
+					Schema: &resource,
+				},
+			},
+		},
+	}
+	condition := apiext_v1b1.JSONSchemaProps{
+		Type:     "object",
+		Required: []string{"type", "status"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"type": {
+				Type:      "string",
+				MinLength: int64ptr(1),
+			},
+			"status": {
+				Type:      "string",
+				MinLength: int64ptr(1),
+			},
+			//"lastTransitionTime": Seem to be no way to express "string or null" constraint in schema
+			"reason": {
+				Type: "string",
+			},
+			"message": {
+				Type: "string",
+			},
+		},
+	}
+	resourceStatus := apiext_v1b1.JSONSchemaProps{
+		Type:     "object",
+		Required: []string{"name"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"name": {
+				Type:      "string",
+				MinLength: int64ptr(1),
+			},
+			"conditions": {
+				Type: "array",
+				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
+					Schema: &condition,
+				},
+			},
+		},
+	}
+	objectToDelete := apiext_v1b1.JSONSchemaProps{
+		Type:     "object",
+		Required: []string{"group", "version", "kind", "name"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"group": {
+				Type: "string",
+			},
+			"version": {
+				Type:      "string",
+				MinLength: int64ptr(1),
+			},
+			"kind": {
+				Type:      "string",
+				MinLength: int64ptr(1),
+			},
+			"name": {
+				Type:      "string",
+				MinLength: int64ptr(1),
+			},
+		},
+	}
+	pluginStatus := apiext_v1b1.JSONSchemaProps{
+		Type:     "object",
+		Required: []string{"name", "group", "version", "kind"},
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"name": {
+				Type:      "string",
+				MinLength: int64ptr(1),
+			},
+			"group": {
+				Type: "string",
+			},
+			"version": {
+				Type:      "string",
+				MinLength: int64ptr(1),
+			},
+			"kind": {
+				Type:      "string",
+				MinLength: int64ptr(1),
+			},
+			"status": {
+				Type: "string",
+			},
+		},
+	}
+	bundleStatus := apiext_v1b1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"conditions": {
+				Type: "array",
+				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
+					Schema: &condition,
+				},
+			},
+			"resourceStatuses": {
+				Type: "array",
+				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
+					Schema: &resourceStatus,
+				},
+			},
+			"objectsToDelete": {
+				Type: "array",
+				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
+					Schema: &objectToDelete,
+				},
+			},
+			"pluginStatuses": {
+				Type: "array",
+				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
+					Schema: &pluginStatus,
+				},
+			},
+		},
+	}
 
 	return &apiext_v1b1.CustomResourceDefinition{
 		TypeMeta: meta_v1.TypeMeta{
@@ -214,18 +337,10 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 			Scope: apiext_v1b1.NamespaceScoped,
 			Validation: &apiext_v1b1.CustomResourceValidation{
 				OpenAPIV3Schema: &apiext_v1b1.JSONSchemaProps{
+					Required: []string{"spec"},
 					Properties: map[string]apiext_v1b1.JSONSchemaProps{
-						"spec": {
-							Type: "object",
-							Properties: map[string]apiext_v1b1.JSONSchemaProps{
-								"resources": {
-									Type: "array",
-									Items: &apiext_v1b1.JSONSchemaPropsOrArray{
-										Schema: &resource,
-									},
-								},
-							},
-						},
+						"spec":   bundleSpec,
+						"status": bundleStatus,
 					},
 				},
 			},
