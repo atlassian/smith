@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
@@ -69,14 +70,14 @@ func TestDetectInfiniteUpdateCycles(t *testing.T) {
 			bundleUpdate := actions[2].(kube_testing.UpdateAction)
 			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
-			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleReady, smith_v1.ConditionFalse)
-			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
-			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleError, smith_v1.ConditionTrue)
+			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleReady, cond_v1.ConditionFalse)
+			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleInProgress, cond_v1.ConditionFalse)
+			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleError, cond_v1.ConditionTrue)
 
-			smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
-			smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
-			smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceReady, smith_v1.ConditionFalse)
-			resCond := smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceError, smith_v1.ConditionTrue)
+			smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceBlocked, cond_v1.ConditionFalse)
+			smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceInProgress, cond_v1.ConditionFalse)
+			smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceReady, cond_v1.ConditionFalse)
+			resCond := smith_testing.AssertResourceCondition(t, updateBundle, mapNeedsAnUpdate, smith_v1.ResourceError, cond_v1.ConditionTrue)
 			if resCond != nil {
 				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
 				assert.Equal(t, "specification of the created/updated object does not match the desired spec", resCond.Message)

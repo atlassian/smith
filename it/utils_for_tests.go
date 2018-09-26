@@ -10,6 +10,7 @@ import (
 
 	"github.com/ash2k/stager"
 	"github.com/atlassian/ctrl"
+	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	ctrlApp "github.com/atlassian/ctrl/app"
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
@@ -87,7 +88,7 @@ func AndCond(conds ...watch.ConditionFunc) watch.ConditionFunc {
 	}
 }
 
-func IsBundleStatusCond(namespace, name string, cType smith_v1.BundleConditionType, status smith_v1.ConditionStatus) watch.ConditionFunc {
+func IsBundleStatusCond(namespace, name string, cType cond_v1.ConditionType, status cond_v1.ConditionStatus) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		metaObj := event.Object.(meta_v1.Object)
 		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
@@ -96,7 +97,7 @@ func IsBundleStatusCond(namespace, name string, cType smith_v1.BundleConditionTy
 		switch event.Type {
 		case watch.Added, watch.Modified:
 			b := event.Object.(*smith_v1.Bundle)
-			_, cond := b.GetCondition(cType)
+			_, cond := cond_v1.FindCondition(b.Status.Conditions, cType)
 			return cond != nil && cond.Status == status, nil
 		default:
 			return false, errors.Errorf("unexpected event type %q: %v", event.Type, event.Object)
@@ -106,7 +107,7 @@ func IsBundleStatusCond(namespace, name string, cType smith_v1.BundleConditionTy
 
 // IsBundleResourceCond is a condition that checks conditions of a resource.
 // Sometimes it is necessary to await a particular resource condition(s) to happen, not a Bundle condition.
-func IsBundleResourceCond(t *testing.T, namespace, name string, resource smith_v1.ResourceName, conds ...*smith_v1.ResourceCondition) watch.ConditionFunc {
+func IsBundleResourceCond(t *testing.T, namespace, name string, resource smith_v1.ResourceName, conds ...*cond_v1.Condition) watch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		metaObj := event.Object.(meta_v1.Object)
 		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
@@ -121,7 +122,7 @@ func IsBundleResourceCond(t *testing.T, namespace, name string, resource smith_v
 				return false, nil
 			}
 			for _, condExpected := range conds {
-				_, condActual := resStatus.GetCondition(condExpected.Type)
+				_, condActual := cond_v1.FindCondition(resStatus.Conditions, condExpected.Type)
 				if condActual == nil {
 					t.Logf("Resource condition %q for resource %q not found", condExpected.Type, resource)
 					return false, nil
@@ -272,11 +273,11 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 }
 
 func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, resourceVersions ...string) *smith_v1.Bundle {
-	bundleRes := cfg.AwaitBundleCondition(IsBundleNewerCond(cfg.Namespace, bundle.Name, resourceVersions...), IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleReady, smith_v1.ConditionTrue))
+	bundleRes := cfg.AwaitBundleCondition(IsBundleNewerCond(cfg.Namespace, bundle.Name, resourceVersions...), IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleReady, cond_v1.ConditionTrue))
 
-	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleReady, smith_v1.ConditionTrue)
-	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
-	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, smith_v1.ConditionFalse)
+	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleReady, cond_v1.ConditionTrue)
+	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleInProgress, cond_v1.ConditionFalse)
+	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, cond_v1.ConditionFalse)
 	if assert.Len(cfg.T, bundleRes.Spec.Resources, len(bundle.Spec.Resources), "%#v", bundleRes) {
 		for i, res := range bundle.Spec.Resources {
 			spec, err := util.RuntimeToUnstructured(res.Spec.Object)
@@ -288,10 +289,10 @@ func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle, re
 				continue
 			}
 			assert.Equal(cfg.T, spec, actual, "%#v", bundleRes)
-			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
-			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
-			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceReady, smith_v1.ConditionTrue)
-			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceError, smith_v1.ConditionFalse)
+			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceBlocked, cond_v1.ConditionFalse)
+			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceInProgress, cond_v1.ConditionFalse)
+			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceReady, cond_v1.ConditionTrue)
+			smith_testing.AssertResourceCondition(cfg.T, bundleRes, res.Name, smith_v1.ResourceError, cond_v1.ConditionFalse)
 		}
 	}
 

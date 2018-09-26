@@ -33,6 +33,7 @@ go_test(
     race = "on",
     deps = [
         "//pkg/apis/smith/v1:go_default_library",
+        "//vendor/github.com/atlassian/ctrl/apis/condition/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",

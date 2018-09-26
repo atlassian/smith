@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
@@ -170,9 +171,9 @@ func TestResolveBindingSecretReferences(t *testing.T) {
 			tc.defaultTest(t, ctx, cntrlr)
 			bundle := tc.findBundleUpdate(t, true)
 			require.NotNil(t, bundle, "Bundle update action not found: %v", tc.smithFake.Actions())
-			smith_testing.AssertCondition(t, bundle, smith_v1.BundleReady, smith_v1.ConditionTrue)
-			smith_testing.AssertCondition(t, bundle, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
-			smith_testing.AssertCondition(t, bundle, smith_v1.BundleError, smith_v1.ConditionFalse)
+			smith_testing.AssertCondition(t, bundle, smith_v1.BundleReady, cond_v1.ConditionTrue)
+			smith_testing.AssertCondition(t, bundle, smith_v1.BundleInProgress, cond_v1.ConditionFalse)
+			smith_testing.AssertCondition(t, bundle, smith_v1.BundleError, cond_v1.ConditionFalse)
 
 		},
 	}

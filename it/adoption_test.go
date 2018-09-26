@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ash2k/stager"
+	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
-
-	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
@@ -116,30 +116,30 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 
 	// Bundle should be in Error=true state
 	bundleActual = cfg.AwaitBundleCondition(AndCond(
-		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, "cm", &smith_v1.ResourceCondition{
+		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, "cm", &cond_v1.Condition{
 			Type:    smith_v1.ResourceError,
-			Status:  smith_v1.ConditionTrue,
+			Status:  cond_v1.ConditionTrue,
 			Reason:  smith_v1.ResourceReasonTerminalError,
 			Message: `object is not controlled by the Bundle and does not have a controller at all`,
 		}),
-		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, "sleeper2", &smith_v1.ResourceCondition{
+		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, "sleeper2", &cond_v1.Condition{
 			Type:    smith_v1.ResourceError,
-			Status:  smith_v1.ConditionTrue,
+			Status:  cond_v1.ConditionTrue,
 			Reason:  smith_v1.ResourceReasonTerminalError,
 			Message: `object is not controlled by the Bundle and does not have a controller at all`,
 		})))
 
-	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleReady, smith_v1.ConditionFalse)
-	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
-	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleReady, cond_v1.ConditionFalse)
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleInProgress, cond_v1.ConditionFalse)
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleError, cond_v1.ConditionTrue)
 
-	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
-	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
-	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceReady, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceBlocked, cond_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceInProgress, cond_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceReady, cond_v1.ConditionFalse)
 
-	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
-	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
-	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceReady, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceBlocked, cond_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceInProgress, cond_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceReady, cond_v1.ConditionFalse)
 
 	// Point ConfigMap controller reference to Bundle
 	trueVar := true
@@ -158,24 +158,24 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	// Bundle should be in Error=true state
 	bundleActual = cfg.AwaitBundleCondition(
 		IsBundleNewerCond(cfg.Namespace, cfg.Bundle.Name, bundleActual.ResourceVersion),
-		IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleError, smith_v1.ConditionTrue))
+		IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleError, cond_v1.ConditionTrue))
 
-	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleReady, smith_v1.ConditionFalse)
-	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleInProgress, smith_v1.ConditionFalse)
-	cond := smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleError, smith_v1.ConditionTrue)
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleReady, cond_v1.ConditionFalse)
+	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleInProgress, cond_v1.ConditionFalse)
+	cond := smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleError, cond_v1.ConditionTrue)
 	if cond != nil {
 		assert.Equal(t, smith_v1.ResourceReasonTerminalError, cond.Reason)
 		assert.Equal(t, `error processing resource(s): ["sleeper2"]`, cond.Message)
 	}
-	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
-	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
-	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceReady, smith_v1.ConditionTrue)
-	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceError, smith_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceBlocked, cond_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceInProgress, cond_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceReady, cond_v1.ConditionTrue)
+	smith_testing.AssertResourceCondition(t, bundleActual, "cm", smith_v1.ResourceError, cond_v1.ConditionFalse)
 
-	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceBlocked, smith_v1.ConditionFalse)
-	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceInProgress, smith_v1.ConditionFalse)
-	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceReady, smith_v1.ConditionFalse)
-	resCond := smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceError, smith_v1.ConditionTrue)
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceBlocked, cond_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceInProgress, cond_v1.ConditionFalse)
+	smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceReady, cond_v1.ConditionFalse)
+	resCond := smith_testing.AssertResourceCondition(t, bundleActual, "sleeper2", smith_v1.ResourceError, cond_v1.ConditionTrue)
 	if resCond != nil {
 		assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
 		assert.Equal(t, "object is not controlled by the Bundle and does not have a controller at all", resCond.Message)

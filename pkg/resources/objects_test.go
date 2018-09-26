@@ -3,8 +3,8 @@ package resources
 import (
 	"testing"
 
+	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -14,18 +14,18 @@ func TestGetJsonPathStringBundle(t *testing.T) {
 	t.Parallel()
 	b := &smith_v1.Bundle{
 		Status: smith_v1.BundleStatus{
-			Conditions: []smith_v1.BundleCondition{
+			Conditions: []cond_v1.Condition{
 				{
 					Type:   smith_v1.BundleError,
-					Status: smith_v1.ConditionFalse,
+					Status: cond_v1.ConditionFalse,
 				},
 				{
 					Type:   smith_v1.BundleReady,
-					Status: smith_v1.ConditionTrue,
+					Status: cond_v1.ConditionTrue,
 				},
 				{
 					Type:   smith_v1.BundleInProgress,
-					Status: smith_v1.ConditionFalse,
+					Status: cond_v1.ConditionFalse,
 				},
 			},
 		},
@@ -37,7 +37,7 @@ func TestGetJsonPathStringBundle(t *testing.T) {
 	require.NoError(t, err)
 	status, err := GetJSONPathString(unstructured, `{$.status.conditions[?(@.type=="Ready")].status}`)
 	require.NoError(t, err)
-	assert.Equal(t, string(smith_v1.ConditionTrue), status)
+	assert.Equal(t, string(cond_v1.ConditionTrue), status)
 }
 
 func TestGetJsonPathStringMissing(t *testing.T) {
@@ -59,10 +59,10 @@ func TestGetJsonPathStringInvalid(t *testing.T) {
 	t.Parallel()
 	b := &smith_v1.Bundle{
 		Status: smith_v1.BundleStatus{
-			Conditions: []smith_v1.BundleCondition{
+			Conditions: []cond_v1.Condition{
 				{
 					Type:   smith_v1.BundleReady,
-					Status: smith_v1.ConditionTrue,
+					Status: cond_v1.ConditionTrue,
 				},
 			},
 		},

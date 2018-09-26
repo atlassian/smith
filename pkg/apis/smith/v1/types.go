@@ -2,8 +2,8 @@ package v1
 
 import (
 	"bytes"
-	"fmt"
 
+	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	"github.com/atlassian/smith/pkg/apis/smith"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -11,13 +11,11 @@ import (
 	k8s_json "k8s.io/apimachinery/pkg/util/json"
 )
 
-type BundleConditionType string
-
 // These are valid conditions of a Bundle.
 const (
-	BundleInProgress BundleConditionType = "InProgress"
-	BundleReady      BundleConditionType = "Ready"
-	BundleError      BundleConditionType = "Error"
+	BundleInProgress = cond_v1.ConditionInProgress
+	BundleReady      = cond_v1.ConditionReady
+	BundleError      = cond_v1.ConditionError
 )
 
 const (
@@ -25,14 +23,12 @@ const (
 	BundleReasonRetriableError = "RetriableError"
 )
 
-type ResourceConditionType string
-
 // These are valid conditions of a resource.
 const (
-	ResourceBlocked    ResourceConditionType = "Blocked"
-	ResourceInProgress ResourceConditionType = "InProgress"
-	ResourceReady      ResourceConditionType = "Ready"
-	ResourceError      ResourceConditionType = "Error"
+	ResourceBlocked    cond_v1.ConditionType = "Blocked"
+	ResourceInProgress                       = cond_v1.ConditionInProgress
+	ResourceReady                            = cond_v1.ConditionReady
+	ResourceError                            = cond_v1.ConditionError
 )
 
 const (
@@ -44,18 +40,6 @@ const (
 
 	ResourceReasonTerminalError  = "TerminalError"
 	ResourceReasonRetriableError = "RetriableError"
-)
-
-type ConditionStatus string
-
-// These are valid condition statuses. "ConditionTrue" means a resource is in the condition.
-// "ConditionFalse" means a resource is not in the condition. "ConditionUnknown" means kubernetes
-// can't decide if a resource is in the condition or not. In the future, we could add other
-// intermediate conditions, e.g. ConditionDegraded.
-const (
-	ConditionTrue    ConditionStatus = "True"
-	ConditionFalse   ConditionStatus = "False"
-	ConditionUnknown ConditionStatus = "Unknown"
 )
 
 type PluginStatusStr string
@@ -110,50 +94,9 @@ type Bundle struct {
 	Status BundleStatus `json:"status,omitempty"`
 }
 
-func (b *Bundle) GetCondition(conditionType BundleConditionType) (int, *BundleCondition) {
-	for i := range b.Status.Conditions {
-		condition := &b.Status.Conditions[i]
-		if condition.Type == conditionType {
-			return i, condition
-		}
-	}
-	return -1, nil
-}
-
 // +k8s:deepcopy-gen=true
 type BundleSpec struct {
 	Resources []Resource `json:"resources"`
-}
-
-// +k8s:deepcopy-gen=true
-// BundleCondition describes the state of a bundle at a certain point.
-type BundleCondition struct {
-	// Type of Bundle condition.
-	Type BundleConditionType `json:"type"`
-	// Status of the condition.
-	Status ConditionStatus `json:"status"`
-	// The last time this condition was updated.
-	LastUpdateTime meta_v1.Time `json:"lastUpdateTime,omitempty"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime meta_v1.Time `json:"lastTransitionTime,omitempty"`
-	// The reason for the condition's last transition.
-	Reason string `json:"reason,omitempty"`
-	// A human readable message indicating details about the transition.
-	Message string `json:"message,omitempty"`
-}
-
-func (bc *BundleCondition) String() string {
-	var buf bytes.Buffer
-	buf.WriteString(string(bc.Type))   // nolint: gosec
-	buf.WriteByte(' ')                 // nolint: gosec
-	buf.WriteString(string(bc.Status)) // nolint: gosec
-	if bc.Reason != "" {
-		fmt.Fprintf(&buf, " %q", bc.Reason) // nolint: errcheck
-	}
-	if bc.Message != "" {
-		fmt.Fprintf(&buf, " %q", bc.Message) // nolint: errcheck
-	}
-	return buf.String()
 }
 
 type PluginStatus struct {
@@ -167,10 +110,10 @@ type PluginStatus struct {
 // +k8s:deepcopy-gen=true
 // BundleStatus represents the latest available observations of a Bundle's current state.
 type BundleStatus struct {
-	Conditions       []BundleCondition `json:"conditions,omitempty"`
-	ResourceStatuses []ResourceStatus  `json:"resourceStatuses,omitempty"`
-	ObjectsToDelete  []ObjectToDelete  `json:"objectsToDelete,omitempty"`
-	PluginStatuses   []PluginStatus    `json:"pluginStatuses,omitempty"`
+	Conditions       []cond_v1.Condition `json:"conditions,omitempty"`
+	ResourceStatuses []ResourceStatus    `json:"resourceStatuses,omitempty"`
+	ObjectsToDelete  []ObjectToDelete    `json:"objectsToDelete,omitempty"`
+	PluginStatuses   []PluginStatus      `json:"pluginStatuses,omitempty"`
 }
 
 func (bs *BundleStatus) String() string {
@@ -284,17 +227,7 @@ func (in *PluginSpec) DeepCopyInto(out *PluginSpec) {
 // +k8s:deepcopy-gen=true
 type ResourceStatus struct {
 	Name       ResourceName        `json:"name"`
-	Conditions []ResourceCondition `json:"conditions,omitempty"`
-}
-
-func (rs *ResourceStatus) GetCondition(conditionType ResourceConditionType) (int, *ResourceCondition) {
-	for i := range rs.Conditions {
-		resCond := &rs.Conditions[i]
-		if resCond.Type == conditionType {
-			return i, resCond
-		}
-	}
-	return -1, nil
+	Conditions []cond_v1.Condition `json:"conditions,omitempty"`
 }
 
 type ObjectToDelete struct {
@@ -305,35 +238,4 @@ type ObjectToDelete struct {
 	Kind    string `json:"kind"`
 	// Name of the object.
 	Name string `json:"name"`
-}
-
-// +k8s:deepcopy-gen=true
-// ResourceCondition describes the state of a resource at a certain point.
-type ResourceCondition struct {
-	// Type of Resource condition.
-	Type ResourceConditionType `json:"type"`
-	// Status of the condition.
-	Status ConditionStatus `json:"status"`
-	// The last time this condition was updated.
-	LastUpdateTime meta_v1.Time `json:"lastUpdateTime,omitempty"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime meta_v1.Time `json:"lastTransitionTime,omitempty"`
-	// The reason for the condition's last transition.
-	Reason string `json:"reason,omitempty"`
-	// A human readable message indicating details about the transition.
-	Message string `json:"message,omitempty"`
-}
-
-func (rc *ResourceCondition) String() string {
-	var buf bytes.Buffer
-	buf.WriteString(string(rc.Type))   // nolint: gosec
-	buf.WriteByte(' ')                 // nolint: gosec
-	buf.WriteString(string(rc.Status)) // nolint: gosec
-	if rc.Reason != "" {
-		fmt.Fprintf(&buf, " %q", rc.Reason) // nolint: errcheck
-	}
-	if rc.Message != "" {
-		fmt.Fprintf(&buf, " %q", rc.Message) // nolint: errcheck
-	}
-	return buf.String()
 }
