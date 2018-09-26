@@ -76,7 +76,6 @@ type BundleList struct {
 }
 
 // +genclient
-// +genclient:noStatus
 
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -110,10 +109,13 @@ type PluginStatus struct {
 // +k8s:deepcopy-gen=true
 // BundleStatus represents the latest available observations of a Bundle's current state.
 type BundleStatus struct {
-	Conditions       []cond_v1.Condition `json:"conditions,omitempty"`
-	ResourceStatuses []ResourceStatus    `json:"resourceStatuses,omitempty"`
-	ObjectsToDelete  []ObjectToDelete    `json:"objectsToDelete,omitempty"`
-	PluginStatuses   []PluginStatus      `json:"pluginStatuses,omitempty"`
+	// observedGeneration is the most recent generation observed for this Bundle. It corresponds to the
+	// Bundle's generation, which is updated on mutation by the API Server.
+	ObservedGeneration int64               `json:"observedGeneration,omitempty"`
+	Conditions         []cond_v1.Condition `json:"conditions,omitempty"`
+	ResourceStatuses   []ResourceStatus    `json:"resourceStatuses,omitempty"`
+	ObjectsToDelete    []ObjectToDelete    `json:"objectsToDelete,omitempty"`
+	PluginStatuses     []PluginStatus      `json:"pluginStatuses,omitempty"`
 }
 
 func (bs *BundleStatus) String() string {

@@ -10,6 +10,8 @@ spec:
     plural: bundles
     singular: bundle
   scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       properties:
@@ -207,6 +209,9 @@ spec:
                 - name
                 type: object
               type: array
+            observedGeneration:
+              format: int64
+              type: integer
             pluginStatuses:
               items:
                 properties:

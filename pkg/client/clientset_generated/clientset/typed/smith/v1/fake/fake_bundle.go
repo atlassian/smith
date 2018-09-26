@@ -86,6 +86,18 @@ func (c *FakeBundles) Update(bundle *smith_v1.Bundle) (result *smith_v1.Bundle, 
 	return obj.(*smith_v1.Bundle), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeBundles) UpdateStatus(bundle *smith_v1.Bundle) (*smith_v1.Bundle, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(bundlesResource, "status", c.ns, bundle), &smith_v1.Bundle{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*smith_v1.Bundle), err
+}
+
 // Delete takes name of the bundle and deletes it. Returns an error if one occurs.
 func (c *FakeBundles) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.

@@ -31,7 +31,7 @@ func TestAdoption(t *testing.T) {
 			"a": "b",
 		},
 	}
-	sleeper := &sleeper_v1.Sleeper{
+	sl := &sleeper_v1.Sleeper{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       sleeper_v1.SleeperResourceKind,
 			APIVersion: sleeper_v1.SleeperResourceGroupVersion,
@@ -61,15 +61,15 @@ func TestAdoption(t *testing.T) {
 					},
 				},
 				{
-					Name: smith_v1.ResourceName(sleeper.Name),
+					Name: smith_v1.ResourceName(sl.Name),
 					Spec: smith_v1.ResourceSpec{
-						Object: sleeper,
+						Object: sl,
 					},
 				},
 			},
 		},
 	}
-	SetupApp(t, bundle, false, false, testAdoption, cm, sleeper)
+	SetupApp(t, bundle, false, false, testAdoption, cm, sl)
 }
 
 func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...interface{}) {
@@ -114,7 +114,7 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	cfg.CreateObject(ctxTest, cfg.Bundle, bundleActual, smith_v1.BundleResourcePlural, cfg.SmithClient.SmithV1().RESTClient())
 	cfg.CreatedBundle = bundleActual
 
-	// Bundle should be in Error=true state
+	// Wait for Bundle to set the ConfigMap and Sleeper resource statuses to error=true
 	bundleActual = cfg.AwaitBundleCondition(AndCond(
 		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, "cm", &cond_v1.Condition{
 			Type:    smith_v1.ResourceError,
@@ -155,10 +155,12 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	_, err = cmClient.Update(cmActual)
 	require.NoError(t, err)
 
-	// Bundle should be in Error=true state
+	// Wait for Bundle to update the ConfigMap resource status
 	bundleActual = cfg.AwaitBundleCondition(
-		IsBundleNewerCond(cfg.Namespace, cfg.Bundle.Name, bundleActual.ResourceVersion),
-		IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleError, cond_v1.ConditionTrue))
+		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, "cm", &cond_v1.Condition{
+			Type:   smith_v1.ResourceReady,
+			Status: cond_v1.ConditionTrue,
+		}))
 
 	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleReady, cond_v1.ConditionFalse)
 	smith_testing.AssertCondition(t, bundleActual, smith_v1.BundleInProgress, cond_v1.ConditionFalse)

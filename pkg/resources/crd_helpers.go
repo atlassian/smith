@@ -292,6 +292,10 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 	bundleStatus := apiext_v1b1.JSONSchemaProps{
 		Type: "object",
 		Properties: map[string]apiext_v1b1.JSONSchemaProps{
+			"observedGeneration": {
+				Type:   "integer",
+				Format: "int64",
+			},
 			"conditions": {
 				Type: "array",
 				Items: &apiext_v1b1.JSONSchemaPropsOrArray{
@@ -343,6 +347,9 @@ func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 						"status": bundleStatus,
 					},
 				},
+			},
+			Subresources: &apiext_v1b1.CustomResourceSubresources{
+				Status: &apiext_v1b1.CustomResourceSubresourceStatus{},
 			},
 			Versions: []apiext_v1b1.CustomResourceDefinitionVersion{
 				{

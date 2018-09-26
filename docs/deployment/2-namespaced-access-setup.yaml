@@ -26,7 +26,13 @@ rules:
   verbs:
   - list
   - watch
-  - create
+  - update # need to be able to update finalizers
+
+- apiGroups:
+  - smith.atlassian.com
+  resources:
+  - bundles/status
+  verbs:
   - update
 
 - apiGroups:

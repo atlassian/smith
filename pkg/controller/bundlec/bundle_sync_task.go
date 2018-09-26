@@ -28,25 +28,24 @@ type bundleSyncTask struct {
 
 	// Inputs
 
-	logger           *zap.Logger
-	bundleClient     smithClient_v1.BundlesGetter
-	smartClient      SmartClient
-	rc               ReadyChecker
-	store            Store
-	specCheck        SpecCheck
-	bundle           *smith_v1.Bundle
-	pluginContainers map[smith_v1.PluginName]plugin.Container
-	scheme           *runtime.Scheme
-	catalog          *store.Catalog
+	logger                          *zap.Logger
+	bundleClient                    smithClient_v1.BundlesGetter
+	smartClient                     SmartClient
+	rc                              ReadyChecker
+	store                           Store
+	specCheck                       SpecCheck
+	bundle                          *smith_v1.Bundle
+	pluginContainers                map[smith_v1.PluginName]plugin.Container
+	scheme                          *runtime.Scheme
+	catalog                         *store.Catalog
+	bundleTransitionCounter         *prometheus.CounterVec
+	bundleResourceTransitionCounter *prometheus.CounterVec
 
 	// Outputs
 
 	processedResources map[smith_v1.ResourceName]*resourceInfo
 	objectsToDelete    map[objectRef]runtime.Object
 	newFinalizers      []string
-
-	bundleTransitionCounter         *prometheus.CounterVec
-	bundleResourceTransitionCounter *prometheus.CounterVec
 }
 
 // Parse bundle, build resource graph, traverse graph, assert each resource exists.
@@ -293,8 +292,16 @@ func (st *bundleSyncTask) updateBundle() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to update bundle")
 	}
-	st.logger.Sugar().Debugf("Set bundle status to %s", &bundleUpdated.Status)
 	st.logger.Sugar().Debugf("Set bundle finalizers to %s", bundleUpdated.Finalizers)
+	return nil
+}
+
+func (st *bundleSyncTask) updateBundleStatus() error {
+	bundleUpdated, err := st.bundleClient.Bundles(st.bundle.Namespace).UpdateStatus(st.bundle)
+	if err != nil {
+		return errors.Wrap(err, "failed to update bundle status")
+	}
+	st.logger.Sugar().Debugf("Set bundle status to %s", &bundleUpdated.Status)
 	return nil
 }
 
@@ -305,30 +312,20 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 	if processErr == context.Canceled || processErr == context.DeadlineExceeded {
 		return false, processErr
 	}
-
-	bundleUpdated := false
-
 	if st.newFinalizers != nil {
 		// Update finalizers
 		st.bundle.Finalizers = st.newFinalizers
-		// Set status to "InProgress: True"
-		// (there will be one more iteration for resource sync that will set an appropriate status)
-		// TODO: Setting status to "InProgress" here might be unnecessary
-		// (if the Bundle spec wasn't updated during the last update, the status should be kept with no changes)
-		// The better solution could be storing "ObservedGeneration" in the status to reflect
-		// whether the status is up-to-date with the spec or stale
-		st.bundle.Status.Conditions = []cond_v1.Condition{
-			{Type: smith_v1.BundleInProgress, Status: cond_v1.ConditionTrue},
-			{Type: smith_v1.BundleReady, Status: cond_v1.ConditionFalse},
-			{Type: smith_v1.BundleError, Status: cond_v1.ConditionFalse},
-		}
-		_, err := st.updateObjectsToDeleteStatus()
+		err := st.updateBundle()
 		if err != nil {
-			// Just log the error and continue. Bundle will be reprocessed anyway.
-			st.logger.Error("Error updating ObjectsToDelete status field", zap.Error(err))
+			if processErr == nil {
+				processErr = err
+				retriable = true
+			} else {
+				st.logger.Error("Error updating Bundle", zap.Error(err))
+			}
 		}
-		bundleUpdated = true
 	} else if st.bundle.DeletionTimestamp == nil {
+		bundleStatusUpdated := false
 		// Construct resource conditions and check if there were any resource errors
 		resourceStatuses := make([]smith_v1.ResourceStatus, 0, len(st.processedResources))
 		var failedResources []smith_v1.ResourceName
@@ -341,10 +338,10 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 				retriableResourceErr = retriableResourceErr && errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must not continue if at least one error is not retriable
 			}
 
-			bundleUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &blockedCond) || bundleUpdated
-			bundleUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &inProgressCond) || bundleUpdated
-			bundleUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &readyCond) || bundleUpdated
-			bundleUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &errorCond) || bundleUpdated
+			bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &blockedCond) || bundleStatusUpdated
+			bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &inProgressCond) || bundleStatusUpdated
+			bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &readyCond) || bundleStatusUpdated
+			bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &errorCond) || bundleStatusUpdated
 
 			resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
 				Name:       res.Name,
@@ -379,17 +376,17 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 			}
 		}
 
-		bundleUpdated = st.checkBundleConditionNeedsUpdate(&inProgressCond) || bundleUpdated
-		bundleUpdated = st.checkBundleConditionNeedsUpdate(&readyCond) || bundleUpdated
-		bundleUpdated = st.checkBundleConditionNeedsUpdate(&errorCond) || bundleUpdated
+		bundleStatusUpdated = st.checkBundleConditionNeedsUpdate(&inProgressCond) || bundleStatusUpdated
+		bundleStatusUpdated = st.checkBundleConditionNeedsUpdate(&readyCond) || bundleStatusUpdated
+		bundleStatusUpdated = st.checkBundleConditionNeedsUpdate(&errorCond) || bundleStatusUpdated
 
 		// Plugin statuses
 		pluginStatuses := st.pluginStatuses()
-		bundleUpdated = bundleUpdated || !reflect.DeepEqual(st.bundle.Status.PluginStatuses, pluginStatuses)
+		bundleStatusUpdated = bundleStatusUpdated || !reflect.DeepEqual(st.bundle.Status.PluginStatuses, pluginStatuses)
 		st.bundle.Status.PluginStatuses = pluginStatuses
 
 		// Update the bundle status
-		if bundleUpdated {
+		if bundleStatusUpdated {
 			st.bundle.Status.ResourceStatuses = resourceStatuses
 			st.bundle.Status.Conditions = []cond_v1.Condition{inProgressCond, readyCond, errorCond}
 		}
@@ -399,18 +396,22 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 			// Just log the error and continue
 			st.logger.Error("Error updating ObjectsToDelete status field", zap.Error(err))
 		} else {
-			bundleUpdated = obj2deleteUpdated || bundleUpdated
+			bundleStatusUpdated = obj2deleteUpdated || bundleStatusUpdated
 		}
-	}
-
-	if bundleUpdated {
-		err := st.updateBundle()
-		if err != nil {
-			if processErr == nil {
-				processErr = err
-				retriable = true
-			} else {
-				st.logger.Error("Error updating Bundle", zap.Error(err))
+		if st.bundle.Generation != st.bundle.Status.ObservedGeneration {
+			st.logger.Sugar().Debugf("Updating ObservedGeneration %d -> %d", st.bundle.Status.ObservedGeneration, st.bundle.Generation)
+			st.bundle.Status.ObservedGeneration = st.bundle.Generation
+			bundleStatusUpdated = true
+		}
+		if bundleStatusUpdated {
+			err = st.updateBundleStatus()
+			if err != nil {
+				if processErr == nil {
+					processErr = err
+					retriable = true
+				} else {
+					st.logger.Error("Error updating Bundle status", zap.Error(err))
+				}
 			}
 		}
 	}
