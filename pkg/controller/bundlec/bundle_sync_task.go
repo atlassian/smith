@@ -404,12 +404,14 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 	}
 
 	if bundleUpdated {
-		ex := st.updateBundle()
-		if processErr == nil {
-			processErr = ex
-			retriable = true
-		} else {
-			st.logger.Error("Error updating Bundle", zap.Error(ex))
+		err := st.updateBundle()
+		if err != nil {
+			if processErr == nil {
+				processErr = err
+				retriable = true
+			} else {
+				st.logger.Error("Error updating Bundle", zap.Error(err))
+			}
 		}
 	}
 
