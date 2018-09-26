@@ -408,6 +408,8 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		if processErr == nil {
 			processErr = ex
 			retriable = true
+		} else {
+			st.logger.Error("Error updating Bundle", zap.Error(ex))
 		}
 	}
 
