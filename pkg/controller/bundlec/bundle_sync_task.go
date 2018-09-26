@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 
+	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	ctrlLogz "github.com/atlassian/ctrl/logz"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
@@ -316,10 +317,10 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		// (if the Bundle spec wasn't updated during the last update, the status should be kept with no changes)
 		// The better solution could be storing "ObservedGeneration" in the status to reflect
 		// whether the status is up-to-date with the spec or stale
-		st.bundle.Status.Conditions = []smith_v1.BundleCondition{
-			{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionTrue},
-			{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse},
-			{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse},
+		st.bundle.Status.Conditions = []cond_v1.Condition{
+			{Type: smith_v1.BundleInProgress, Status: cond_v1.ConditionTrue},
+			{Type: smith_v1.BundleReady, Status: cond_v1.ConditionFalse},
+			{Type: smith_v1.BundleError, Status: cond_v1.ConditionFalse},
 		}
 		_, err := st.updateObjectsToDeleteStatus()
 		if err != nil {
@@ -335,19 +336,19 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
 			blockedCond, inProgressCond, readyCond, errorCond := st.resourceConditions(res)
 
-			if errorCond.Status == smith_v1.ConditionTrue {
+			if errorCond.Status == cond_v1.ConditionTrue {
 				failedResources = append(failedResources, res.Name)
 				retriableResourceErr = retriableResourceErr && errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must not continue if at least one error is not retriable
 			}
 
-			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &blockedCond) || bundleUpdated
-			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &inProgressCond) || bundleUpdated
-			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &readyCond) || bundleUpdated
-			bundleUpdated = st.updateResourceCondition(st.bundle, res.Name, &errorCond) || bundleUpdated
+			bundleUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &blockedCond) || bundleUpdated
+			bundleUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &inProgressCond) || bundleUpdated
+			bundleUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &readyCond) || bundleUpdated
+			bundleUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &errorCond) || bundleUpdated
 
 			resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
 				Name:       res.Name,
-				Conditions: []smith_v1.ResourceCondition{blockedCond, inProgressCond, readyCond, errorCond},
+				Conditions: []cond_v1.Condition{blockedCond, inProgressCond, readyCond, errorCond},
 			})
 		}
 
@@ -357,30 +358,30 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		}
 
 		// Bundle conditions
-		inProgressCond := smith_v1.BundleCondition{Type: smith_v1.BundleInProgress, Status: smith_v1.ConditionFalse}
-		readyCond := smith_v1.BundleCondition{Type: smith_v1.BundleReady, Status: smith_v1.ConditionFalse}
-		errorCond := smith_v1.BundleCondition{Type: smith_v1.BundleError, Status: smith_v1.ConditionFalse}
+		inProgressCond := cond_v1.Condition{Type: smith_v1.BundleInProgress, Status: cond_v1.ConditionFalse}
+		readyCond := cond_v1.Condition{Type: smith_v1.BundleReady, Status: cond_v1.ConditionFalse}
+		errorCond := cond_v1.Condition{Type: smith_v1.BundleError, Status: cond_v1.ConditionFalse}
 
 		if processErr == nil {
 			if st.isBundleReady() {
-				readyCond.Status = smith_v1.ConditionTrue
+				readyCond.Status = cond_v1.ConditionTrue
 			} else {
-				inProgressCond.Status = smith_v1.ConditionTrue
+				inProgressCond.Status = cond_v1.ConditionTrue
 			}
 		} else {
-			errorCond.Status = smith_v1.ConditionTrue
+			errorCond.Status = cond_v1.ConditionTrue
 			errorCond.Message = processErr.Error()
 			if retriable {
 				errorCond.Reason = smith_v1.BundleReasonRetriableError
-				inProgressCond.Status = smith_v1.ConditionTrue
+				inProgressCond.Status = cond_v1.ConditionTrue
 			} else {
 				errorCond.Reason = smith_v1.BundleReasonTerminalError
 			}
 		}
 
-		bundleUpdated = st.updateBundleCondition(st.bundle, &inProgressCond) || bundleUpdated
-		bundleUpdated = st.updateBundleCondition(st.bundle, &readyCond) || bundleUpdated
-		bundleUpdated = st.updateBundleCondition(st.bundle, &errorCond) || bundleUpdated
+		bundleUpdated = st.checkBundleConditionNeedsUpdate(&inProgressCond) || bundleUpdated
+		bundleUpdated = st.checkBundleConditionNeedsUpdate(&readyCond) || bundleUpdated
+		bundleUpdated = st.checkBundleConditionNeedsUpdate(&errorCond) || bundleUpdated
 
 		// Plugin statuses
 		pluginStatuses := st.pluginStatuses()
@@ -390,7 +391,7 @@ func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) 
 		// Update the bundle status
 		if bundleUpdated {
 			st.bundle.Status.ResourceStatuses = resourceStatuses
-			st.bundle.Status.Conditions = []smith_v1.BundleCondition{inProgressCond, readyCond, errorCond}
+			st.bundle.Status.Conditions = []cond_v1.Condition{inProgressCond, readyCond, errorCond}
 		}
 
 		obj2deleteUpdated, err := st.updateObjectsToDeleteStatus()
@@ -522,87 +523,65 @@ func (st *bundleSyncTask) pluginStatuses() []smith_v1.PluginStatus {
 // resourceConditions calculates conditions for a given Resource,
 // which can be useful when determining whether to retry or not.
 func (st *bundleSyncTask) resourceConditions(res smith_v1.Resource) (
-	smith_v1.ResourceCondition, /* blockedCond */
-	smith_v1.ResourceCondition, /* inProgressCond */
-	smith_v1.ResourceCondition, /* readyCond */
-	smith_v1.ResourceCondition, /* errorCond */
+	cond_v1.Condition, /* blockedCond */
+	cond_v1.Condition, /* inProgressCond */
+	cond_v1.Condition, /* readyCond */
+	cond_v1.Condition, /* errorCond */
 ) {
-	blockedCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceBlocked, Status: smith_v1.ConditionFalse}
-	inProgressCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceInProgress, Status: smith_v1.ConditionFalse}
-	readyCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceReady, Status: smith_v1.ConditionFalse}
-	errorCond := smith_v1.ResourceCondition{Type: smith_v1.ResourceError, Status: smith_v1.ConditionFalse}
+	blockedCond := cond_v1.Condition{Type: smith_v1.ResourceBlocked, Status: cond_v1.ConditionFalse}
+	inProgressCond := cond_v1.Condition{Type: smith_v1.ResourceInProgress, Status: cond_v1.ConditionFalse}
+	readyCond := cond_v1.Condition{Type: smith_v1.ResourceReady, Status: cond_v1.ConditionFalse}
+	errorCond := cond_v1.Condition{Type: smith_v1.ResourceError, Status: cond_v1.ConditionFalse}
 
 	if resInfo, ok := st.processedResources[res.Name]; ok {
 		// Resource was processed
 		switch resStatus := resInfo.status.(type) {
 		case resourceStatusDependenciesNotReady:
-			blockedCond.Status = smith_v1.ConditionTrue
+			blockedCond.Status = cond_v1.ConditionTrue
 			blockedCond.Reason = smith_v1.ResourceReasonDependenciesNotReady
 			blockedCond.Message = fmt.Sprintf("Not ready: %q", resStatus.dependencies)
 		case resourceStatusInProgress:
-			inProgressCond.Status = smith_v1.ConditionTrue
+			inProgressCond.Status = cond_v1.ConditionTrue
 		case resourceStatusReady:
-			readyCond.Status = smith_v1.ConditionTrue
+			readyCond.Status = cond_v1.ConditionTrue
 		case resourceStatusError:
-			errorCond.Status = smith_v1.ConditionTrue
+			errorCond.Status = cond_v1.ConditionTrue
 			errorCond.Message = resStatus.err.Error()
 			if resStatus.isRetriableError {
 				errorCond.Reason = smith_v1.ResourceReasonRetriableError
-				inProgressCond.Status = smith_v1.ConditionTrue
+				inProgressCond.Status = cond_v1.ConditionTrue
 			} else {
 				errorCond.Reason = smith_v1.ResourceReasonTerminalError
 			}
 		default:
-			blockedCond.Status = smith_v1.ConditionUnknown
-			inProgressCond.Status = smith_v1.ConditionUnknown
-			readyCond.Status = smith_v1.ConditionUnknown
-			errorCond.Status = smith_v1.ConditionTrue
+			blockedCond.Status = cond_v1.ConditionUnknown
+			inProgressCond.Status = cond_v1.ConditionUnknown
+			readyCond.Status = cond_v1.ConditionUnknown
+			errorCond.Status = cond_v1.ConditionTrue
 			errorCond.Reason = smith_v1.ResourceReasonTerminalError
 			errorCond.Message = fmt.Sprintf("internal error - unknown resource status type %T", resInfo.status)
 		}
 	} else {
 		// Resource was not processed
-		blockedCond.Status = smith_v1.ConditionUnknown
-		inProgressCond.Status = smith_v1.ConditionUnknown
-		readyCond.Status = smith_v1.ConditionUnknown
-		errorCond.Status = smith_v1.ConditionUnknown
+		blockedCond.Status = cond_v1.ConditionUnknown
+		inProgressCond.Status = cond_v1.ConditionUnknown
+		readyCond.Status = cond_v1.ConditionUnknown
+		errorCond.Status = cond_v1.ConditionUnknown
 	}
 
 	return blockedCond, inProgressCond, readyCond, errorCond
 }
 
-// updateBundleCondition updates passed condition by fetching information from an existing resource condition if present.
+// checkBundleConditionNeedsUpdate updates passed condition by fetching information from an existing resource condition if present.
 // Sets LastTransitionTime to now if the status has changed.
 // Returns true if resource condition in the bundle does not match and needs to be updated.
-func (st *bundleSyncTask) updateBundleCondition(b *smith_v1.Bundle, condition *smith_v1.BundleCondition) bool {
+func (st *bundleSyncTask) checkBundleConditionNeedsUpdate(condition *cond_v1.Condition) bool {
 	now := meta_v1.Now()
 	condition.LastTransitionTime = now
 
-	needsUpdate := true
+	needsUpdate := cond_v1.PrepareCondition(st.bundle.Status.Conditions, condition)
 
-	// Try to find resource condition
-	_, oldCondition := b.GetCondition(condition.Type)
-
-	if oldCondition != nil {
-		// We are updating an existing condition, so we need to check if it has changed.
-		if condition.Status == oldCondition.Status {
-			condition.LastTransitionTime = oldCondition.LastTransitionTime
-		}
-
-		isEqual := condition.Status == oldCondition.Status &&
-			condition.Reason == oldCondition.Reason &&
-			condition.Message == oldCondition.Message &&
-			condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
-
-		needsUpdate = !isEqual
-		if needsUpdate {
-			condition.LastUpdateTime = now
-		}
-	}
-
-	// Otherwise it's a new resource condition
-
-	if condition.Status == smith_v1.ConditionTrue {
+	if needsUpdate && condition.Status == cond_v1.ConditionTrue {
 		st.bundleTransitionCounter.
 			WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(condition.Type), condition.Reason).
 			Inc()
@@ -612,45 +591,25 @@ func (st *bundleSyncTask) updateBundleCondition(b *smith_v1.Bundle, condition *s
 	return needsUpdate
 }
 
-// updateResourceCondition updates passed condition by fetching information from an existing resource condition if present.
+// checkResourceConditionNeedsUpdate updates passed condition by fetching information from an existing resource condition if present.
 // Sets LastTransitionTime to now if the status has changed.
 // Returns true if resource condition in the bundle does not match and needs to be updated.
-func (st *bundleSyncTask) updateResourceCondition(b *smith_v1.Bundle, resName smith_v1.ResourceName, condition *smith_v1.ResourceCondition) bool {
+func (st *bundleSyncTask) checkResourceConditionNeedsUpdate(resName smith_v1.ResourceName, condition *cond_v1.Condition) bool {
 	now := meta_v1.Now()
 	condition.LastTransitionTime = now
 
 	needsUpdate := true
 
 	// Try to find this resource status
-	_, status := b.Status.GetResourceStatus(resName)
+	_, status := st.bundle.Status.GetResourceStatus(resName)
 
 	if status != nil {
-		// Try to find resource condition
-		_, oldCondition := status.GetCondition(condition.Type)
-
-		if oldCondition != nil {
-			// We are updating an existing condition, so we need to check if it has changed.
-			if condition.Status == oldCondition.Status {
-				condition.LastTransitionTime = oldCondition.LastTransitionTime
-			}
-
-			isEqual := condition.Status == oldCondition.Status &&
-				condition.Reason == oldCondition.Reason &&
-				condition.Message == oldCondition.Message &&
-				condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
-
-			needsUpdate = !isEqual
-			if needsUpdate {
-				condition.LastUpdateTime = now
-			}
-		}
-
-		// Otherwise it's a new resource condition
+		needsUpdate = cond_v1.PrepareCondition(status.Conditions, condition)
 	}
 
 	// Otherwise, no status for this resource, hence it's a new resource condition
 
-	if needsUpdate && condition.Status == smith_v1.ConditionTrue {
+	if needsUpdate && condition.Status == cond_v1.ConditionTrue {
 		st.bundleResourceTransitionCounter.
 			WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(resName), string(condition.Type), condition.Reason).
 			Inc()

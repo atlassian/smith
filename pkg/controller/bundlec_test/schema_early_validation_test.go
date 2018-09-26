@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
@@ -196,22 +197,22 @@ func TestSchemaEarlyValidation(t *testing.T) {
 			assert.Equal(t, testNamespace, bundleUpdate.GetNamespace())
 			updateBundle := bundleUpdate.GetObject().(*smith_v1.Bundle)
 
-			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resPWithDefaults, smith_v1.ResourceError, smith_v1.ConditionTrue)
+			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resPWithDefaults, smith_v1.ResourceError, cond_v1.ConditionTrue)
 			if resCond != nil {
 				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
 				assert.Equal(t, "invalid spec: spec failed validation against schema: p1: Invalid type. Expected: string, given: boolean", resCond.Message)
 			}
-			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resSiWithDefaults, smith_v1.ResourceError, smith_v1.ConditionTrue)
+			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resSiWithDefaults, smith_v1.ResourceError, cond_v1.ConditionTrue)
 			if resCond != nil {
 				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
 				assert.Equal(t, "spec failed validation against schema: testSchema: Invalid type. Expected: boolean, given: string", resCond.Message)
 			}
-			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resPWithoutDefaults, smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
+			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resPWithoutDefaults, smith_v1.ResourceBlocked, cond_v1.ConditionTrue)
 			if resCond != nil {
 				assert.Equal(t, smith_v1.ResourceReasonDependenciesNotReady, resCond.Reason)
 				assert.Equal(t, `Not ready: ["`+resSb1+`"]`, resCond.Message)
 			}
-			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resPWithoutDefaults, smith_v1.ResourceBlocked, smith_v1.ConditionTrue)
+			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resPWithoutDefaults, smith_v1.ResourceBlocked, cond_v1.ConditionTrue)
 			if resCond != nil {
 				assert.Equal(t, smith_v1.ResourceReasonDependenciesNotReady, resCond.Reason)
 				assert.Equal(t, `Not ready: ["`+resSb1+`"]`, resCond.Message)
