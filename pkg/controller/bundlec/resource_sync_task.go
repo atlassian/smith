@@ -400,9 +400,6 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 		return nil, errors.New(`neither "object" nor "plugin" field is specified`)
 	}
 
-	// Update label to point at the parent bundle
-	obj.SetLabels(mergeLabels(st.bundle.Labels, obj.GetLabels()))
-
 	// Update OwnerReferences
 	trueRef := true
 	refs := obj.GetOwnerReferences()
@@ -589,14 +586,4 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	}
 	st.logger.Info("Object updated", ctrlLogz.Object(spec))
 	return updated, false, nil
-}
-
-func mergeLabels(labels ...map[string]string) map[string]string {
-	result := make(map[string]string)
-	for _, m := range labels {
-		for k, v := range m {
-			result[k] = v
-		}
-	}
-	return result
 }

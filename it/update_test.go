@@ -232,12 +232,8 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 
 	cfMap, err := cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	require.NoError(t, err)
-	assert.Equal(t, map[string]string{
-		"configLabel":      "configValue",
-		"bundleLabel":      "bundleValue2",
-		"overlappingLabel": "overlappingConfigValue",
-	}, cfMap.Labels)
 	assert.Equal(t, cm2.Data, cfMap.Data)
+	assert.Equal(t, cm2.BinaryData, cfMap.BinaryData)
 
 	secret, err = secretClient.Get(s2.Name, meta_v1.GetOptions{})
 	require.NoError(t, err)
@@ -253,11 +249,6 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 		Do().
 		Into(&sleeperObj)
 	require.NoError(t, err)
-	assert.Equal(t, map[string]string{
-		"configLabel":      "configValue",
-		"bundleLabel":      "bundleValue2",
-		"overlappingLabel": "overlappingConfigValue",
-	}, sleeperObj.Labels)
 	assert.Equal(t, sleeper_v1.Awake, sleeperObj.Status.State)
 	assert.Equal(t, sleeper2.Spec, sleeperObj.Spec)
 
