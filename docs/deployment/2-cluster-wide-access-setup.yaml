@@ -60,6 +60,17 @@ rules:
   - delete
 
 - apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - list
+  - watch
+  - create
+  - update
+  - delete
+
+- apiGroups:
   - servicecatalog.k8s.io
   resources:
   - servicebindings
