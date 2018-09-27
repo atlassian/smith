@@ -55,7 +55,7 @@ func TestActualObjectPassedToPlugin(t *testing.T) {
 		plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
 			pluginSimpleConfigMap: simpleConfigMapPlugin,
 		},
-		pluginsShouldBeInvoked: sets.NewString(pluginSimpleConfigMap),
+		pluginsShouldBeInvoked: sets.NewString(string(pluginSimpleConfigMap)),
 	}
 	tc.run(t)
 }

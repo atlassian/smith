@@ -234,7 +234,7 @@ func TestPluginSpecProcessed(t *testing.T) {
 		plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
 			pluginConfigMapWithDeps: configMapWithDependenciesPlugin(true, true),
 		},
-		pluginsShouldBeInvoked: sets.NewString(pluginConfigMapWithDeps),
+		pluginsShouldBeInvoked: sets.NewString(string(pluginConfigMapWithDeps)),
 	}
 	tc.run(t)
 }

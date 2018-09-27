@@ -181,3 +181,30 @@ func (p *simpleConfigMap) Process(pluginSpec map[string]interface{}, context *pl
 		},
 	}, nil
 }
+
+func newFailingPlugin(t *testing.T) testingPlugin {
+	return &failingPluginStruct{
+		t: t,
+	}
+}
+
+type failingPluginStruct struct {
+	t          *testing.T
+	wasInvoked bool
+}
+
+func (p *failingPluginStruct) WasInvoked() bool {
+	return p.wasInvoked
+}
+
+func (p *failingPluginStruct) Describe() *plugin.Description {
+	return &plugin.Description{
+		Name: pluginFailing,
+		GVK:  core_v1.SchemeGroupVersion.WithKind("ConfigMap"),
+	}
+}
+
+func (p *failingPluginStruct) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
+	p.wasInvoked = true
+	return nil, errors.New("plugin failed as it should. BOOM!")
+}
