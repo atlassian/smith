@@ -17,7 +17,7 @@ func TestCrInAnotherNamespace(t *testing.T) {
 	t.Parallel()
 	tc := testCase{
 		apiExtClientObjects: []runtime.Object{
-			SleeperCrdWithStatus(),
+			sleeperCrdWithStatus(),
 		},
 		expectedActions: sets.NewString(
 			"GET=/apis/"+sleeper_v1.SleeperResourceGroupVersion+"/namespaces/"+testNamespace+"/"+sleeper_v1.SleeperResourcePlural+
