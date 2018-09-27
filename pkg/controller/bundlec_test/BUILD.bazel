@@ -17,7 +17,6 @@ go_test(
         "no_actions_for_blocked_resources_test.go",
         "no_deletions_while_in_progress_test.go",
         "not_marked_crd_ignored_test.go",
-        "plugin_error_propagated_test.go",
         "plugin_schema_invalid_test.go",
         "plugin_spec_processed_test.go",
         "processing_continues_after_error_test.go",
