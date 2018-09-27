@@ -1,7 +1,6 @@
 package bundlec
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -306,116 +305,121 @@ func (st *bundleSyncTask) updateBundleStatus() error {
 }
 
 func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) (bool /*retriable*/, error) {
-	if processErr != nil && api_errors.IsConflict(errors.Cause(processErr)) {
-		return retriable, processErr
+	switch {
+	case st.newFinalizers != nil:
+		return st.handleNewFinalizers(retriable, processErr)
+	case st.bundle.DeletionTimestamp == nil:
+		return st.handleNormalStatusUpdate(retriable, processErr)
 	}
-	if processErr == context.Canceled || processErr == context.DeadlineExceeded {
-		return false, processErr
+
+	return retriable, processErr
+}
+
+func (st *bundleSyncTask) handleNewFinalizers(retriable bool, processErr error) (bool /*retriable*/, error) {
+	// Update finalizers
+	st.bundle.Finalizers = st.newFinalizers
+	err := st.updateBundle()
+	if err != nil {
+		if processErr == nil {
+			processErr = err
+			retriable = true
+		} else {
+			st.logger.Error("Error updating Bundle", zap.Error(err))
+		}
 	}
-	if st.newFinalizers != nil {
-		// Update finalizers
-		st.bundle.Finalizers = st.newFinalizers
-		err := st.updateBundle()
+	return retriable, processErr
+}
+
+func (st *bundleSyncTask) handleNormalStatusUpdate(retriable bool, processErr error) (bool /*retriable*/, error) {
+	bundleStatusUpdated := false
+	// Construct resource conditions and check if there were any resource errors
+	resourceStatuses := make([]smith_v1.ResourceStatus, 0, len(st.processedResources))
+	var failedResources []smith_v1.ResourceName
+	retriableResourceErr := true
+	for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
+		blockedCond, inProgressCond, readyCond, errorCond := st.resourceConditions(res)
+
+		if errorCond.Status == cond_v1.ConditionTrue {
+			failedResources = append(failedResources, res.Name)
+			retriableResourceErr = retriableResourceErr && errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must not continue if at least one error is not retriable
+		}
+
+		bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &blockedCond) || bundleStatusUpdated
+		bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &inProgressCond) || bundleStatusUpdated
+		bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &readyCond) || bundleStatusUpdated
+		bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &errorCond) || bundleStatusUpdated
+
+		resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
+			Name:       res.Name,
+			Conditions: []cond_v1.Condition{blockedCond, inProgressCond, readyCond, errorCond},
+		})
+	}
+
+	if processErr == nil && len(failedResources) > 0 {
+		processErr = errors.Errorf("error processing resource(s): %q", failedResources)
+		retriable = retriableResourceErr
+	}
+
+	// Bundle conditions
+	inProgressCond := cond_v1.Condition{Type: smith_v1.BundleInProgress, Status: cond_v1.ConditionFalse}
+	readyCond := cond_v1.Condition{Type: smith_v1.BundleReady, Status: cond_v1.ConditionFalse}
+	errorCond := cond_v1.Condition{Type: smith_v1.BundleError, Status: cond_v1.ConditionFalse}
+
+	if processErr == nil {
+		if st.isBundleReady() {
+			readyCond.Status = cond_v1.ConditionTrue
+		} else {
+			inProgressCond.Status = cond_v1.ConditionTrue
+		}
+	} else {
+		errorCond.Status = cond_v1.ConditionTrue
+		errorCond.Message = processErr.Error()
+		if retriable {
+			errorCond.Reason = smith_v1.BundleReasonRetriableError
+			inProgressCond.Status = cond_v1.ConditionTrue
+		} else {
+			errorCond.Reason = smith_v1.BundleReasonTerminalError
+		}
+	}
+
+	bundleStatusUpdated = st.checkBundleConditionNeedsUpdate(&inProgressCond) || bundleStatusUpdated
+	bundleStatusUpdated = st.checkBundleConditionNeedsUpdate(&readyCond) || bundleStatusUpdated
+	bundleStatusUpdated = st.checkBundleConditionNeedsUpdate(&errorCond) || bundleStatusUpdated
+
+	// Plugin statuses
+	pluginStatuses := st.pluginStatuses()
+	bundleStatusUpdated = bundleStatusUpdated || !reflect.DeepEqual(st.bundle.Status.PluginStatuses, pluginStatuses)
+	st.bundle.Status.PluginStatuses = pluginStatuses
+
+	// Update the bundle status
+	if bundleStatusUpdated {
+		st.bundle.Status.ResourceStatuses = resourceStatuses
+		st.bundle.Status.Conditions = []cond_v1.Condition{inProgressCond, readyCond, errorCond}
+	}
+
+	obj2deleteUpdated, err := st.updateObjectsToDeleteStatus()
+	if err != nil {
+		// Just log the error and continue
+		st.logger.Error("Error updating ObjectsToDelete status field", zap.Error(err))
+	} else {
+		bundleStatusUpdated = obj2deleteUpdated || bundleStatusUpdated
+	}
+	if st.bundle.Generation != st.bundle.Status.ObservedGeneration {
+		st.logger.Sugar().Debugf("Updating ObservedGeneration %d -> %d", st.bundle.Status.ObservedGeneration, st.bundle.Generation)
+		st.bundle.Status.ObservedGeneration = st.bundle.Generation
+		bundleStatusUpdated = true
+	}
+	if bundleStatusUpdated {
+		err = st.updateBundleStatus()
 		if err != nil {
 			if processErr == nil {
 				processErr = err
 				retriable = true
 			} else {
-				st.logger.Error("Error updating Bundle", zap.Error(err))
-			}
-		}
-	} else if st.bundle.DeletionTimestamp == nil {
-		bundleStatusUpdated := false
-		// Construct resource conditions and check if there were any resource errors
-		resourceStatuses := make([]smith_v1.ResourceStatus, 0, len(st.processedResources))
-		var failedResources []smith_v1.ResourceName
-		retriableResourceErr := true
-		for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
-			blockedCond, inProgressCond, readyCond, errorCond := st.resourceConditions(res)
-
-			if errorCond.Status == cond_v1.ConditionTrue {
-				failedResources = append(failedResources, res.Name)
-				retriableResourceErr = retriableResourceErr && errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must not continue if at least one error is not retriable
-			}
-
-			bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &blockedCond) || bundleStatusUpdated
-			bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &inProgressCond) || bundleStatusUpdated
-			bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &readyCond) || bundleStatusUpdated
-			bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &errorCond) || bundleStatusUpdated
-
-			resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
-				Name:       res.Name,
-				Conditions: []cond_v1.Condition{blockedCond, inProgressCond, readyCond, errorCond},
-			})
-		}
-
-		if processErr == nil && len(failedResources) > 0 {
-			processErr = errors.Errorf("error processing resource(s): %q", failedResources)
-			retriable = retriableResourceErr
-		}
-
-		// Bundle conditions
-		inProgressCond := cond_v1.Condition{Type: smith_v1.BundleInProgress, Status: cond_v1.ConditionFalse}
-		readyCond := cond_v1.Condition{Type: smith_v1.BundleReady, Status: cond_v1.ConditionFalse}
-		errorCond := cond_v1.Condition{Type: smith_v1.BundleError, Status: cond_v1.ConditionFalse}
-
-		if processErr == nil {
-			if st.isBundleReady() {
-				readyCond.Status = cond_v1.ConditionTrue
-			} else {
-				inProgressCond.Status = cond_v1.ConditionTrue
-			}
-		} else {
-			errorCond.Status = cond_v1.ConditionTrue
-			errorCond.Message = processErr.Error()
-			if retriable {
-				errorCond.Reason = smith_v1.BundleReasonRetriableError
-				inProgressCond.Status = cond_v1.ConditionTrue
-			} else {
-				errorCond.Reason = smith_v1.BundleReasonTerminalError
-			}
-		}
-
-		bundleStatusUpdated = st.checkBundleConditionNeedsUpdate(&inProgressCond) || bundleStatusUpdated
-		bundleStatusUpdated = st.checkBundleConditionNeedsUpdate(&readyCond) || bundleStatusUpdated
-		bundleStatusUpdated = st.checkBundleConditionNeedsUpdate(&errorCond) || bundleStatusUpdated
-
-		// Plugin statuses
-		pluginStatuses := st.pluginStatuses()
-		bundleStatusUpdated = bundleStatusUpdated || !reflect.DeepEqual(st.bundle.Status.PluginStatuses, pluginStatuses)
-		st.bundle.Status.PluginStatuses = pluginStatuses
-
-		// Update the bundle status
-		if bundleStatusUpdated {
-			st.bundle.Status.ResourceStatuses = resourceStatuses
-			st.bundle.Status.Conditions = []cond_v1.Condition{inProgressCond, readyCond, errorCond}
-		}
-
-		obj2deleteUpdated, err := st.updateObjectsToDeleteStatus()
-		if err != nil {
-			// Just log the error and continue
-			st.logger.Error("Error updating ObjectsToDelete status field", zap.Error(err))
-		} else {
-			bundleStatusUpdated = obj2deleteUpdated || bundleStatusUpdated
-		}
-		if st.bundle.Generation != st.bundle.Status.ObservedGeneration {
-			st.logger.Sugar().Debugf("Updating ObservedGeneration %d -> %d", st.bundle.Status.ObservedGeneration, st.bundle.Generation)
-			st.bundle.Status.ObservedGeneration = st.bundle.Generation
-			bundleStatusUpdated = true
-		}
-		if bundleStatusUpdated {
-			err = st.updateBundleStatus()
-			if err != nil {
-				if processErr == nil {
-					processErr = err
-					retriable = true
-				} else {
-					st.logger.Error("Error updating Bundle status", zap.Error(err))
-				}
+				st.logger.Error("Error updating Bundle status", zap.Error(err))
 			}
 		}
 	}
-
 	return retriable, processErr
 }
 
