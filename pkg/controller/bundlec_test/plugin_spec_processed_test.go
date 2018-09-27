@@ -20,7 +20,7 @@ func TestPluginSpecProcessed(t *testing.T) {
 	tr := true
 	tc := testCase{
 		apiExtClientObjects: []runtime.Object{
-			SleeperCrdWithStatus(),
+			sleeperCrdWithStatus(),
 		},
 		mainClientObjects: []runtime.Object{
 			&core_v1.Secret{

@@ -15,7 +15,7 @@ func TestNotMarkedCrdIgnored(t *testing.T) {
 	t.Parallel()
 	t.Run("set to false", func(t *testing.T) {
 		t.Parallel()
-		sleeperCrd := SleeperCrdWithStatus()
+		sleeperCrd := sleeperCrdWithStatus()
 		sleeperCrd.Annotations[smith.CrdSupportEnabled] = "false"
 		tc := testCase{
 			apiExtClientObjects: []runtime.Object{
@@ -36,7 +36,7 @@ func TestNotMarkedCrdIgnored(t *testing.T) {
 	})
 	t.Run("not set", func(t *testing.T) {
 		t.Parallel()
-		sleeperCrd := SleeperCrdWithStatus()
+		sleeperCrd := sleeperCrdWithStatus()
 		delete(sleeperCrd.Annotations, smith.CrdSupportEnabled)
 		tc := testCase{
 			apiExtClientObjects: []runtime.Object{
