@@ -2,6 +2,8 @@ package resources
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"reflect"
 	"time"
 
@@ -11,13 +13,42 @@ import (
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	yaml "gopkg.in/yaml.v2"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_lst_v1b1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
+
+func PrintCleanedObject(sink io.Writer, format string, obj runtime.Object) error {
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return errors.Wrap(err, "failed to convert objed to unstructured")
+	}
+	unstructured.RemoveNestedField(u, "metadata", "creationTimestamp")
+	unstructured.RemoveNestedField(u, "status")
+	switch format {
+	case "json":
+		enc := json.NewEncoder(sink)
+		enc.SetIndent("", "  ")
+		enc.SetEscapeHTML(false)
+		err := enc.Encode(u)
+		return errors.Wrap(err, "failed to marshal into JSON")
+	case "yaml":
+		data, err := yaml.Marshal(u)
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal into YAML")
+		}
+		_, err = sink.Write(data)
+		return errors.Wrap(err, "failed to write to sink")
+	default:
+		return errors.Errorf("unsupported output format %q", format)
+	}
+}
 
 func BundleCrd() *apiext_v1b1.CustomResourceDefinition {
 	// Schema is based on:
