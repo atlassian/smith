@@ -11,11 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kube_testing "k8s.io/client-go/testing"
 )
 
-// Should not process plugin if specification is invalid according to the schema
-func TestPluginSchemaInvalid(t *testing.T) {
+// Should propagate plugin error into resource's status
+func TestPluginErrorPropagated(t *testing.T) {
 	t.Parallel()
 	tc := testCase{
 		bundle: &smith_v1.Bundle{
@@ -31,11 +32,8 @@ func TestPluginSchemaInvalid(t *testing.T) {
 						Name: resP1,
 						Spec: smith_v1.ResourceSpec{
 							Plugin: &smith_v1.PluginSpec{
-								Name:       pluginConfigMapWithDeps,
+								Name:       pluginFailing,
 								ObjectName: m1,
-								Spec: map[string]interface{}{
-									"p1": nil,
-								},
 							},
 						},
 					},
@@ -43,8 +41,9 @@ func TestPluginSchemaInvalid(t *testing.T) {
 			},
 		},
 		plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
-			pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
+			pluginFailing: newFailingPlugin,
 		},
+		pluginsShouldBeInvoked: sets.NewString(string(pluginFailing)),
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
 			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.EqualError(t, err, `error processing resource(s): ["`+resP1+`"]`)
@@ -59,7 +58,7 @@ func TestPluginSchemaInvalid(t *testing.T) {
 			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceError, cond_v1.ConditionTrue)
 			if resCond != nil {
 				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-				assert.Equal(t, "invalid spec: spec failed validation against schema: p1: Invalid type. Expected: string, given: null", resCond.Message)
+				assert.Equal(t, "plugin failed as it should. BOOM!", resCond.Message)
 			}
 		},
 	}

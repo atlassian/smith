@@ -117,8 +117,9 @@ const (
 	mapMarkedForDeletion              = "map-not-in-the-bundle-anymore-marked-for-deletetion"
 	mapMarkedForDeletionUid types.UID = "map-deleted-uid"
 
-	pluginSimpleConfigMap   = "simpleConfigMap"
-	pluginConfigMapWithDeps = "configMapWithDeps"
+	pluginSimpleConfigMap   smith_v1.PluginName = "simpleConfigMap"
+	pluginConfigMapWithDeps smith_v1.PluginName = "configMapWithDeps"
+	pluginFailing           smith_v1.PluginName = "pluginFailing"
 
 	serviceClassNameAndID    = "uid-1"
 	serviceClassExternalName = "database"
