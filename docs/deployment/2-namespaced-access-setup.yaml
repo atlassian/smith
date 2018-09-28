@@ -1,5 +1,5 @@
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: smith-cluster-role
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole # cluster wide role but it is bound only in a specific namespace (or multiple)
 metadata:
   name: smith-namespaced-role
@@ -93,7 +93,7 @@ rules:
   - update
   - delete
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: smith-cluster-binding
@@ -106,7 +106,7 @@ subjects:
   name: smith
   namespace: <your namespace>
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: smith-namespaced-binding
