@@ -39,6 +39,7 @@ a controller owner reference pointing at the origin Bundle.
 
 ### Example bundle
 CR definitions:
+
 For `Bundle` see [0-crd.yaml](docs/deployment/0-crd.yaml).
 ```yaml
 apiVersion: apiextensions.k8s.io/v1beta1
@@ -152,10 +153,9 @@ use case is a PaaS that delegates (some) object manipulations to Smith.
 
 ## Requirements
 
-* Please run on recent enough Kubernetes version because earlier versions have some bugs that may prevent Smith from
-working properly. We test on 1.8+;
-* Go 1.7+ is required because [context package](https://golang.org/doc/go1.7#context) is used and it was added to
-standard library in this version;
+* Kubernetes 1.11+ is required - we use
+[`/status` subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#status-subresource)
+and OpenAPI schema features that became available in this version; 
 * List of project dependencies and their versions can be found in `Gopkg.toml` and `Gopkg.lock` files.
 
 ## Building, testing and running
