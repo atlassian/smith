@@ -11,6 +11,7 @@ import (
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/resources"
+	"github.com/atlassian/smith/pkg/statuschecker"
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util/graph"
 	"github.com/atlassian/smith/pkg/util/logz"
@@ -31,7 +32,7 @@ type bundleSyncTask struct {
 	logger                          *zap.Logger
 	bundleClient                    smithClient_v1.BundlesGetter
 	smartClient                     SmartClient
-	rc                              ReadyChecker
+	checker                         statuschecker.Interface
 	store                           Store
 	specCheck                       SpecCheck
 	bundle                          *smith_v1.Bundle
@@ -89,7 +90,7 @@ func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
 		rst := resourceSyncTask{
 			logger:             logger,
 			smartClient:        st.smartClient,
-			rc:                 st.rc,
+			checker:            st.checker,
 			store:              st.store,
 			specCheck:          st.specCheck,
 			bundle:             st.bundle,

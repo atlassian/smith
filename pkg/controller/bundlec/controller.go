@@ -11,6 +11,7 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/statuschecker"
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -37,7 +38,7 @@ type Controller struct {
 	BundleClient smithClient_v1.BundlesGetter
 	BundleStore  BundleStore
 	SmartClient  SmartClient
-	Rc           ReadyChecker
+	Rc           statuschecker.Interface
 	Store        Store
 	SpecCheck    SpecCheck
 	WorkQueue    ctrl.WorkQueueProducer

@@ -1,9 +1,10 @@
 package types
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/atlassian/smith/pkg/readychecker"
+	"github.com/atlassian/smith/pkg/statuschecker"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
@@ -24,7 +25,7 @@ const (
 )
 
 var (
-	MainKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
+	MainKnownTypes = map[schema.GroupKind]statuschecker.ObjectStatusChecker{
 		{Group: core_v1.GroupName, Kind: "ConfigMap"}:      alwaysReady,
 		{Group: core_v1.GroupName, Kind: "Secret"}:         alwaysReady,
 		{Group: core_v1.GroupName, Kind: "Service"}:        alwaysReady,
@@ -34,7 +35,7 @@ var (
 
 		{Group: autoscaling_v2b1.GroupName, Kind: "HorizontalPodAutoscaler"}: isHorizontalPodAutoscalerReady,
 	}
-	ServiceCatalogKnownTypes = map[schema.GroupKind]readychecker.IsObjectReady{
+	ServiceCatalogKnownTypes = map[schema.GroupKind]statuschecker.ObjectStatusChecker{
 		{Group: sc_v1b1.GroupName, Kind: "ServiceBinding"}:  isScServiceBindingReady,
 		{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: isScServiceInstanceReady,
 	}
@@ -68,16 +69,16 @@ func init() {
 	}
 }
 
-func alwaysReady(_ runtime.Object) (isReady, retriableError bool, e error) {
-	return true, false, nil
+func alwaysReady(_ runtime.Object) (r statuschecker.ObjectStatusResult, e error) {
+	return statuschecker.ObjectStatusReady{}, nil
 }
 
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
-func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e error) {
+func isDeploymentReady(obj runtime.Object) (r statuschecker.ObjectStatusResult, e error) {
 	var deployment apps_v1.Deployment
 	if err := util.ConvertType(appsV1Scheme, obj, &deployment); err != nil {
-		return false, false, err
+		return nil, err
 	}
 
 	replicas := int32(1) // Default value if not specified
@@ -85,14 +86,16 @@ func isDeploymentReady(obj runtime.Object) (isReady, retriableError bool, e erro
 		replicas = *deployment.Spec.Replicas
 	}
 
-	return deployment.Status.ObservedGeneration >= deployment.Generation &&
-		deployment.Status.UpdatedReplicas == replicas, false, nil
+	if deployment.Status.ObservedGeneration >= deployment.Generation && deployment.Status.UpdatedReplicas == replicas {
+		return statuschecker.ObjectStatusReady{}, nil
+	}
+	return statuschecker.ObjectStatusInProgress{}, nil
 }
 
-func isHorizontalPodAutoscalerReady(obj runtime.Object) (isReady, retriableError bool, e error) {
+func isHorizontalPodAutoscalerReady(obj runtime.Object) (r statuschecker.ObjectStatusResult, e error) {
 	var hpa autoscaling_v2b1.HorizontalPodAutoscaler
 	if err := util.ConvertType(autoscalingV2B1Scheme, obj, &hpa); err != nil {
-		return false, false, err
+		return nil, err
 	}
 
 	// For the HPA to be ready, AbleToScale and ScalingActive conditions should exist and be true
@@ -108,7 +111,10 @@ func isHorizontalPodAutoscalerReady(obj runtime.Object) (isReady, retriableError
 				foundAbleToScale = true
 			case core_v1.ConditionFalse:
 				// AbleToScale should not be false if the HPA is working, this is a (retriable) failure
-				return false, true, errors.Errorf("%s: %s", cond.Reason, cond.Message)
+				return statuschecker.ObjectStatusError{
+					Error:          errors.Errorf("%s: %s", cond.Reason, cond.Message),
+					RetriableError: true,
+				}, nil
 			case core_v1.ConditionUnknown:
 				// Assume it's still coming up
 			}
@@ -121,7 +127,10 @@ func isHorizontalPodAutoscalerReady(obj runtime.Object) (isReady, retriableError
 				// Assume it has failed after a timeout
 				now := meta_v1.Now()
 				if cond.LastTransitionTime.Add(hpaScalingActiveTimeout).Before(now.Time) {
-					return false, true, errors.Errorf("%s: %s", cond.Reason, cond.Message)
+					return statuschecker.ObjectStatusError{
+						Error:          errors.Errorf("%s: %s", cond.Reason, cond.Message),
+						RetriableError: true,
+					}, nil
 				}
 			case core_v1.ConditionUnknown:
 				// Assume it's still coming up
@@ -129,47 +138,83 @@ func isHorizontalPodAutoscalerReady(obj runtime.Object) (isReady, retriableError
 		}
 	}
 
-	return foundAbleToScale && foundScalingActive, false, nil
+	if foundAbleToScale && foundScalingActive {
+		return statuschecker.ObjectStatusReady{}, nil
+	}
+	return statuschecker.ObjectStatusInProgress{
+		Message: fmt.Sprintf("ableToScale: %v, scalingActive: %v", foundAbleToScale, foundScalingActive),
+	}, nil
 }
 
-func isScServiceBindingReady(obj runtime.Object) (isReady, retriableError bool, e error) {
+func isScServiceBindingReady(obj runtime.Object) (r statuschecker.ObjectStatusResult, e error) {
 	var sic sc_v1b1.ServiceBinding
 	if err := util.ConvertType(scV1B1Scheme, obj, &sic); err != nil {
-		return false, false, err
+		return nil, err
 	}
 	readyCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionReady)
-	if readyCond != nil && readyCond.Status == sc_v1b1.ConditionTrue {
-		return true, false, nil
+	if readyCond != nil {
+		switch readyCond.Status {
+		case sc_v1b1.ConditionFalse:
+			return statuschecker.ObjectStatusInProgress{
+				Message: fmt.Sprintf("%v: %v", readyCond.Reason, readyCond.Message),
+			}, nil
+		case sc_v1b1.ConditionTrue:
+			return statuschecker.ObjectStatusReady{}, nil
+		default:
+			return statuschecker.ObjectStatusUnknown{
+				Details: fmt.Sprintf("status is %q", readyCond.Status),
+			}, nil
+		}
 	}
 	failedCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionFailed)
 	if failedCond != nil && failedCond.Status == sc_v1b1.ConditionTrue {
-		return false, false, errors.Errorf("%s: %s", failedCond.Reason, failedCond.Message)
+		return statuschecker.ObjectStatusError{
+			Error: errors.Errorf("%s: %s", failedCond.Reason, failedCond.Message),
+		}, nil
 	}
-	// TODO support "unknown" and "in progress"
-	return false, false, nil
 
+	return statuschecker.ObjectStatusInProgress{
+		Message: "Waiting for service catalog",
+	}, nil
 }
 
-func isScServiceInstanceReady(obj runtime.Object) (isReady, retriableError bool, e error) {
+func isScServiceInstanceReady(obj runtime.Object) (r statuschecker.ObjectStatusResult, e error) {
 	var instance sc_v1b1.ServiceInstance
 	if err := util.ConvertType(scV1B1Scheme, obj, &instance); err != nil {
-		return false, false, err
+		return nil, err
 	}
 	readyCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionReady)
 	if readyCond != nil {
-		if readyCond.Status == sc_v1b1.ConditionFalse && !scNonErrorReasons.Has(readyCond.Reason) {
-			return false, true, errors.New(readyCond.Message)
-		}
-		if readyCond.Status == sc_v1b1.ConditionTrue {
-			return true, false, nil
+		switch readyCond.Status {
+		case sc_v1b1.ConditionFalse:
+			if !scNonErrorReasons.Has(readyCond.Reason) {
+				// e.g. ProvisioningCallFailed
+				return statuschecker.ObjectStatusError{
+					Error:          errors.Errorf("%s: %s", readyCond.Reason, readyCond.Message),
+					RetriableError: true,
+				}, nil
+			}
+			return statuschecker.ObjectStatusInProgress{
+				Message: fmt.Sprintf("%v: %v", readyCond.Reason, readyCond.Message),
+			}, nil
+		case sc_v1b1.ConditionTrue:
+			return statuschecker.ObjectStatusReady{}, nil
+		default:
+			return statuschecker.ObjectStatusUnknown{
+				Details: fmt.Sprintf("status is %q", readyCond.Status),
+			}, nil
 		}
 	}
 	failedCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionFailed)
 	if failedCond != nil && failedCond.Status == sc_v1b1.ConditionTrue {
-		return false, false, errors.Errorf("%s: %s", failedCond.Reason, failedCond.Message)
+		return statuschecker.ObjectStatusError{
+			Error: errors.Errorf("%s: %s", failedCond.Reason, failedCond.Message),
+		}, nil
 	}
-	// TODO support "unknown" and "in progress"
-	return false, false, nil
+
+	return statuschecker.ObjectStatusInProgress{
+		Message: "Waiting for service catalog",
+	}, nil
 }
 
 func getServiceInstanceCondition(instance *sc_v1b1.ServiceInstance, conditionType sc_v1b1.ServiceInstanceConditionType) *sc_v1b1.ServiceInstanceCondition {
