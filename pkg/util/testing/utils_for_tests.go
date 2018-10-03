@@ -11,8 +11,7 @@ import (
 func AssertCondition(t *testing.T, bundle *smith_v1.Bundle, conditionType cond_v1.ConditionType, status cond_v1.ConditionStatus) *cond_v1.Condition {
 	_, condition := cond_v1.FindCondition(bundle.Status.Conditions, conditionType)
 	if assert.NotNil(t, condition) {
-		// TODO string casts are a workaround for https://github.com/stretchr/testify/issues/644
-		assert.Equal(t, string(status), string(condition.Status), "%s: %s: %s", conditionType, condition.Reason, condition.Message)
+		assert.Equal(t, status, condition.Status, "%s: %s: %s", conditionType, condition.Reason, condition.Message)
 	}
 	return condition
 }
@@ -26,7 +25,6 @@ func AssertResourceCondition(t *testing.T, bundle *smith_v1.Bundle, resName smit
 	if !assert.NotNil(t, condition, "%s: %s", resName, conditionType) {
 		return nil
 	}
-	// TODO string casts are a workaround for https://github.com/stretchr/testify/issues/644
-	assert.Equal(t, string(status), string(condition.Status), "%s: %s: %s: %s", resName, string(conditionType), condition.Reason, condition.Message)
+	assert.Equal(t, status, condition.Status, "%s: %s: %s: %s", resName, conditionType, condition.Reason, condition.Message)
 	return condition
 }

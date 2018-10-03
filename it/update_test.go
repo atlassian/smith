@@ -249,7 +249,7 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 		Do().
 		Into(&sleeperObj)
 	require.NoError(t, err)
-	assert.Equal(t, string(sleeper_v1.Awake), string(sleeperObj.Status.State)) // TODO workaround for https://github.com/stretchr/testify/issues/644
+	assert.Equal(t, sleeper_v1.Awake, sleeperObj.Status.State)
 	assert.Equal(t, sleeper2.Spec, sleeperObj.Spec)
 
 	emptyBundle := cfg.Bundle.DeepCopy()
