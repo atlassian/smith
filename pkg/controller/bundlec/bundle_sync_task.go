@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -296,11 +297,29 @@ func (st *bundleSyncTask) updateBundle() error {
 }
 
 func (st *bundleSyncTask) updateBundleStatus() error {
+	// ------ BACKWARDS COMPATIBILITY with existing Bundle CRD without /status. REMOVE ONCE NOT NEEDED ------
+	obj, exists, err := st.store.Get(apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"), meta_v1.NamespaceNone, smith_v1.BundleResourceName)
+	if err != nil {
+		return errors.Wrap(err, "failed to get Bundle CRD")
+	}
+	if !exists {
+		return errors.New("Bundle CRD does not exist")
+	}
+	bundleCRD := obj.(*apiext_v1b1.CustomResourceDefinition)
+	if bundleCRD.Spec.Subresources == nil || bundleCRD.Spec.Subresources.Status == nil { // /status subresource is NOT enabled
+		bundleUpdated, err := st.bundleClient.Bundles(st.bundle.Namespace).Update(st.bundle)
+		if err != nil {
+			return errors.Wrap(err, "failed to update bundle status")
+		}
+		st.logger.Sugar().Debugf("Set bundle status (via UPDATE) to %s", &bundleUpdated.Status)
+		return nil
+	}
+	// ------ END COMPATIBILITY BLOCK ------
 	bundleUpdated, err := st.bundleClient.Bundles(st.bundle.Namespace).UpdateStatus(st.bundle)
 	if err != nil {
 		return errors.Wrap(err, "failed to update bundle status")
 	}
-	st.logger.Sugar().Debugf("Set bundle status to %s", &bundleUpdated.Status)
+	st.logger.Sugar().Debugf("Set bundle status (via /status) to %s", &bundleUpdated.Status)
 	return nil
 }
 

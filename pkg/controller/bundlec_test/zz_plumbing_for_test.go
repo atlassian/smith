@@ -18,6 +18,7 @@ import (
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -51,11 +52,12 @@ type reaction struct {
 }
 
 type testCase struct {
-	logger              *zap.Logger
-	mainClientObjects   []runtime.Object
-	mainReactors        []reaction
-	smithClientObjects  []runtime.Object
-	smithReactors       []reaction
+	logger             *zap.Logger
+	mainClientObjects  []runtime.Object
+	mainReactors       []reaction
+	smithClientObjects []runtime.Object
+	smithReactors      []reaction
+	// Bundle CRD is added automatically
 	apiExtClientObjects []runtime.Object
 	apiExtReactors      []reaction
 	scClientObjects     []runtime.Object
@@ -151,7 +153,7 @@ func (tc *testCase) run(t *testing.T) {
 	for _, reactor := range tc.smithReactors {
 		smithClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
-	apiExtClient := apiExtFake.NewSimpleClientset(tc.apiExtClientObjects...)
+	apiExtClient := apiExtFake.NewSimpleClientset(append(tc.apiExtClientObjects, resources.BundleCrd())...)
 	tc.apiExtFake = &apiExtClient.Fake
 	for _, reactor := range tc.apiExtReactors {
 		apiExtClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
