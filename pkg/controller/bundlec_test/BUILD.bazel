@@ -21,6 +21,7 @@ go_test(
         "plugin_schema_invalid_test.go",
         "plugin_spec_processed_test.go",
         "processing_continues_after_error_test.go",
+        "propagate_status_test.go",
         "resolve_binding_secret_references_test.go",
         "schema_early_validation_test.go",
         "secret_keys_not_merged_test.go",

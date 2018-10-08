@@ -36,7 +36,7 @@ func serviceInstance(ready, inProgress, error bool) *sc_v1b1.ServiceInstance {
 		status.Conditions = append(status.Conditions, sc_v1b1.ServiceInstanceCondition{
 			Type:    sc_v1b1.ServiceInstanceConditionReady,
 			Status:  sc_v1b1.ConditionFalse,
-			Reason:  "WorkingOnIt",
+			Reason:  "Provisioning",
 			Message: "Doing something",
 		})
 	}

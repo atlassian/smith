@@ -15,6 +15,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -41,6 +42,16 @@ var (
 	appsV1Scheme          = runtime.NewScheme()
 	scV1B1Scheme          = runtime.NewScheme()
 	autoscalingV2B1Scheme = runtime.NewScheme()
+)
+
+var scNonErrorReasons = sets.NewString(
+	"Provisioning",
+	"UpdatingInstance",
+	"Deprovisioning",
+	"ProvisionRequestInFlight",
+	"UpdateInstanceRequestInFlight",
+	"DeprovisionRequestInFlight",
+	"StartingInstanceOrphanMitigation",
 )
 
 func init() {
@@ -146,8 +157,13 @@ func isScServiceInstanceReady(obj runtime.Object) (isReady, retriableError bool,
 		return false, false, err
 	}
 	readyCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionReady)
-	if readyCond != nil && readyCond.Status == sc_v1b1.ConditionTrue {
-		return true, false, nil
+	if readyCond != nil {
+		if readyCond.Status == sc_v1b1.ConditionFalse && !scNonErrorReasons.Has(readyCond.Reason) {
+			return false, true, errors.New(readyCond.Message)
+		}
+		if readyCond.Status == sc_v1b1.ConditionTrue {
+			return true, false, nil
+		}
 	}
 	failedCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionFailed)
 	if failedCond != nil && failedCond.Status == sc_v1b1.ConditionTrue {
