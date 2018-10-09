@@ -99,4 +99,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: smith
-  namespace: <your namespace>
+  namespace: smith

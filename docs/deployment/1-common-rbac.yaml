@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: smith
+  namespace: smith
+
+# Leader Election role
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: smith:leader-locking
+  namespace: smith
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - events
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  resourceNames:
+  - smith-leader-elect
+  verbs:
+  - get
+  - update
+
+# Leader Election binding
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: smith:leader-locking
+  namespace: smith
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: "smith:leader-locking"
+subjects:
+- kind: ServiceAccount
+  name: smith
+  namespace: smith
