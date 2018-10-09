@@ -12,6 +12,8 @@ type D interface{}
 type Vertex struct {
 	// Edges in order of appearance (for deterministic order after sort).
 	OutgoingEdges []V
+	// Edges in the inverse of outgoing, i.e. vertices that depend on this vertex
+	IncomingEdges []V
 	Data          D
 }
 
@@ -45,12 +47,13 @@ func (g *Graph) AddEdge(from, to V) error {
 	if !ok {
 		return errors.Errorf("vertex %q not found", from)
 	}
-	_, ok = g.Vertices[to]
+	t, ok := g.Vertices[to]
 	if !ok {
 		return errors.Errorf("vertex %q not found", to)
 	}
 
-	f.addEdge(to)
+	f.addOutgoingEdge(to)
+	t.addIncomingEdge(from)
 	return nil
 }
 
@@ -59,6 +62,10 @@ func (g *Graph) ContainsVertex(name V) bool {
 	return ok
 }
 
-func (v *Vertex) addEdge(name V) {
+func (v *Vertex) addOutgoingEdge(name V) {
 	v.OutgoingEdges = append(v.OutgoingEdges, name)
+}
+
+func (v *Vertex) addIncomingEdge(name V) {
+	v.IncomingEdges = append(v.IncomingEdges, name)
 }

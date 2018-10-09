@@ -104,6 +104,81 @@ func TestSortIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestInverseDependencies(t *testing.T) {
+	t.Parallel()
+	g := initGraph()
+
+	// a -> b
+	// b -> c
+	// c -> d
+	require.NoError(t, g.AddEdge("a", "b"))
+	require.NoError(t, g.AddEdge("b", "c"))
+	require.NoError(t, g.AddEdge("c", "d"))
+
+	// ensure they are sorted in the correct order
+	// d -> c -> b -> a
+	sorted, err := g.TopologicalSort()
+	require.NoError(t, err)
+	assert.Equal(t, []V{"d", "c", "b", "a"}, sorted)
+
+	// ensure we can trace in the opposite direction
+	assert.Equal(t, V("a"), followIncomingEdges(sorted[0], g.Vertices))
+}
+
+func TestInverseDependencies2(t *testing.T) {
+	t.Parallel()
+	g := initGraph()
+
+	// a -> b
+	// b -> c
+	// c -> b
+	require.NoError(t, g.AddEdge("a", "c"))
+	require.NoError(t, g.AddEdge("a", "b"))
+	require.NoError(t, g.AddEdge("b", "c"))
+
+	// ensure they are sorted in the correct order
+	// c -> b -> a -> d
+	sorted, err := g.TopologicalSort()
+	require.NoError(t, err)
+	assert.Equal(t, []V{"c", "b", "a", "d"}, sorted)
+
+	// ensure we can trace in the opposite direction
+	assert.Equal(t, V("a"), followIncomingEdges(sorted[0], g.Vertices))
+	assert.Equal(t, V("a"), followIncomingEdges(sorted[1], g.Vertices))
+	assert.Equal(t, V("a"), followIncomingEdges(sorted[2], g.Vertices))
+	// d doesn't have any incoming edges, it returns itself
+	assert.Equal(t, V("d"), followIncomingEdges(sorted[3], g.Vertices))
+}
+
+func TestInverseDependencies3(t *testing.T) {
+	t.Parallel()
+	g := initGraph()
+
+	// a -> d
+	// b -> d
+	// c -> d
+	require.NoError(t, g.AddEdge("a", "d"))
+	require.NoError(t, g.AddEdge("b", "d"))
+	require.NoError(t, g.AddEdge("c", "d"))
+
+	// ensure they are sorted in the correct order
+	// c -> a -> b -> c
+	sorted, err := g.TopologicalSort()
+	require.NoError(t, err)
+	assert.Equal(t, []V{"d", "a", "b", "c"}, sorted)
+
+	// ensure d has incoming edges referring to the 3 vertices that depend on it
+	assert.Len(t, g.Vertices["d"].IncomingEdges, 3)
+}
+
+func followIncomingEdges(name V, vertices map[V]*Vertex) V {
+	v := vertices[name]
+	if len(v.IncomingEdges) == 0 {
+		return name
+	}
+	return followIncomingEdges(v.IncomingEdges[0], vertices)
+}
+
 func sortIsDeterministic(t *testing.T) {
 	g := initGraph()
 
