@@ -7,7 +7,6 @@ import (
 	"os"
 
 	ctrlApp "github.com/atlassian/ctrl/app"
-	ctrlLogz "github.com/atlassian/ctrl/logz"
 	"github.com/atlassian/smith/examples/sleeper"
 	"github.com/atlassian/smith/pkg/client"
 	"k8s.io/client-go/rest"
@@ -49,7 +48,10 @@ func runWithContext(ctx context.Context) error {
 
 func runWithConfig(ctx context.Context, config *rest.Config) error {
 	a := sleeper.App{
-		Logger:     ctrlLogz.LoggerStr("debug", "console"),
+		Logger: ctrlApp.LoggerFromOptions(ctrlApp.LoggerOptions{
+			LogLevel:    "debug",
+			LogEncoding: "console",
+		}),
 		RestConfig: config,
 	}
 	return a.Run(ctx)

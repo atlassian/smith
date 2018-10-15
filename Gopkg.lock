@@ -14,20 +14,19 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:f6334b9de3c9ee961aa7698bcf29b8d8c8db1e2f4168be3385acebc6500341dc"
+  digest = "1:1af0a534a2ff93f03eb23b93d26fac60957c82682fd500298932e6bb2d6125da"
   name = "github.com/atlassian/ctrl"
   packages = [
     ".",
     "apis/condition/v1",
     "app",
-    "client",
     "flagutil",
     "handlers",
     "logz",
     "process",
   ]
   pruneopts = "NT"
-  revision = "65a385a90ea3486861c6901922b4beb6651846b0"
+  revision = "022fee48a5800a4fe66c6ccebefa9b7db5ccb3d8"
 
 [[projects]]
   branch = "master"
