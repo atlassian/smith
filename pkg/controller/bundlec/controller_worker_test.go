@@ -5,7 +5,6 @@ import (
 
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util/graph"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

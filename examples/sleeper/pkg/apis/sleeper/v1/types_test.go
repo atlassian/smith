@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith/pkg/resources"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

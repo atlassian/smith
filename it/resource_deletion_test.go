@@ -4,13 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ash2k/stager"
 	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	"github.com/atlassian/smith/examples/sleeper"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
-
-	"github.com/ash2k/stager"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
