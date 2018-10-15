@@ -260,6 +260,10 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 			PrometheusRegistry: prometheus.NewPedanticRegistry(),
 			Name:               "smith",
 			RestConfig:         config,
+			GenericNamespacedControllerOptions: GenericNamespacedControllerOptions{
+				GenericControllerOptions: GenericControllerOptions{ Workers: 2 },
+				Namespace: cfg.Namespace,
+			},
 			Controllers: []ctrl.Constructor{
 				&app.BundleControllerConstructor{
 					ServiceCatalogSupport: serviceCatalog,
