@@ -4,8 +4,8 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "97cf62bdef33519412167fd1e4b0810a318a7c234f5f8dc4f53e2da86241c492",
-    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.15.3/rules_go-0.15.3.tar.gz"],
+    sha256 = "7519e9e1c716ae3c05bd2d984a42c3b02e690c5df728dc0a84b23f90c355c5a1",
+    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.15.4/rules_go-0.15.4.tar.gz"],
 )
 
 http_archive(
@@ -30,9 +30,9 @@ http_archive(
 
 http_archive(
     name = "com_github_atlassian_bazel_tools",
-    sha256 = "15b3c0b43f29f802d4ec06ee2b8e175fac08c0e93f91950830e5ed3b4171dd3a",
-    strip_prefix = "bazel-tools-03b64959dd47b6d904de72cfdca5eaa3a3945bf1",
-    urls = ["https://github.com/atlassian/bazel-tools/archive/03b64959dd47b6d904de72cfdca5eaa3a3945bf1.tar.gz"],
+    sha256 = "91208f44bbc6ac9773f34b624e25c90216bdf35e533ec9caa6fd60e7d33b0de2",
+    strip_prefix = "bazel-tools-333dc4fc3538c407a8af095ad35bfb83e26ab853",
+    urls = ["https://github.com/atlassian/bazel-tools/archive/333dc4fc3538c407a8af095ad35bfb83e26ab853.tar.gz"],
 )
 
 http_archive(
@@ -56,6 +56,10 @@ load("@com_github_atlassian_bazel_tools//buildozer:deps.bzl", "buildozer_depende
 load("@com_github_atlassian_bazel_tools//goimports:deps.bzl", "goimports_dependencies")
 load("@com_github_atlassian_bazel_tools//gometalinter:deps.bzl", "gometalinter_dependencies")
 
+# Brings in newer version of org_golang_x_tools which is what provides the goimpotrs binary.
+# Should be before go_rules_dependencies()/etc which briging in older version.
+goimports_dependencies()
+
 go_rules_dependencies()
 
 go_register_toolchains()
@@ -69,7 +73,5 @@ go_image_repositories()
 buildifier_dependencies()
 
 buildozer_dependencies()
-
-goimports_dependencies()
 
 gometalinter_dependencies()
