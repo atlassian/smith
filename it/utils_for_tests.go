@@ -260,13 +260,11 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 			PrometheusRegistry: prometheus.NewPedanticRegistry(),
 			Name:               "smith",
 			RestConfig:         config,
-			Namespace:          cfg.Namespace,
 			Controllers: []ctrl.Constructor{
 				&app.BundleControllerConstructor{
 					ServiceCatalogSupport: serviceCatalog,
 				},
 			},
-			Workers: 2,
 		}
 		if e := apl.Run(ctx); e != context.Canceled && e != context.DeadlineExceeded {
 			assert.NoError(t, e)

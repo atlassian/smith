@@ -9,7 +9,6 @@ go_library(
         "//examples/sleeper:go_default_library",
         "//pkg/client:go_default_library",
         "//vendor/github.com/atlassian/ctrl/app:go_default_library",
-        "//vendor/github.com/atlassian/ctrl/logz:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )

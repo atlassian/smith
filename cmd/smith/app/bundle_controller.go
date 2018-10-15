@@ -1,7 +1,6 @@
 package app
 
 import (
-	"flag"
 	"time"
 
 	"github.com/atlassian/ctrl"
@@ -52,7 +51,7 @@ type BundleControllerConstructor struct {
 	SmartClient  bundlec.SmartClient
 }
 
-func (c *BundleControllerConstructor) AddFlags(flagset *flag.FlagSet) {
+func (c *BundleControllerConstructor) AddFlags(flagset ctrl.FlagSet) {
 	flagset.BoolVar(&c.ServiceCatalogSupport, "bundle-service-catalog", true, "Service Catalog support in Bundle controller. Enabled by default.")
 }
 
