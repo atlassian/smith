@@ -3,7 +3,6 @@ package readychecker
 import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/resources"
-
 	"github.com/pkg/errors"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

@@ -3,7 +3,6 @@ package sleeper
 import (
 	"github.com/atlassian/smith"
 	sleeper_v1 "github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1"
-
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

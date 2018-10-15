@@ -7,7 +7,6 @@ import (
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/util"
-
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"

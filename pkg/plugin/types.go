@@ -6,7 +6,6 @@ package plugin
 
 import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
