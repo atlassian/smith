@@ -115,7 +115,7 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	cfg.CreatedBundle = bundleActual
 
 	// Wait for Bundle to set the ConfigMap and Sleeper resource statuses to error=true
-	bundleActual = cfg.AwaitBundleCondition(AndCond(
+	bundleActual = cfg.AwaitBundleCondition(ctxTest, AndCond(
 		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, "cm", &cond_v1.Condition{
 			Type:    smith_v1.ResourceError,
 			Status:  cond_v1.ConditionTrue,
@@ -156,7 +156,7 @@ func testAdoption(ctxTest context.Context, t *testing.T, cfg *Config, args ...in
 	require.NoError(t, err)
 
 	// Wait for Bundle to update the ConfigMap resource status
-	bundleActual = cfg.AwaitBundleCondition(
+	bundleActual = cfg.AwaitBundleCondition(ctxTest,
 		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, "cm", &cond_v1.Condition{
 			Type:   smith_v1.ResourceReady,
 			Status: cond_v1.ConditionTrue,
