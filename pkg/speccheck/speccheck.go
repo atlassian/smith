@@ -65,9 +65,9 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	}
 
 	// Some stuff from ObjectMeta
-	updated.SetLabels(processLabels(spec.GetLabels(), updated.GetLabels()))
+	updated.SetLabels(processLabels(spec.GetLabels()))
 	updated.SetAnnotations(processAnnotations(spec.GetAnnotations(), updated.GetAnnotations()))
-	updated.SetOwnerReferences(processOwnerReferences(spec.GetOwnerReferences(), updated.GetOwnerReferences()))
+	updated.SetOwnerReferences(processOwnerReferences(spec.GetOwnerReferences()))
 	updated.SetFinalizers(mergeFinalizers(spec.GetFinalizers(), updated.GetFinalizers()))
 
 	// Remove status to make sure ready checker will only detect readiness after resource controller has seen
@@ -120,18 +120,18 @@ func trimEmptyField(u *unstructured.Unstructured, fields ...string) {
 }
 
 // TODO Is this ok? Check that there is only one controller and it is THIS bundle
-func processOwnerReferences(spec, actual []meta_v1.OwnerReference) []meta_v1.OwnerReference {
+func processOwnerReferences(spec []meta_v1.OwnerReference) []meta_v1.OwnerReference {
 	if len(spec) == 0 {
-		// return nil slice to make it go away
+		// return nil slice to make the field go away
 		return nil
 	}
 	return spec
 }
 
 // TODO Nukes added labels. Should be configurable per-object and/or per-object kind?
-func processLabels(spec, actual map[string]string) map[string]string {
+func processLabels(spec map[string]string) map[string]string {
 	if len(spec) == 0 {
-		// return nil map to make it go away
+		// return nil map to make the field go away
 		return nil
 	}
 	return spec
@@ -140,7 +140,7 @@ func processLabels(spec, actual map[string]string) map[string]string {
 func mergeFinalizers(spec, actual []string) []string {
 	if len(actual) == 0 {
 		if len(spec) == 0 {
-			// nothing to update, return nil slice to make it go away
+			// nothing to update, return nil slice to make the field go away
 			return nil
 		} else {
 			return spec
@@ -154,7 +154,7 @@ func mergeFinalizers(spec, actual []string) []string {
 func processAnnotations(spec, actual map[string]string) map[string]string {
 	if len(actual) == 0 {
 		if len(spec) == 0 {
-			// nothing to update, return nil map to make it go away
+			// nothing to update, return nil map to make the field go away
 			return nil
 		} else {
 			return spec
