@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
+	toolswatch "k8s.io/client-go/tools/watch"
 )
 
 type TestFunc func(context.Context, *testing.T, *Config, ...interface{})
@@ -70,19 +71,19 @@ func (cfg *Config) CreateObject(ctxTest context.Context, obj, res runtime.Object
 		Into(res))
 }
 
-func (cfg *Config) AwaitBundleCondition(conditions ...watch.ConditionFunc) *smith_v1.Bundle {
+func (cfg *Config) AwaitBundleCondition(ctx context.Context, conditions ...toolswatch.ConditionFunc) *smith_v1.Bundle {
 	// Before checking any conditions, ensure that .status is up to date with .spec
 	generation := IsBundleObservedGenerationCond(cfg.Namespace, cfg.Bundle.Name)
 	for i, cond := range conditions {
 		conditions[i] = AndCond(generation, cond)
 	}
 	lw := cache.NewListWatchFromClient(cfg.SmithClient.SmithV1().RESTClient(), smith_v1.BundleResourcePlural, cfg.Namespace, fields.Everything())
-	event, err := cache.ListWatchUntil(20*time.Second, lw, conditions...)
+	event, err := toolswatch.UntilWithSync(ctx, lw, &smith_v1.Bundle{}, nil, conditions...)
 	require.NoError(cfg.T, err)
 	return event.Object.(*smith_v1.Bundle)
 }
 
-func AndCond(conds ...watch.ConditionFunc) watch.ConditionFunc {
+func AndCond(conds ...toolswatch.ConditionFunc) toolswatch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		for _, c := range conds {
 			res, err := c(event)
@@ -94,7 +95,7 @@ func AndCond(conds ...watch.ConditionFunc) watch.ConditionFunc {
 	}
 }
 
-func IsBundleStatusCond(namespace, name string, cType cond_v1.ConditionType, status cond_v1.ConditionStatus) watch.ConditionFunc {
+func IsBundleStatusCond(namespace, name string, cType cond_v1.ConditionType, status cond_v1.ConditionStatus) toolswatch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		metaObj := event.Object.(meta_v1.Object)
 		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
@@ -113,7 +114,7 @@ func IsBundleStatusCond(namespace, name string, cType cond_v1.ConditionType, sta
 
 // IsBundleResourceCond is a condition that checks conditions of a resource.
 // Sometimes it is necessary to await a particular resource condition(s) to happen, not a Bundle condition.
-func IsBundleResourceCond(t *testing.T, namespace, name string, resource smith_v1.ResourceName, conds ...*cond_v1.Condition) watch.ConditionFunc {
+func IsBundleResourceCond(t *testing.T, namespace, name string, resource smith_v1.ResourceName, conds ...*cond_v1.Condition) toolswatch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		metaObj := event.Object.(meta_v1.Object)
 		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
@@ -148,7 +149,7 @@ func IsBundleResourceCond(t *testing.T, namespace, name string, resource smith_v
 	}
 }
 
-func IsBundleObservedGenerationCond(namespace, name string) watch.ConditionFunc {
+func IsBundleObservedGenerationCond(namespace, name string) toolswatch.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		metaObj := event.Object.(meta_v1.Object)
 		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
@@ -260,8 +261,10 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 			PrometheusRegistry: prometheus.NewPedanticRegistry(),
 			Name:               "smith",
 			RestConfig:         config,
-			GenericNamespacedControllerOptions: GenericNamespacedControllerOptions{
-				GenericControllerOptions: GenericControllerOptions{ Workers: 2 },
+			GenericNamespacedControllerOptions: ctrlApp.GenericNamespacedControllerOptions{
+				GenericControllerOptions: ctrlApp.GenericControllerOptions{
+					Workers: 2,
+				},
 				Namespace: cfg.Namespace,
 			},
 			Controllers: []ctrl.Constructor{
@@ -285,7 +288,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 }
 
 func (cfg *Config) AssertBundle(ctx context.Context, bundle *smith_v1.Bundle) *smith_v1.Bundle {
-	bundleRes := cfg.AwaitBundleCondition(
+	bundleRes := cfg.AwaitBundleCondition(ctx,
 		IsBundleStatusCond(cfg.Namespace, cfg.Bundle.Name, smith_v1.BundleReady, cond_v1.ConditionTrue))
 
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleReady, cond_v1.ConditionTrue)

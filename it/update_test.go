@@ -214,10 +214,10 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	sClient, err := sleeper.Client(cfg.Config)
 	require.NoError(t, err)
 
-	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
-	defer cancel()
+	ctxTimeout1, cancel1 := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
+	defer cancel1()
 
-	bundleRes1 := cfg.AssertBundle(ctxTimeout, cfg.Bundle)
+	bundleRes1 := cfg.AssertBundle(ctxTimeout1, cfg.Bundle)
 
 	secret, err := secretClient.Get(s1.Name, meta_v1.GetOptions{})
 	require.NoError(t, err)
@@ -228,7 +228,10 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	_, err = cfg.SmithClient.SmithV1().Bundles(cfg.Namespace).Update(bundle2)
 	require.NoError(t, err)
 
-	bundleRes2 := cfg.AssertBundle(ctxTimeout, bundle2)
+	ctxTimeout2, cancel2 := context.WithTimeout(ctxTest, time.Duration(sleeper2.Spec.SleepFor+2)*time.Second)
+	defer cancel2()
+
+	bundleRes2 := cfg.AssertBundle(ctxTimeout2, bundle2)
 
 	cfMap, err := cmClient.Get(cm2.Name, meta_v1.GetOptions{})
 	require.NoError(t, err)

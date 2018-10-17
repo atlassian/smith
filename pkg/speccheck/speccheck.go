@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -37,30 +38,24 @@ func (sc *SpecCheck) CompareActualVsSpec(spec, actual runtime.Object) (*unstruct
 // Mutates spec (reuses parts of it).
 func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, bool /*match*/, error) {
 	updated := actual.DeepCopy()
-	delete(updated.Object, "status")
+	unstructured.RemoveNestedField(updated.Object, "status")
 
 	actualClone := updated.DeepCopy()
 
-	// This is to ensure those fields actually exist in underlying map whether they are nil or empty slices/map
-	actualClone.SetKind(spec.GetKind())             // Objects from type-specific informers don't have kind/api version
-	actualClone.SetAPIVersion(spec.GetAPIVersion()) // Objects from type-specific informers don't have kind/api version
-	actualClone.SetName(actualClone.GetName())
-	actualClone.SetLabels(actualClone.GetLabels())
-	actualClone.SetAnnotations(actualClone.GetAnnotations())
-	actualClone.SetOwnerReferences(actualClone.GetOwnerReferences())
-	actualClone.SetFinalizers(actualClone.GetFinalizers())
+	// This is to ensure those fields do not exist in the underlying map whether they are nil or empty slices/maps
+	// Because that is the behaviour of json omitempty
+	trimEmptyField(actualClone, "metadata", "labels")
+	trimEmptyField(actualClone, "metadata", "annotations")
+	trimEmptyField(actualClone, "metadata", "ownerReferences")
+	trimEmptyField(actualClone, "metadata", "finalizers")
 
-	// 1. TypeMeta
-	updated.SetKind(spec.GetKind())
-	updated.SetAPIVersion(spec.GetAPIVersion())
-
-	// 2. Ignore fields managed by server, pre-process spec, etc
+	// Ignore fields managed by server, pre-process spec, etc
 	spec, err := sc.Cleaner.Cleanup(spec, actualClone)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "cleanup failed")
 	}
 
-	// 3. Copy data from the spec
+	// Copy data from the spec
 	for field, specValue := range spec.Object {
 		switch field {
 		case "kind", "apiVersion", "metadata", "status":
@@ -69,16 +64,11 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 		updated.Object[field] = specValue // using the value directly - we've made a copy up the stack so it's ok
 	}
 
-	// 4. Some stuff from ObjectMeta
-	// TODO Ignores added annotations/labels. Should be configurable per-object and/or per-object kind?
-	updated.SetName(spec.GetName())
-	updated.SetLabels(spec.GetLabels())
+	// Some stuff from ObjectMeta
+	updated.SetLabels(processLabels(spec.GetLabels()))
 	updated.SetAnnotations(processAnnotations(spec.GetAnnotations(), updated.GetAnnotations()))
-	updated.SetOwnerReferences(spec.GetOwnerReferences()) // TODO Is this ok? Check that there is only one controller and it is THIS bundle
-
-	finalizers := sets.NewString(updated.GetFinalizers()...)
-	finalizers.Insert(spec.GetFinalizers()...)
-	updated.SetFinalizers(finalizers.List()) // Sorted list of all finalizers
+	updated.SetOwnerReferences(processOwnerReferences(spec.GetOwnerReferences()))
+	updated.SetFinalizers(mergeFinalizers(spec.GetFinalizers(), updated.GetFinalizers()))
 
 	// Remove status to make sure ready checker will only detect readiness after resource controller has seen
 	// the object.
@@ -86,7 +76,7 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	// See https://github.com/kubernetes/kubernetes/issues/38113
 	// Also ideally we don't want to clear the status at all but have a way to tell if controller has
 	// observed the update yet. Like Generation/ObservedGeneration for built-in controllers.
-	delete(updated.Object, "status")
+	unstructured.RemoveNestedField(updated.Object, "status")
 
 	if !equality.Semantic.DeepEqual(updated.Object, actualClone.Object) {
 		gvk := spec.GroupVersionKind()
@@ -102,9 +92,71 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	return actual, true, nil
 }
 
+// removes:
+// - empty slice/map fields
+// - typed nil slice/map fields
+// - nil fields
+func trimEmptyField(u *unstructured.Unstructured, fields ...string) {
+	val, found, err := unstructured.NestedFieldNoCopy(u.Object, fields...)
+	if err != nil || !found {
+		return
+	}
+	remove := false
+	switch typedVal := val.(type) {
+	case map[string]interface{}:
+		if len(typedVal) == 0 { // typed nil/empty map
+			remove = true
+		}
+	case []interface{}:
+		if len(typedVal) == 0 { // typed nil/empty slice
+			remove = true
+		}
+	case nil: // untyped nil
+		remove = true
+	}
+	if remove {
+		unstructured.RemoveNestedField(u.Object, fields...)
+	}
+}
+
+// TODO Is this ok? Check that there is only one controller and it is THIS bundle
+func processOwnerReferences(spec []meta_v1.OwnerReference) []meta_v1.OwnerReference {
+	if len(spec) == 0 {
+		// return nil slice to make the field go away
+		return nil
+	}
+	return spec
+}
+
+// TODO Nukes added labels. Should be configurable per-object and/or per-object kind?
+func processLabels(spec map[string]string) map[string]string {
+	if len(spec) == 0 {
+		// return nil map to make the field go away
+		return nil
+	}
+	return spec
+}
+
+func mergeFinalizers(spec, actual []string) []string {
+	if len(actual) == 0 {
+		if len(spec) == 0 {
+			// nothing to update, return nil slice to make the field go away
+			return nil
+		}
+		return spec
+	}
+	finalizers := sets.NewString(spec...)
+	finalizers.Insert(actual...)
+	return finalizers.List() // Sorted list of all finalizers
+}
+
 func processAnnotations(spec, actual map[string]string) map[string]string {
-	if actual == nil {
-		actual = make(map[string]string, len(spec))
+	if len(actual) == 0 {
+		if len(spec) == 0 {
+			// nothing to update, return nil map to make the field go away
+			return nil
+		}
+		return spec
 	}
 
 	for key, val := range spec {

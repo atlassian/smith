@@ -116,7 +116,7 @@ func testResourceDeletion(ctxTest context.Context, t *testing.T, cfg *Config, ar
 	cfg.CreatedBundle = bundleActual
 
 	// Bundle should be in Error=true state
-	bundleActual = cfg.AwaitBundleCondition(AndCond(
+	bundleActual = cfg.AwaitBundleCondition(ctxTest, AndCond(
 		IsBundleResourceCond(t, cfg.Namespace, cfg.Bundle.Name, resCm, &cond_v1.Condition{
 			Type:    smith_v1.ResourceError,
 			Status:  cond_v1.ConditionTrue,

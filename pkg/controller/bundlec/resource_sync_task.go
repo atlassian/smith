@@ -548,7 +548,7 @@ func (st *resourceSyncTask) createOrUpdate(spec *unstructured.Unstructured, actu
 
 func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
 	gvk := spec.GroupVersionKind()
-	response, err := resClient.Create(spec)
+	response, err := resClient.Create(spec, meta_v1.CreateOptions{})
 	if err == nil {
 		st.logger.Info("Object created", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
 		return response, false, nil
@@ -575,7 +575,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	}
 
 	// Update if different
-	updated, err = resClient.Update(updated)
+	updated, err = resClient.Update(updated, meta_v1.UpdateOptions{})
 	if err != nil {
 		if api_errors.IsConflict(err) {
 			// We let the next processKey() iteration, triggered by someone else updating the resource, finish the work.
