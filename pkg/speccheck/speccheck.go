@@ -142,9 +142,8 @@ func mergeFinalizers(spec, actual []string) []string {
 		if len(spec) == 0 {
 			// nothing to update, return nil slice to make the field go away
 			return nil
-		} else {
-			return spec
 		}
+		return spec
 	}
 	finalizers := sets.NewString(spec...)
 	finalizers.Insert(actual...)
@@ -156,9 +155,8 @@ func processAnnotations(spec, actual map[string]string) map[string]string {
 		if len(spec) == 0 {
 			// nothing to update, return nil map to make the field go away
 			return nil
-		} else {
-			return spec
 		}
+		return spec
 	}
 
 	for key, val := range spec {
