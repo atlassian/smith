@@ -14,7 +14,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:da6aac130e70f1610ec0355a69271b327547e8763d37d0a88b2dacb6d90dcfd1"
+  digest = "1:2a04cca822cad03308a7ac2e99c6a2fcf9526dbb70331f881e876fc49f4ab510"
   name = "github.com/atlassian/ctrl"
   packages = [
     ".",
@@ -23,10 +23,11 @@
     "flagutil",
     "handlers",
     "logz",
+    "options",
     "process",
   ]
   pruneopts = "NT"
-  revision = "59d2ec921fb676946211b0d59e95fd996c5a0fcc"
+  revision = "1a7f22f42ffb7fb8e1cf4f77eb3628071d552c16"
 
 [[projects]]
   digest = "1:07918ac16957399fa68bf94b3ab26dccccc6992f1ccbcf589896734569a0a7e7"
@@ -157,8 +158,7 @@
   revision = "f2b4162afba35581b6d4a50d3b8f34e33c144682"
 
 [[projects]]
-  branch = "master"
-  digest = "1:249ce6d34a7839acfd0b2fda5ad5bf991c6a8aba7bbe5375a3e2e10eb7594cd6"
+  digest = "1:32681fa8d21ae67ef63f88087e24955e3c84a5291604fad28a23e29c3cf09d99"
   name = "github.com/kubernetes-incubator/service-catalog"
   packages = [
     "pkg/apis/servicecatalog",
@@ -178,7 +178,8 @@
     "pkg/filter",
   ]
   pruneopts = "NT"
-  revision = "ff7f8a073416e82e7065972ac9f19c6806d3e6a3"
+  revision = "58b88f4d33cb708e4b22c39ccbe498b00738488e"
+  version = "v0.1.36"
 
 [[projects]]
   digest = "1:ea1db000388d88b31db7531c83016bef0d6db0d908a07794bfc36aca16fbf935"
@@ -673,6 +674,7 @@
     "tools/pager",
     "tools/record",
     "tools/reference",
+    "tools/watch",
     "transport",
     "util/buffer",
     "util/cert",
@@ -740,6 +742,7 @@
     "github.com/atlassian/ctrl/app",
     "github.com/atlassian/ctrl/handlers",
     "github.com/atlassian/ctrl/logz",
+    "github.com/atlassian/ctrl/options",
     "github.com/atlassian/ctrl/process",
     "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1",
     "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset",
@@ -778,6 +781,7 @@
     "k8s.io/apimachinery/pkg/util/diff",
     "k8s.io/apimachinery/pkg/util/errors",
     "k8s.io/apimachinery/pkg/util/json",
+    "k8s.io/apimachinery/pkg/util/runtime",
     "k8s.io/apimachinery/pkg/util/sets",
     "k8s.io/apimachinery/pkg/util/wait",
     "k8s.io/apimachinery/pkg/watch",
@@ -794,8 +798,7 @@
     "k8s.io/client-go/restmapper",
     "k8s.io/client-go/testing",
     "k8s.io/client-go/tools/cache",
-    "k8s.io/client-go/tools/clientcmd",
-    "k8s.io/client-go/tools/clientcmd/api",
+    "k8s.io/client-go/tools/watch",
     "k8s.io/client-go/util/flowcontrol",
     "k8s.io/client-go/util/jsonpath",
     "k8s.io/client-go/util/workqueue",
