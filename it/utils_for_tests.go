@@ -12,10 +12,10 @@ import (
 	"github.com/atlassian/ctrl"
 	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	ctrlApp "github.com/atlassian/ctrl/app"
+	"github.com/atlassian/ctrl/options"
 	"github.com/atlassian/smith/cmd/smith/app"
 	"github.com/atlassian/smith/examples/sleeper"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/resources"
@@ -161,11 +161,12 @@ func IsBundleObservedGenerationCond(namespace, name string) toolswatch.Condition
 }
 
 func TestSetup(t *testing.T) (*rest.Config, *kubernetes.Clientset, *smithClientset.Clientset) {
-	configFileFrom := os.Getenv("KUBERNETES_CONFIG_FROM")
-	configFileName := os.Getenv("KUBERNETES_CONFIG_FILENAME")
-	configContext := os.Getenv("KUBERNETES_CONFIG_CONTEXT")
-
-	config, err := client.LoadConfig(configFileFrom, configFileName, configContext)
+	config, err := options.LoadRestClientConfig("voyager-test", options.RestClientOptions{
+		APIQPS:               10,
+		ClientConfigFileFrom: os.Getenv("KUBERNETES_CONFIG_FROM"),
+		ClientConfigFileName: os.Getenv("KUBERNETES_CONFIG_FILENAME"),
+		ClientContext:        os.Getenv("KUBERNETES_CONFIG_CONTEXT"),
+	})
 	require.NoError(t, err)
 
 	mainClient, err := kubernetes.NewForConfig(config)
@@ -261,8 +262,8 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 			PrometheusRegistry: prometheus.NewPedanticRegistry(),
 			Name:               "smith",
 			RestConfig:         config,
-			GenericNamespacedControllerOptions: ctrlApp.GenericNamespacedControllerOptions{
-				GenericControllerOptions: ctrlApp.GenericControllerOptions{
+			GenericNamespacedControllerOptions: options.GenericNamespacedControllerOptions{
+				GenericControllerOptions: options.GenericControllerOptions{
 					Workers: 2,
 				},
 				Namespace: cfg.Namespace,

@@ -33,10 +33,6 @@ required = [
   branch = "master" # I want the latest commit from this branch, not just the latest tag or the version used by client-go.
   name = "github.com/stretchr/testify"
 
-[[override]]
-  branch = "master" # pick up 1.12 migration
-  name = "github.com/kubernetes-incubator/service-catalog"
-
 # Overrides below have been generated using https://github.com/ash2k/kubegodep2dep
 # Do not edit manually
 
