@@ -3,6 +3,7 @@ package speccheck
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/atlassian/smith/pkg/cleanup"
@@ -22,6 +23,8 @@ import (
 func TestEqualityCheck(t *testing.T) {
 	t.Parallel()
 
+	var numberOfReplicas int32 = 3
+	var runningNumberOfReplicas int32 = 5
 	inputs := []struct {
 		name   string
 		spec   runtime.Object
@@ -35,6 +38,7 @@ func TestEqualityCheck(t *testing.T) {
 					APIVersion: apps_v1.SchemeGroupVersion.String(),
 				},
 				Spec: apps_v1.DeploymentSpec{
+					Replicas: &numberOfReplicas,
 					Template: core_v1.PodTemplateSpec{
 						Spec: core_v1.PodSpec{
 							Containers: []core_v1.Container{
@@ -60,7 +64,75 @@ func TestEqualityCheck(t *testing.T) {
 					Kind:       "Deployment",
 					APIVersion: apps_v1.SchemeGroupVersion.String(),
 				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+				},
 				Spec: apps_v1.DeploymentSpec{
+					Replicas: &numberOfReplicas,
+					Template: core_v1.PodTemplateSpec{
+						Spec: core_v1.PodSpec{
+							Containers: []core_v1.Container{
+								{
+									Name:  "c1",
+									Image: "ima.ge",
+									Ports: []core_v1.ContainerPort{
+										{
+											Name:          "http",
+											ContainerPort: 8080,
+											Protocol:      core_v1.ProtocolTCP,
+										},
+									},
+								},
+							},
+							ServiceAccountName:       "abc",
+							DeprecatedServiceAccount: "abc",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Deployment with running replicas changed",
+			spec: &apps_v1.Deployment{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Deployment",
+					APIVersion: apps_v1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+				},
+				Spec: apps_v1.DeploymentSpec{
+					Replicas: &numberOfReplicas,
+					Template: core_v1.PodTemplateSpec{
+						Spec: core_v1.PodSpec{
+							Containers: []core_v1.Container{
+								{
+									Name:  "c1",
+									Image: "ima.ge",
+									Ports: []core_v1.ContainerPort{
+										{
+											Name:          "http",
+											ContainerPort: 8080,
+											Protocol:      core_v1.ProtocolTCP,
+										},
+									},
+								},
+							},
+							ServiceAccountName: "abc",
+						},
+					},
+				},
+			},
+			actual: &apps_v1.Deployment{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Deployment",
+					APIVersion: apps_v1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+				},
+				Spec: apps_v1.DeploymentSpec{
+					Replicas: &runningNumberOfReplicas,
 					Template: core_v1.PodTemplateSpec{
 						Spec: core_v1.PodSpec{
 							Containers: []core_v1.Container{
@@ -191,6 +263,8 @@ func TestEqualityCheck(t *testing.T) {
 func TestEqualityUnequal(t *testing.T) {
 	t.Parallel()
 
+	var numberOfReplicas int32 = 3
+	var newNumberOfReplicas int32 = 5
 	inputs := []struct {
 		name   string
 		spec   runtime.Object
@@ -237,6 +311,134 @@ func TestEqualityUnequal(t *testing.T) {
 						},
 					},
 					UpdateRequests: 1,
+				},
+			},
+		},
+		{
+			name: "Deployment with spec replicas changed",
+			spec: &apps_v1.Deployment{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Deployment",
+					APIVersion: apps_v1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+				},
+				Spec: apps_v1.DeploymentSpec{
+					Replicas: &newNumberOfReplicas,
+					Template: core_v1.PodTemplateSpec{
+						Spec: core_v1.PodSpec{
+							Containers: []core_v1.Container{
+								{
+									Name:  "c1",
+									Image: "ima.ge",
+									Ports: []core_v1.ContainerPort{
+										{
+											Name:          "http",
+											ContainerPort: 8080,
+											Protocol:      core_v1.ProtocolTCP,
+										},
+									},
+								},
+							},
+							ServiceAccountName: "abc",
+						},
+					},
+				},
+			},
+			actual: &apps_v1.Deployment{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Deployment",
+					APIVersion: apps_v1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+				},
+				Spec: apps_v1.DeploymentSpec{
+					Replicas: &numberOfReplicas,
+					Template: core_v1.PodTemplateSpec{
+						Spec: core_v1.PodSpec{
+							Containers: []core_v1.Container{
+								{
+									Name:  "c1",
+									Image: "ima.ge",
+									Ports: []core_v1.ContainerPort{
+										{
+											Name:          "http",
+											ContainerPort: 8080,
+											Protocol:      core_v1.ProtocolTCP,
+										},
+									},
+								},
+							},
+							ServiceAccountName:       "abc",
+							DeprecatedServiceAccount: "abc",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Deployment with wrong format running replicas annotation",
+			spec: &apps_v1.Deployment{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Deployment",
+					APIVersion: apps_v1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+				},
+				Spec: apps_v1.DeploymentSpec{
+					Replicas: &numberOfReplicas,
+					Template: core_v1.PodTemplateSpec{
+						Spec: core_v1.PodSpec{
+							Containers: []core_v1.Container{
+								{
+									Name:  "c1",
+									Image: "ima.ge",
+									Ports: []core_v1.ContainerPort{
+										{
+											Name:          "http",
+											ContainerPort: 8080,
+											Protocol:      core_v1.ProtocolTCP,
+										},
+									},
+								},
+							},
+							ServiceAccountName: "abc",
+						},
+					},
+				},
+			},
+			actual: &apps_v1.Deployment{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Deployment",
+					APIVersion: apps_v1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: "WrongNumberOfReplicas"},
+				},
+				Spec: apps_v1.DeploymentSpec{
+					Replicas: &numberOfReplicas,
+					Template: core_v1.PodTemplateSpec{
+						Spec: core_v1.PodSpec{
+							Containers: []core_v1.Container{
+								{
+									Name:  "c1",
+									Image: "ima.ge",
+									Ports: []core_v1.ContainerPort{
+										{
+											Name:          "http",
+											ContainerPort: 8080,
+											Protocol:      core_v1.ProtocolTCP,
+										},
+									},
+								},
+							},
+							ServiceAccountName:       "abc",
+							DeprecatedServiceAccount: "abc",
+						},
+					},
 				},
 			},
 		},
