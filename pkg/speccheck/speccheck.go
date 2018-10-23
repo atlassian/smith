@@ -50,7 +50,7 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	trimEmptyField(actualClone, "metadata", "finalizers")
 
 	// Ignore fields managed by server, pre-process spec, etc
-	spec, err := sc.Cleaner.Cleanup(spec, actualClone)
+	spec, err := sc.Cleaner.Cleanup(sc.Logger, spec, actualClone)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "cleanup failed")
 	}

@@ -144,6 +144,7 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 	if c.ServiceCatalogSupport {
 		cleanupTypes = append(cleanupTypes, clean_types.ServiceCatalogKnownTypes)
 	}
+
 	oc := cleanup.New(cleanupTypes...)
 
 	// Spec check
