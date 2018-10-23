@@ -4,28 +4,29 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "7519e9e1c716ae3c05bd2d984a42c3b02e690c5df728dc0a84b23f90c355c5a1",
-    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.15.4/rules_go-0.15.4.tar.gz"],
+    sha256 = "2ef1d7970012550e5cf636b66359c21b37b3ffdf8346c6f1743a3686180ffe05",
+    strip_prefix = "rules_go-3553e886579e390f045893050e4d79e760e70ebb",
+    urls = ["https://github.com/bazelbuild/rules_go/archive/3553e886579e390f045893050e4d79e760e70ebb.tar.gz"],
 )
 
 http_archive(
     name = "bazel_gazelle",
-    sha256 = "c0a5739d12c6d05b6c1ad56f2200cb0b57c5a70e03ebd2f7b87ce88cabf09c7b",
-    urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.14.0/bazel-gazelle-0.14.0.tar.gz"],
+    sha256 = "6e875ab4b6bf64a38c352887760f21203ab054676d9c1b274963907e0768740d",
+    urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.15.0/bazel-gazelle-0.15.0.tar.gz"],
 )
 
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "8795052cc537db8e0350ef6b5ad9d7a60079b9724359f43bf9f7287ca7704dee",
-    strip_prefix = "rules_docker-0d6d69a2a4bbc33fc61a8350897b0e8136491ad5",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/0d6d69a2a4bbc33fc61a8350897b0e8136491ad5.tar.gz"],
+    sha256 = "35ea63d865e9e484ef4150629a302614e92d0bb95757770ffc273faf4d9a1f17",
+    strip_prefix = "rules_docker-39186e056fd7dc0c29c676e387e1ad73fc381aa2",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/39186e056fd7dc0c29c676e387e1ad73fc381aa2.tar.gz"],
 )
 
 http_archive(
     name = "com_github_bazelbuild_buildtools",
-    sha256 = "a25411abad46673b35c2e3d59c53712d6e779800d1dffeed38e3fe3d05348a0b",
-    strip_prefix = "buildtools-ae772d29d07002dfd89ed1d9ff673a1721f1b8dd",
-    urls = ["https://github.com/bazelbuild/buildtools/archive/ae772d29d07002dfd89ed1d9ff673a1721f1b8dd.tar.gz"],
+    sha256 = "2a593582bfaf77717afb33371891f87f5d631af6de10069926ff8e51eab1a232",
+    strip_prefix = "buildtools-53432872c9e41db2d613d653f3cd0707d53ebc56",
+    urls = ["https://github.com/bazelbuild/buildtools/archive/53432872c9e41db2d613d653f3cd0707d53ebc56.tar.gz"],
 )
 
 http_archive(
@@ -44,7 +45,7 @@ http_archive(
 
 load("@bazel_skylib//:lib.bzl", "versions")
 
-versions.check(minimum_bazel_version = "0.14.0")
+versions.check(minimum_bazel_version = "0.18.0")
 
 load("@io_bazel_rules_go//go:def.bzl", "go_register_toolchains", "go_rules_dependencies")
 load(
@@ -55,18 +56,15 @@ load("@com_github_bazelbuild_buildtools//buildifier:deps.bzl", "buildifier_depen
 load("@com_github_atlassian_bazel_tools//buildozer:deps.bzl", "buildozer_dependencies")
 load("@com_github_atlassian_bazel_tools//goimports:deps.bzl", "goimports_dependencies")
 load("@com_github_atlassian_bazel_tools//gometalinter:deps.bzl", "gometalinter_dependencies")
-
-# Brings in newer version of org_golang_x_tools which is what provides the goimpotrs binary.
-# Should be before go_rules_dependencies()/etc which briging in older version.
-goimports_dependencies()
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 
 go_rules_dependencies()
 
 go_register_toolchains()
 
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
-
 gazelle_dependencies()
+
+goimports_dependencies()
 
 go_image_repositories()
 
