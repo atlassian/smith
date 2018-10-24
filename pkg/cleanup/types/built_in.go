@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 var (
@@ -39,18 +40,9 @@ var (
 const LastAppliedReplicasAnnotation string = smith.Domain + "/LastAppliedReplicas"
 
 func init() {
-	err := apps_v1.SchemeBuilder.AddToScheme(appsV1Scheme)
-	if err != nil {
-		panic(err)
-	}
-	err = sc_v1b1.SchemeBuilder.AddToScheme(scV1B1Scheme)
-	if err != nil {
-		panic(err)
-	}
-	err = core_v1.SchemeBuilder.AddToScheme(coreV1Scheme)
-	if err != nil {
-		panic(err)
-	}
+	utilruntime.Must(apps_v1.SchemeBuilder.AddToScheme(appsV1Scheme))
+	utilruntime.Must(sc_v1b1.SchemeBuilder.AddToScheme(scV1B1Scheme))
+	utilruntime.Must(core_v1.SchemeBuilder.AddToScheme(coreV1Scheme))
 }
 
 func deploymentCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
