@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -54,4 +55,9 @@ func RuntimeToUnstructured(obj runtime.Object) (*unstructured.Unstructured, erro
 	return &unstructured.Unstructured{
 		Object: u,
 	}, nil
+}
+
+func IsSecret(obj runtime.Object) bool {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	return gvk.Group == core_v1.GroupName && gvk.Kind == "Secret"
 }

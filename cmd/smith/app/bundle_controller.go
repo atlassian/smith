@@ -149,7 +149,6 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 
 	// Spec check
 	specCheck := &speccheck.SpecCheck{
-		Logger:  config.Logger,
 		Cleaner: oc,
 	}
 

@@ -1,11 +1,9 @@
 package speccheck
 
 import (
-	ctrlLogz "github.com/atlassian/ctrl/logz"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -15,28 +13,27 @@ import (
 )
 
 type SpecCheck struct {
-	Logger *zap.Logger
 	// Server fields cleanup
 	Cleaner SpecCleaner
 }
 
-func (sc *SpecCheck) CompareActualVsSpec(spec, actual runtime.Object) (*unstructured.Unstructured, bool /*match*/, error) {
+func (sc *SpecCheck) CompareActualVsSpec(logger *zap.Logger, spec, actual runtime.Object) (*unstructured.Unstructured, bool /*match*/, string /* diff */, error) {
 	specUnstr, err := util.RuntimeToUnstructured(spec)
 	if err != nil {
-		return nil, false, err
+		return nil, false, "", err
 	}
 	actualUnstr, err := util.RuntimeToUnstructured(actual)
 	if err != nil {
-		return nil, false, err
+		return nil, false, "", err
 	}
 	// Compare spec and existing resource
-	return sc.compareActualVsSpec(specUnstr, actualUnstr)
+	return sc.compareActualVsSpec(logger, specUnstr, actualUnstr)
 }
 
 // compareActualVsSpec checks if actual resource satisfies the desired spec.
 // If actual matches spec then actual is returned untouched otherwise an updated object is returned.
 // Mutates spec (reuses parts of it).
-func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, bool /*match*/, error) {
+func (sc *SpecCheck) compareActualVsSpec(logger *zap.Logger, spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, bool /*match*/, string /* diff */, error) {
 	updated := actual.DeepCopy()
 	unstructured.RemoveNestedField(updated.Object, "status")
 
@@ -50,9 +47,9 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	trimEmptyField(actualClone, "metadata", "finalizers")
 
 	// Ignore fields managed by server, pre-process spec, etc
-	spec, err := sc.Cleaner.Cleanup(sc.Logger, spec, actualClone)
+	spec, err := sc.Cleaner.Cleanup(logger, spec, actualClone)
 	if err != nil {
-		return nil, false, errors.Wrap(err, "cleanup failed")
+		return nil, false, "", errors.Wrap(err, "cleanup failed")
 	}
 
 	// Copy data from the spec
@@ -79,17 +76,17 @@ func (sc *SpecCheck) compareActualVsSpec(spec, actual *unstructured.Unstructured
 	unstructured.RemoveNestedField(updated.Object, "status")
 
 	if !equality.Semantic.DeepEqual(updated.Object, actualClone.Object) {
-		gvk := spec.GroupVersionKind()
+		var difference string
 
-		if gvk.Group == core_v1.GroupName && gvk.Kind == "Secret" {
-			sc.Logger.Info("Objects are different: Secret object has changed", ctrlLogz.Object(spec))
-			return updated, false, nil
+		if util.IsSecret(spec) {
+			difference = "Secret object has changed"
+		} else {
+			// return diff if not a secret
+			difference = diff.ObjectDiff(updated.Object, actualClone.Object)
 		}
-
-		sc.Logger.Sugar().Infof("Objects are different: %s", diff.ObjectDiff(updated.Object, actualClone.Object))
-		return updated, false, nil
+		return updated, false, difference, nil
 	}
-	return actual, true, nil
+	return actual, true, "", nil
 }
 
 // removes:
