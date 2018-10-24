@@ -145,7 +145,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Check if the resource actually matches the spec to detect infinite update cycles
-	updatedSpec, match, err := st.specCheck.CompareActualVsSpec(spec, resUpdated)
+	updatedSpec, match, _, err := st.specCheck.CompareActualVsSpec(st.logger, spec, resUpdated)
 	if err != nil {
 		return resourceInfo{
 			status: resourceStatusError{
@@ -154,8 +154,14 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 		}
 	}
 	if !match {
-		st.logger.Sugar().Warnf("Objects are different after specification re-check:\n%s",
-			diff.ObjectReflectDiff(updatedSpec.Object, resUpdated.Object))
+		var difference string
+		if util.IsSecret(updatedSpec) {
+			difference = "Secret object does not match"
+		} else {
+			// We use reflect diff here instead of the returned json diff to see the types
+			difference = diff.ObjectReflectDiff(updatedSpec.Object, resUpdated.Object)
+		}
+		st.logger.Sugar().Warnf("Objects are different after specification re-check:\n%s", difference)
 		return resourceInfo{
 			status: resourceStatusError{
 				err: errors.New("specification of the created/updated object does not match the desired spec"),
@@ -565,7 +571,7 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 // Mutates spec and actual.
 func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
 	// Compare spec and existing resource
-	updated, match, err := st.specCheck.CompareActualVsSpec(spec, actual)
+	updated, match, difference, err := st.specCheck.CompareActualVsSpec(st.logger, spec, actual)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "specification check failed")
 	}
@@ -573,6 +579,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 		st.logger.Info("Object has correct spec", ctrlLogz.Object(spec))
 		return updated, false, nil
 	}
+	st.logger.Sugar().Infof("Objects are different: %s", difference)
 
 	// Update if different
 	updated, err = resClient.Update(updated, meta_v1.UpdateOptions{})
