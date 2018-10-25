@@ -203,6 +203,11 @@ This command only builds the image, which is not very useful. If you want to imp
 make docker-export
 ```
 
+## Documentation
+
+- [Sample deployment YAMLs](docs/deployment)
+- [Design documents](docs/design) for implemented and potential future features
+
 ## Contributing
 
 Pull requests, issues and comments welcome. For pull requests:
