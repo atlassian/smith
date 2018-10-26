@@ -123,7 +123,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Force Service Catalog to update service instances when secrets they depend change
-	spec, err = st.forceServiceInstanceUpdates(spec, actual, st.bundle.Namespace)
+	spec, err = st.forceUpdatesOfResources(spec, actual, st.bundle.Namespace)
 	if err != nil {
 		return resourceInfo{
 			status: resourceStatusError{
@@ -202,6 +202,15 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 		status:               resourceStatusReady{},
 		serviceBindingSecret: bindingSecret,
 	}
+}
+
+func (st *resourceSyncTask) forceUpdatesOfResources(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
+	spec, err := st.forceServiceInstanceUpdates(spec, actual, st.bundle.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return st.forceDeploymentUpdates(spec, actual, st.bundle.Namespace)
 }
 
 func (st *resourceSyncTask) maybeExtractBindingSecret(obj *unstructured.Unstructured) (*core_v1.Secret, error) {

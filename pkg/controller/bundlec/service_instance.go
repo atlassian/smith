@@ -3,13 +3,11 @@ package bundlec
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/hex"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/bcrypt"
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,7 +73,7 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 		updateCount = actualInstance.Spec.UpdateRequests
 	}
 
-	checkSum, err := st.calculateNewCheckSum(instanceSpec, namespace, previousEncodedChecksum)
+	checkSum, err := st.calculateNewServiceInstanceCheckSum(instanceSpec, namespace, previousEncodedChecksum)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate new checksum")
 	}
@@ -84,7 +82,7 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 		instanceSpec.Spec.UpdateRequests = updateCount + 1
 	}
 
-	setAnnotation(instanceSpec, checkSum)
+	setInstanceAnnotation(instanceSpec, checkSum)
 
 	unstructuredSpec, err := util.RuntimeToUnstructured(instanceSpec)
 	if err != nil {
@@ -94,7 +92,7 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 	return unstructuredSpec, nil
 }
 
-func (st *resourceSyncTask) calculateNewCheckSum(instanceSpec *sc_v1b1.ServiceInstance, namespace string, previousEncodedChecksum string) (string, error) {
+func (st *resourceSyncTask) calculateNewServiceInstanceCheckSum(instanceSpec *sc_v1b1.ServiceInstance, namespace string, previousEncodedChecksum string) (string, error) {
 	checksumPayload, err := st.generateSecretParametersChecksumPayload(&instanceSpec.Spec, namespace)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate checksum")
@@ -145,28 +143,10 @@ func (st *resourceSyncTask) generateSecretParametersChecksumPayload(spec *sc_v1b
 	return buf.Bytes(), nil
 }
 
-func setAnnotation(instanceSpec *sc_v1b1.ServiceInstance, checksum string) {
+func setInstanceAnnotation(instanceSpec *sc_v1b1.ServiceInstance, checksum string) {
 	if instanceSpec.ObjectMeta.Annotations == nil {
 		instanceSpec.ObjectMeta.Annotations = make(map[string]string, 1)
 	}
 
 	instanceSpec.ObjectMeta.Annotations[secretParametersChecksumAnnotation] = checksum
-}
-
-func generateChecksum(data []byte) ([]byte, error) {
-	return bcrypt.GenerateFromPassword(data, bcrypt.MinCost)
-}
-
-// hashed password with its possible plaintext equivalent, return true if they match
-func validateChecksum(checksum, data []byte) bool {
-	err := bcrypt.CompareHashAndPassword(checksum, data)
-	return err == nil
-}
-
-func encodeChecksum(data []byte) string {
-	return hex.EncodeToString(data)
-}
-
-func decodeChecksum(s string) ([]byte, error) {
-	return hex.DecodeString(s)
 }
