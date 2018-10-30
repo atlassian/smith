@@ -12,9 +12,9 @@ import (
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
-	"github.com/atlassian/smith/pkg/readychecker"
-	ready_types "github.com/atlassian/smith/pkg/readychecker/types"
 	"github.com/atlassian/smith/pkg/speccheck"
+	"github.com/atlassian/smith/pkg/statuschecker"
+	ready_types "github.com/atlassian/smith/pkg/statuschecker/types"
 	"github.com/atlassian/smith/pkg/store"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -132,12 +132,15 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 		}
 	}
 
-	// Ready Checker
-	readyTypes := []map[schema.GroupKind]readychecker.IsObjectReady{ready_types.MainKnownTypes}
+	// Status Checker
+	readyTypes := []map[schema.GroupKind]statuschecker.ObjectStatusChecker{ready_types.MainKnownTypes}
 	if c.ServiceCatalogSupport {
 		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
 	}
-	rc := readychecker.New(crdStore, readyTypes...)
+	rc, err := statuschecker.New(crdStore, readyTypes...)
+	if err != nil {
+		return nil, err
+	}
 
 	// Object cleanup
 	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}

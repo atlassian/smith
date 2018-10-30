@@ -117,7 +117,7 @@ func TestNoActionsForBlockedResources(t *testing.T) {
 			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resSi1, smith_v1.ResourceError, cond_v1.ConditionTrue)
 			if resCond != nil {
 				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-				assert.Equal(t, "readiness check failed: BlaBla: Oh no!", resCond.Message)
+				assert.Equal(t, "BlaBla: Oh no!", resCond.Message)
 			}
 			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resSb1, smith_v1.ResourceBlocked, cond_v1.ConditionTrue)
 			if resCond != nil {

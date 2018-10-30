@@ -16,10 +16,6 @@ type SpecCheck interface {
 	CompareActualVsSpec(logger *zap.Logger, spec, actual runtime.Object) (updatedSpec *unstructured.Unstructured, match bool, diff string, err error)
 }
 
-type ReadyChecker interface {
-	IsReady(*unstructured.Unstructured) (isReady, retriableError bool, e error)
-}
-
 type Store interface {
 	Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error)
 	ObjectsControlledBy(namespace string, uid types.UID) ([]runtime.Object, error)

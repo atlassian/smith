@@ -20,7 +20,7 @@ func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) 
 		logger:                          logger,
 		bundleClient:                    c.BundleClient,
 		smartClient:                     c.SmartClient,
-		rc:                              c.Rc,
+		checker:                         c.Rc,
 		store:                           c.Store,
 		specCheck:                       c.SpecCheck,
 		bundle:                          bundle,

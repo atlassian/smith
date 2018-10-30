@@ -4,6 +4,7 @@ import (
 	ctrlLogz "github.com/atlassian/ctrl/logz"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
+	"github.com/atlassian/smith/pkg/statuschecker"
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
@@ -20,9 +21,20 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+type ResourceStatusType string
+
+const (
+	ResourceStatusTypeReady                ResourceStatusType = "Ready"
+	ResourceStatusTypeInProgress           ResourceStatusType = "InProgress"
+	ResourceStatusTypeDependenciesNotReady ResourceStatusType = "DependenciesNotReady"
+	ResourceStatusTypeError                ResourceStatusType = "Error"
+)
+
 // resourceStatus is one of "resourceStatus*" structs.
 // It is a mechanism to communicate the status of a resource.
-type resourceStatus interface{}
+type resourceStatus interface {
+	StatusType() ResourceStatusType
+}
 
 // resourceStatusDependenciesNotReady means resource processing is blocked by dependencies that are not ready.
 type resourceStatusDependenciesNotReady struct {
@@ -41,6 +53,19 @@ type resourceStatusReady struct {
 type resourceStatusError struct {
 	err              error
 	isRetriableError bool
+}
+
+func (r resourceStatusReady) StatusType() ResourceStatusType {
+	return ResourceStatusTypeReady
+}
+func (r resourceStatusDependenciesNotReady) StatusType() ResourceStatusType {
+	return ResourceStatusTypeDependenciesNotReady
+}
+func (r resourceStatusInProgress) StatusType() ResourceStatusType {
+	return ResourceStatusTypeInProgress
+}
+func (r resourceStatusError) StatusType() ResourceStatusType {
+	return ResourceStatusTypeError
 }
 
 type resourceInfo struct {
@@ -66,7 +91,7 @@ func (ri *resourceInfo) fetchError() (bool, error) {
 type resourceSyncTask struct {
 	logger             *zap.Logger
 	smartClient        SmartClient
-	rc                 ReadyChecker
+	checker            statuschecker.Interface
 	store              Store
 	specCheck          SpecCheck
 	bundle             *smith_v1.Bundle
@@ -149,7 +174,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	if err != nil {
 		return resourceInfo{
 			status: resourceStatusError{
-				err: errors.Wrap(err, "specification re-check failed"),
+				err: err,
 			},
 		}
 	}
@@ -169,37 +194,63 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Check if resource is ready
-	var ready bool
-	if ready, retriable, err = st.rc.IsReady(resUpdated); err != nil {
+	statusResult, err := st.checker.CheckStatus(resUpdated)
+	if err != nil {
+		// This represents an internal error (something wrong with smith)
+		// and should probably be handled differently.
 		return resourceInfo{
 			actual: resUpdated,
 			status: resourceStatusError{
-				err:              errors.Wrap(err, "readiness check failed"),
-				isRetriableError: retriable,
+				err:              err,
+				isRetriableError: false,
 			},
 		}
-	} else if !ready {
+	}
+	switch s := statusResult.(type) {
+	case statuschecker.ObjectStatusInProgress:
 		return resourceInfo{
 			actual: resUpdated,
 			status: resourceStatusInProgress{},
 		}
-	}
-
-	// Augment with binding output (used for references)
-	bindingSecret, err := st.maybeExtractBindingSecret(resUpdated)
-	if err != nil {
+	case statuschecker.ObjectStatusError:
 		return resourceInfo{
 			actual: resUpdated,
 			status: resourceStatusError{
-				err: err,
+				err:              s.Error,
+				isRetriableError: s.RetriableError,
 			},
 		}
-	}
+	case statuschecker.ObjectStatusUnknown:
+		return resourceInfo{
+			actual: resUpdated,
+			status: resourceStatusError{
+				err: errors.Errorf("unknown status: %v", s.Details),
+			},
+		}
+	case statuschecker.ObjectStatusReady:
+		// Augment with binding output (used for references)
+		bindingSecret, err := st.maybeExtractBindingSecret(resUpdated)
+		if err != nil {
+			return resourceInfo{
+				actual: resUpdated,
+				status: resourceStatusError{
+					err: err,
+				},
+			}
+		}
 
-	return resourceInfo{
-		actual:               resUpdated,
-		status:               resourceStatusReady{},
-		serviceBindingSecret: bindingSecret,
+		return resourceInfo{
+			actual:               resUpdated,
+			status:               resourceStatusReady{},
+			serviceBindingSecret: bindingSecret,
+		}
+	default:
+		return resourceInfo{
+			actual: resUpdated,
+			status: resourceStatusError{
+				err: errors.Errorf("unknown ObjectStatus %q", s.StatusType()),
+			},
+		}
 	}
 }
 
@@ -246,7 +297,9 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 	} else if res.Spec.Plugin != nil {
 		pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
 		if !ok {
-			return nil, errors.Errorf("no such plugin %q", res.Spec.Plugin.Name)
+			return nil, resourceStatusError{
+				err: errors.Errorf("no such plugin %q", res.Spec.Plugin.Name),
+			}
 		}
 		gvk = pluginContainer.Plugin.Describe().GVK
 		name = res.Spec.Plugin.ObjectName

@@ -64,7 +64,7 @@ func TestStatusPropagated(t *testing.T) {
 			require.EqualError(t, err, "error processing resource(s): [\"resSi1\"]")
 			bundle := tc.findBundleUpdate(t, true)
 			smith_testing.AssertResourceCondition(t, bundle, "resSi1", smith_v1.BundleError, cond_v1.ConditionTrue)
-			smith_testing.AssertResourceConditionMessage(t, bundle, "resSi1", smith_v1.BundleError, "readiness check failed: Error provisioning ServiceInstance of ClusterServiceClass failed")
+			smith_testing.AssertResourceConditionMessage(t, bundle, "resSi1", smith_v1.BundleError, "ProvisionCallFailed: Error provisioning ServiceInstance of ClusterServiceClass failed")
 		},
 	}
 
