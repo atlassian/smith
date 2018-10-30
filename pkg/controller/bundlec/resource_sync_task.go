@@ -154,14 +154,13 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 		}
 	}
 	if !match {
-		var difference string
 		if util.IsSecret(updatedSpec) {
-			difference = "Secret object does not match"
+			st.logger.Error("Objects are different after specification re-check: Secret object does not match")
 		} else {
 			// We use reflect diff here instead of the returned json diff to see the types
-			difference = diff.ObjectReflectDiff(updatedSpec.Object, resUpdated.Object)
+			difference := diff.ObjectReflectDiff(updatedSpec.Object, resUpdated.Object)
+			st.logger.Sugar().Errorf("Objects are different after specification re-check (`a` is what we've sent and `b` is what Kubernetes persisted and returned):\n%s", difference)
 		}
-		st.logger.Sugar().Warnf("Objects are different after specification re-check:\n%s", difference)
 		return resourceInfo{
 			status: resourceStatusError{
 				err: errors.New("specification of the created/updated object does not match the desired spec"),
@@ -579,7 +578,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 		st.logger.Info("Object has correct spec", ctrlLogz.Object(spec))
 		return updated, false, nil
 	}
-	st.logger.Sugar().Infof("Objects are different: %s", difference)
+	st.logger.Sugar().Infof("Objects are different (`a` is specification and `b` is the actual object): %s", difference)
 
 	// Update if different
 	updated, err = resClient.Update(updated, meta_v1.UpdateOptions{})
