@@ -25,7 +25,9 @@ type ObjectStatusResult interface {
 	StatusType() ObjectStatusType
 }
 
-type ObjectStatusReady struct{}
+type ObjectStatusReady struct {
+	Message string
+}
 type ObjectStatusUnknown struct {
 	Details string
 }

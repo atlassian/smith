@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/atlassian/smith/pkg/statuschecker"
@@ -69,13 +70,13 @@ func init() {
 	}
 }
 
-func alwaysReady(_ runtime.Object) (r statuschecker.ObjectStatusResult, e error) {
+func alwaysReady(_ runtime.Object) (statuschecker.ObjectStatusResult, error) {
 	return statuschecker.ObjectStatusReady{}, nil
 }
 
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 // and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
-func isDeploymentReady(obj runtime.Object) (r statuschecker.ObjectStatusResult, e error) {
+func isDeploymentReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
 	var deployment apps_v1.Deployment
 	if err := util.ConvertType(appsV1Scheme, obj, &deployment); err != nil {
 		return nil, err
@@ -92,7 +93,7 @@ func isDeploymentReady(obj runtime.Object) (r statuschecker.ObjectStatusResult, 
 	return statuschecker.ObjectStatusInProgress{}, nil
 }
 
-func isHorizontalPodAutoscalerReady(obj runtime.Object) (r statuschecker.ObjectStatusResult, e error) {
+func isHorizontalPodAutoscalerReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
 	var hpa autoscaling_v2b1.HorizontalPodAutoscaler
 	if err := util.ConvertType(autoscalingV2B1Scheme, obj, &hpa); err != nil {
 		return nil, err
@@ -146,7 +147,7 @@ func isHorizontalPodAutoscalerReady(obj runtime.Object) (r statuschecker.ObjectS
 	}, nil
 }
 
-func isScServiceBindingReady(obj runtime.Object) (r statuschecker.ObjectStatusResult, e error) {
+func isScServiceBindingReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
 	var sic sc_v1b1.ServiceBinding
 	if err := util.ConvertType(scV1B1Scheme, obj, &sic); err != nil {
 		return nil, err
@@ -159,7 +160,16 @@ func isScServiceBindingReady(obj runtime.Object) (r statuschecker.ObjectStatusRe
 				Message: fmt.Sprintf("%v: %v", readyCond.Reason, readyCond.Message),
 			}, nil
 		case sc_v1b1.ConditionTrue:
-			return statuschecker.ObjectStatusReady{}, nil
+			var msg []string
+			if len(readyCond.Reason) != 0 {
+				msg = append(msg, readyCond.Reason)
+			}
+			if len(readyCond.Message) != 0 {
+				msg = append(msg, readyCond.Message)
+			}
+			return statuschecker.ObjectStatusReady{
+				Message: strings.Join(msg, ": "),
+			}, nil
 		default:
 			return statuschecker.ObjectStatusUnknown{
 				Details: fmt.Sprintf("status is %q", readyCond.Status),
@@ -178,7 +188,7 @@ func isScServiceBindingReady(obj runtime.Object) (r statuschecker.ObjectStatusRe
 	}, nil
 }
 
-func isScServiceInstanceReady(obj runtime.Object) (r statuschecker.ObjectStatusResult, e error) {
+func isScServiceInstanceReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
 	var instance sc_v1b1.ServiceInstance
 	if err := util.ConvertType(scV1B1Scheme, obj, &instance); err != nil {
 		return nil, err
@@ -198,7 +208,16 @@ func isScServiceInstanceReady(obj runtime.Object) (r statuschecker.ObjectStatusR
 				Message: fmt.Sprintf("%v: %v", readyCond.Reason, readyCond.Message),
 			}, nil
 		case sc_v1b1.ConditionTrue:
-			return statuschecker.ObjectStatusReady{}, nil
+			var msg []string
+			if len(readyCond.Reason) != 0 {
+				msg = append(msg, readyCond.Reason)
+			}
+			if len(readyCond.Message) != 0 {
+				msg = append(msg, readyCond.Message)
+			}
+			return statuschecker.ObjectStatusReady{
+				Message: strings.Join(msg, ": "),
+			}, nil
 		default:
 			return statuschecker.ObjectStatusUnknown{
 				Details: fmt.Sprintf("status is %q", readyCond.Status),
