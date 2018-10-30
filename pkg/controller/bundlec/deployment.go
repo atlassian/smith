@@ -83,7 +83,8 @@ func (st *resourceSyncTask) processDeployment(spec *unstructured.Unstructured, a
 func (st *resourceSyncTask) generateHash(template core_v1.PodTemplateSpec, namespace string) ([]byte, error) {
 	hash := sha256.New()
 
-	for _, container := range template.Spec.Containers {
+	containers := append(template.Spec.Containers, template.Spec.InitContainers...)
+	for _, container := range containers {
 		for _, envFrom := range container.EnvFrom {
 			secretRef := envFrom.SecretRef
 			if secretRef != nil {
