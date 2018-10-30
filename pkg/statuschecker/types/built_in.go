@@ -16,6 +16,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -56,18 +57,9 @@ var scNonErrorReasons = sets.NewString(
 )
 
 func init() {
-	err := apps_v1.SchemeBuilder.AddToScheme(appsV1Scheme)
-	if err != nil {
-		panic(err)
-	}
-	err = sc_v1b1.SchemeBuilder.AddToScheme(scV1B1Scheme)
-	if err != nil {
-		panic(err)
-	}
-	err = autoscaling_v2b1.SchemeBuilder.AddToScheme(autoscalingV2B1Scheme)
-	if err != nil {
-		panic(err)
-	}
+	utilruntime.Must(apps_v1.SchemeBuilder.AddToScheme(appsV1Scheme))
+	utilruntime.Must(sc_v1b1.SchemeBuilder.AddToScheme(scV1B1Scheme))
+	utilruntime.Must(autoscaling_v2b1.SchemeBuilder.AddToScheme(autoscalingV2B1Scheme))
 }
 
 func alwaysReady(_ runtime.Object) (statuschecker.ObjectStatusResult, error) {

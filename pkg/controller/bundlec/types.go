@@ -2,6 +2,7 @@ package bundlec
 
 import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"go.uber.org/zap"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -12,7 +13,7 @@ import (
 )
 
 type SpecCheck interface {
-	CompareActualVsSpec(spec, actual runtime.Object) (updatedSpec *unstructured.Unstructured, match bool, err error)
+	CompareActualVsSpec(logger *zap.Logger, spec, actual runtime.Object) (updatedSpec *unstructured.Unstructured, match bool, diff string, err error)
 }
 
 type Store interface {

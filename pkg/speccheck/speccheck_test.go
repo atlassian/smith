@@ -250,12 +250,12 @@ func TestEqualityCheck(t *testing.T) {
 		t.Run(input.name, func(t *testing.T) {
 			t.Parallel()
 			sc := SpecCheck{
-				Logger:  logger,
 				Cleaner: cleanup.New(types.ServiceCatalogKnownTypes, types.MainKnownTypes),
 			}
-			_, match, err := sc.CompareActualVsSpec(input.spec, input.actual)
+			_, match, difference, err := sc.CompareActualVsSpec(logger, input.spec, input.actual)
 			require.NoError(t, err)
 			assert.True(t, match)
+			assert.Empty(t, difference)
 		})
 	}
 }
@@ -451,12 +451,12 @@ func TestEqualityUnequal(t *testing.T) {
 		t.Run(input.name, func(t *testing.T) {
 			t.Parallel()
 			sc := SpecCheck{
-				Logger:  logger,
 				Cleaner: cleanup.New(types.ServiceCatalogKnownTypes, types.MainKnownTypes),
 			}
-			_, match, err := sc.CompareActualVsSpec(input.spec, input.actual)
+			_, match, difference, err := sc.CompareActualVsSpec(logger, input.spec, input.actual)
 			require.NoError(t, err)
 			assert.False(t, match)
+			assert.NotEmpty(t, difference)
 		})
 	}
 }
@@ -476,10 +476,9 @@ func TestDoNotPanicWhenLoggingDiff(t *testing.T) {
 	require.NoError(t, err)
 
 	sc := SpecCheck{
-		Logger:  logger,
 		Cleaner: cleanup.New(types.ServiceCatalogKnownTypes, types.MainKnownTypes),
 	}
-	_, _, err = sc.compareActualVsSpec(&expected, &actual)
+	_, _, _, err = sc.compareActualVsSpec(logger, &expected, &actual)
 	require.NoError(t, err)
 }
 
@@ -501,12 +500,12 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 			t.Run(fmt.Sprintf("%s actual, %s spec", kind1, kind2), func(t *testing.T) {
 				t.Parallel()
 				sc := SpecCheck{
-					Logger:  logger,
 					Cleaner: cleanup.New(),
 				}
-				updated, match, err := sc.CompareActualVsSpec(spec, actual)
+				updated, match, difference, err := sc.CompareActualVsSpec(logger, spec, actual)
 				require.NoError(t, err)
 				assert.True(t, match)
+				assert.Empty(t, difference)
 				assert.True(t, equality.Semantic.DeepEqual(updated.Object, actual.Object))
 			})
 		}

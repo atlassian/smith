@@ -15,7 +15,7 @@ setup-base:
 .PHONY: fmt-bazel
 fmt-bazel:
 	bazel run //:buildozer
-	-bazel run //:buildifier
+	bazel run //:buildifier
 
 .PHONY: update-bazel
 update-bazel:
@@ -130,6 +130,7 @@ test-ci:
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
 		-- //... -//vendor/...
+	bazel build $$(bazel query 'attr(tags, manual, kind(test, //... -//vendor/...))')
 
 .PHONY: quick-test
 quick-test:
