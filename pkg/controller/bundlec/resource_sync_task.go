@@ -603,3 +603,11 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	st.logger.Info("Object updated", ctrlLogz.Object(spec))
 	return updated, false, nil
 }
+
+func (st *resourceSyncTask) derefObject(gvk schema.GroupVersionKind, name, namespace string) (runtime.Object, bool, error) {
+	obj, exists, err := st.store.Get(gvk, namespace, name)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "failure retrieving %s %q in namespace %q", gvk.Kind, name, namespace)
+	}
+	return obj, exists, nil
+}

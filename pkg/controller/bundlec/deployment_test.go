@@ -17,7 +17,9 @@ import (
 
 const (
 	deploymentTestNamespace     = "ns"
-	deploymentTestAnnotationKey = smith.Domain + "/envFromChecksum"
+	deploymentTestAnnotationKey = smith.Domain + "/envRefHash"
+
+	nullSha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 )
 
 func deploymentUnmarshal(t *testing.T, spec *unstructured.Unstructured) *apps_v1.Deployment {
@@ -27,7 +29,7 @@ func deploymentUnmarshal(t *testing.T, spec *unstructured.Unstructured) *apps_v1
 	return &deploymentSpec
 }
 
-func TestAddsChecksumToDeploymentSpec(t *testing.T) {
+func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 	t.Parallel()
 
 	deploymentSpec := apps_v1.Deployment{
@@ -142,10 +144,319 @@ func TestAddsChecksumToDeploymentSpec(t *testing.T) {
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
 
-	assert.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
+	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
+	assert.NotEmpty(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
 }
 
-func TestNoAnnotationForEmptyEnvFrom(t *testing.T) {
+func TestAddsHashToDeploymentSpecForEnv(t *testing.T) {
+	t.Parallel()
+
+	deploymentSpec := apps_v1.Deployment{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		Spec: apps_v1.DeploymentSpec{
+			Template: core_v1.PodTemplateSpec{
+				Spec: core_v1.PodSpec{
+					Containers: []core_v1.Container{
+						core_v1.Container{}, // empty EnvFrom
+						core_v1.Container{
+							Env: []core_v1.EnvVar{
+								core_v1.EnvVar{
+									Name: "blah2",
+									ValueFrom: &core_v1.EnvVarSource{
+										SecretKeyRef: &core_v1.SecretKeySelector{
+											Key: "parameters",
+											LocalObjectReference: core_v1.LocalObjectReference{
+												Name: "secret1",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec := runtimeToUnstructured(t, &deploymentSpec)
+
+	rst := resourceSyncTask{
+		store: fakeStore{
+			responses: map[string]runtime.Object{
+				"secret1": &core_v1.Secret{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "Secret",
+						APIVersion: "v1",
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name: "secret1",
+					},
+					Data: map[string][]byte{
+						"parameters": []byte(`{
+							"secretEnvVars": {
+								"a": "1",
+								"b": "2"
+							}
+						}`),
+					},
+				},
+			},
+		},
+		scheme: scheme(t),
+	}
+
+	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	require.NoError(t, err)
+
+	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+
+	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
+	assert.NotEmpty(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+}
+
+func TestHashNotIgnoredForNonExistingKey(t *testing.T) {
+	t.Parallel()
+
+	deploymentSpec := apps_v1.Deployment{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		Spec: apps_v1.DeploymentSpec{
+			Template: core_v1.PodTemplateSpec{
+				Spec: core_v1.PodSpec{
+					Containers: []core_v1.Container{
+						core_v1.Container{}, // empty EnvFrom
+						core_v1.Container{
+							Env: []core_v1.EnvVar{
+								core_v1.EnvVar{
+									Name: "blah2",
+									ValueFrom: &core_v1.EnvVarSource{
+										SecretKeyRef: &core_v1.SecretKeySelector{
+											Key: "notexistingkey",
+											LocalObjectReference: core_v1.LocalObjectReference{
+												Name: "secret1",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec := runtimeToUnstructured(t, &deploymentSpec)
+
+	rst := resourceSyncTask{
+		store: fakeStore{
+			responses: map[string]runtime.Object{
+				"secret1": &core_v1.Secret{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "Secret",
+						APIVersion: "v1",
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name: "secret1",
+					},
+					Data: map[string][]byte{
+						"parameters": []byte(`{
+							"secretEnvVars": {
+								"a": "1",
+								"b": "2"
+							}
+						}`),
+					},
+				},
+			},
+		},
+		scheme: scheme(t),
+	}
+
+	_, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	require.Error(t, err)
+}
+
+func TestHashIgnoredForOptionalNonExistingKey(t *testing.T) {
+	t.Parallel()
+
+	trueVal := true
+	deploymentSpec := apps_v1.Deployment{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		Spec: apps_v1.DeploymentSpec{
+			Template: core_v1.PodTemplateSpec{
+				Spec: core_v1.PodSpec{
+					Containers: []core_v1.Container{
+						core_v1.Container{}, // empty EnvFrom
+						core_v1.Container{
+							Env: []core_v1.EnvVar{
+								core_v1.EnvVar{
+									Name: "blah2",
+									ValueFrom: &core_v1.EnvVarSource{
+										SecretKeyRef: &core_v1.SecretKeySelector{
+											Key: "notexistingkey",
+											LocalObjectReference: core_v1.LocalObjectReference{
+												Name: "secret1",
+											},
+											Optional: &trueVal,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec := runtimeToUnstructured(t, &deploymentSpec)
+
+	rst := resourceSyncTask{
+		store: fakeStore{
+			responses: map[string]runtime.Object{
+				"secret1": &core_v1.Secret{
+					TypeMeta: meta_v1.TypeMeta{
+						Kind:       "Secret",
+						APIVersion: "v1",
+					},
+					ObjectMeta: meta_v1.ObjectMeta{
+						Name: "secret1",
+					},
+					Data: map[string][]byte{
+						"parameters": []byte(`{
+							"secretEnvVars": {
+								"a": "1",
+								"b": "2"
+							}
+						}`),
+					},
+				},
+			},
+		},
+		scheme: scheme(t),
+	}
+
+	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	require.NoError(t, err)
+
+	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+
+	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
+	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+}
+
+func TestHashIgnoredForOptionalNonExistingSecret(t *testing.T) {
+	t.Parallel()
+
+	trueVal := true
+	deploymentSpec := apps_v1.Deployment{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		Spec: apps_v1.DeploymentSpec{
+			Template: core_v1.PodTemplateSpec{
+				Spec: core_v1.PodSpec{
+					Containers: []core_v1.Container{
+						core_v1.Container{}, // empty EnvFrom
+						core_v1.Container{
+							Env: []core_v1.EnvVar{
+								core_v1.EnvVar{
+									Name: "blah2",
+									ValueFrom: &core_v1.EnvVarSource{
+										SecretKeyRef: &core_v1.SecretKeySelector{
+											Key: "parameters",
+											LocalObjectReference: core_v1.LocalObjectReference{
+												Name: "secret1",
+											},
+											Optional: &trueVal,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec := runtimeToUnstructured(t, &deploymentSpec)
+
+	rst := resourceSyncTask{
+		store: fakeStore{
+			responses: map[string]runtime.Object{},
+		},
+		scheme: scheme(t),
+	}
+
+	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	require.NoError(t, err)
+
+	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+
+	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
+	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+}
+
+func TestHashNotIgnoredForNonExistingSecret(t *testing.T) {
+	t.Parallel()
+
+	deploymentSpec := apps_v1.Deployment{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		Spec: apps_v1.DeploymentSpec{
+			Template: core_v1.PodTemplateSpec{
+				Spec: core_v1.PodSpec{
+					Containers: []core_v1.Container{
+						core_v1.Container{}, // empty EnvFrom
+						core_v1.Container{
+							Env: []core_v1.EnvVar{
+								core_v1.EnvVar{
+									Name: "blah2",
+									ValueFrom: &core_v1.EnvVarSource{
+										SecretKeyRef: &core_v1.SecretKeySelector{
+											Key: "parameters",
+											LocalObjectReference: core_v1.LocalObjectReference{
+												Name: "secret1",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec := runtimeToUnstructured(t, &deploymentSpec)
+
+	rst := resourceSyncTask{
+		store: fakeStore{
+			responses: map[string]runtime.Object{},
+		},
+		scheme: scheme(t),
+	}
+
+	_, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	require.Error(t, err)
+}
+
+func TestNoAnnotationForEmptyDeployment(t *testing.T) {
 	t.Parallel()
 
 	deploymentSpec := apps_v1.Deployment{
@@ -155,8 +466,24 @@ func TestNoAnnotationForEmptyEnvFrom(t *testing.T) {
 		},
 		Spec: apps_v1.DeploymentSpec{},
 	}
+	expectedDeploymentSpec := apps_v1.Deployment{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		Spec: apps_v1.DeploymentSpec{
+			Template: core_v1.PodTemplateSpec{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Annotations: map[string]string{
+						deploymentTestAnnotationKey: "",
+					},
+				},
+			},
+		},
+	}
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
+	expectedSpec := runtimeToUnstructured(t, &expectedDeploymentSpec)
 
 	rst := resourceSyncTask{
 		scheme: scheme(t),
@@ -165,7 +492,62 @@ func TestNoAnnotationForEmptyEnvFrom(t *testing.T) {
 	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
 	require.NoError(t, err)
 
-	assert.True(t, equality.Semantic.DeepEqual(spec.Object, updatedSpec.Object))
+	assert.True(t, equality.Semantic.DeepEqual(expectedSpec.Object, updatedSpec.Object))
+}
+
+func TestEmptyAnnotationForDeploymentThatDoesntUseAnything(t *testing.T) {
+	t.Parallel()
+
+	deploymentSpec := apps_v1.Deployment{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		Spec: apps_v1.DeploymentSpec{
+			Template: core_v1.PodTemplateSpec{
+				Spec: core_v1.PodSpec{
+					Containers: []core_v1.Container{
+						core_v1.Container{}, // empty EnvFrom
+						core_v1.Container{
+							Env: []core_v1.EnvVar{
+								core_v1.EnvVar{
+									Name:  "blah1",
+									Value: "my env var",
+								},
+							},
+						},
+						core_v1.Container{
+							Env: []core_v1.EnvVar{
+								core_v1.EnvVar{
+									Name: "blah1",
+									ValueFrom: &core_v1.EnvVarSource{
+										FieldRef: &core_v1.ObjectFieldSelector{
+											APIVersion: "something",
+											FieldPath:  "something else",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	rst := resourceSyncTask{
+		scheme: scheme(t),
+	}
+
+	spec := runtimeToUnstructured(t, &deploymentSpec)
+
+	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	require.NoError(t, err)
+
+	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+
+	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
+	assert.Empty(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
 }
 
 func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
@@ -218,10 +600,9 @@ func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
 	assert.Equal(t, deploymentCheck.Spec.Template.Annotations[deploymentTestAnnotationKey], "disabled")
 }
 
-func TestUserEnteredAnnotationInDeploymentNoRefs(t *testing.T) {
+func TestUserEnteredAnnotationOverridden(t *testing.T) {
 	t.Parallel()
 
-	expectedAnnotationValue := "mashingonthekeyboard"
 	deploymentSpec := apps_v1.Deployment{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Deployment",
@@ -231,7 +612,7 @@ func TestUserEnteredAnnotationInDeploymentNoRefs(t *testing.T) {
 			Template: core_v1.PodTemplateSpec{
 				ObjectMeta: meta_v1.ObjectMeta{
 					Annotations: map[string]string{
-						deploymentTestAnnotationKey: expectedAnnotationValue,
+						deploymentTestAnnotationKey: "mashingonthekeyboard",
 					},
 				},
 				Spec: core_v1.PodSpec{},
@@ -250,7 +631,7 @@ func TestUserEnteredAnnotationInDeploymentNoRefs(t *testing.T) {
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
 	assert.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.Equal(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey], expectedAnnotationValue)
+	assert.Equal(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey], "")
 }
 
 func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
@@ -403,7 +784,7 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
 	assert.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
 
-	firstChecksum := deploymentCheck.Spec.Template.ObjectMeta.Annotations
+	firstHash := deploymentCheck.Spec.Template.ObjectMeta.Annotations
 
 	allResponses["secret1"] = allResponses["secret2"]
 	rstUpdatedMocks := resourceSyncTask{
@@ -418,5 +799,5 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 
 	secondDeploymentCheck := deploymentUnmarshal(t, secondUpdate)
 	assert.Contains(t, secondDeploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.NotEqual(t, secondDeploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey], firstChecksum)
+	assert.NotEqual(t, secondDeploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey], firstHash)
 }

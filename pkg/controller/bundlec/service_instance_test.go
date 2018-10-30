@@ -1,7 +1,6 @@
 package bundlec
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/atlassian/smith"
@@ -31,9 +30,6 @@ type fakeStore struct {
 
 func (f fakeStore) Get(gvk schema.GroupVersionKind, namespace, name string) (obj runtime.Object, exists bool, err error) {
 	v, ok := f.responses[name]
-	if !ok {
-		panic(fmt.Sprintf("Could not find expected response in mock object for key %q", name))
-	}
 	return v, ok, nil
 }
 
@@ -413,6 +409,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 
 func scheme(t *testing.T) *runtime.Scheme {
 	scheme := runtime.NewScheme()
+	require.NoError(t, core_v1.AddToScheme(scheme))
 	require.NoError(t, sc_v1b1.AddToScheme(scheme))
 	require.NoError(t, apps_v1.AddToScheme(scheme))
 	return scheme

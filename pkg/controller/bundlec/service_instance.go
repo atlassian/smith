@@ -1,16 +1,16 @@
 package bundlec
 
 import (
-	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
-	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -73,7 +73,7 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 		updateCount = actualInstance.Spec.UpdateRequests
 	}
 
-	checkSum, err := st.calculateNewServiceInstanceCheckSum(instanceSpec, namespace, previousEncodedChecksum)
+	checkSum, err := st.calculateNewServiceInstanceCheckSum(instanceSpec, namespace)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate new checksum")
 	}
@@ -92,55 +92,27 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 	return unstructuredSpec, nil
 }
 
-func (st *resourceSyncTask) calculateNewServiceInstanceCheckSum(instanceSpec *sc_v1b1.ServiceInstance, namespace string, previousEncodedChecksum string) (string, error) {
+func (st *resourceSyncTask) calculateNewServiceInstanceCheckSum(instanceSpec *sc_v1b1.ServiceInstance, namespace string) (string, error) {
 	checksumPayload, err := st.generateSecretParametersChecksumPayload(&instanceSpec.Spec, namespace)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate checksum")
 	}
 
-	if previousEncodedChecksum != "" {
-		previousCheckSum, checkSumErr := decodeChecksum(previousEncodedChecksum)
-		if checkSumErr == nil && validateChecksum(previousCheckSum, checksumPayload) {
-			return previousEncodedChecksum, nil
-		}
-	}
-	checksum, err := generateChecksum(checksumPayload)
-	if err != nil {
-		return "", err
-	}
-
-	return encodeChecksum(checksum), nil
+	return hex.EncodeToString(checksumPayload), nil
 }
 
 func (st *resourceSyncTask) generateSecretParametersChecksumPayload(spec *sc_v1b1.ServiceInstanceSpec, namespace string) ([]byte, error) {
-	var buf bytes.Buffer
+	hash := sha256.New()
 
 	for _, parametersFrom := range spec.ParametersFrom {
 		secretKeyRef := parametersFrom.SecretKeyRef
-		secretObj, exists, err := st.store.Get(core_v1.SchemeGroupVersion.WithKind("Secret"), namespace, secretKeyRef.Name)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failure retrieving Secret %q referenced from spec.ParametersFrom", secretKeyRef.Name)
-		}
-		if !exists {
-			return nil, errors.Errorf("Secret %q referenced from spec.ParametersFrom not found", secretKeyRef.Name)
-		}
-		secret, ok := secretObj.(*core_v1.Secret)
-		if !ok {
-			return nil, errors.Errorf("failure casting Secret %q referenced from spec.ParametersFrom", secretKeyRef.Name)
-		}
-
-		secretData := secret.Data[secretKeyRef.Key]
-		if secretData == nil {
-			return nil, errors.Errorf("key %q not found in Secret %q", secretKeyRef.Key, secretKeyRef.Name)
-		}
-		// Using SHA256 here is fine since we will hash the final result with bcrypt anyway
-		hash := sha256.Sum256(secretData)
-		_, err = buf.Write(hash[:])
+		err := st.hashSecretRef(secretKeyRef.Name, namespace, sets.NewString(secretKeyRef.Key), nil, hash)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return buf.Bytes(), nil
+
+	return hash.Sum(nil), nil
 }
 
 func setInstanceAnnotation(instanceSpec *sc_v1b1.ServiceInstance, checksum string) {
