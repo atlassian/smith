@@ -604,7 +604,7 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	return updated, false, nil
 }
 
-func (st *resourceSyncTask) derefObject(gvk schema.GroupVersionKind, name, namespace string) (runtime.Object, bool, error) {
+func (st *resourceSyncTask) derefObject(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, bool, error) {
 	obj, exists, err := st.store.Get(gvk, namespace, name)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "failure retrieving %s %q in namespace %q", gvk.Kind, name, namespace)

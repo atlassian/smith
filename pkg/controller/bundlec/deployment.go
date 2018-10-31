@@ -29,27 +29,6 @@ func (st *resourceSyncTask) forceDeploymentUpdates(spec *unstructured.Unstructur
 	return spec, nil
 }
 
-func deploymentHasRefs(deployment *apps_v1.Deployment) bool {
-	containers := append(deployment.Spec.Template.Spec.Containers, deployment.Spec.Template.Spec.InitContainers...)
-	for _, container := range containers {
-		if len(container.EnvFrom) != 0 {
-			return true
-		}
-		for _, env := range container.Env {
-			if env.ValueFrom != nil {
-				if env.ValueFrom.ConfigMapKeyRef != nil {
-					return true
-				}
-				if env.ValueFrom.SecretKeyRef != nil {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
 func (st *resourceSyncTask) processDeployment(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
 	deploymentSpec := &apps_v1.Deployment{}
 
@@ -57,20 +36,16 @@ func (st *resourceSyncTask) processDeployment(spec *unstructured.Unstructured, a
 		return nil, errors.Wrap(err, "failure to parse Deployment")
 	}
 
-	if !deploymentHasRefs(deploymentSpec) {
-		setDeploymentAnnotation(deploymentSpec, "")
-	} else {
-		if v, ok := deploymentSpec.Spec.Template.ObjectMeta.Annotations[envRefHashAnnotation]; ok && v == disabled {
-			return spec, nil
-		}
-
-		bytes, err := st.generateHash(deploymentSpec.Spec.Template, namespace)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to generate checksum")
-		}
-
-		setDeploymentAnnotation(deploymentSpec, hex.EncodeToString(bytes))
+	if v, ok := deploymentSpec.Spec.Template.ObjectMeta.Annotations[envRefHashAnnotation]; ok && v == disabled {
+		return spec, nil
 	}
+
+	bytes, err := st.generateHash(deploymentSpec.Spec.Template, namespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate checksum")
+	}
+
+	setDeploymentAnnotation(deploymentSpec, hex.EncodeToString(bytes))
 
 	unstructuredSpec, err := util.RuntimeToUnstructured(deploymentSpec)
 	if err != nil {
@@ -83,7 +58,10 @@ func (st *resourceSyncTask) processDeployment(spec *unstructured.Unstructured, a
 func (st *resourceSyncTask) generateHash(template core_v1.PodTemplateSpec, namespace string) ([]byte, error) {
 	hash := sha256.New()
 
-	containers := append(template.Spec.Containers, template.Spec.InitContainers...)
+	containers := make([]core_v1.Container, 0, len(template.Spec.Containers)+len(template.Spec.InitContainers))
+	containers = append(containers, template.Spec.Containers...)
+	containers = append(containers, template.Spec.InitContainers...)
+
 	for _, container := range containers {
 		for _, envFrom := range container.EnvFrom {
 			secretRef := envFrom.SecretRef
@@ -103,21 +81,23 @@ func (st *resourceSyncTask) generateHash(template core_v1.PodTemplateSpec, names
 			}
 		}
 		for _, env := range container.Env {
-			if env.ValueFrom != nil {
-				secretKeyRef := env.ValueFrom.SecretKeyRef
-				if secretKeyRef != nil {
-					err := st.hashSecretRef(secretKeyRef.Name, namespace, sets.NewString(secretKeyRef.Key), secretKeyRef.Optional, hash)
-					if err != nil {
-						return nil, err
-					}
-				}
+			if env.ValueFrom == nil {
+				continue
+			}
 
-				configMapKeyRef := env.ValueFrom.ConfigMapKeyRef
-				if configMapKeyRef != nil {
-					err := st.hashConfigMapRef(configMapKeyRef.Name, namespace, sets.NewString(configMapKeyRef.Key), configMapKeyRef.Optional, hash)
-					if err != nil {
-						return nil, err
-					}
+			secretKeyRef := env.ValueFrom.SecretKeyRef
+			if secretKeyRef != nil {
+				err := st.hashSecretRef(secretKeyRef.Name, namespace, sets.NewString(secretKeyRef.Key), secretKeyRef.Optional, hash)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			configMapKeyRef := env.ValueFrom.ConfigMapKeyRef
+			if configMapKeyRef != nil {
+				err := st.hashConfigMapRef(configMapKeyRef.Name, namespace, sets.NewString(configMapKeyRef.Key), configMapKeyRef.Optional, hash)
+				if err != nil {
+					return nil, err
 				}
 			}
 		}

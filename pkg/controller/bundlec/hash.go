@@ -2,15 +2,17 @@ package bundlec
 
 import (
 	"hash"
+	"io"
 	"sort"
 
 	"github.com/pkg/errors"
 	core_v1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func (st *resourceSyncTask) hashSecretRef(name, namespace string, filter sets.String, optional *bool, hash hash.Hash) error {
-	secret, exists, err := st.derefObject(core_v1.SchemeGroupVersion.WithKind("Secret"), name, namespace)
+func (st *resourceSyncTask) hashSecretRef(name, namespace string, filter sets.String, optional *bool, h hash.Hash) error {
+	secret, exists, err := st.derefObject(core_v1.SchemeGroupVersion.WithKind("Secret"), namespace, name)
 	if err != nil {
 		return err
 	}
@@ -21,10 +23,7 @@ func (st *resourceSyncTask) hashSecretRef(name, namespace string, filter sets.St
 		return nil
 	}
 
-	found, err := hashSecret(secret.(*core_v1.Secret), hash, filter)
-	if err != nil {
-		return err
-	}
+	found := hashSecret(secret.(*core_v1.Secret), h, filter)
 	if !found && (optional == nil || !*optional) {
 		return errors.Errorf("not all keys %v found in secret %q", filter, name)
 	}
@@ -32,8 +31,8 @@ func (st *resourceSyncTask) hashSecretRef(name, namespace string, filter sets.St
 	return nil
 }
 
-func (st *resourceSyncTask) hashConfigMapRef(name, namespace string, filter sets.String, optional *bool, hash hash.Hash) error {
-	configmap, exists, err := st.derefObject(core_v1.SchemeGroupVersion.WithKind("ConfigMap"), name, namespace)
+func (st *resourceSyncTask) hashConfigMapRef(name, namespace string, filter sets.String, optional *bool, h hash.Hash) error {
+	configmap, exists, err := st.derefObject(core_v1.SchemeGroupVersion.WithKind("ConfigMap"), namespace, name)
 	if err != nil {
 		return err
 	}
@@ -44,10 +43,7 @@ func (st *resourceSyncTask) hashConfigMapRef(name, namespace string, filter sets
 		return nil
 	}
 
-	found, err := hashConfigMap(configmap.(*core_v1.ConfigMap), hash, filter)
-	if err != nil {
-		return err
-	}
+	found := hashConfigMap(configmap.(*core_v1.ConfigMap), h, filter)
 	if !found && (optional == nil || !*optional) {
 		return errors.Errorf("not all keys %v found in configmap %q", filter, name)
 	}
@@ -57,7 +53,8 @@ func (st *resourceSyncTask) hashConfigMapRef(name, namespace string, filter sets
 
 // hashConfigMap hashes the sorted values in the configmap in sorted order
 // with a NUL as a separator character between and within pairs of key + value.
-func hashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String) (bool, error) {
+func hashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String) bool {
+	w := h.(io.Writer)
 	keys := make([]string, 0, len(configMap.Data))
 	search := sets.NewString(filter.UnsortedList()...)
 	for k := range configMap.Data {
@@ -65,29 +62,45 @@ func hashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String
 			keys = append(keys, k)
 		}
 	}
+	for k := range configMap.BinaryData {
+		if filter.Len() == 0 || filter.Has(k) {
+			keys = append(keys, k)
+		}
+	}
 	search.Delete(keys...)
 	if search.Len() != 0 {
 		// not all the provided keys in filter were found
-		return false, nil
+		return false
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		val := []byte(k)
-		val = append(val, 0)
-		val = append(val, []byte(configMap.Data[k])...)
-		val = append(val, 0)
-		_, err := h.Write(val)
-		if err != nil {
-			return false, errors.WithStack(err)
+		_, err := io.WriteString(w, k)
+		utilruntime.Must(err)
+		_, err = w.Write([]byte{0})
+		utilruntime.Must(err)
+
+		// The key is either in Data or BinaryData
+		data, inData := configMap.Data[k]
+		binaryData, inBinaryData := configMap.BinaryData[k]
+		if inData {
+			_, err := io.WriteString(w, data)
+			utilruntime.Must(err)
+		} else if inBinaryData {
+			_, err = w.Write(binaryData)
+			utilruntime.Must(err)
 		}
+
+		_, err = w.Write([]byte{0})
+		utilruntime.Must(err)
 	}
 
-	return true, nil
+	return true
 }
 
 // hashSecret hashes the sorted values in the secret in sorted order
 // with a NUL as a separator character between and within pairs of key + value.
-func hashSecret(secret *core_v1.Secret, h hash.Hash, filter sets.String) (bool, error) {
+func hashSecret(secret *core_v1.Secret, h hash.Hash, filter sets.String) bool {
+	w := h.(io.Writer)
 	keys := make([]string, 0, len(secret.Data))
 	search := sets.NewString(filter.UnsortedList()...)
 	for k := range secret.Data {
@@ -98,19 +111,19 @@ func hashSecret(secret *core_v1.Secret, h hash.Hash, filter sets.String) (bool, 
 	search.Delete(keys...)
 	if search.Len() != 0 {
 		// not all the provided keys in filter were found
-		return false, nil
+		return false
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		val := []byte(k)
-		val = append(val, 0)
-		val = append(val, secret.Data[k]...)
-		val = append(val, 0)
-		_, err := h.Write(val)
-		if err != nil {
-			return false, errors.WithStack(err)
-		}
+		_, err := io.WriteString(w, k)
+		utilruntime.Must(err)
+		_, err = w.Write([]byte{0})
+		utilruntime.Must(err)
+		_, err = w.Write(secret.Data[k])
+		utilruntime.Must(err)
+		_, err = w.Write([]byte{0})
+		utilruntime.Must(err)
 	}
 
-	return true, nil
+	return true
 }

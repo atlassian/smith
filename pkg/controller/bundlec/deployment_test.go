@@ -594,7 +594,7 @@ func TestNoAnnotationForEmptyDeployment(t *testing.T) {
 			Template: core_v1.PodTemplateSpec{
 				ObjectMeta: meta_v1.ObjectMeta{
 					Annotations: map[string]string{
-						deploymentTestAnnotationKey: "",
+						deploymentTestAnnotationKey: nullSha256,
 					},
 				},
 			},
@@ -666,7 +666,7 @@ func TestEmptyAnnotationForDeploymentThatDoesntUseAnything(t *testing.T) {
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
 
 	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.Empty(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
 }
 
 func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
@@ -750,7 +750,7 @@ func TestUserEnteredAnnotationOverridden(t *testing.T) {
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
 	assert.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.Equal(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey], "")
+	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
 }
 
 func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
