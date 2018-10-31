@@ -148,7 +148,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Force Service Catalog to update service instances when secrets they depend change
-	spec, err = st.forceServiceInstanceUpdates(spec, actual, st.bundle.Namespace)
+	spec, err = st.forceUpdatesOfResources(spec, actual, st.bundle.Namespace)
 	if err != nil {
 		return resourceInfo{
 			status: resourceStatusError{
@@ -252,6 +252,15 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 			},
 		}
 	}
+}
+
+func (st *resourceSyncTask) forceUpdatesOfResources(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
+	spec, err := st.forceServiceInstanceUpdates(spec, actual, st.bundle.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return st.forceDeploymentUpdates(spec, actual, st.bundle.Namespace)
 }
 
 func (st *resourceSyncTask) maybeExtractBindingSecret(obj *unstructured.Unstructured) (*core_v1.Secret, error) {
@@ -645,4 +654,12 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	}
 	st.logger.Info("Object updated", ctrlLogz.Object(spec))
 	return updated, false, nil
+}
+
+func (st *resourceSyncTask) derefObject(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, bool, error) {
+	obj, exists, err := st.store.Get(gvk, namespace, name)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "failure retrieving %s %q in namespace %q", gvk.Kind, name, namespace)
+	}
+	return obj, exists, nil
 }
