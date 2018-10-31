@@ -72,19 +72,19 @@ func hashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		io.WriteString(h, k)
-		h.Write([]byte{0})
+		io.WriteString(h, k) // nolint: gosec, errcheck
+		h.Write([]byte{0})   // nolint: gosec, errcheck
 
 		// The key is either in Data or BinaryData
 		data, inData := configMap.Data[k]
 		binaryData := configMap.BinaryData[k]
 		if inData {
-			io.WriteString(h, data)
+			io.WriteString(h, data) // nolint: gosec, errcheck
 		} else {
-			h.Write(binaryData)
+			h.Write(binaryData) // nolint: gosec, errcheck
 		}
 
-		h.Write([]byte{0})
+		h.Write([]byte{0}) // nolint: gosec, errcheck
 	}
 
 	return true
@@ -107,10 +107,10 @@ func hashSecret(secret *core_v1.Secret, h hash.Hash, filter sets.String) bool {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		io.WriteString(h, k)
-		h.Write([]byte{0})
-		h.Write(secret.Data[k])
-		h.Write([]byte{0})
+		io.WriteString(h, k)    // nolint: gosec, errcheck
+		h.Write([]byte{0})      // nolint: gosec, errcheck
+		h.Write(secret.Data[k]) // nolint: gosec, errcheck
+		h.Write([]byte{0})      // nolint: gosec, errcheck
 	}
 
 	return true
