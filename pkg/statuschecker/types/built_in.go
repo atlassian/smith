@@ -99,24 +99,24 @@ func isDeploymentReady(obj runtime.Object) (statuschecker.ObjectStatusResult, er
 			return statuschecker.ObjectStatusError{
 				UserError:      false,
 				RetriableError: false,
-				Error:          errors.Errorf("deployment %q exceeded its progress deadline", deployment.Name),
+				Error:          errors.Errorf("deployment exceeded its progress deadline"),
 			}, nil
 		}
 		if replicas != nil && updatedReplicas < *replicas {
 			return statuschecker.ObjectStatusInProgress{
-				Message: fmt.Sprintf("Too few replicas. Requested=%d, Have=%d", *replicas, updatedReplicas),
+				Message: fmt.Sprintf("Number of replicas converging. Requested=%d, Have=%d", *replicas, updatedReplicas),
 			}, nil
 		}
 
 		if deployment.Status.Replicas > updatedReplicas {
 			return statuschecker.ObjectStatusInProgress{
-				Message: fmt.Sprintf("Too many replicas. Requested=%d, Have=%d", *replicas, updatedReplicas),
+				Message: fmt.Sprintf("Number of replicas converging. Requested=%d, Have=%d", deployment.Status.Replicas, updatedReplicas),
 			}, nil
 		}
 
 		if availableReplicas < updatedReplicas {
 			return statuschecker.ObjectStatusInProgress{
-				Message: fmt.Sprintf("Too many replicas. Requested=%d, Have=%d", *replicas, updatedReplicas),
+				Message: fmt.Sprintf("Number of replicas converging. Available=%d, Updated=%d", availableReplicas, updatedReplicas),
 			}, nil
 		}
 
