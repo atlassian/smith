@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 	core_v1 "k8s.io/api/core/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -74,24 +73,19 @@ func hashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		_, err := io.WriteString(w, k)
-		utilruntime.Must(err)
-		_, err = w.Write([]byte{0})
-		utilruntime.Must(err)
+		io.WriteString(w, k)
+		w.Write([]byte{0})
 
 		// The key is either in Data or BinaryData
 		data, inData := configMap.Data[k]
-		binaryData, inBinaryData := configMap.BinaryData[k]
+		binaryData := configMap.BinaryData[k]
 		if inData {
-			_, err := io.WriteString(w, data)
-			utilruntime.Must(err)
-		} else if inBinaryData {
-			_, err = w.Write(binaryData)
-			utilruntime.Must(err)
+			io.WriteString(w, data)
+		} else {
+			w.Write(binaryData)
 		}
 
-		_, err = w.Write([]byte{0})
-		utilruntime.Must(err)
+		w.Write([]byte{0})
 	}
 
 	return true
@@ -115,14 +109,10 @@ func hashSecret(secret *core_v1.Secret, h hash.Hash, filter sets.String) bool {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		_, err := io.WriteString(w, k)
-		utilruntime.Must(err)
-		_, err = w.Write([]byte{0})
-		utilruntime.Must(err)
-		_, err = w.Write(secret.Data[k])
-		utilruntime.Must(err)
-		_, err = w.Write([]byte{0})
-		utilruntime.Must(err)
+		io.WriteString(w, k)
+		w.Write([]byte{0})
+		w.Write(secret.Data[k])
+		w.Write([]byte{0})
 	}
 
 	return true
