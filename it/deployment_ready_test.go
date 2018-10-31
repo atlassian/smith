@@ -16,16 +16,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func constructBundle(t *testing.T, progressDeadlineSeconds int32, containerParams ...string) *smith_v1.Bundle {
-	t.Parallel()
+const deploymentResourceName string = "deployment-ready-test"
 
+func constructBundle(t *testing.T, progressDeadlineSeconds int32, containerParams ...string) *smith_v1.Bundle {
 	// This is a hack for now until someone can help
 	// This is "set" in the deploymentCleanup but that is AFTER the object was created
 	// So this never really works since it should be set before the object was created
 	// in processResource "createOrUpdate"
 	const LastAppliedReplicasAnnotation string = smith.Domain + "/LastAppliedReplicas"
 
-	resourceName := smith_v1.ResourceName("deployment-ready-test")
+	resourceName := smith_v1.ResourceName(deploymentResourceName)
 
 	labelMap := map[string]string{
 		"name": string(resourceName),
@@ -142,11 +142,15 @@ func constructBundle(t *testing.T, progressDeadlineSeconds int32, containerParam
 }
 
 func TestDeploymentReady(t *testing.T) {
+	t.Parallel()
+
 	bundle := constructBundle(t, 10, "-l", "0", "-r", "0")
 	SetupApp(t, bundle, false, true, assertSuccess)
 }
 
 func TestDeploymentNeverReady(t *testing.T) {
+	t.Parallel()
+
 	bundle := constructBundle(t, 10, "-l", "20", "-r", "20")
 	SetupApp(t, bundle, false, true, assertDeadlineExceeded)
 }
@@ -157,6 +161,17 @@ func assertSuccess(ctx context.Context, t *testing.T, cfg *Config, args ...inter
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleReady, cond_v1.ConditionTrue)
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleInProgress, cond_v1.ConditionFalse)
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, cond_v1.ConditionFalse)
+
+	resCond := smith_testing.AssertResourceCondition(t,
+		bundleRes,
+		smith_v1.ResourceName(deploymentResourceName),
+		smith_v1.ResourceReady,
+		cond_v1.ConditionTrue)
+
+	if resCond != nil {
+		assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+		assert.Equal(t, "object is not controlled by the Bundle and does not have a controller at all", resCond.Message)
+	}
 }
 
 func assertDeadlineExceeded(ctx context.Context, t *testing.T, cfg *Config, args ...interface{}) {
@@ -166,7 +181,15 @@ func assertDeadlineExceeded(ctx context.Context, t *testing.T, cfg *Config, args
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleInProgress, cond_v1.ConditionFalse)
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, cond_v1.ConditionTrue)
 
-	resourceStatus := bundleRes.Status.ResourceStatuses[0]
-	_, cond := cond_v1.FindCondition(resourceStatus.Conditions, smith_v1.BundleError)
-	assert.Contains(t, cond.Message, "exceeded its progress deadline")
+	resCond := smith_testing.AssertResourceCondition(t,
+		bundleRes,
+		smith_v1.ResourceName(deploymentResourceName),
+		smith_v1.ResourceError,
+		cond_v1.ConditionTrue)
+
+	if resCond != nil {
+		assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+		assert.Equal(t, "deployment exceeded its progress deadline", resCond.Message)
+	}
+
 }

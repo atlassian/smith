@@ -44,16 +44,6 @@
   revision = "782f4967f2dc4564575ca782fe2d04090b5faca8"
 
 [[projects]]
-  digest = "1:971de71a8f57576cf3a8ff5216e97fb01d152a99c3ff5a0fecc7ed393d26bf34"
-  name = "github.com/docker/distribution"
-  packages = [
-    "digestset",
-    "reference",
-  ]
-  pruneopts = "NT"
-  revision = "edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c"
-
-[[projects]]
   digest = "1:abfe129dc92b16fbf0cc9d6336096a2823151756f62072a700eb10754141b38e"
   name = "github.com/ghodss/yaml"
   packages = ["."]
@@ -213,13 +203,6 @@
   revision = "05fbef0ca5da472bbf96c9322b84a53edc03c9fd"
 
 [[projects]]
-  digest = "1:69e47979091e47a10e5ff0e2776ca71aa3e884238ce446bd71e246878ba0858d"
-  name = "github.com/opencontainers/go-digest"
-  packages = ["."]
-  pruneopts = "NT"
-  revision = "a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb"
-
-[[projects]]
   branch = "master"
   digest = "1:bf2ac97824a7221eb16b096aecc1c390d4c8a4e49524386aaa2e2dd215cbfb31"
   name = "github.com/petar/GoLLRB"
@@ -366,8 +349,6 @@
   packages = [
     "bcrypt",
     "blowfish",
-    "ed25519",
-    "ed25519/internal/edwards25519",
     "ssh/terminal",
   ]
   pruneopts = "NT"
@@ -472,18 +453,6 @@
   revision = "3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4"
 
 [[projects]]
-  digest = "1:f7f0a0cecea5b491393567ad51441c922e37bd24fd1a7e2fc8f772e32d24edac"
-  name = "gopkg.in/square/go-jose.v2"
-  packages = [
-    ".",
-    "cipher",
-    "json",
-    "jwt",
-  ]
-  pruneopts = "NT"
-  revision = "89060dee6a84df9a4dae49f676f0c755037834f1"
-
-[[projects]]
   digest = "1:b1f13c74112ab237c8b840517fbbcfb98d3690073caad6c5b1a56c29fea086e3"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
@@ -545,7 +514,6 @@
     "pkg/client/informers/externalversions/apiextensions/v1beta1",
     "pkg/client/informers/externalversions/internalinterfaces",
     "pkg/client/listers/apiextensions/v1beta1",
-    "pkg/features",
   ]
   pruneopts = "NT"
   revision = "ca1024863b48cf0701229109df75ac5f0bb4907e"
@@ -559,11 +527,9 @@
     "pkg/api/errors",
     "pkg/api/meta",
     "pkg/api/resource",
-    "pkg/api/validation",
     "pkg/apis/meta/internalversion",
     "pkg/apis/meta/v1",
     "pkg/apis/meta/v1/unstructured",
-    "pkg/apis/meta/v1/validation",
     "pkg/apis/meta/v1beta1",
     "pkg/conversion",
     "pkg/conversion/queryparams",
@@ -589,7 +555,6 @@
     "pkg/util/mergepatch",
     "pkg/util/naming",
     "pkg/util/net",
-    "pkg/util/rand",
     "pkg/util/runtime",
     "pkg/util/sets",
     "pkg/util/strategicpatch",
@@ -604,20 +569,6 @@
   ]
   pruneopts = "NT"
   revision = "6dd46049f39503a1fc8d65de4bd566829e95faff"
-
-[[projects]]
-  branch = "release-1.12"
-  digest = "1:711f4e3a1d7469568b65dd66d04457b086105438f3558aea7881e6b99f0dbc90"
-  name = "k8s.io/apiserver"
-  packages = [
-    "pkg/authentication/authenticator",
-    "pkg/authentication/serviceaccount",
-    "pkg/authentication/user",
-    "pkg/features",
-    "pkg/util/feature",
-  ]
-  pruneopts = "NT"
-  revision = "f1efbe52ad282d7d18ca4e5580b35c08e3bf521f"
 
 [[projects]]
   branch = "release-9.0"
@@ -780,59 +731,6 @@
   pruneopts = "NT"
   revision = "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
 
-[[projects]]
-  digest = "1:9c47d7bd8d8c871437cc55f68096ad6ea37177106351f9d93ef36d59688c9391"
-  name = "k8s.io/kubernetes"
-  packages = [
-    "pkg/api/legacyscheme",
-    "pkg/api/service",
-    "pkg/api/v1/pod",
-    "pkg/apis/autoscaling",
-    "pkg/apis/core",
-    "pkg/apis/core/helper",
-    "pkg/apis/core/install",
-    "pkg/apis/core/pods",
-    "pkg/apis/core/v1",
-    "pkg/apis/core/v1/helper",
-    "pkg/apis/core/validation",
-    "pkg/apis/extensions",
-    "pkg/apis/networking",
-    "pkg/apis/policy",
-    "pkg/apis/scheduling",
-    "pkg/capabilities",
-    "pkg/controller",
-    "pkg/controller/deployment/util",
-    "pkg/features",
-    "pkg/fieldpath",
-    "pkg/kubelet/apis",
-    "pkg/kubelet/types",
-    "pkg/master/ports",
-    "pkg/scheduler/algorithm",
-    "pkg/scheduler/algorithm/priorities/util",
-    "pkg/scheduler/api",
-    "pkg/scheduler/cache",
-    "pkg/scheduler/util",
-    "pkg/security/apparmor",
-    "pkg/serviceaccount",
-    "pkg/util/file",
-    "pkg/util/hash",
-    "pkg/util/labels",
-    "pkg/util/net/sets",
-    "pkg/util/node",
-    "pkg/util/parsers",
-    "pkg/util/taints",
-  ]
-  pruneopts = "NT"
-  revision = "17c77c7898218073f14c8d573582e8d2313dc740"
-  version = "v1.12.2"
-
-[[projects]]
-  digest = "1:364cf0cec877346e8f4e04f309322b7d826521b485b1a711abaeb02fdced3098"
-  name = "k8s.io/utils"
-  packages = ["pointer"]
-  pruneopts = "NT"
-  revision = "66066c83e385e385ccc3c964b44fd7dcd413d0ed"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
@@ -907,7 +805,6 @@
     "k8s.io/client-go/util/workqueue",
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",
-    "k8s.io/kubernetes/pkg/controller/deployment/util",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

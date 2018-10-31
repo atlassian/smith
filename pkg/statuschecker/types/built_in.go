@@ -9,7 +9,6 @@ import (
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
-	apps "k8s.io/api/apps/v1"
 	apps_v1 "k8s.io/api/apps/v1"
 	autoscaling_v2b1 "k8s.io/api/autoscaling/v2beta1"
 	core_v1 "k8s.io/api/core/v1"
@@ -25,6 +24,7 @@ const (
 	// Timeout for how long an HPA with a "False" ScalingActive condition should be considered "In Progress"
 	// before being considered a failure
 	hpaScalingActiveTimeout = 5 * time.Minute
+	timedOutReason          = "ProgressDeadlineExceeded"
 )
 
 var (
@@ -67,9 +67,10 @@ func alwaysReady(_ runtime.Object) (statuschecker.ObjectStatusResult, error) {
 	return statuschecker.ObjectStatusReady{}, nil
 }
 
-func getDeploymentCondition(status apps.DeploymentStatus, condType apps.DeploymentConditionType) *apps.DeploymentCondition {
-	for i := range status.Conditions {
-		c := status.Conditions[i]
+func getDeploymentCondition(deployment apps_v1.Deployment, condType apps_v1.DeploymentConditionType) *apps_v1.DeploymentCondition {
+	deploymentStatus := deployment.Status
+	for i := range deploymentStatus.Conditions {
+		c := deploymentStatus.Conditions[i]
 		if c.Type == condType {
 			return &c
 		}
@@ -79,7 +80,6 @@ func getDeploymentCondition(status apps.DeploymentStatus, condType apps.Deployme
 
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
 func isDeploymentReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
-	const TimedOutReason = "ProgressDeadlineExceeded"
 
 	var deployment apps_v1.Deployment
 	if err := util.ConvertType(appsV1Scheme, obj, &deployment); err != nil {
@@ -94,8 +94,8 @@ func isDeploymentReady(obj runtime.Object) (statuschecker.ObjectStatusResult, er
 	availableReplicas := deployment.Status.AvailableReplicas
 
 	if generation <= observedGeneration {
-		progressingCond := getDeploymentCondition(deployment.Status, apps_v1.DeploymentProgressing)
-		if progressingCond != nil && progressingCond.Reason == TimedOutReason {
+		progressingCond := getDeploymentCondition(deployment, apps_v1.DeploymentProgressing)
+		if progressingCond != nil && progressingCond.Reason == timedOutReason {
 			return statuschecker.ObjectStatusError{
 				UserError:      false,
 				RetriableError: false,
