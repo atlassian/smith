@@ -53,7 +53,6 @@ func (st *resourceSyncTask) hashConfigMapRef(name, namespace string, filter sets
 // hashConfigMap hashes the sorted values in the configmap in sorted order
 // with a NUL as a separator character between and within pairs of key + value.
 func hashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String) bool {
-	w := h.(io.Writer)
 	keys := make([]string, 0, len(configMap.Data))
 	search := sets.NewString(filter.UnsortedList()...)
 	for k := range configMap.Data {
@@ -73,19 +72,19 @@ func hashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		io.WriteString(w, k)
-		w.Write([]byte{0})
+		io.WriteString(h, k)
+		h.Write([]byte{0})
 
 		// The key is either in Data or BinaryData
 		data, inData := configMap.Data[k]
 		binaryData := configMap.BinaryData[k]
 		if inData {
-			io.WriteString(w, data)
+			io.WriteString(h, data)
 		} else {
-			w.Write(binaryData)
+			h.Write(binaryData)
 		}
 
-		w.Write([]byte{0})
+		h.Write([]byte{0})
 	}
 
 	return true
@@ -94,7 +93,6 @@ func hashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String
 // hashSecret hashes the sorted values in the secret in sorted order
 // with a NUL as a separator character between and within pairs of key + value.
 func hashSecret(secret *core_v1.Secret, h hash.Hash, filter sets.String) bool {
-	w := h.(io.Writer)
 	keys := make([]string, 0, len(secret.Data))
 	search := sets.NewString(filter.UnsortedList()...)
 	for k := range secret.Data {
@@ -109,10 +107,10 @@ func hashSecret(secret *core_v1.Secret, h hash.Hash, filter sets.String) bool {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		io.WriteString(w, k)
-		w.Write([]byte{0})
-		w.Write(secret.Data[k])
-		w.Write([]byte{0})
+		io.WriteString(h, k)
+		h.Write([]byte{0})
+		h.Write(secret.Data[k])
+		h.Write([]byte{0})
 	}
 
 	return true
