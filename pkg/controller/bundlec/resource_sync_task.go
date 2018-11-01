@@ -467,7 +467,13 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 		Controller:         &trueRef,
 		BlockOwnerDeletion: &trueRef,
 	})
+	setRefs := make(map[smith_v1.ResourceName]struct{}, len(res.References))
 	for _, dep := range res.References {
+		if _, ok := setRefs[dep.Resource]; ok {
+			// This resource is referenced more than once and an owner reference has been added already
+			continue
+		}
+		setRefs[dep.Resource] = struct{}{}
 		processedObj := st.processedResources[dep.Resource].actual // this is ok because we've checked earlier that resources contains all dependencies
 		refs = append(refs, meta_v1.OwnerReference{
 			APIVersion:         processedObj.GetAPIVersion(),
