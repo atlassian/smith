@@ -24,6 +24,7 @@ const (
 	// Timeout for how long an HPA with a "False" ScalingActive condition should be considered "In Progress"
 	// before being considered a failure
 	hpaScalingActiveTimeout = 5 * time.Minute
+	timedOutReason          = "ProgressDeadlineExceeded"
 )
 
 var (
@@ -66,23 +67,65 @@ func alwaysReady(_ runtime.Object) (statuschecker.ObjectStatusResult, error) {
 	return statuschecker.ObjectStatusReady{}, nil
 }
 
+func getDeploymentCondition(deployment *apps_v1.Deployment, condType apps_v1.DeploymentConditionType) *apps_v1.DeploymentCondition {
+	deploymentStatus := deployment.Status
+	for i := range deploymentStatus.Conditions {
+		c := deploymentStatus.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
+}
+
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
-// and k8s.io/kubernetes/pkg/client/unversioned/conditions.go:120 DeploymentHasDesiredReplicas()
 func isDeploymentReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
+
 	var deployment apps_v1.Deployment
 	if err := util.ConvertType(appsV1Scheme, obj, &deployment); err != nil {
 		return nil, err
 	}
 
-	replicas := int32(1) // Default value if not specified
-	if deployment.Spec.Replicas != nil {
-		replicas = *deployment.Spec.Replicas
-	}
+	replicas := deployment.Spec.Replicas
 
-	if deployment.Status.ObservedGeneration >= deployment.Generation && deployment.Status.UpdatedReplicas == replicas {
+	generation := deployment.Generation
+	observedGeneration := deployment.Status.ObservedGeneration
+	updatedReplicas := deployment.Status.UpdatedReplicas
+	availableReplicas := deployment.Status.AvailableReplicas
+
+	if generation <= observedGeneration {
+		progressingCond := getDeploymentCondition(&deployment, apps_v1.DeploymentProgressing)
+		if progressingCond != nil && progressingCond.Reason == timedOutReason {
+			return statuschecker.ObjectStatusError{
+				UserError:      true,
+				RetriableError: false,
+				Error:          errors.Errorf("deployment exceeded its progress deadline"),
+			}, nil
+		}
+		if replicas != nil && updatedReplicas < *replicas {
+			return statuschecker.ObjectStatusInProgress{
+				Message: fmt.Sprintf("Number of replicas converging. Requested=%d, Updated=%d", *replicas, updatedReplicas),
+			}, nil
+		}
+
+		if deployment.Status.Replicas > updatedReplicas {
+			return statuschecker.ObjectStatusInProgress{
+				Message: fmt.Sprintf("Number of replicas converging. Replicas=%d, Updated=%d", deployment.Status.Replicas, updatedReplicas),
+			}, nil
+		}
+
+		if availableReplicas < updatedReplicas {
+			return statuschecker.ObjectStatusInProgress{
+				Message: fmt.Sprintf("Number of replicas converging. Available=%d, Updated=%d", availableReplicas, updatedReplicas),
+			}, nil
+		}
+
 		return statuschecker.ObjectStatusReady{}, nil
 	}
-	return statuschecker.ObjectStatusInProgress{}, nil
+
+	return statuschecker.ObjectStatusInProgress{
+		Message: "Deployment in progress",
+	}, nil
 }
 
 func isHorizontalPodAutoscalerReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
