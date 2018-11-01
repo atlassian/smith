@@ -482,12 +482,12 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 	// Object GroupKind-specific munging
 	switch obj.GroupVersionKind().GroupKind() {
 	case schema.GroupKind{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}:
-		obj, err = st.processServiceInstance(obj, actual, st.bundle.Namespace)
+		obj, err = st.processServiceInstance(obj, actual)
 		if err != nil {
 			return nil, err
 		}
 	case schema.GroupKind{Group: apps_v1.GroupName, Kind: "Deployment"}:
-		obj, err = st.processDeployment(obj, st.bundle.Namespace)
+		obj, err = st.processDeployment(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -652,10 +652,10 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	return updated, false, nil
 }
 
-func (st *resourceSyncTask) derefObject(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, bool, error) {
-	obj, exists, err := st.store.Get(gvk, namespace, name)
+func (st *resourceSyncTask) derefObject(gvk schema.GroupVersionKind, name string) (runtime.Object, bool, error) {
+	obj, exists, err := st.store.Get(gvk, st.bundle.Namespace, name)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "failure retrieving %s %q in namespace %q", gvk.Kind, name, namespace)
+		return nil, false, errors.Wrapf(err, "failure retrieving %s %q", gvk, name)
 	}
 	return obj, exists, nil
 }

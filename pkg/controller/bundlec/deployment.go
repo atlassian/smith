@@ -18,7 +18,7 @@ const (
 )
 
 // works around https://github.com/kubernetes/kubernetes/issues/22368
-func (st *resourceSyncTask) processDeployment(spec *unstructured.Unstructured, namespace string) (specRet *unstructured.Unstructured, e error) {
+func (st *resourceSyncTask) processDeployment(spec *unstructured.Unstructured) (*unstructured.Unstructured /*spec*/, error) {
 	deploymentSpec := &apps_v1.Deployment{}
 
 	if err := util.ConvertType(st.scheme, spec, deploymentSpec); err != nil {
@@ -29,7 +29,7 @@ func (st *resourceSyncTask) processDeployment(spec *unstructured.Unstructured, n
 		return spec, nil
 	}
 
-	bytes, err := st.generateHash(deploymentSpec.Spec.Template, namespace)
+	bytes, err := st.generateHash(deploymentSpec.Spec.Template)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate checksum")
 	}
@@ -44,7 +44,7 @@ func (st *resourceSyncTask) processDeployment(spec *unstructured.Unstructured, n
 	return unstructuredSpec, nil
 }
 
-func (st *resourceSyncTask) generateHash(template core_v1.PodTemplateSpec, namespace string) ([]byte, error) {
+func (st *resourceSyncTask) generateHash(template core_v1.PodTemplateSpec) ([]byte, error) {
 	hash := sha256.New()
 
 	containers := make([]core_v1.Container, 0, len(template.Spec.Containers)+len(template.Spec.InitContainers))
@@ -55,7 +55,7 @@ func (st *resourceSyncTask) generateHash(template core_v1.PodTemplateSpec, names
 		for _, envFrom := range container.EnvFrom {
 			secretRef := envFrom.SecretRef
 			if secretRef != nil {
-				err := st.hashSecretRef(secretRef.Name, namespace, sets.NewString(), secretRef.Optional, hash)
+				err := st.hashSecretRef(secretRef.Name, sets.NewString(), secretRef.Optional, hash)
 				if err != nil {
 					return nil, err
 				}
@@ -63,7 +63,7 @@ func (st *resourceSyncTask) generateHash(template core_v1.PodTemplateSpec, names
 
 			configMapRef := envFrom.ConfigMapRef
 			if configMapRef != nil {
-				err := st.hashConfigMapRef(configMapRef.Name, namespace, sets.NewString(), configMapRef.Optional, hash)
+				err := st.hashConfigMapRef(configMapRef.Name, sets.NewString(), configMapRef.Optional, hash)
 				if err != nil {
 					return nil, err
 				}
@@ -76,7 +76,7 @@ func (st *resourceSyncTask) generateHash(template core_v1.PodTemplateSpec, names
 
 			secretKeyRef := env.ValueFrom.SecretKeyRef
 			if secretKeyRef != nil {
-				err := st.hashSecretRef(secretKeyRef.Name, namespace, sets.NewString(secretKeyRef.Key), secretKeyRef.Optional, hash)
+				err := st.hashSecretRef(secretKeyRef.Name, sets.NewString(secretKeyRef.Key), secretKeyRef.Optional, hash)
 				if err != nil {
 					return nil, err
 				}
@@ -84,7 +84,7 @@ func (st *resourceSyncTask) generateHash(template core_v1.PodTemplateSpec, names
 
 			configMapKeyRef := env.ValueFrom.ConfigMapKeyRef
 			if configMapKeyRef != nil {
-				err := st.hashConfigMapRef(configMapKeyRef.Name, namespace, sets.NewString(configMapKeyRef.Key), configMapKeyRef.Optional, hash)
+				err := st.hashConfigMapRef(configMapKeyRef.Name, sets.NewString(configMapKeyRef.Key), configMapKeyRef.Optional, hash)
 				if err != nil {
 					return nil, err
 				}

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -136,10 +137,11 @@ func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 				},
 			},
 		},
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -255,10 +257,11 @@ func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
 				},
 			},
 		},
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -325,10 +328,11 @@ func TestAddsHashToDeploymentSpecForEnv(t *testing.T) {
 				},
 			},
 		},
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -395,10 +399,11 @@ func TestHashNotIgnoredForNonExistingKey(t *testing.T) {
 				},
 			},
 		},
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	_, err := rst.processDeployment(spec, deploymentTestNamespace)
+	_, err := rst.processDeployment(spec)
 	require.Error(t, err)
 }
 
@@ -462,10 +467,11 @@ func TestHashIgnoredForOptionalNonExistingKey(t *testing.T) {
 				},
 			},
 		},
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -516,10 +522,11 @@ func TestHashIgnoredForOptionalNonExistingSecret(t *testing.T) {
 		store: fakeStore{
 			responses: map[string]runtime.Object{},
 		},
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -568,10 +575,11 @@ func TestHashNotIgnoredForNonExistingSecret(t *testing.T) {
 		store: fakeStore{
 			responses: map[string]runtime.Object{},
 		},
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	_, err := rst.processDeployment(spec, deploymentTestNamespace)
+	_, err := rst.processDeployment(spec)
 	require.Error(t, err)
 }
 
@@ -605,10 +613,11 @@ func TestNoAnnotationForEmptyDeployment(t *testing.T) {
 	expectedSpec := runtimeToUnstructured(t, &expectedDeploymentSpec)
 
 	rst := resourceSyncTask{
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	assert.True(t, equality.Semantic.DeepEqual(expectedSpec.Object, updatedSpec.Object))
@@ -655,12 +664,13 @@ func TestEmptyAnnotationForDeploymentThatDoesntUseAnything(t *testing.T) {
 	}
 
 	rst := resourceSyncTask{
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -706,10 +716,11 @@ func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
 	rst := resourceSyncTask{
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -742,10 +753,11 @@ func TestUserEnteredAnnotationOverridden(t *testing.T) {
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
 	rst := resourceSyncTask{
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -812,10 +824,11 @@ func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
 				},
 			},
 		},
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -894,10 +907,11 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 		store: fakeStore{
 			responses: allResponses,
 		},
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -910,13 +924,27 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 		store: fakeStore{
 			responses: allResponses,
 		},
+		bundle: depBundle(),
 		scheme: scheme(t),
 	}
 
-	secondUpdate, err := rstUpdatedMocks.processDeployment(spec, deploymentTestNamespace)
+	secondUpdate, err := rstUpdatedMocks.processDeployment(spec)
 	require.NoError(t, err)
 
 	secondDeploymentCheck := deploymentUnmarshal(t, secondUpdate)
 	assert.Contains(t, secondDeploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
 	assert.NotEqual(t, secondDeploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey], firstHash)
+}
+
+func depBundle() *smith_v1.Bundle {
+	return &smith_v1.Bundle{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       smith_v1.BundleResourceKind,
+			APIVersion: smith_v1.BundleResourceGroupVersion,
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name:      "bundle1",
+			Namespace: deploymentTestNamespace,
+		},
+	}
 }
