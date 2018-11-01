@@ -104,13 +104,13 @@ func isDeploymentReady(obj runtime.Object) (statuschecker.ObjectStatusResult, er
 		}
 		if replicas != nil && updatedReplicas < *replicas {
 			return statuschecker.ObjectStatusInProgress{
-				Message: fmt.Sprintf("Number of replicas converging. Requested=%d, Have=%d", *replicas, updatedReplicas),
+				Message: fmt.Sprintf("Number of replicas converging. Requested=%d, Updated=%d", *replicas, updatedReplicas),
 			}, nil
 		}
 
 		if deployment.Status.Replicas > updatedReplicas {
 			return statuschecker.ObjectStatusInProgress{
-				Message: fmt.Sprintf("Number of replicas converging. Requested=%d, Have=%d", deployment.Status.Replicas, updatedReplicas),
+				Message: fmt.Sprintf("Number of replicas converging. Replicas=%d, Updated=%d", deployment.Status.Replicas, updatedReplicas),
 			}, nil
 		}
 
