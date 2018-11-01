@@ -162,16 +162,11 @@ func assertSuccess(ctx context.Context, t *testing.T, cfg *Config, args ...inter
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleInProgress, cond_v1.ConditionFalse)
 	smith_testing.AssertCondition(cfg.T, bundleRes, smith_v1.BundleError, cond_v1.ConditionFalse)
 
-	resCond := smith_testing.AssertResourceCondition(t,
+	smith_testing.AssertResourceCondition(t,
 		bundleRes,
 		deploymentResourceName,
 		smith_v1.ResourceReady,
 		cond_v1.ConditionTrue)
-
-	if resCond != nil {
-		assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-		assert.Equal(t, "object is not controlled by the Bundle and does not have a controller at all", resCond.Message)
-	}
 }
 
 func assertDeadlineExceeded(ctx context.Context, t *testing.T, cfg *Config, args ...interface{}) {
@@ -187,9 +182,8 @@ func assertDeadlineExceeded(ctx context.Context, t *testing.T, cfg *Config, args
 		smith_v1.ResourceError,
 		cond_v1.ConditionTrue)
 
-	if resCond != nil {
-		assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-		assert.Equal(t, "deployment exceeded its progress deadline", resCond.Message)
-	}
+	assert.NotNil(t, resCond)
+	assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
+	assert.Equal(t, "deployment exceeded its progress deadline", resCond.Message)
 
 }
