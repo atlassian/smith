@@ -70,7 +70,7 @@ func testCrdAttribute(ctxTest context.Context, t *testing.T, cfg *Config, args .
 		}
 	})
 
-	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sl.Spec.SleepFor+3)*time.Second)
+	ctxTimeout, cancel := context.WithTimeout(ctxTest, time.Duration(sl.Spec.SleepFor+10)*time.Second)
 	defer cancel()
 
 	cfg.AssertBundle(ctxTimeout, cfg.Bundle)

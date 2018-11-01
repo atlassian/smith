@@ -214,7 +214,7 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	sClient, err := sleeper.Client(cfg.Config)
 	require.NoError(t, err)
 
-	ctxTimeout1, cancel1 := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+2)*time.Second)
+	ctxTimeout1, cancel1 := context.WithTimeout(ctxTest, time.Duration(sleeper1.Spec.SleepFor+10)*time.Second)
 	defer cancel1()
 
 	bundleRes1 := cfg.AssertBundle(ctxTimeout1, cfg.Bundle)
@@ -228,7 +228,7 @@ func testUpdate(ctxTest context.Context, t *testing.T, cfg *Config, args ...inte
 	_, err = cfg.SmithClient.SmithV1().Bundles(cfg.Namespace).Update(bundle2)
 	require.NoError(t, err)
 
-	ctxTimeout2, cancel2 := context.WithTimeout(ctxTest, time.Duration(sleeper2.Spec.SleepFor+2)*time.Second)
+	ctxTimeout2, cancel2 := context.WithTimeout(ctxTest, time.Duration(sleeper2.Spec.SleepFor+10)*time.Second)
 	defer cancel2()
 
 	bundleRes2 := cfg.AssertBundle(ctxTimeout2, bundle2)
