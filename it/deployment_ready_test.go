@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const deploymentResourceName string = "deployment-ready-test"
+const deploymentResourceName = smith_v1.ResourceName("deployment-ready-test")
 
 func constructBundle(t *testing.T, progressDeadlineSeconds int32, containerParams ...string) *smith_v1.Bundle {
 	// This is a hack for now until someone can help
@@ -25,7 +25,7 @@ func constructBundle(t *testing.T, progressDeadlineSeconds int32, containerParam
 	// in processResource "createOrUpdate"
 	const LastAppliedReplicasAnnotation string = smith.Domain + "/LastAppliedReplicas"
 
-	resourceName := smith_v1.ResourceName(deploymentResourceName)
+	resourceName := deploymentResourceName
 
 	labelMap := map[string]string{
 		"name": string(resourceName),
@@ -164,7 +164,7 @@ func assertSuccess(ctx context.Context, t *testing.T, cfg *Config, args ...inter
 
 	resCond := smith_testing.AssertResourceCondition(t,
 		bundleRes,
-		smith_v1.ResourceName(deploymentResourceName),
+		deploymentResourceName,
 		smith_v1.ResourceReady,
 		cond_v1.ConditionTrue)
 
@@ -183,7 +183,7 @@ func assertDeadlineExceeded(ctx context.Context, t *testing.T, cfg *Config, args
 
 	resCond := smith_testing.AssertResourceCondition(t,
 		bundleRes,
-		smith_v1.ResourceName(deploymentResourceName),
+		deploymentResourceName,
 		smith_v1.ResourceError,
 		cond_v1.ConditionTrue)
 
