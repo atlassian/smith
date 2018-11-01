@@ -97,7 +97,7 @@ func isDeploymentReady(obj runtime.Object) (statuschecker.ObjectStatusResult, er
 		progressingCond := getDeploymentCondition(&deployment, apps_v1.DeploymentProgressing)
 		if progressingCond != nil && progressingCond.Reason == timedOutReason {
 			return statuschecker.ObjectStatusError{
-				UserError:      false,
+				UserError:      true,
 				RetriableError: false,
 				Error:          errors.Errorf("deployment exceeded its progress deadline"),
 			}, nil
