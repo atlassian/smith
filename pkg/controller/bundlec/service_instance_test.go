@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/atlassian/smith"
+	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -117,10 +118,11 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 				},
 			},
 		},
+		bundle: siBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil)
 	require.NoError(t, err)
 
 	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
@@ -129,7 +131,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
 	firstCheckSum := instanceCheck.ObjectMeta.Annotations[siTestAnnotationKey]
 
-	updateTwice, err := rst.processServiceInstance(spec, instanceCheck, siTestNamespace)
+	updateTwice, err := rst.processServiceInstance(spec, instanceCheck)
 	require.NoError(t, err)
 	secondInstance := serviceInstanceUnmarshal(t, updateTwice)
 
@@ -152,10 +154,11 @@ func TestNoAnnotationForEmptyParameretersFrom(t *testing.T) {
 	spec := runtimeToUnstructured(t, &instanceSpec)
 
 	rst := resourceSyncTask{
+		bundle: siBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil)
 	require.NoError(t, err)
 
 	assert.True(t, equality.Semantic.DeepEqual(spec.Object, updatedSpec.Object))
@@ -189,10 +192,11 @@ func TestExplicitlyDisabled(t *testing.T) {
 	spec := runtimeToUnstructured(t, &instanceSpec)
 
 	rst := resourceSyncTask{
+		bundle: siBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil)
 	require.NoError(t, err)
 
 	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
@@ -269,10 +273,11 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 		store: fakeStore{
 			responses: allResponses,
 		},
+		bundle: siBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil)
 	require.NoError(t, err)
 
 	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
@@ -287,10 +292,11 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 		store: fakeStore{
 			responses: allResponses,
 		},
+		bundle: siBundle(),
 		scheme: scheme(t),
 	}
 
-	updateTwice, err := rstUpdatedMocks.processServiceInstance(spec, instanceCheck, siTestNamespace)
+	updateTwice, err := rstUpdatedMocks.processServiceInstance(spec, instanceCheck)
 	require.NoError(t, err)
 	secondInstance := serviceInstanceUnmarshal(t, updateTwice)
 
@@ -319,10 +325,11 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 	spec := runtimeToUnstructured(t, &instanceSpec)
 
 	rst := resourceSyncTask{
+		bundle: siBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil)
 	require.NoError(t, err)
 
 	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
@@ -383,10 +390,11 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 				},
 			},
 		},
+		bundle: siBundle(),
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil)
 	require.NoError(t, err)
 
 	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
@@ -396,7 +404,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	assert.NotEqual(t, instanceCheck.ObjectMeta.Annotations[siTestAnnotationKey], userAnnotationValue)
 	firstAnnotationValue := instanceCheck.ObjectMeta.Annotations[siTestAnnotationKey]
 
-	compareToPreviousUpdate, err := rst.processServiceInstance(spec, instanceCheck, siTestNamespace)
+	compareToPreviousUpdate, err := rst.processServiceInstance(spec, instanceCheck)
 	require.NoError(t, err)
 
 	ignoreUserValue := serviceInstanceUnmarshal(t, compareToPreviousUpdate)
@@ -419,4 +427,17 @@ func runtimeToUnstructured(t *testing.T, obj runtime.Object) *unstructured.Unstr
 	out, err := util.RuntimeToUnstructured(obj)
 	require.NoError(t, err)
 	return out
+}
+
+func siBundle() *smith_v1.Bundle {
+	return &smith_v1.Bundle{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       smith_v1.BundleResourceKind,
+			APIVersion: smith_v1.BundleResourceGroupVersion,
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name:      "bundle1",
+			Namespace: siTestNamespace,
+		},
+	}
 }

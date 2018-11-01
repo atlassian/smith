@@ -32,7 +32,7 @@ const (
 // 2. if there are referenced secrets we proceed to check and generate a new value for the annotation
 //
 // This can be disabled by adding the annotation with the value 'disabled'
-func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
+func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructured, actual runtime.Object) (*unstructured.Unstructured /*spec*/, error) {
 	instanceSpec := &sc_v1b1.ServiceInstance{}
 	var previousEncodedChecksum string
 	var updateCount int64
@@ -58,7 +58,7 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 		updateCount = actualInstance.Spec.UpdateRequests
 	}
 
-	checkSum, err := st.calculateNewServiceInstanceCheckSum(instanceSpec, namespace)
+	checkSum, err := st.calculateNewServiceInstanceCheckSum(instanceSpec)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate new checksum")
 	}
@@ -77,8 +77,8 @@ func (st *resourceSyncTask) processServiceInstance(spec *unstructured.Unstructur
 	return unstructuredSpec, nil
 }
 
-func (st *resourceSyncTask) calculateNewServiceInstanceCheckSum(instanceSpec *sc_v1b1.ServiceInstance, namespace string) (string, error) {
-	checksumPayload, err := st.generateSecretParametersChecksumPayload(&instanceSpec.Spec, namespace)
+func (st *resourceSyncTask) calculateNewServiceInstanceCheckSum(instanceSpec *sc_v1b1.ServiceInstance) (string, error) {
+	checksumPayload, err := st.generateSecretParametersChecksumPayload(&instanceSpec.Spec)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate checksum")
 	}
@@ -86,12 +86,12 @@ func (st *resourceSyncTask) calculateNewServiceInstanceCheckSum(instanceSpec *sc
 	return hex.EncodeToString(checksumPayload), nil
 }
 
-func (st *resourceSyncTask) generateSecretParametersChecksumPayload(spec *sc_v1b1.ServiceInstanceSpec, namespace string) ([]byte, error) {
+func (st *resourceSyncTask) generateSecretParametersChecksumPayload(spec *sc_v1b1.ServiceInstanceSpec) ([]byte, error) {
 	hash := sha256.New()
 
 	for _, parametersFrom := range spec.ParametersFrom {
 		secretKeyRef := parametersFrom.SecretKeyRef
-		err := st.hashSecretRef(secretKeyRef.Name, namespace, sets.NewString(secretKeyRef.Key), nil, hash)
+		err := st.hashSecretRef(secretKeyRef.Name, sets.NewString(secretKeyRef.Key), nil, hash)
 		if err != nil {
 			return nil, err
 		}

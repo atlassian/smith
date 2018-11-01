@@ -10,41 +10,41 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func (st *resourceSyncTask) hashSecretRef(name, namespace string, filter sets.String, optional *bool, h hash.Hash) error {
-	secret, exists, err := st.derefObject(core_v1.SchemeGroupVersion.WithKind("Secret"), namespace, name)
+func (st *resourceSyncTask) hashSecretRef(name string, filter sets.String, optional *bool, h hash.Hash) error {
+	secret, exists, err := st.derefObject(core_v1.SchemeGroupVersion.WithKind("Secret"), name)
 	if err != nil {
 		return err
 	}
 	if !exists {
 		if optional == nil || !*optional {
-			return errors.Errorf("secret %q not found", name)
+			return errors.Errorf("Secret %q not found", name)
 		}
 		return nil
 	}
 
 	found := hashSecret(secret.(*core_v1.Secret), h, filter)
 	if !found && (optional == nil || !*optional) {
-		return errors.Errorf("not all keys %v found in secret %q", filter, name)
+		return errors.Errorf("not all keys %v found in Secret %q", filter, name)
 	}
 
 	return nil
 }
 
-func (st *resourceSyncTask) hashConfigMapRef(name, namespace string, filter sets.String, optional *bool, h hash.Hash) error {
-	configmap, exists, err := st.derefObject(core_v1.SchemeGroupVersion.WithKind("ConfigMap"), namespace, name)
+func (st *resourceSyncTask) hashConfigMapRef(name string, filter sets.String, optional *bool, h hash.Hash) error {
+	configmap, exists, err := st.derefObject(core_v1.SchemeGroupVersion.WithKind("ConfigMap"), name)
 	if err != nil {
 		return err
 	}
 	if !exists {
 		if optional == nil || !*optional {
-			return errors.Errorf("configMap %q not found", name)
+			return errors.Errorf("ConfigMap %q not found", name)
 		}
 		return nil
 	}
 
 	found := hashConfigMap(configmap.(*core_v1.ConfigMap), h, filter)
 	if !found && (optional == nil || !*optional) {
-		return errors.Errorf("not all keys %v found in configmap %q", filter, name)
+		return errors.Errorf("not all keys %v found in ConfigMap %q", filter, name)
 	}
 
 	return nil
