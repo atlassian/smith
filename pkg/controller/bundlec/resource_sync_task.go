@@ -10,6 +10,7 @@ import (
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -147,16 +148,6 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 		}
 	}
 
-	// Force Service Catalog to update service instances when secrets they depend change
-	spec, err = st.forceUpdatesOfResources(spec, actual, st.bundle.Namespace)
-	if err != nil {
-		return resourceInfo{
-			status: resourceStatusError{
-				err: err,
-			},
-		}
-	}
-
 	// Create or update resource
 	resUpdated, retriable, err := st.createOrUpdate(spec, actual)
 	if err != nil {
@@ -252,15 +243,6 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 			},
 		}
 	}
-}
-
-func (st *resourceSyncTask) forceUpdatesOfResources(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
-	spec, err := st.forceServiceInstanceUpdates(spec, actual, st.bundle.Namespace)
-	if err != nil {
-		return nil, err
-	}
-
-	return st.forceDeploymentUpdates(spec, actual, st.bundle.Namespace)
 }
 
 func (st *resourceSyncTask) maybeExtractBindingSecret(obj *unstructured.Unstructured) (*core_v1.Secret, error) {
@@ -496,6 +478,20 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 		})
 	}
 	obj.SetOwnerReferences(refs)
+
+	// Object GroupKind-specific munging
+	switch obj.GroupVersionKind().GroupKind() {
+	case schema.GroupKind{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}:
+		obj, err = st.processServiceInstance(obj, actual, st.bundle.Namespace)
+		if err != nil {
+			return nil, err
+		}
+	case schema.GroupKind{Group: apps_v1.GroupName, Kind: "Deployment"}:
+		obj, err = st.processDeployment(obj, st.bundle.Namespace)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return obj, nil
 }

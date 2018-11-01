@@ -23,24 +23,9 @@ const (
 // do this we record the contents of all referenced secrets in an annotation, compare that annotations value
 // each time a service instance is processed, and force UpdateRequests to a higher value when those secrets
 // change to trigger service catalog to send an update request.
-func (st *resourceSyncTask) forceServiceInstanceUpdates(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
-	gvk := spec.GroupVersionKind()
-
-	if gvk.Group == sc_v1b1.GroupName && gvk.Kind == "ServiceInstance" {
-		return st.processServiceInstance(spec, actual, namespace)
-	}
-
-	return spec, nil
-}
-
-// works by adding using an annotation to remember the previous contents of all the secrets referenced in
-// parametersFrom and forcing updateRequest to higher value when the referenced secrets change. The annotation
-// stores the hex value of the bcryted hash of the sha256 hash of the contents of all secrets referenced in
-// parametersFrom.
 //
 // The annotation is only ever added to the spec object not the actual object. The modified spec is treated as
-// if the user manually set the annotation.  This means that if the spec is updated to remove all parametersFrom
-// referenced secrets the annotation will be removed.
+// if the user manually set the annotation.
 //
 // If the a user actually did set the annotation manually there are two cases.
 // 1. if there are no parametersFrom referenced secrets we leave the spec untouched
