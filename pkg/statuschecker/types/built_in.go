@@ -67,7 +67,7 @@ func alwaysReady(_ runtime.Object) (statuschecker.ObjectStatusResult, error) {
 	return statuschecker.ObjectStatusReady{}, nil
 }
 
-func getDeploymentCondition(deployment apps_v1.Deployment, condType apps_v1.DeploymentConditionType) *apps_v1.DeploymentCondition {
+func getDeploymentCondition(deployment *apps_v1.Deployment, condType apps_v1.DeploymentConditionType) *apps_v1.DeploymentCondition {
 	deploymentStatus := deployment.Status
 	for i := range deploymentStatus.Conditions {
 		c := deploymentStatus.Conditions[i]
@@ -94,7 +94,7 @@ func isDeploymentReady(obj runtime.Object) (statuschecker.ObjectStatusResult, er
 	availableReplicas := deployment.Status.AvailableReplicas
 
 	if generation <= observedGeneration {
-		progressingCond := getDeploymentCondition(deployment, apps_v1.DeploymentProgressing)
+		progressingCond := getDeploymentCondition(&deployment, apps_v1.DeploymentProgressing)
 		if progressingCond != nil && progressingCond.Reason == timedOutReason {
 			return statuschecker.ObjectStatusError{
 				UserError:      false,
