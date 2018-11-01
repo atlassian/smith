@@ -120,7 +120,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
 	require.NoError(t, err)
 
 	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
@@ -129,7 +129,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 	assert.Zero(t, instanceCheck.Spec.UpdateRequests, "expected UpdateRequests to be 0 for create")
 	firstCheckSum := instanceCheck.ObjectMeta.Annotations[siTestAnnotationKey]
 
-	updateTwice, err := rst.forceServiceInstanceUpdates(spec, instanceCheck, siTestNamespace)
+	updateTwice, err := rst.processServiceInstance(spec, instanceCheck, siTestNamespace)
 	require.NoError(t, err)
 	secondInstance := serviceInstanceUnmarshal(t, updateTwice)
 
@@ -155,7 +155,7 @@ func TestNoAnnotationForEmptyParameretersFrom(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
 	require.NoError(t, err)
 
 	assert.True(t, equality.Semantic.DeepEqual(spec.Object, updatedSpec.Object))
@@ -192,7 +192,7 @@ func TestExplicitlyDisabled(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
 	require.NoError(t, err)
 
 	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
@@ -272,7 +272,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
 	require.NoError(t, err)
 
 	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
@@ -290,7 +290,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updateTwice, err := rstUpdatedMocks.forceServiceInstanceUpdates(spec, instanceCheck, siTestNamespace)
+	updateTwice, err := rstUpdatedMocks.processServiceInstance(spec, instanceCheck, siTestNamespace)
 	require.NoError(t, err)
 	secondInstance := serviceInstanceUnmarshal(t, updateTwice)
 
@@ -322,7 +322,7 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
 	require.NoError(t, err)
 
 	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
@@ -386,7 +386,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceServiceInstanceUpdates(spec, nil, siTestNamespace)
+	updatedSpec, err := rst.processServiceInstance(spec, nil, siTestNamespace)
 	require.NoError(t, err)
 
 	instanceCheck := serviceInstanceUnmarshal(t, updatedSpec)
@@ -396,7 +396,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	assert.NotEqual(t, instanceCheck.ObjectMeta.Annotations[siTestAnnotationKey], userAnnotationValue)
 	firstAnnotationValue := instanceCheck.ObjectMeta.Annotations[siTestAnnotationKey]
 
-	compareToPreviousUpdate, err := rst.forceServiceInstanceUpdates(spec, instanceCheck, siTestNamespace)
+	compareToPreviousUpdate, err := rst.processServiceInstance(spec, instanceCheck, siTestNamespace)
 	require.NoError(t, err)
 
 	ignoreUserValue := serviceInstanceUnmarshal(t, compareToPreviousUpdate)

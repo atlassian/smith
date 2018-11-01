@@ -10,7 +10,6 @@ import (
 	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -19,17 +18,7 @@ const (
 )
 
 // works around https://github.com/kubernetes/kubernetes/issues/22368
-func (st *resourceSyncTask) forceDeploymentUpdates(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
-	gvk := spec.GroupVersionKind()
-
-	if gvk.Group == apps_v1.GroupName && gvk.Kind == "Deployment" {
-		return st.processDeployment(spec, actual, namespace)
-	}
-
-	return spec, nil
-}
-
-func (st *resourceSyncTask) processDeployment(spec *unstructured.Unstructured, actual runtime.Object, namespace string) (specRet *unstructured.Unstructured, e error) {
+func (st *resourceSyncTask) processDeployment(spec *unstructured.Unstructured, namespace string) (specRet *unstructured.Unstructured, e error) {
 	deploymentSpec := &apps_v1.Deployment{}
 
 	if err := util.ConvertType(st.scheme, spec, deploymentSpec); err != nil {

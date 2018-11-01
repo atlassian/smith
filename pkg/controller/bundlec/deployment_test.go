@@ -139,7 +139,7 @@ func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -258,7 +258,7 @@ func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -328,7 +328,7 @@ func TestAddsHashToDeploymentSpecForEnv(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -398,7 +398,7 @@ func TestHashNotIgnoredForNonExistingKey(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	_, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	_, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.Error(t, err)
 }
 
@@ -465,7 +465,7 @@ func TestHashIgnoredForOptionalNonExistingKey(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -519,7 +519,7 @@ func TestHashIgnoredForOptionalNonExistingSecret(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -571,7 +571,7 @@ func TestHashNotIgnoredForNonExistingSecret(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	_, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	_, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.Error(t, err)
 }
 
@@ -608,7 +608,7 @@ func TestNoAnnotationForEmptyDeployment(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	assert.True(t, equality.Semantic.DeepEqual(expectedSpec.Object, updatedSpec.Object))
@@ -660,7 +660,7 @@ func TestEmptyAnnotationForDeploymentThatDoesntUseAnything(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -709,7 +709,7 @@ func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -745,7 +745,7 @@ func TestUserEnteredAnnotationOverridden(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -815,7 +815,7 @@ func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -897,7 +897,7 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	updatedSpec, err := rst.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
@@ -913,7 +913,7 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 		scheme: scheme(t),
 	}
 
-	secondUpdate, err := rstUpdatedMocks.forceDeploymentUpdates(spec, nil, deploymentTestNamespace)
+	secondUpdate, err := rstUpdatedMocks.processDeployment(spec, deploymentTestNamespace)
 	require.NoError(t, err)
 
 	secondDeploymentCheck := deploymentUnmarshal(t, secondUpdate)
