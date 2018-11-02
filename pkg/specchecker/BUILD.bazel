@@ -3,7 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "built_in.go",
+        "process_deployment.go",
+        "process_secret.go",
+        "process_service.go",
+        "process_service_binding.go",
+        "process_service_instance.go",
+        "process_util.go",
         "specchecker.go",
         "types.go",
     ],
