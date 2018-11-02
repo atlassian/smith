@@ -1,4 +1,4 @@
-package speccheck
+package specchecker
 
 import (
 	"github.com/atlassian/smith/pkg/util"
@@ -8,13 +8,28 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type SpecCheck struct {
-	// Server fields cleanup
-	Cleaner SpecCleaner
+	KnownTypes map[schema.GroupKind]ObjectProcessor
+}
+
+func New(kts ...map[schema.GroupKind]ObjectProcessor) *SpecCheck {
+	kt := make(map[schema.GroupKind]ObjectProcessor)
+	for _, knownTypes := range kts {
+		for knownGK, f := range knownTypes {
+			if kt[knownGK] != nil {
+				panic(errors.Errorf("GK specified more than once: %s", knownGK))
+			}
+			kt[knownGK] = f
+		}
+	}
+	return &SpecCheck{
+		KnownTypes: kt,
+	}
 }
 
 func (sc *SpecCheck) CompareActualVsSpec(logger *zap.Logger, spec, actual runtime.Object) (*unstructured.Unstructured, bool /*match*/, string /* diff */, error) {
@@ -47,9 +62,17 @@ func (sc *SpecCheck) compareActualVsSpec(logger *zap.Logger, spec, actual *unstr
 	trimEmptyField(actualClone, "metadata", "finalizers")
 
 	// Ignore fields managed by server, pre-process spec, etc
-	spec, err := sc.Cleaner.Cleanup(logger, spec, actualClone)
-	if err != nil {
-		return nil, false, "", errors.Wrap(err, "cleanup failed")
+	gk := spec.GroupVersionKind().GroupKind()
+
+	if processor, ok := sc.KnownTypes[gk]; ok {
+		appliedSpec, err := processor.ApplySpec(&Context{Logger: logger}, spec, actualClone)
+		if err != nil {
+			return nil, false, "", errors.Wrap(err, "failed to apply specification to the actual object")
+		}
+		spec, err = util.RuntimeToUnstructured(appliedSpec)
+		if err != nil {
+			return nil, false, "", err
+		}
 	}
 
 	// Copy data from the spec

@@ -5,14 +5,12 @@ import (
 
 	"github.com/atlassian/ctrl"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/cleanup"
-	clean_types "github.com/atlassian/smith/pkg/cleanup/types"
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
-	"github.com/atlassian/smith/pkg/speccheck"
+	"github.com/atlassian/smith/pkg/specchecker"
 	"github.com/atlassian/smith/pkg/statuschecker"
 	ready_types "github.com/atlassian/smith/pkg/statuschecker/types"
 	"github.com/atlassian/smith/pkg/store"
@@ -142,18 +140,12 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 		return nil, err
 	}
 
-	// Object cleanup
-	cleanupTypes := []map[schema.GroupKind]cleanup.SpecCleanup{clean_types.MainKnownTypes}
+	// Spec checker
+	checkTypes := []map[schema.GroupKind]specchecker.ObjectProcessor{specchecker.MainKnownTypes}
 	if c.ServiceCatalogSupport {
-		cleanupTypes = append(cleanupTypes, clean_types.ServiceCatalogKnownTypes)
+		checkTypes = append(checkTypes, specchecker.ServiceCatalogKnownTypes)
 	}
-
-	oc := cleanup.New(cleanupTypes...)
-
-	// Spec check
-	specCheck := &speccheck.SpecCheck{
-		Cleaner: oc,
-	}
+	specChecker := specchecker.New(checkTypes...)
 
 	// Multi store
 	multiStore := store.NewMulti()
@@ -210,7 +202,7 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 		SmartClient:                     smartClient,
 		Rc:                              rc,
 		Store:                           multiStore,
-		SpecCheck:                       specCheck,
+		SpecChecker:                     specChecker,
 		WorkQueue:                       cctx.WorkQueue,
 		CrdResyncPeriod:                 config.ResyncPeriod,
 		Namespace:                       config.Namespace,
