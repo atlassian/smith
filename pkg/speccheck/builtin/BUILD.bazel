@@ -2,7 +2,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["built_in.go"],
+    srcs = [
+        "known_types.go",
+        "process_deployment.go",
+        "process_secret.go",
+        "process_service.go",
+        "process_service_binding.go",
+        "process_service_instance.go",
+        "process_util.go",
+    ],
     importpath = "github.com/atlassian/smith/pkg/speccheck/builtin",
     visibility = ["//visibility:public"],
     deps = [
