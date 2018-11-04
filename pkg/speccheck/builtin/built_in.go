@@ -1,4 +1,4 @@
-package types
+package builtin
 
 import (
 	"reflect"
@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/cleanup"
+	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
@@ -20,15 +20,15 @@ import (
 )
 
 var (
-	MainKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
-		{Group: apps_v1.GroupName, Kind: "Deployment"}: deploymentCleanup,
-		{Group: core_v1.GroupName, Kind: "Service"}:    serviceCleanup,
-		{Group: core_v1.GroupName, Kind: "Secret"}:     secretCleanup,
+	MainKnownTypes = map[schema.GroupKind]speccheck.ObjectProcessor{
+		{Group: apps_v1.GroupName, Kind: "Deployment"}: deployment{},
+		{Group: core_v1.GroupName, Kind: "Service"}:    service{},
+		{Group: core_v1.GroupName, Kind: "Secret"}:     secret{},
 	}
 
-	ServiceCatalogKnownTypes = map[schema.GroupKind]cleanup.SpecCleanup{
-		{Group: sc_v1b1.GroupName, Kind: "ServiceBinding"}:  bindingCleanup,
-		{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: instanceCleanup,
+	ServiceCatalogKnownTypes = map[schema.GroupKind]speccheck.ObjectProcessor{
+		{Group: sc_v1b1.GroupName, Kind: "ServiceBinding"}:  serviceBinding{},
+		{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}: serviceInstance{},
 	}
 
 	appsV1Scheme = runtime.NewScheme()
@@ -36,8 +36,10 @@ var (
 	coreV1Scheme = runtime.NewScheme()
 )
 
-// LastAppliedReplicasAnnotation is the name of annotation which stores last applied replicas for deployment
-const LastAppliedReplicasAnnotation string = smith.Domain + "/LastAppliedReplicas"
+const (
+	// LastAppliedReplicasAnnotation is the name of annotation which stores last applied replicas for deployment
+	LastAppliedReplicasAnnotation = smith.Domain + "/LastAppliedReplicas"
+)
 
 func init() {
 	utilruntime.Must(apps_v1.SchemeBuilder.AddToScheme(appsV1Scheme))
@@ -45,7 +47,10 @@ func init() {
 	utilruntime.Must(core_v1.SchemeBuilder.AddToScheme(coreV1Scheme))
 }
 
-func deploymentCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+type deployment struct {
+}
+
+func (deployment) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var deploymentSpec apps_v1.Deployment
 	if err := util.ConvertType(appsV1Scheme, spec, &deploymentSpec); err != nil {
 		return nil, err
@@ -81,7 +86,7 @@ func deploymentCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.U
 	// overrides with current replicas inside spec if parsing failure
 	lastAppliedReplicas, err := strconv.Atoi(strings.TrimSpace(lastAppliedReplicasConf))
 	if err != nil {
-		cleanupCtx.Logger.Warn("overriding last applied replicas annotation due to parsing failure", zap.Error(err))
+		ctx.Logger.Warn("overriding last applied replicas annotation due to parsing failure", zap.Error(err))
 		deploymentSpec.Annotations[LastAppliedReplicasAnnotation] = strconv.Itoa(int(*deploymentSpec.Spec.Replicas))
 		return util.RuntimeToUnstructured(&deploymentSpec)
 	}
@@ -101,7 +106,10 @@ func deploymentCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.U
 	return util.RuntimeToUnstructured(&deploymentSpec)
 }
 
-func serviceCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+type service struct {
+}
+
+func (service) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var serviceSpec core_v1.Service
 	if err := util.ConvertType(coreV1Scheme, spec, &serviceSpec); err != nil {
 		return nil, err
@@ -130,7 +138,10 @@ func serviceCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.Unst
 	return &serviceSpec, nil
 }
 
-func secretCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+type secret struct {
+}
+
+func (secret) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var secretSpec core_v1.Secret
 	if err := util.ConvertType(coreV1Scheme, spec, &secretSpec); err != nil {
 		return nil, err
@@ -150,7 +161,10 @@ func secretCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.Unstr
 	return &secretSpec, nil
 }
 
-func bindingCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+type serviceBinding struct {
+}
+
+func (serviceBinding) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var sbSpec sc_v1b1.ServiceBinding
 	if err := util.ConvertType(scV1B1Scheme, spec, &sbSpec); err != nil {
 		return nil, err
@@ -177,7 +191,10 @@ func bindingCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.Unst
 	return &sbSpec, nil
 }
 
-func instanceCleanup(cleanupCtx *cleanup.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+type serviceInstance struct {
+}
+
+func (serviceInstance) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var instanceSpec sc_v1b1.ServiceInstance
 	if err := util.ConvertType(scV1B1Scheme, spec, &instanceSpec); err != nil {
 		return nil, err

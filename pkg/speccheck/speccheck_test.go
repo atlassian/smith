@@ -1,4 +1,4 @@
-package speccheck
+package speccheck_test
 
 import (
 	"encoding/json"
@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/atlassian/smith/pkg/cleanup"
-	"github.com/atlassian/smith/pkg/cleanup/types"
+	"github.com/atlassian/smith/pkg/speccheck"
+	"github.com/atlassian/smith/pkg/speccheck/builtin"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,7 +65,7 @@ func TestEqualityCheck(t *testing.T) {
 					APIVersion: apps_v1.SchemeGroupVersion.String(),
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+					Annotations: map[string]string{builtin.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
 				},
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &numberOfReplicas,
@@ -99,7 +99,7 @@ func TestEqualityCheck(t *testing.T) {
 					APIVersion: apps_v1.SchemeGroupVersion.String(),
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+					Annotations: map[string]string{builtin.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
 				},
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &numberOfReplicas,
@@ -129,7 +129,7 @@ func TestEqualityCheck(t *testing.T) {
 					APIVersion: apps_v1.SchemeGroupVersion.String(),
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+					Annotations: map[string]string{builtin.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
 				},
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &runningNumberOfReplicas,
@@ -249,9 +249,7 @@ func TestEqualityCheck(t *testing.T) {
 		input := input
 		t.Run(input.name, func(t *testing.T) {
 			t.Parallel()
-			sc := SpecCheck{
-				Cleaner: cleanup.New(types.ServiceCatalogKnownTypes, types.MainKnownTypes),
-			}
+			sc := speccheck.New(builtin.ServiceCatalogKnownTypes, builtin.MainKnownTypes)
 			_, match, difference, err := sc.CompareActualVsSpec(logger, input.spec, input.actual)
 			require.NoError(t, err)
 			assert.True(t, match)
@@ -322,7 +320,7 @@ func TestEqualityUnequal(t *testing.T) {
 					APIVersion: apps_v1.SchemeGroupVersion.String(),
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+					Annotations: map[string]string{builtin.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
 				},
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &newNumberOfReplicas,
@@ -352,7 +350,7 @@ func TestEqualityUnequal(t *testing.T) {
 					APIVersion: apps_v1.SchemeGroupVersion.String(),
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+					Annotations: map[string]string{builtin.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
 				},
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &numberOfReplicas,
@@ -386,7 +384,7 @@ func TestEqualityUnequal(t *testing.T) {
 					APIVersion: apps_v1.SchemeGroupVersion.String(),
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
+					Annotations: map[string]string{builtin.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas))},
 				},
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &numberOfReplicas,
@@ -416,7 +414,7 @@ func TestEqualityUnequal(t *testing.T) {
 					APIVersion: apps_v1.SchemeGroupVersion.String(),
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Annotations: map[string]string{types.LastAppliedReplicasAnnotation: "WrongNumberOfReplicas"},
+					Annotations: map[string]string{builtin.LastAppliedReplicasAnnotation: "WrongNumberOfReplicas"},
 				},
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &numberOfReplicas,
@@ -450,9 +448,7 @@ func TestEqualityUnequal(t *testing.T) {
 		input := input
 		t.Run(input.name, func(t *testing.T) {
 			t.Parallel()
-			sc := SpecCheck{
-				Cleaner: cleanup.New(types.ServiceCatalogKnownTypes, types.MainKnownTypes),
-			}
+			sc := speccheck.New(builtin.ServiceCatalogKnownTypes, builtin.MainKnownTypes)
 			_, match, difference, err := sc.CompareActualVsSpec(logger, input.spec, input.actual)
 			require.NoError(t, err)
 			assert.False(t, match)
@@ -469,16 +465,14 @@ func TestDoNotPanicWhenLoggingDiff(t *testing.T) {
 
 	var expected, actual unstructured.Unstructured
 
-	err := json.Unmarshal([]byte(`{ "kind": "Bundle", "environment": {} }`), &expected)
+	err := json.Unmarshal([]byte(`{ "kind": "Bundle", "apiVersion": "v1", "environment": {} }`), &expected)
 	require.NoError(t, err)
 
-	err = json.Unmarshal([]byte(`{ "kind": "Bundle", "environment": "test" }`), &actual)
+	err = json.Unmarshal([]byte(`{ "kind": "Bundle", "apiVersion": "v1", "environment": "test" }`), &actual)
 	require.NoError(t, err)
 
-	sc := SpecCheck{
-		Cleaner: cleanup.New(types.ServiceCatalogKnownTypes, types.MainKnownTypes),
-	}
-	_, _, _, err = sc.compareActualVsSpec(logger, &expected, &actual)
+	sc := speccheck.New(builtin.ServiceCatalogKnownTypes, builtin.MainKnownTypes)
+	_, _, _, err = sc.CompareActualVsSpec(logger, &expected, &actual)
 	require.NoError(t, err)
 }
 
@@ -499,9 +493,7 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 			spec := input2()
 			t.Run(fmt.Sprintf("%s actual, %s spec", kind1, kind2), func(t *testing.T) {
 				t.Parallel()
-				sc := SpecCheck{
-					Cleaner: cleanup.New(),
-				}
+				sc := speccheck.New()
 				updated, match, difference, err := sc.CompareActualVsSpec(logger, spec, actual)
 				require.NoError(t, err)
 				assert.True(t, match)

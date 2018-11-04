@@ -346,11 +346,7 @@
 [[projects]]
   digest = "1:b8a780002f2309acd91eae62d81f012d79842f224d29ad091e4da231b6114946"
   name = "golang.org/x/crypto"
-  packages = [
-    "bcrypt",
-    "blowfish",
-    "ssh/terminal",
-  ]
+  packages = ["ssh/terminal"]
   pruneopts = "NT"
   revision = "de0752318171da717af4ce24d0a2e8626afaeb11"
 
@@ -756,7 +752,6 @@
     "go.uber.org/zap",
     "go.uber.org/zap/zapcore",
     "go.uber.org/zap/zaptest",
-    "golang.org/x/crypto/bcrypt",
     "gopkg.in/yaml.v2",
     "k8s.io/api/apps/v1",
     "k8s.io/api/autoscaling/v2beta1",
