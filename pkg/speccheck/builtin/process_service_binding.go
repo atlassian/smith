@@ -11,6 +11,10 @@ import (
 type serviceBinding struct {
 }
 
+func (serviceBinding) BeforeCreate(ctx *speccheck.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
+	return spec, nil
+}
+
 func (serviceBinding) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var sbSpec sc_v1b1.ServiceBinding
 	if err := util.ConvertType(scV1B1Scheme, spec, &sbSpec); err != nil {

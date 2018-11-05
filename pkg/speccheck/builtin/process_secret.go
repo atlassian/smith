@@ -11,6 +11,10 @@ import (
 type secret struct {
 }
 
+func (secret) BeforeCreate(ctx *speccheck.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
+	return spec, nil
+}
+
 func (secret) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var secretSpec core_v1.Secret
 	if err := util.ConvertType(coreV1Scheme, spec, &secretSpec); err != nil {

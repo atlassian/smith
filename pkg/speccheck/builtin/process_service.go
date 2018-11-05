@@ -11,6 +11,10 @@ import (
 type service struct {
 }
 
+func (service) BeforeCreate(ctx *speccheck.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
+	return spec, nil
+}
+
 func (service) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var serviceSpec core_v1.Service
 	if err := util.ConvertType(coreV1Scheme, spec, &serviceSpec); err != nil {

@@ -131,23 +131,6 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 		}
 	}
 
-	// Status Checker
-	readyTypes := []map[schema.GroupKind]statuschecker.ObjectStatusChecker{ready_types.MainKnownTypes}
-	if c.ServiceCatalogSupport {
-		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
-	}
-	rc, err := statuschecker.New(crdStore, readyTypes...)
-	if err != nil {
-		return nil, err
-	}
-
-	// Spec check
-	checkTypes := []map[schema.GroupKind]speccheck.ObjectProcessor{builtin.MainKnownTypes}
-	if c.ServiceCatalogSupport {
-		checkTypes = append(checkTypes, builtin.ServiceCatalogKnownTypes)
-	}
-	specCheck := speccheck.New(checkTypes...)
-
 	// Multi store
 	multiStore := store.NewMulti()
 
@@ -169,6 +152,7 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 		}
 	}
 
+	// Metrics
 	bundleTransitionCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: config.AppName,
@@ -193,6 +177,23 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 			return nil, errors.WithStack(err)
 		}
 	}
+
+	// Status Checker
+	readyTypes := []map[schema.GroupKind]statuschecker.ObjectStatusChecker{ready_types.MainKnownTypes}
+	if c.ServiceCatalogSupport {
+		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
+	}
+	rc, err := statuschecker.New(crdStore, readyTypes...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Spec check
+	checkTypes := []map[schema.GroupKind]speccheck.ObjectProcessor{builtin.MainKnownTypes}
+	if c.ServiceCatalogSupport {
+		checkTypes = append(checkTypes, builtin.ServiceCatalogKnownTypes)
+	}
+	specCheck := speccheck.New(multiStore, checkTypes...)
 
 	// Controller
 	cntrlr := &bundlec.Controller{

@@ -5,6 +5,7 @@ import (
 
 	"github.com/atlassian/smith/examples/sleeper"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/speccheck/builtin"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -57,6 +58,9 @@ func serviceInstance(ready, inProgress, error bool) *sc_v1b1.ServiceInstance {
 			Name:      si1,
 			Namespace: testNamespace,
 			UID:       si1uid,
+			Annotations: map[string]string{
+				builtin.SecretParametersChecksumAnnotation: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			},
 			OwnerReferences: []meta_v1.OwnerReference{
 				{
 					APIVersion:         smith_v1.BundleResourceGroupVersion,

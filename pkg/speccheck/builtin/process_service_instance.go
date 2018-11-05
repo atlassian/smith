@@ -1,17 +1,39 @@
 package builtin
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+
+	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/speccheck"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+)
+
+const (
+	SecretParametersChecksumAnnotation = smith.Domain + "/secretParametersChecksum"
+	Disabled                           = "disabled"
 )
 
 type serviceInstance struct {
 }
 
-func (serviceInstance) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+func (s serviceInstance) BeforeCreate(ctx *speccheck.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
+	var instanceSpec sc_v1b1.ServiceInstance
+	if err := util.ConvertType(scV1B1Scheme, spec, &instanceSpec); err != nil {
+		return nil, err
+	}
+	if err := s.setSecretParametersChecksumAnnotation(ctx, &instanceSpec, nil); err != nil {
+		return nil, err
+	}
+	return &instanceSpec, nil
+}
+
+func (s serviceInstance) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var instanceSpec sc_v1b1.ServiceInstance
 	if err := util.ConvertType(scV1B1Scheme, spec, &instanceSpec); err != nil {
 		return nil, err
@@ -20,8 +42,11 @@ func (serviceInstance) ApplySpec(ctx *speccheck.Context, spec, actual *unstructu
 	if err := util.ConvertType(scV1B1Scheme, actual, &instanceActual); err != nil {
 		return nil, err
 	}
+	if err := s.setSecretParametersChecksumAnnotation(ctx, &instanceSpec, &instanceActual); err != nil {
+		return nil, err
+	}
 
-	instanceSpec.ObjectMeta.Finalizers = instanceActual.ObjectMeta.Finalizers
+	instanceSpec.Finalizers = instanceActual.Finalizers
 	// managed by service catalog auth filtering just copy to make the comparison work
 	instanceSpec.Spec.UserInfo = instanceActual.Spec.UserInfo
 
@@ -41,4 +66,75 @@ func (serviceInstance) ApplySpec(ctx *speccheck.Context, spec, actual *unstructu
 	}
 
 	return &instanceSpec, nil
+}
+
+// works around the fact that service catalog does not know when to send an update request if the
+// parameters section would change as the result of changing a secret referenced in parametersFrom. To
+// do this we record the contents of all referenced secrets in an annotation, compare that annotations value
+// each time a service instance is processed, and force UpdateRequests to a higher value when those secrets
+// change to trigger service catalog to send an update request.
+//
+// The annotation is only ever added to the spec object not the actual object. The modified spec is treated as
+// if the user manually set the annotation.
+//
+// If the a user actually did set the annotation manually there are two cases.
+// 1. if there are no parametersFrom referenced secrets we leave the spec untouched
+// 2. if there are referenced secrets we proceed to check and generate a new value for the annotation
+//
+// This can be disabled by adding the annotation with the value 'disabled'
+func (s serviceInstance) setSecretParametersChecksumAnnotation(ctx *speccheck.Context, spec, actual *sc_v1b1.ServiceInstance) error {
+	if spec.Annotations[SecretParametersChecksumAnnotation] == Disabled {
+		return nil
+	}
+	var previousEncodedChecksum string
+	var updateCount int64
+
+	if actual != nil {
+		previousEncodedChecksum = actual.Annotations[SecretParametersChecksumAnnotation]
+		updateCount = actual.Spec.UpdateRequests
+	}
+
+	checkSum, err := s.calculateNewServiceInstanceCheckSum(ctx, spec)
+	if err != nil {
+		return errors.Wrap(err, "failed to generate new checksum")
+	}
+
+	if actual != nil && checkSum != previousEncodedChecksum {
+		spec.Spec.UpdateRequests = updateCount + 1
+	}
+
+	s.setInstanceAnnotation(spec, checkSum)
+
+	return nil
+}
+
+func (s serviceInstance) calculateNewServiceInstanceCheckSum(ctx *speccheck.Context, instanceSpec *sc_v1b1.ServiceInstance) (string, error) {
+	checksumPayload, err := s.generateSecretParametersChecksumPayload(ctx, instanceSpec)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to generate checksum")
+	}
+
+	return hex.EncodeToString(checksumPayload), nil
+}
+
+func (serviceInstance) generateSecretParametersChecksumPayload(ctx *speccheck.Context, instanceSpec *sc_v1b1.ServiceInstance) ([]byte, error) {
+	hash := sha256.New()
+
+	for _, parametersFrom := range instanceSpec.Spec.ParametersFrom {
+		secretKeyRef := parametersFrom.SecretKeyRef
+		err := speccheck.HashSecretRef(ctx.Store, instanceSpec.Namespace, secretKeyRef.Name, sets.NewString(secretKeyRef.Key), nil, hash)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return hash.Sum(nil), nil
+}
+
+func (serviceInstance) setInstanceAnnotation(instanceSpec *sc_v1b1.ServiceInstance, checksum string) {
+	if instanceSpec.Annotations == nil {
+		instanceSpec.Annotations = make(map[string]string, 1)
+	}
+
+	instanceSpec.Annotations[SecretParametersChecksumAnnotation] = checksum
 }
