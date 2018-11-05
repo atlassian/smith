@@ -30,6 +30,9 @@ func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
 		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
+		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
 				Spec: core_v1.PodSpec{
@@ -80,6 +83,7 @@ func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
 	store := specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
 				TypeMeta: meta_v1.TypeMeta{
@@ -87,7 +91,8 @@ func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret1",
+					Name:      "secret1",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{
@@ -104,7 +109,8 @@ func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret2",
+					Name:      "secret2",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{
@@ -119,7 +125,8 @@ func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "configmap1",
+					Name:      "configmap1",
+					Namespace: testNs,
 				},
 				Data: map[string]string{
 					"a": "b",
@@ -147,6 +154,9 @@ func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
@@ -198,6 +208,7 @@ func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
 	store := specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
 				TypeMeta: meta_v1.TypeMeta{
@@ -205,7 +216,8 @@ func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret1",
+					Name:      "secret1",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{
@@ -222,7 +234,8 @@ func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret2",
+					Name:      "secret2",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{
@@ -237,7 +250,8 @@ func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "configmap1",
+					Name:      "configmap1",
+					Namespace: testNs,
 				},
 				Data: map[string]string{
 					"a": "b",
@@ -266,6 +280,9 @@ func TestAddsHashToDeploymentSpecForEnv(t *testing.T) {
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
@@ -296,6 +313,7 @@ func TestAddsHashToDeploymentSpecForEnv(t *testing.T) {
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
 	store := specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
 				TypeMeta: meta_v1.TypeMeta{
@@ -303,7 +321,8 @@ func TestAddsHashToDeploymentSpecForEnv(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret1",
+					Name:      "secret1",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{
@@ -337,6 +356,9 @@ func TestHashNotIgnoredForNonExistingKey(t *testing.T) {
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
 		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
+		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
 				Spec: core_v1.PodSpec{
@@ -366,6 +388,7 @@ func TestHashNotIgnoredForNonExistingKey(t *testing.T) {
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
 	store := specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
 				TypeMeta: meta_v1.TypeMeta{
@@ -373,7 +396,8 @@ func TestHashNotIgnoredForNonExistingKey(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret1",
+					Name:      "secret1",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{
@@ -402,6 +426,9 @@ func TestHashIgnoredForOptionalNonExistingKey(t *testing.T) {
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
@@ -433,6 +460,7 @@ func TestHashIgnoredForOptionalNonExistingKey(t *testing.T) {
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
 	store := specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
 				TypeMeta: meta_v1.TypeMeta{
@@ -440,7 +468,8 @@ func TestHashIgnoredForOptionalNonExistingKey(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret1",
+					Name:      "secret1",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{
@@ -474,6 +503,9 @@ func TestHashIgnoredForOptionalNonExistingSecret(t *testing.T) {
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
 		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
+		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
 				Spec: core_v1.PodSpec{
@@ -503,7 +535,7 @@ func TestHashIgnoredForOptionalNonExistingSecret(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	store := specchecktesting.FakeStore{}
+	store := specchecktesting.FakeStore{Namespace: testNs}
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
@@ -523,6 +555,9 @@ func TestHashNotIgnoredForNonExistingSecret(t *testing.T) {
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
@@ -551,7 +586,7 @@ func TestHashNotIgnoredForNonExistingSecret(t *testing.T) {
 	}
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
-	store := specchecktesting.FakeStore{}
+	store := specchecktesting.FakeStore{Namespace: testNs}
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
@@ -568,6 +603,9 @@ func TestNoAnnotationForEmptyDeployment(t *testing.T) {
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
 		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
+		},
 		Spec: apps_v1.DeploymentSpec{},
 	}
 	var one int32 = 1
@@ -577,6 +615,7 @@ func TestNoAnnotationForEmptyDeployment(t *testing.T) {
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 			Annotations: map[string]string{
 				LastAppliedReplicasAnnotation: "1",
 			},
@@ -595,7 +634,7 @@ func TestNoAnnotationForEmptyDeployment(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 	expectedSpec := runtimeToUnstructured(t, &expectedDeploymentSpec)
-	store := specchecktesting.FakeStore{}
+	store := specchecktesting.FakeStore{Namespace: testNs}
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
@@ -617,6 +656,9 @@ func TestEmptyAnnotationForDeploymentThatDoesntUseAnything(t *testing.T) {
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
@@ -654,7 +696,7 @@ func TestEmptyAnnotationForDeploymentThatDoesntUseAnything(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	store := specchecktesting.FakeStore{}
+	store := specchecktesting.FakeStore{Namespace: testNs}
 
 	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
@@ -672,6 +714,9 @@ func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
@@ -703,7 +748,7 @@ func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	store := specchecktesting.FakeStore{}
+	store := specchecktesting.FakeStore{Namespace: testNs}
 
 	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
@@ -723,6 +768,9 @@ func TestUserEnteredAnnotationOverridden(t *testing.T) {
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
 		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
+		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
 				ObjectMeta: meta_v1.ObjectMeta{
@@ -739,7 +787,7 @@ func TestUserEnteredAnnotationOverridden(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	store := specchecktesting.FakeStore{}
+	store := specchecktesting.FakeStore{Namespace: testNs}
 
 	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
@@ -758,6 +806,9 @@ func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
@@ -788,6 +839,7 @@ func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
 	store := specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
 				TypeMeta: meta_v1.TypeMeta{
@@ -795,7 +847,8 @@ func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret1",
+					Name:      "secret1",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{
@@ -830,6 +883,9 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
 		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
+		},
 		Spec: apps_v1.DeploymentSpec{
 			Template: core_v1.PodTemplateSpec{
 				Spec: core_v1.PodSpec{
@@ -860,7 +916,8 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 				APIVersion: "v1",
 			},
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name: "secret1",
+				Name:      "secret1",
+				Namespace: testNs,
 			},
 			Data: map[string][]byte{
 				"parameters": []byte(`{
@@ -877,7 +934,8 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 				APIVersion: "v1",
 			},
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name: "secret2",
+				Name:      "secret2",
+				Namespace: testNs,
 			},
 			Data: map[string][]byte{
 				"parameters": []byte(`{
@@ -888,6 +946,7 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 		},
 	}
 	store := specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: allResponses,
 	}
 
@@ -904,6 +963,7 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 
 	allResponses["secret1"] = allResponses["secret2"]
 	store = specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: allResponses,
 	}
 

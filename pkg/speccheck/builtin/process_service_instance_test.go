@@ -14,6 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const (
+	testNs = "ns"
+)
+
 func TestSameChecksumIfNoChanges(t *testing.T) {
 	t.Parallel()
 
@@ -21,6 +25,9 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
 			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 		},
 		Spec: sc_v1b1.ServiceInstanceSpec{
 			ParametersFrom: []sc_v1b1.ParametersFromSource{
@@ -43,6 +50,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 	spec := runtimeToUnstructured(t, &instanceSpec)
 
 	store := specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
 				TypeMeta: meta_v1.TypeMeta{
@@ -50,7 +58,8 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret1",
+					Name:      "secret1",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{
@@ -67,7 +76,8 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret2",
+					Name:      "secret2",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{
@@ -108,6 +118,9 @@ func TestAnnotationAddedForEmptyParametersFrom(t *testing.T) {
 			Kind:       "ServiceInstance",
 			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
+		},
 		Spec: sc_v1b1.ServiceInstanceSpec{},
 	}
 
@@ -115,7 +128,7 @@ func TestAnnotationAddedForEmptyParametersFrom(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	ctx := &speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{}}
+	ctx := &speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{Namespace: testNs}}
 	updatedSpec, err := serviceInstance{}.BeforeCreate(ctx, spec)
 	require.NoError(t, err)
 
@@ -133,6 +146,7 @@ func TestExplicitlyDisabled(t *testing.T) {
 			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 			Annotations: map[string]string{
 				SecretParametersChecksumAnnotation: "disabled",
 			},
@@ -153,7 +167,7 @@ func TestExplicitlyDisabled(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	ctx := &speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{}}
+	ctx := &speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{Namespace: testNs}}
 	updatedSpec, err := serviceInstance{}.BeforeCreate(ctx, spec)
 	require.NoError(t, err)
 
@@ -171,6 +185,9 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "ServiceInstance",
 			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 		},
 		Spec: sc_v1b1.ServiceInstanceSpec{
 			ParametersFrom: []sc_v1b1.ParametersFromSource{
@@ -199,7 +216,8 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 				APIVersion: "v1",
 			},
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name: "secret1",
+				Name:      "secret1",
+				Namespace: testNs,
 			},
 			Data: map[string][]byte{
 				"parameters": []byte(`{
@@ -216,7 +234,8 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 				APIVersion: "v1",
 			},
 			ObjectMeta: meta_v1.ObjectMeta{
-				Name: "secret2",
+				Name:      "secret2",
+				Namespace: testNs,
 			},
 			Data: map[string][]byte{
 				"parameters": []byte(`{
@@ -229,6 +248,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 	ctx := &speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: allResponses,
 	}}
 	updatedSpec, err := serviceInstance{}.BeforeCreate(ctx, spec)
@@ -243,6 +263,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 	allResponses["secret1"] = allResponses["secret2"]
 
 	ctx = &speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: allResponses,
 	}}
 	updateTwice, err := serviceInstance{}.ApplySpec(ctx, spec, runtimeToUnstructured(t, instanceCheck))
@@ -264,6 +285,7 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 			Annotations: map[string]string{
 				SecretParametersChecksumAnnotation: userAnnotationValue,
 			},
@@ -274,7 +296,7 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	updatedSpec, err := serviceInstance{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{}}, spec)
+	updatedSpec, err := serviceInstance{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{Namespace: testNs}}, spec)
 	require.NoError(t, err)
 
 	instanceCheck := updatedSpec.(*sc_v1b1.ServiceInstance)
@@ -284,7 +306,10 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 	firstAnnotationValue := instanceCheck.Annotations[SecretParametersChecksumAnnotation]
 	assert.NotEqual(t, firstAnnotationValue, userAnnotationValue)
 
-	compareToPreviousUpdate, err := serviceInstance{}.ApplySpec(&speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{}}, spec, runtimeToUnstructured(t, instanceCheck))
+	compareToPreviousUpdate, err := serviceInstance{}.ApplySpec(&speccheck.Context{
+		Logger: logger,
+		Store:  specchecktesting.FakeStore{Namespace: testNs},
+	}, spec, runtimeToUnstructured(t, instanceCheck))
 	require.NoError(t, err)
 
 	ignoreUserValue := compareToPreviousUpdate.(*sc_v1b1.ServiceInstance)
@@ -305,6 +330,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 			APIVersion: sc_v1b1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
 			Annotations: map[string]string{
 				SecretParametersChecksumAnnotation: userAnnotationValue,
 			},
@@ -324,6 +350,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	spec := runtimeToUnstructured(t, &instanceSpec)
 
 	store := specchecktesting.FakeStore{
+		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
 				TypeMeta: meta_v1.TypeMeta{
@@ -331,7 +358,8 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 					APIVersion: "v1",
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name: "secret1",
+					Name:      "secret1",
+					Namespace: testNs,
 				},
 				Data: map[string][]byte{
 					"parameters": []byte(`{

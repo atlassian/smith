@@ -75,11 +75,8 @@ func (s serviceInstance) ApplySpec(ctx *speccheck.Context, spec, actual *unstruc
 // change to trigger service catalog to send an update request.
 //
 // The annotation is only ever added to the spec object not the actual object. The modified spec is treated as
-// if the user manually set the annotation.
-//
-// If the a user actually did set the annotation manually there are two cases.
-// 1. if there are no parametersFrom referenced secrets we leave the spec untouched
-// 2. if there are referenced secrets we proceed to check and generate a new value for the annotation
+// if the user manually set the annotation. The annotation is always set to a value, even if no
+// secrets referenced.
 //
 // This can be disabled by adding the annotation with the value 'disabled'
 func (s serviceInstance) setSecretParametersChecksumAnnotation(ctx *speccheck.Context, spec, actual *sc_v1b1.ServiceInstance) error {
