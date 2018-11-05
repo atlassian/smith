@@ -1,34 +1,26 @@
-package bundlec
+package builtin
 
 import (
 	"testing"
 
-	"github.com/atlassian/smith"
-	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
+	"github.com/atlassian/smith/pkg/speccheck"
+	specchecktesting "github.com/atlassian/smith/pkg/speccheck/testing"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
 	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 const (
-	deploymentTestNamespace     = "ns"
-	deploymentTestAnnotationKey = smith.Domain + "/envRefHash"
-
 	nullSha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 )
-
-func deploymentUnmarshal(t *testing.T, spec *unstructured.Unstructured) *apps_v1.Deployment {
-	var deploymentSpec apps_v1.Deployment
-	err := util.ConvertType(scheme(t), spec, &deploymentSpec)
-	require.NoError(t, err)
-	return &deploymentSpec
-}
 
 func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 	t.Parallel()
@@ -87,67 +79,65 @@ func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	rst := resourceSyncTask{
-		store: fakeStore{
-			responses: map[string]runtime.Object{
-				"secret1": &core_v1.Secret{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "Secret",
-						APIVersion: "v1",
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "secret1",
-					},
-					Data: map[string][]byte{
-						"parameters": []byte(`{
+	store := specchecktesting.FakeStore{
+		Responses: map[string]runtime.Object{
+			"secret1": &core_v1.Secret{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: "secret1",
+				},
+				Data: map[string][]byte{
+					"parameters": []byte(`{
 							"secretEnvVars": {
 								"a": "1",
 								"b": "2"
 							}
 						}`),
-					},
 				},
-				"secret2": &core_v1.Secret{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "Secret",
-						APIVersion: "v1",
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "secret2",
-					},
-					Data: map[string][]byte{
-						"parameters": []byte(`{
+			},
+			"secret2": &core_v1.Secret{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: "secret2",
+				},
+				Data: map[string][]byte{
+					"parameters": []byte(`{
 							"iamRole": "some-role"
 							}
 						}`),
-					},
 				},
-				"configmap1": &core_v1.ConfigMap{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "ConfigMap",
-						APIVersion: "v1",
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "configmap1",
-					},
-					Data: map[string]string{
-						"a": "b",
-						"c": "d",
-					},
+			},
+			"configmap1": &core_v1.ConfigMap{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: "v1",
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: "configmap1",
+				},
+				Data: map[string]string{
+					"a": "b",
+					"c": "d",
 				},
 			},
 		},
-		bundle: depBundle(),
-		scheme: scheme(t),
 	}
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := rst.processDeployment(spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
 
-	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.NotEmpty(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+	require.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
+	assert.NotEmpty(t, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation])
 }
 
 func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
@@ -207,67 +197,66 @@ func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	rst := resourceSyncTask{
-		store: fakeStore{
-			responses: map[string]runtime.Object{
-				"secret1": &core_v1.Secret{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "Secret",
-						APIVersion: "v1",
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "secret1",
-					},
-					Data: map[string][]byte{
-						"parameters": []byte(`{
+	store := specchecktesting.FakeStore{
+		Responses: map[string]runtime.Object{
+			"secret1": &core_v1.Secret{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: "secret1",
+				},
+				Data: map[string][]byte{
+					"parameters": []byte(`{
 							"secretEnvVars": {
 								"a": "1",
 								"b": "2"
 							}
 						}`),
-					},
 				},
-				"secret2": &core_v1.Secret{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "Secret",
-						APIVersion: "v1",
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "secret2",
-					},
-					Data: map[string][]byte{
-						"parameters": []byte(`{
+			},
+			"secret2": &core_v1.Secret{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: "secret2",
+				},
+				Data: map[string][]byte{
+					"parameters": []byte(`{
 							"iamRole": "some-role"
 							}
 						}`),
-					},
 				},
-				"configmap1": &core_v1.ConfigMap{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "ConfigMap",
-						APIVersion: "v1",
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "configmap1",
-					},
-					Data: map[string]string{
-						"a": "b",
-						"c": "d",
-					},
+			},
+			"configmap1": &core_v1.ConfigMap{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: "v1",
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: "configmap1",
+				},
+				Data: map[string]string{
+					"a": "b",
+					"c": "d",
 				},
 			},
 		},
-		bundle: depBundle(),
-		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec)
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
+
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
 
-	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.NotEmpty(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+	require.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
+	assert.NotEmpty(t, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation])
 }
 
 func TestAddsHashToDeploymentSpecForEnv(t *testing.T) {
@@ -306,39 +295,38 @@ func TestAddsHashToDeploymentSpecForEnv(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	rst := resourceSyncTask{
-		store: fakeStore{
-			responses: map[string]runtime.Object{
-				"secret1": &core_v1.Secret{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "Secret",
-						APIVersion: "v1",
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "secret1",
-					},
-					Data: map[string][]byte{
-						"parameters": []byte(`{
+	store := specchecktesting.FakeStore{
+		Responses: map[string]runtime.Object{
+			"secret1": &core_v1.Secret{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: "secret1",
+				},
+				Data: map[string][]byte{
+					"parameters": []byte(`{
 							"secretEnvVars": {
 								"a": "1",
 								"b": "2"
 							}
 						}`),
-					},
 				},
 			},
 		},
-		bundle: depBundle(),
-		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec)
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
+
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
 
-	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.NotEmpty(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+	require.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
+	assert.NotEmpty(t, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation])
 }
 
 func TestHashNotIgnoredForNonExistingKey(t *testing.T) {
@@ -377,33 +365,32 @@ func TestHashNotIgnoredForNonExistingKey(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	rst := resourceSyncTask{
-		store: fakeStore{
-			responses: map[string]runtime.Object{
-				"secret1": &core_v1.Secret{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "Secret",
-						APIVersion: "v1",
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "secret1",
-					},
-					Data: map[string][]byte{
-						"parameters": []byte(`{
+	store := specchecktesting.FakeStore{
+		Responses: map[string]runtime.Object{
+			"secret1": &core_v1.Secret{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: "secret1",
+				},
+				Data: map[string][]byte{
+					"parameters": []byte(`{
 							"secretEnvVars": {
 								"a": "1",
 								"b": "2"
 							}
 						}`),
-					},
 				},
 			},
 		},
-		bundle: depBundle(),
-		scheme: scheme(t),
 	}
 
-	_, err := rst.processDeployment(spec)
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
+
+	_, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.Error(t, err)
 }
 
@@ -445,39 +432,37 @@ func TestHashIgnoredForOptionalNonExistingKey(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	rst := resourceSyncTask{
-		store: fakeStore{
-			responses: map[string]runtime.Object{
-				"secret1": &core_v1.Secret{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "Secret",
-						APIVersion: "v1",
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "secret1",
-					},
-					Data: map[string][]byte{
-						"parameters": []byte(`{
+	store := specchecktesting.FakeStore{
+		Responses: map[string]runtime.Object{
+			"secret1": &core_v1.Secret{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: "secret1",
+				},
+				Data: map[string][]byte{
+					"parameters": []byte(`{
 							"secretEnvVars": {
 								"a": "1",
 								"b": "2"
 							}
 						}`),
-					},
 				},
 			},
 		},
-		bundle: depBundle(),
-		scheme: scheme(t),
 	}
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := rst.processDeployment(spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
 
-	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+	require.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
+	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation])
 }
 
 func TestHashIgnoredForOptionalNonExistingSecret(t *testing.T) {
@@ -518,21 +503,17 @@ func TestHashIgnoredForOptionalNonExistingSecret(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	rst := resourceSyncTask{
-		store: fakeStore{
-			responses: map[string]runtime.Object{},
-		},
-		bundle: depBundle(),
-		scheme: scheme(t),
-	}
+	store := specchecktesting.FakeStore{}
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := rst.processDeployment(spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
 
-	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+	require.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
+	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation])
 }
 
 func TestHashNotIgnoredForNonExistingSecret(t *testing.T) {
@@ -570,16 +551,12 @@ func TestHashNotIgnoredForNonExistingSecret(t *testing.T) {
 	}
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
+	store := specchecktesting.FakeStore{}
 
-	rst := resourceSyncTask{
-		store: fakeStore{
-			responses: map[string]runtime.Object{},
-		},
-		bundle: depBundle(),
-		scheme: scheme(t),
-	}
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
 
-	_, err := rst.processDeployment(spec)
+	_, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.Error(t, err)
 }
 
@@ -593,16 +570,23 @@ func TestNoAnnotationForEmptyDeployment(t *testing.T) {
 		},
 		Spec: apps_v1.DeploymentSpec{},
 	}
+	var one int32 = 1
 	expectedDeploymentSpec := apps_v1.Deployment{
 		TypeMeta: meta_v1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: apps_v1.SchemeGroupVersion.String(),
 		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Annotations: map[string]string{
+				LastAppliedReplicasAnnotation: "1",
+			},
+		},
 		Spec: apps_v1.DeploymentSpec{
+			Replicas: &one,
 			Template: core_v1.PodTemplateSpec{
 				ObjectMeta: meta_v1.ObjectMeta{
 					Annotations: map[string]string{
-						deploymentTestAnnotationKey: nullSha256,
+						EnvRefHashAnnotation: nullSha256,
 					},
 				},
 			},
@@ -611,16 +595,19 @@ func TestNoAnnotationForEmptyDeployment(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 	expectedSpec := runtimeToUnstructured(t, &expectedDeploymentSpec)
+	store := specchecktesting.FakeStore{}
 
-	rst := resourceSyncTask{
-		bundle: depBundle(),
-		scheme: scheme(t),
-	}
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := rst.processDeployment(spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	assert.True(t, equality.Semantic.DeepEqual(expectedSpec.Object, updatedSpec.Object))
+	updatedSpecUnstr := runtimeToUnstructured(t, updatedSpec)
+
+	if !assert.True(t, equality.Semantic.DeepEqual(expectedSpec.Object, updatedSpecUnstr.Object)) {
+		t.Log(diff.ObjectReflectDiff(expectedSpec.Object, updatedSpecUnstr.Object))
+	}
 }
 
 func TestEmptyAnnotationForDeploymentThatDoesntUseAnything(t *testing.T) {
@@ -663,20 +650,19 @@ func TestEmptyAnnotationForDeploymentThatDoesntUseAnything(t *testing.T) {
 		},
 	}
 
-	rst := resourceSyncTask{
-		bundle: depBundle(),
-		scheme: scheme(t),
-	}
-
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	updatedSpec, err := rst.processDeployment(spec)
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
+	store := specchecktesting.FakeStore{}
+
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
 
-	require.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+	require.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
+	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation])
 }
 
 func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
@@ -691,7 +677,7 @@ func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
 			Template: core_v1.PodTemplateSpec{
 				ObjectMeta: meta_v1.ObjectMeta{
 					Annotations: map[string]string{
-						deploymentTestAnnotationKey: "disabled",
+						EnvRefHashAnnotation: "disabled",
 					},
 				},
 				Spec: core_v1.PodSpec{
@@ -715,19 +701,18 @@ func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	rst := resourceSyncTask{
-		bundle: depBundle(),
-		scheme: scheme(t),
-	}
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
+	store := specchecktesting.FakeStore{}
 
-	updatedSpec, err := rst.processDeployment(spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
 
-	assert.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.Contains(t, deploymentCheck.Spec.Template.Annotations, deploymentTestAnnotationKey)
-	assert.Equal(t, deploymentCheck.Spec.Template.Annotations[deploymentTestAnnotationKey], "disabled")
+	assert.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
+	assert.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
+	assert.Equal(t, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation], "disabled")
 }
 
 func TestUserEnteredAnnotationOverridden(t *testing.T) {
@@ -742,7 +727,7 @@ func TestUserEnteredAnnotationOverridden(t *testing.T) {
 			Template: core_v1.PodTemplateSpec{
 				ObjectMeta: meta_v1.ObjectMeta{
 					Annotations: map[string]string{
-						deploymentTestAnnotationKey: "mashingonthekeyboard",
+						EnvRefHashAnnotation: "mashingonthekeyboard",
 					},
 				},
 				Spec: core_v1.PodSpec{},
@@ -752,17 +737,17 @@ func TestUserEnteredAnnotationOverridden(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	rst := resourceSyncTask{
-		bundle: depBundle(),
-		scheme: scheme(t),
-	}
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
+	store := specchecktesting.FakeStore{}
 
-	updatedSpec, err := rst.processDeployment(spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
-	assert.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey])
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
+
+	assert.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
+	assert.Equal(t, nullSha256, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation])
 }
 
 func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
@@ -778,7 +763,7 @@ func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
 			Template: core_v1.PodTemplateSpec{
 				ObjectMeta: meta_v1.ObjectMeta{
 					Annotations: map[string]string{
-						deploymentTestAnnotationKey: expectedAnnotationValue,
+						EnvRefHashAnnotation: expectedAnnotationValue,
 					},
 				},
 				Spec: core_v1.PodSpec{
@@ -802,40 +787,39 @@ func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	rst := resourceSyncTask{
-		store: fakeStore{
-			responses: map[string]runtime.Object{
-				"secret1": &core_v1.Secret{
-					TypeMeta: meta_v1.TypeMeta{
-						Kind:       "Secret",
-						APIVersion: "v1",
-					},
-					ObjectMeta: meta_v1.ObjectMeta{
-						Name: "secret1",
-					},
-					Data: map[string][]byte{
-						"parameters": []byte(`{
+	store := specchecktesting.FakeStore{
+		Responses: map[string]runtime.Object{
+			"secret1": &core_v1.Secret{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name: "secret1",
+				},
+				Data: map[string][]byte{
+					"parameters": []byte(`{
 							"secretEnvVars": {
 								"a": "1",
 								"b": "2"
 							}
 						}`),
-					},
 				},
 			},
 		},
-		bundle: depBundle(),
-		scheme: scheme(t),
 	}
 
-	updatedSpec, err := rst.processDeployment(spec)
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
+
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
-	assert.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
+	assert.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
 
 	// The annotation is no longer equal
-	assert.NotEqual(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey], expectedAnnotationValue)
+	assert.NotEqual(t, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation], expectedAnnotationValue)
 }
 
 func TestDeploymentUpdatedSecrets(t *testing.T) {
@@ -903,48 +887,36 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 			},
 		},
 	}
-	rst := resourceSyncTask{
-		store: fakeStore{
-			responses: allResponses,
-		},
-		bundle: depBundle(),
-		scheme: scheme(t),
+	store := specchecktesting.FakeStore{
+		Responses: allResponses,
 	}
 
-	updatedSpec, err := rst.processDeployment(spec)
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
+
+	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	deploymentCheck := deploymentUnmarshal(t, updatedSpec)
-	assert.Contains(t, deploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
+	assert.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
 
-	firstHash := deploymentCheck.Spec.Template.ObjectMeta.Annotations
+	firstHash := deploymentCheck.Spec.Template.Annotations
 
 	allResponses["secret1"] = allResponses["secret2"]
-	rstUpdatedMocks := resourceSyncTask{
-		store: fakeStore{
-			responses: allResponses,
-		},
-		bundle: depBundle(),
-		scheme: scheme(t),
+	store = specchecktesting.FakeStore{
+		Responses: allResponses,
 	}
 
-	secondUpdate, err := rstUpdatedMocks.processDeployment(spec)
+	updatedSpec, err = deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
-	secondDeploymentCheck := deploymentUnmarshal(t, secondUpdate)
-	assert.Contains(t, secondDeploymentCheck.Spec.Template.ObjectMeta.Annotations, deploymentTestAnnotationKey)
-	assert.NotEqual(t, secondDeploymentCheck.Spec.Template.ObjectMeta.Annotations[deploymentTestAnnotationKey], firstHash)
+	secondDeploymentCheck := updatedSpec.(*apps_v1.Deployment)
+	assert.Contains(t, secondDeploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
+	assert.NotEqual(t, secondDeploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation], firstHash)
 }
 
-func depBundle() *smith_v1.Bundle {
-	return &smith_v1.Bundle{
-		TypeMeta: meta_v1.TypeMeta{
-			Kind:       smith_v1.BundleResourceKind,
-			APIVersion: smith_v1.BundleResourceGroupVersion,
-		},
-		ObjectMeta: meta_v1.ObjectMeta{
-			Name:      "bundle1",
-			Namespace: deploymentTestNamespace,
-		},
-	}
+func runtimeToUnstructured(t *testing.T, obj runtime.Object) *unstructured.Unstructured {
+	out, err := util.RuntimeToUnstructured(obj)
+	require.NoError(t, err)
+	return out
 }

@@ -14,10 +14,11 @@ import (
 )
 
 type SpecCheck struct {
+	Store      Store
 	KnownTypes map[schema.GroupKind]ObjectProcessor
 }
 
-func New(kts ...map[schema.GroupKind]ObjectProcessor) *SpecCheck {
+func New(store Store, kts ...map[schema.GroupKind]ObjectProcessor) *SpecCheck {
 	kt := make(map[schema.GroupKind]ObjectProcessor)
 	for _, knownTypes := range kts {
 		for knownGK, f := range knownTypes {
@@ -28,8 +29,26 @@ func New(kts ...map[schema.GroupKind]ObjectProcessor) *SpecCheck {
 		}
 	}
 	return &SpecCheck{
+		Store:      store,
 		KnownTypes: kt,
 	}
+}
+
+// BeforeCreate pre-processes object specification and returns an updated version.
+func (sc *SpecCheck) BeforeCreate(logger *zap.Logger, spec *unstructured.Unstructured) (*unstructured.Unstructured /*updatedSpec*/, error) {
+	processor, ok := sc.KnownTypes[spec.GroupVersionKind().GroupKind()]
+	if !ok {
+		return spec, nil
+	}
+	ctx := &Context{
+		Logger: logger,
+		Store:  sc.Store,
+	}
+	updatedSpec, err := processor.BeforeCreate(ctx, spec)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to pre-process object specification")
+	}
+	return util.RuntimeToUnstructured(updatedSpec)
 }
 
 func (sc *SpecCheck) CompareActualVsSpec(logger *zap.Logger, spec, actual runtime.Object) (*unstructured.Unstructured, bool /*match*/, string /* diff */, error) {
@@ -65,7 +84,11 @@ func (sc *SpecCheck) compareActualVsSpec(logger *zap.Logger, spec, actual *unstr
 	gk := spec.GroupVersionKind().GroupKind()
 
 	if processor, ok := sc.KnownTypes[gk]; ok {
-		appliedSpec, err := processor.ApplySpec(&Context{Logger: logger}, spec, actualClone)
+		ctx := &Context{
+			Logger: logger,
+			Store:  sc.Store,
+		}
+		appliedSpec, err := processor.ApplySpec(ctx, spec, actualClone)
 		if err != nil {
 			return nil, false, "", errors.Wrap(err, "failed to apply specification to the actual object")
 		}

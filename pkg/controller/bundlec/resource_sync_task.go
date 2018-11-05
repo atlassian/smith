@@ -10,7 +10,6 @@ import (
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -485,20 +484,6 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 	}
 	obj.SetOwnerReferences(refs)
 
-	// Object GroupKind-specific munging
-	switch obj.GroupVersionKind().GroupKind() {
-	case schema.GroupKind{Group: sc_v1b1.GroupName, Kind: "ServiceInstance"}:
-		obj, err = st.processServiceInstance(obj, actual)
-		if err != nil {
-			return nil, err
-		}
-	case schema.GroupKind{Group: apps_v1.GroupName, Kind: "Deployment"}:
-		obj, err = st.processDeployment(obj)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return obj, nil
 }
 
@@ -605,18 +590,23 @@ func (st *resourceSyncTask) createOrUpdate(spec *unstructured.Unstructured, actu
 	gvk := spec.GroupVersionKind()
 	resClient, err := st.smartClient.ForGVK(gvk, st.bundle.Namespace)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "failed to get the client for %q", gvk)
+		return nil, false, errors.Wrapf(err, "failed to get the client for %s", gvk)
 	}
-	if actual != nil {
-		st.logger.Info("Object found, checking spec", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
+	switch actual {
+	case nil:
+		return st.createResource(resClient, spec)
+	default:
 		return st.updateResource(resClient, spec, actual)
 	}
-	st.logger.Info("Object not found, creating", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
-	return st.createResource(resClient, spec)
 }
 
 func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
+	spec, err := st.specCheck.BeforeCreate(st.logger, spec)
+	if err != nil {
+		return nil, false, errors.Wrap(err, "object specification pre-processing failed")
+	}
 	gvk := spec.GroupVersionKind()
+	st.logger.Info("Object not found, creating", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
 	response, err := resClient.Create(spec, meta_v1.CreateOptions{})
 	if err == nil {
 		st.logger.Info("Object created", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
@@ -633,6 +623,7 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 
 // Mutates spec and actual.
 func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
+	st.logger.Info("Object found, checking spec", ctrlLogz.ObjectGk(spec.GroupVersionKind().GroupKind()), ctrlLogz.Object(spec))
 	// Compare spec and existing resource
 	updated, match, difference, err := st.specCheck.CompareActualVsSpec(st.logger, spec, actual)
 	if err != nil {
@@ -656,12 +647,4 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	}
 	st.logger.Info("Object updated", ctrlLogz.Object(spec))
 	return updated, false, nil
-}
-
-func (st *resourceSyncTask) derefObject(gvk schema.GroupVersionKind, name string) (runtime.Object, bool, error) {
-	obj, exists, err := st.store.Get(gvk, st.bundle.Namespace, name)
-	if err != nil {
-		return nil, false, errors.Wrapf(err, "failure retrieving %s %q", gvk, name)
-	}
-	return obj, exists, nil
 }

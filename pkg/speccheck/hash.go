@@ -1,4 +1,4 @@
-package bundlec
+package speccheck
 
 import (
 	"hash"
@@ -10,10 +10,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func (st *resourceSyncTask) hashSecretRef(name string, filter sets.String, optional *bool, h hash.Hash) error {
-	secret, exists, err := st.derefObject(core_v1.SchemeGroupVersion.WithKind("Secret"), name)
+func HashSecretRef(store Store, namespace, name string, filter sets.String, optional *bool, h hash.Hash) error {
+	secret, exists, err := store.Get(core_v1.SchemeGroupVersion.WithKind("Secret"), namespace, name)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failure retrieving Secret %q", name)
 	}
 	if !exists {
 		if optional == nil || !*optional {
@@ -22,7 +22,7 @@ func (st *resourceSyncTask) hashSecretRef(name string, filter sets.String, optio
 		return nil
 	}
 
-	found := hashSecret(secret.(*core_v1.Secret), h, filter)
+	found := HashSecret(secret.(*core_v1.Secret), h, filter)
 	if !found && (optional == nil || !*optional) {
 		return errors.Errorf("not all keys %v found in Secret %q", filter, name)
 	}
@@ -30,10 +30,10 @@ func (st *resourceSyncTask) hashSecretRef(name string, filter sets.String, optio
 	return nil
 }
 
-func (st *resourceSyncTask) hashConfigMapRef(name string, filter sets.String, optional *bool, h hash.Hash) error {
-	configmap, exists, err := st.derefObject(core_v1.SchemeGroupVersion.WithKind("ConfigMap"), name)
+func HashConfigMapRef(store Store, namespace, name string, filter sets.String, optional *bool, h hash.Hash) error {
+	configmap, exists, err := store.Get(core_v1.SchemeGroupVersion.WithKind("ConfigMap"), namespace, name)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failure retrieving ConfigMap %q", name)
 	}
 	if !exists {
 		if optional == nil || !*optional {
@@ -42,7 +42,7 @@ func (st *resourceSyncTask) hashConfigMapRef(name string, filter sets.String, op
 		return nil
 	}
 
-	found := hashConfigMap(configmap.(*core_v1.ConfigMap), h, filter)
+	found := HashConfigMap(configmap.(*core_v1.ConfigMap), h, filter)
 	if !found && (optional == nil || !*optional) {
 		return errors.Errorf("not all keys %v found in ConfigMap %q", filter, name)
 	}
@@ -50,9 +50,9 @@ func (st *resourceSyncTask) hashConfigMapRef(name string, filter sets.String, op
 	return nil
 }
 
-// hashConfigMap hashes the sorted values in the configmap in sorted order
+// HashConfigMap hashes the sorted values in the ConfigMap in sorted order
 // with a NUL as a separator character between and within pairs of key + value.
-func hashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String) bool {
+func HashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String) bool {
 	keys := make([]string, 0, len(configMap.Data))
 	search := sets.NewString(filter.UnsortedList()...)
 	for k := range configMap.Data {
@@ -90,9 +90,9 @@ func hashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String
 	return true
 }
 
-// hashSecret hashes the sorted values in the secret in sorted order
+// HashSecret hashes the sorted values in the secret in sorted order
 // with a NUL as a separator character between and within pairs of key + value.
-func hashSecret(secret *core_v1.Secret, h hash.Hash, filter sets.String) bool {
+func HashSecret(secret *core_v1.Secret, h hash.Hash, filter sets.String) bool {
 	keys := make([]string, 0, len(secret.Data))
 	search := sets.NewString(filter.UnsortedList()...)
 	for k := range secret.Data {
