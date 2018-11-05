@@ -63,7 +63,6 @@ go_test(
         "manual",
     ],
     deps = [
-        "//:go_default_library",
         "//examples/sleeper:go_default_library",
         "//examples/sleeper/pkg/apis/sleeper/v1:go_default_library",
         "//pkg/apis/smith/v1:go_default_library",

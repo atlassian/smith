@@ -2,11 +2,9 @@ package it
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
 	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
-	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	"github.com/stretchr/testify/assert"
@@ -16,19 +14,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const deploymentResourceName = smith_v1.ResourceName("deployment-ready-test")
+const (
+	deploymentResourceName smith_v1.ResourceName = "deployment-ready-test"
+)
 
 func constructBundle(t *testing.T, progressDeadlineSeconds int32, containerParams ...string) *smith_v1.Bundle {
-	// This is a hack for now until someone can help
-	// This is "set" in the deploymentCleanup but that is AFTER the object was created
-	// So this never really works since it should be set before the object was created
-	// in processResource "createOrUpdate"
-	const LastAppliedReplicasAnnotation string = smith.Domain + "/LastAppliedReplicas"
-
-	resourceName := deploymentResourceName
-
 	labelMap := map[string]string{
-		"name": string(resourceName),
+		"name": string(deploymentResourceName),
 	}
 	replicas := int32(2)
 	containers := []core_v1.Container{
@@ -74,7 +66,7 @@ func constructBundle(t *testing.T, progressDeadlineSeconds int32, containerParam
 	var terminationGracePeriodSeconds int64 = 30
 
 	deployment := smith_v1.Resource{
-		Name: resourceName,
+		Name: deploymentResourceName,
 		Spec: smith_v1.ResourceSpec{
 			Object: &apps_v1.Deployment{
 				TypeMeta: meta_v1.TypeMeta{
@@ -82,8 +74,7 @@ func constructBundle(t *testing.T, progressDeadlineSeconds int32, containerParam
 					APIVersion: apps_v1.SchemeGroupVersion.String(),
 				},
 				ObjectMeta: meta_v1.ObjectMeta{
-					Name:        string(resourceName),
-					Annotations: map[string]string{LastAppliedReplicasAnnotation: strconv.Itoa(int(replicas))},
+					Name: string(deploymentResourceName),
 				},
 				Spec: apps_v1.DeploymentSpec{
 					Selector: &meta_v1.LabelSelector{
@@ -185,5 +176,4 @@ func assertDeadlineExceeded(ctx context.Context, t *testing.T, cfg *Config, args
 	assert.NotNil(t, resCond)
 	assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
 	assert.Equal(t, "deployment exceeded its progress deadline", resCond.Message)
-
 }
