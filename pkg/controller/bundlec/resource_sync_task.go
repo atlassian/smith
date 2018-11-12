@@ -483,6 +483,13 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 		})
 	}
 	obj.SetOwnerReferences(refs)
+	switch obj.GetNamespace() {
+	case "":
+		obj.SetNamespace(st.bundle.Namespace)
+	case st.bundle.Namespace:
+	default:
+		return nil, errors.Errorf("namespace of resource %q was %q which is different from the bundle namespace %q", res.Name, obj.GetNamespace(), st.bundle.Namespace)
+	}
 
 	return obj, nil
 }
