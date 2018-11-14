@@ -43,16 +43,19 @@ type resourceStatusDependenciesNotReady struct {
 
 // resourceStatusInProgress means resource is being processed by its controller.
 type resourceStatusInProgress struct {
+	details string
 }
 
 // resourceStatusReady means resource is ready.
 type resourceStatusReady struct {
+	message string
 }
 
 // resourceStatusError means there was an error processing this resource.
 type resourceStatusError struct {
 	err              error
 	isRetriableError bool
+	isExternalError  bool
 }
 
 func (r resourceStatusReady) StatusType() ResourceStatusType {
@@ -81,11 +84,11 @@ func (ri *resourceInfo) isReady() bool {
 	return ok
 }
 
-func (ri *resourceInfo) fetchError() (bool, error) {
+func (ri *resourceInfo) fetchError() *resourceStatusError {
 	if rse, ok := ri.status.(resourceStatusError); ok {
-		return rse.isRetriableError, rse.err
+		return &rse
 	}
-	return false, nil
+	return nil
 }
 
 type resourceSyncTask struct {
@@ -184,18 +187,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Check if resource is ready
-	statusResult, err := st.checker.CheckStatus(resUpdated)
-	if err != nil {
-		// This represents an internal error (something wrong with smith)
-		// and should probably be handled differently.
-		return resourceInfo{
-			actual: resUpdated,
-			status: resourceStatusError{
-				err:              err,
-				isRetriableError: false,
-			},
-		}
-	}
+	statusResult := st.checker.CheckStatus(resUpdated)
 	switch s := statusResult.(type) {
 	case statuschecker.ObjectStatusInProgress:
 		return resourceInfo{
@@ -208,6 +200,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 			status: resourceStatusError{
 				err:              s.Error,
 				isRetriableError: s.RetriableError,
+				isExternalError:  s.ExternalError,
 			},
 		}
 	case statuschecker.ObjectStatusUnknown:
@@ -613,7 +606,7 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 		return nil, false, errors.Wrap(err, "object specification pre-processing failed")
 	}
 	gvk := spec.GroupVersionKind()
-	st.logger.Info("Object not found, creating", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
+	st.logger.Debug("Object not found, creating", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
 	response, err := resClient.Create(spec, meta_v1.CreateOptions{})
 	if err == nil {
 		st.logger.Info("Object created", ctrlLogz.ObjectGk(gvk.GroupKind()), ctrlLogz.Object(spec))
@@ -630,14 +623,14 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 
 // Mutates spec and actual.
 func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
-	st.logger.Info("Object found, checking spec", ctrlLogz.ObjectGk(spec.GroupVersionKind().GroupKind()), ctrlLogz.Object(spec))
+	st.logger.Debug("Object found, checking spec", ctrlLogz.ObjectGk(spec.GroupVersionKind().GroupKind()), ctrlLogz.Object(spec))
 	// Compare spec and existing resource
 	updated, match, difference, err := st.specCheck.CompareActualVsSpec(st.logger, spec, actual)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "specification check failed")
 	}
 	if match {
-		st.logger.Info("Object has correct spec", ctrlLogz.Object(spec))
+		st.logger.Debug("Object has correct spec", ctrlLogz.Object(spec))
 		return updated, false, nil
 	}
 	st.logger.Sugar().Infof("Objects are different (`a` is specification and `b` is the actual object): %s", difference)
