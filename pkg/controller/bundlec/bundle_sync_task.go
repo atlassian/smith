@@ -564,8 +564,10 @@ func (st *bundleSyncTask) resourceConditions(res smith_v1.Resource) (
 			blockedCond.Message = fmt.Sprintf("Not ready: %q", resStatus.dependencies)
 		case resourceStatusInProgress:
 			inProgressCond.Status = cond_v1.ConditionTrue
+			inProgressCond.Message = resStatus.message
 		case resourceStatusReady:
 			readyCond.Status = cond_v1.ConditionTrue
+			readyCond.Message = resStatus.message
 		case resourceStatusError:
 			errorCond.Status = cond_v1.ConditionTrue
 			errorCond.Message = resStatus.err.Error()

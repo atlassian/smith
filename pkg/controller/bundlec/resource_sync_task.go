@@ -43,7 +43,7 @@ type resourceStatusDependenciesNotReady struct {
 
 // resourceStatusInProgress means resource is being processed by its controller.
 type resourceStatusInProgress struct {
-	details string
+	message string
 }
 
 // resourceStatusReady means resource is ready.
@@ -192,7 +192,9 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	case statuschecker.ObjectStatusInProgress:
 		return resourceInfo{
 			actual: resUpdated,
-			status: resourceStatusInProgress{},
+			status: resourceStatusInProgress{
+				message: s.Message,
+			},
 		}
 	case statuschecker.ObjectStatusError:
 		return resourceInfo{
@@ -223,8 +225,10 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 		}
 
 		return resourceInfo{
-			actual:               resUpdated,
-			status:               resourceStatusReady{},
+			actual: resUpdated,
+			status: resourceStatusReady{
+				message: s.Message,
+			},
 			serviceBindingSecret: bindingSecret,
 		}
 	default:
