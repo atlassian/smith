@@ -31,7 +31,7 @@ type schemaWithResourceVersion struct {
 	schema          *gojsonschema.Schema
 }
 
-type validationResult struct {
+type ValidationResult struct {
 	Errors []error
 }
 
@@ -254,14 +254,14 @@ func (c *Catalog) getParsedSchema(plan *sc_v1b1.ClusterServicePlan, action planS
 	return schema, nil
 }
 
-func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (validationResult, error) {
+func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (ValidationResult, error) {
 	if len(serviceInstanceSpec.ParametersFrom) > 0 {
-		return validationResult{}, errors.New("cannot validate ServiceInstanceSpec which has a ParametersFrom block (insufficient information)")
+		return ValidationResult{}, errors.New("cannot validate ServiceInstanceSpec which has a ParametersFrom block (insufficient information)")
 	}
 
 	servicePlan, err := c.GetPlanOf(serviceInstanceSpec)
 	if err != nil {
-		return validationResult{}, err
+		return ValidationResult{}, err
 	}
 
 	// We ignore the update schema here and assume it's equivalent to
@@ -269,13 +269,13 @@ func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.Servi
 	// them anyway as there are currently no true PATCH updates).
 	schema, err := c.getParsedSchema(servicePlan, instanceCreateAction)
 	if err != nil {
-		return validationResult{
+		return ValidationResult{
 			Errors: []error{err},
 		}, nil
 	}
 	if schema == nil {
 		// no schema to validate against anyway
-		return validationResult{}, nil
+		return ValidationResult{}, nil
 	}
 	var parameters []byte
 	if serviceInstanceSpec.Parameters != nil {
@@ -289,7 +289,7 @@ func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.Servi
 	}
 	result, err := schema.Validate(gojsonschema.NewBytesLoader(parameters))
 	if err != nil {
-		return validationResult{}, errors.Wrapf(err, "error validating osb resource parameters for %q", servicePlan.Spec.ExternalName)
+		return ValidationResult{}, errors.Wrapf(err, "error validating osb resource parameters for %q", servicePlan.Spec.ExternalName)
 	}
 
 	if !result.Valid() {
@@ -300,8 +300,8 @@ func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.Servi
 			errs = append(errs, errors.New(validationErr.String()))
 		}
 
-		return validationResult{errs}, nil
+		return ValidationResult{errs}, nil
 	}
 
-	return validationResult{}, nil
+	return ValidationResult{}, nil
 }

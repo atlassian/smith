@@ -10,7 +10,7 @@ type Container struct {
 	schema *gojsonschema.Schema
 }
 
-type validationResult struct {
+type ValidationResult struct {
 	Errors []error
 }
 
@@ -34,14 +34,14 @@ func NewContainer(newPlugin NewFunc) (Container, error) {
 	}, nil
 }
 
-func (pc *Container) ValidateSpec(pluginSpec map[string]interface{}) (validationResult, error) {
+func (pc *Container) ValidateSpec(pluginSpec map[string]interface{}) (ValidationResult, error) {
 	if pc.schema == nil {
-		return validationResult{}, nil
+		return ValidationResult{}, nil
 	}
 
 	result, err := pc.schema.Validate(gojsonschema.NewGoLoader(pluginSpec))
 	if err != nil {
-		return validationResult{}, errors.Wrap(err, "error validating plugin spec")
+		return ValidationResult{}, errors.Wrap(err, "error validating plugin spec")
 	}
 
 	if !result.Valid() {
@@ -52,8 +52,8 @@ func (pc *Container) ValidateSpec(pluginSpec map[string]interface{}) (validation
 			errs = append(errs, errors.New(validationErr.String()))
 		}
 
-		return validationResult{errs}, nil
+		return ValidationResult{errs}, nil
 	}
 
-	return validationResult{}, nil
+	return ValidationResult{}, nil
 }
