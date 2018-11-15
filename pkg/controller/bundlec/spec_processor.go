@@ -49,7 +49,7 @@ func isNoExampleError(err error) bool {
 
 func newSpec(resources map[smith_v1.ResourceName]*resourceInfo, references []smith_v1.Reference) (*specProcessor, error) {
 	variables, err := resolveAllReferences(references, func(reference smith_v1.Reference) (interface{}, error) {
-		return resolveReference(resources, reference)
+		return jsonPathReferenceResolver(resources, reference)
 	})
 
 	if err != nil {
@@ -164,7 +164,7 @@ func (sp *specProcessor) ProcessString(value string, path ...string) (interface{
 	return reference, nil
 }
 
-func resolveReference(resInfos map[smith_v1.ResourceName]*resourceInfo, reference smith_v1.Reference) (interface{}, error) {
+func jsonPathReferenceResolver(resInfos map[smith_v1.ResourceName]*resourceInfo, reference smith_v1.Reference) (interface{}, error) {
 	resInfo := resInfos[reference.Resource]
 	if resInfo == nil {
 		return nil, errors.Errorf("internal dependency resolution error - resource referenced by %q not found in Bundle: %s", reference.Name, reference.Resource)

@@ -141,12 +141,10 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Eval spec
-	spec, err := st.evalSpec(res, actual)
-	if err != nil {
+	spec, status := st.evalSpec(res, actual)
+	if status != nil {
 		return resourceInfo{
-			status: resourceStatusError{
-				err: err,
-			},
+			status: status,
 		}
 	}
 
@@ -285,7 +283,8 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 		pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
 		if !ok {
 			return nil, resourceStatusError{
-				err: errors.Errorf("no such plugin %q", res.Spec.Plugin.Name),
+				err:             errors.Errorf("no such plugin %q", res.Spec.Plugin.Name),
+				isExternalError: true,
 			}
 		}
 		gvk = pluginContainer.Plugin.Describe().GVK
@@ -293,11 +292,13 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 	} else {
 		// unreachable
 		return nil, resourceStatusError{
-			err: errors.New(`neither "object" nor "plugin" field is specified`),
+			err:             errors.New(`neither "object" nor "plugin" field is specified`),
+			isExternalError: true,
 		}
 	}
 	actual, exists, err := st.store.Get(gvk, st.bundle.Namespace, name)
 	if err != nil {
+		// internal error - something is up with our stores
 		return nil, resourceStatusError{
 			err: errors.Wrap(err, "failed to get object from the Store"),
 		}
@@ -310,7 +311,8 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 	// Check that the object is not marked for deletion
 	if actualMeta.GetDeletionTimestamp() != nil {
 		return nil, resourceStatusError{
-			err: errors.New("object is marked for deletion"),
+			err:             errors.New("object is marked for deletion"),
+			isExternalError: true,
 		}
 	}
 
@@ -324,7 +326,10 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 			err = errors.Errorf("object is controlled by apiVersion=%s, kind=%s, name=%s, uid=%s, not by the Bundle (uid=%s)",
 				ref.APIVersion, ref.Kind, ref.Name, ref.UID, st.bundle.UID)
 		}
-		return nil, resourceStatusError{err: err}
+		return nil, resourceStatusError{
+			err:             err,
+			isExternalError: true,
+		}
 	}
 	return actual, nil
 }
@@ -429,29 +434,40 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) resourceStatus {
 }
 
 // evalSpec evaluates the resource specification and returns the result.
-func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Object) (*unstructured.Unstructured, error) {
+func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Object) (*unstructured.Unstructured, resourceStatus) {
 	// Process the spec
 	var objectOrPluginSpec map[string]interface{}
 	if res.Spec.Object != nil {
 		specUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
 		if err != nil {
-			return nil, err
+			return nil, resourceStatusError{
+				err: err,
+			}
 		}
 		objectOrPluginSpec = specUnstr.Object
 	} else if res.Spec.Plugin != nil {
 		res = res.DeepCopy() // Spec processor mutates in place
 		objectOrPluginSpec = res.Spec.Plugin.Spec
 	} else {
-		return nil, errors.New(`neither "object" nor "plugin" field is specified`)
+		return nil, resourceStatusError{
+			err:             errors.New(`neither "object" nor "plugin" field is specified`),
+			isExternalError: true,
+		}
 	}
 
 	// Process references
 	sp, err := newSpec(st.processedResources, res.References)
 	if err != nil {
-		return nil, err
+		return nil, resourceStatusError{
+			err:             err,
+			isExternalError: true,
+		}
 	}
 	if err := sp.ProcessObject(objectOrPluginSpec); err != nil {
-		return nil, err
+		return nil, resourceStatusError{
+			err:             err,
+			isExternalError: true,
+		}
 	}
 
 	var obj *unstructured.Unstructured
@@ -460,13 +476,16 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 			Object: objectOrPluginSpec,
 		}
 	} else if res.Spec.Plugin != nil {
-		var err error
-		obj, err = st.evalPluginSpec(res, actual)
-		if err != nil {
-			return nil, err
+		var status resourceStatus
+		obj, status = st.evalPluginSpec(res, actual)
+		if status != nil {
+			return nil, status
 		}
 	} else {
-		return nil, errors.New(`neither "object" nor "plugin" field is specified`)
+		return nil, resourceStatusError{
+			err:             errors.New(`neither "object" nor "plugin" field is specified`),
+			isExternalError: true,
+		}
 	}
 
 	// Update OwnerReferences
@@ -474,7 +493,11 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 	refs := obj.GetOwnerReferences()
 	for i, ref := range refs {
 		if ref.Controller != nil && *ref.Controller {
-			return nil, errors.Errorf("cannot create resource with controller owner reference %v", ref)
+			// user (or plugin) tried to create a resource with controller owner reference
+			return nil, resourceStatusError{
+				err:             errors.Errorf("cannot create resource with controller owner reference %v", ref),
+				isExternalError: res.Spec.Plugin == nil,
+			}
 		}
 		refs[i].BlockOwnerDeletion = &trueRef
 	}
@@ -509,30 +532,44 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 		obj.SetNamespace(st.bundle.Namespace)
 	case st.bundle.Namespace:
 	default:
-		return nil, errors.Errorf("namespace was %q which is different from the bundle namespace %q", obj.GetNamespace(), st.bundle.Namespace)
+		// the plugin or user created an object template with the namespace set to something wrong
+		return nil, resourceStatusError{
+			err:             errors.Errorf("namespace was %q which is different from the bundle namespace %q", obj.GetNamespace(), st.bundle.Namespace),
+			isExternalError: res.Spec.Plugin == nil,
+		}
 	}
 
 	return obj, nil
 }
 
 // evalPluginSpec evaluates the plugin resource specification and returns the result.
-func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtime.Object) (*unstructured.Unstructured, error) {
+func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtime.Object) (*unstructured.Unstructured, resourceStatus) {
 	pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
 	if !ok {
-		return nil, errors.Errorf("no such plugin %q", res.Spec.Plugin.Name)
+		return nil, resourceStatusError{
+			err:             errors.Errorf("no such plugin %q", res.Spec.Plugin.Name),
+			isExternalError: true,
+		}
 	}
 	validationResult, err := pluginContainer.ValidateSpec(res.Spec.Plugin.Spec)
 	if err != nil {
-		return nil, err
+		return nil, resourceStatusError{err: err}
 	}
 	if len(validationResult.Errors) > 0 {
-		return nil, errors.Wrap(k8s_errors.NewAggregate(validationResult.Errors), "spec failed validation against schema")
+		return nil, resourceStatusError{
+			err:             errors.Wrap(k8s_errors.NewAggregate(validationResult.Errors), "spec failed validation against schema"),
+			isExternalError: true,
+		}
 	}
 
 	// validate above should guarantee that our plugin is there
 	dependencies, err := st.prepareDependencies(res.References)
 	if err != nil {
-		return nil, err
+		// there should be no error in processing dependencies. If there is, this
+		// is an internal issue.
+		return nil, resourceStatusError{
+			err: err,
+		}
 	}
 
 	result, err := pluginContainer.Plugin.Process(res.Spec.Plugin.Spec, &plugin.Context{
@@ -541,17 +578,28 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtim
 		Dependencies: dependencies,
 	})
 	if err != nil {
-		return nil, err
+		// This is difficult to tell if it's an internal or external error due
+		// to the current plugin interface. At this point, the spec validated
+		// against the schema but this error could either be plugin failure or
+		// another validation failure and we can't distinguish the two.
+		// Throw it out as an internal error for now.
+		return nil, resourceStatusError{
+			err: err,
+		}
 	}
 
 	// Make sure plugin is returning us something that obeys the PluginSpec.
 	object, err := util.RuntimeToUnstructured(result.Object)
 	if err != nil {
-		return nil, errors.Wrap(err, "plugin output cannot be converted from runtime.Object")
+		return nil, resourceStatusError{
+			err: errors.Wrap(err, "plugin output cannot be converted from runtime.Object"),
+		}
 	}
 	expectedGVK := pluginContainer.Plugin.Describe().GVK
 	if object.GroupVersionKind() != expectedGVK {
-		return nil, errors.Errorf("unexpected GVK from plugin (wanted %s, got %s)", expectedGVK, object.GroupVersionKind())
+		return nil, resourceStatusError{
+			err: errors.Errorf("unexpected GVK from plugin (wanted %s, got %s)", expectedGVK, object.GroupVersionKind()),
+		}
 	}
 	// We are in charge of naming.
 	object.SetName(res.Spec.Plugin.ObjectName)
