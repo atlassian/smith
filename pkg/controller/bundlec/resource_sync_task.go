@@ -408,7 +408,10 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) resourceStatus {
 		}
 		pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
 		if !ok {
-			return resourceStatusError{err: errors.Errorf("plugin %q does not exist", res.Spec.Plugin.Name)}
+			return resourceStatusError{
+				err:             errors.Errorf("plugin %q does not exist", res.Spec.Plugin.Name),
+				isExternalError: true,
+			}
 		}
 		validationResult, err := pluginContainer.ValidateSpec(res.Spec.Plugin.Spec)
 		if err != nil {
