@@ -4,7 +4,6 @@ package store
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
@@ -30,6 +29,10 @@ const (
 type schemaWithResourceVersion struct {
 	resourceVersion string
 	schema          *gojsonschema.Schema
+}
+
+type ValidationResult struct {
+	Errors []error
 }
 
 // Catalog is a convenience interface to access OSB catalog information
@@ -251,14 +254,14 @@ func (c *Catalog) getParsedSchema(plan *sc_v1b1.ClusterServicePlan, action planS
 	return schema, nil
 }
 
-func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) error {
+func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (ValidationResult, error) {
 	if len(serviceInstanceSpec.ParametersFrom) > 0 {
-		return errors.New("cannot validate ServiceInstanceSpec which has a ParametersFrom block (insufficient information)")
+		return ValidationResult{}, errors.New("cannot validate ServiceInstanceSpec which has a ParametersFrom block (insufficient information)")
 	}
 
 	servicePlan, err := c.GetPlanOf(serviceInstanceSpec)
 	if err != nil {
-		return err
+		return ValidationResult{}, err
 	}
 
 	// We ignore the update schema here and assume it's equivalent to
@@ -266,11 +269,13 @@ func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.Servi
 	// them anyway as there are currently no true PATCH updates).
 	schema, err := c.getParsedSchema(servicePlan, instanceCreateAction)
 	if err != nil {
-		return err
+		return ValidationResult{
+			Errors: []error{err},
+		}, nil
 	}
 	if schema == nil {
 		// no schema to validate against anyway
-		return nil
+		return ValidationResult{}, nil
 	}
 	var parameters []byte
 	if serviceInstanceSpec.Parameters != nil {
@@ -282,22 +287,21 @@ func (c *Catalog) ValidateServiceInstanceSpec(serviceInstanceSpec *sc_v1b1.Servi
 		// parameters will give sane looking early validation failures...
 		parameters = []byte("{}")
 	}
-	validationResult, err := schema.Validate(gojsonschema.NewBytesLoader(parameters))
+	result, err := schema.Validate(gojsonschema.NewBytesLoader(parameters))
 	if err != nil {
-		return errors.Wrapf(err, "error validating osb resource parameters for %q", servicePlan.Spec.ExternalName)
+		return ValidationResult{}, errors.Wrapf(err, "error validating osb resource parameters for %q", servicePlan.Spec.ExternalName)
 	}
 
-	if !validationResult.Valid() {
-		validationErrors := validationResult.Errors()
-		msgs := make([]string, 0, len(validationErrors))
+	if !result.Valid() {
+		validationErrors := result.Errors()
+		errs := make([]error, 0, len(validationErrors))
 
 		for _, validationErr := range validationErrors {
-			msgs = append(msgs, validationErr.String())
+			errs = append(errs, errors.New(validationErr.String()))
 		}
 
-		return errors.Errorf("spec failed validation against schema: %s",
-			strings.Join(msgs, ", "))
+		return ValidationResult{errs}, nil
 	}
 
-	return nil
+	return ValidationResult{}, nil
 }

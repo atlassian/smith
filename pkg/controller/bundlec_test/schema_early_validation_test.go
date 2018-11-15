@@ -200,7 +200,7 @@ func TestSchemaEarlyValidation(t *testing.T) {
 			resCond := smith_testing.AssertResourceCondition(t, updateBundle, resPWithDefaults, smith_v1.ResourceError, cond_v1.ConditionTrue)
 			if resCond != nil {
 				assert.Equal(t, smith_v1.ResourceReasonTerminalError, resCond.Reason)
-				assert.Equal(t, "invalid spec: spec failed validation against schema: p1: Invalid type. Expected: string, given: boolean", resCond.Message)
+				assert.Equal(t, "spec failed validation against schema: p1: Invalid type. Expected: string, given: boolean", resCond.Message)
 			}
 			resCond = smith_testing.AssertResourceCondition(t, updateBundle, resSiWithDefaults, smith_v1.ResourceError, cond_v1.ConditionTrue)
 			if resCond != nil {

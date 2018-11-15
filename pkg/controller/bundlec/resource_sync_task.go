@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	k8s_errors "k8s.io/apimachinery/pkg/util/errors"
 	k8s_json "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/dynamic"
 )
@@ -113,11 +114,10 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	// it before we start processing the bundle, both to fail faster and avoid
 	// some unnecessary schema validations (particularly if we want to cache
 	// entire bundle prevalidation results rather than specific validations).
-	if err := st.prevalidate(res); err != nil {
+	status := st.prevalidate(res)
+	if status != nil {
 		return resourceInfo{
-			status: resourceStatusError{
-				err: err,
-			},
+			status: status,
 		}
 	}
 
@@ -330,7 +330,7 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 }
 
 // prevalidate does as much validation as possible before doing any real work.
-func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
+func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) resourceStatus {
 	sp, err := newExamplesSpec(res.References)
 	if err != nil {
 		if isNoExampleError(errors.Cause(err)) {
@@ -340,7 +340,7 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 			st.logger.Debug("Not validating against schema due to missing examples", zap.Error(err))
 			return nil
 		}
-		return err
+		return resourceStatusError{err: err}
 	}
 	serviceInstanceGvk := sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance")
 	res = res.DeepCopy() // Spec processor mutates in place
@@ -353,7 +353,7 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 			}
 			actual, err := st.scheme.ConvertToVersion(res.Spec.Object, serviceInstanceGvk.GroupVersion())
 			if err != nil {
-				return errors.WithStack(err)
+				return resourceStatusError{err: errors.WithStack(err)}
 			}
 			serviceInstance := actual.(*sc_v1b1.ServiceInstance)
 
@@ -365,22 +365,34 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 			if serviceInstance.Spec.Parameters != nil {
 				var parameters map[string]interface{}
 				if err = k8s_json.Unmarshal(serviceInstance.Spec.Parameters.Raw, &parameters); err != nil {
-					return errors.Wrap(err, "unable to unmarshal ServiceInstance resource parameters as object")
+					return resourceStatusError{
+						err:             errors.Wrap(err, "unable to unmarshal ServiceInstance resource parameters as object"),
+						isExternalError: true,
+					}
 				}
 
 				if err = sp.ProcessObject(parameters); err != nil {
-					return err
+					return resourceStatusError{
+						err:             err,
+						isExternalError: true,
+					}
 				}
 
 				serviceInstance.Spec.Parameters.Raw, err = k8s_json.Marshal(parameters)
 				if err != nil {
-					return errors.WithStack(err)
+					return resourceStatusError{err: errors.WithStack(err)}
 				}
 			}
 
-			err = st.catalog.ValidateServiceInstanceSpec(&serviceInstance.Spec)
+			validationResult, err := st.catalog.ValidateServiceInstanceSpec(&serviceInstance.Spec)
 			if err != nil {
-				return errors.WithStack(err)
+				return resourceStatusError{err: err}
+			}
+			if len(validationResult.Errors) > 0 {
+				return resourceStatusError{
+					err:             errors.Wrap(k8s_errors.NewAggregate(validationResult.Errors), "spec failed validation against schema"),
+					isExternalError: true,
+				}
 			}
 		}
 		// TODO validate service binding parameters
@@ -388,16 +400,28 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) error {
 	} else if res.Spec.Plugin != nil {
 		if res.Spec.Plugin.Spec != nil {
 			if err := sp.ProcessObject(res.Spec.Plugin.Spec); err != nil {
-				return err
+				return resourceStatusError{
+					err:             err,
+					isExternalError: true,
+				}
 			}
 		}
 		pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
 		if !ok {
-			return errors.Errorf("plugin %q does not exist", res.Spec.Plugin.Name)
+			return resourceStatusError{
+				err:             errors.Errorf("plugin %q does not exist", res.Spec.Plugin.Name),
+				isExternalError: true,
+			}
 		}
-		err := pluginContainer.ValidateSpec(res.Spec.Plugin.Spec)
+		validationResult, err := pluginContainer.ValidateSpec(res.Spec.Plugin.Spec)
 		if err != nil {
-			return errors.Wrap(err, "invalid spec")
+			return resourceStatusError{err: err}
+		}
+		if len(validationResult.Errors) > 0 {
+			return resourceStatusError{
+				err:             errors.Wrap(k8s_errors.NewAggregate(validationResult.Errors), "spec failed validation against schema"),
+				isExternalError: true,
+			}
 		}
 	}
 
@@ -497,9 +521,12 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtim
 	if !ok {
 		return nil, errors.Errorf("no such plugin %q", res.Spec.Plugin.Name)
 	}
-	err := pluginContainer.ValidateSpec(res.Spec.Plugin.Spec)
+	validationResult, err := pluginContainer.ValidateSpec(res.Spec.Plugin.Spec)
 	if err != nil {
-		return nil, errors.Wrapf(err, "plugin %q has invalid spec", res.Spec.Plugin.Name)
+		return nil, err
+	}
+	if len(validationResult.Errors) > 0 {
+		return nil, errors.Wrap(k8s_errors.NewAggregate(validationResult.Errors), "spec failed validation against schema")
 	}
 
 	// validate above should guarantee that our plugin is there

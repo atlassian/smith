@@ -1,8 +1,6 @@
 package plugin
 
 import (
-	"strings"
-
 	"github.com/pkg/errors"
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -10,6 +8,10 @@ import (
 type Container struct {
 	Plugin Plugin
 	schema *gojsonschema.Schema
+}
+
+type ValidationResult struct {
+	Errors []error
 }
 
 func NewContainer(newPlugin NewFunc) (Container, error) {
@@ -32,27 +34,26 @@ func NewContainer(newPlugin NewFunc) (Container, error) {
 	}, nil
 }
 
-func (pc *Container) ValidateSpec(pluginSpec map[string]interface{}) error {
+func (pc *Container) ValidateSpec(pluginSpec map[string]interface{}) (ValidationResult, error) {
 	if pc.schema == nil {
-		return nil
+		return ValidationResult{}, nil
 	}
 
-	validationResult, err := pc.schema.Validate(gojsonschema.NewGoLoader(pluginSpec))
+	result, err := pc.schema.Validate(gojsonschema.NewGoLoader(pluginSpec))
 	if err != nil {
-		return errors.Wrap(err, "error validating plugin spec")
+		return ValidationResult{}, errors.Wrap(err, "error validating plugin spec")
 	}
 
-	if !validationResult.Valid() {
-		validationErrors := validationResult.Errors()
-		msgs := make([]string, 0, len(validationErrors))
+	if !result.Valid() {
+		validationErrors := result.Errors()
+		errs := make([]error, 0, len(validationErrors))
 
 		for _, validationErr := range validationErrors {
-			msgs = append(msgs, validationErr.String())
+			errs = append(errs, errors.New(validationErr.String()))
 		}
 
-		return errors.Errorf("spec failed validation against schema: %s",
-			strings.Join(msgs, ", "))
+		return ValidationResult{errs}, nil
 	}
 
-	return nil
+	return ValidationResult{}, nil
 }
