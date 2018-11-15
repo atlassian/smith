@@ -99,15 +99,27 @@ func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
 			catalog:            st.catalog,
 		}
 		resInfo := rst.processResource(&res)
-		retriable, resErr := resInfo.fetchError()
+		resErr := resInfo.fetchError()
 		if resErr != nil {
-			if api_errors.IsConflict(errors.Cause(resErr)) {
+			if api_errors.IsConflict(errors.Cause(resErr.err)) {
 				// Short circuit on conflict
-				return retriable, resErr
+				return resErr.isRetriableError, resErr.err
 			}
-			logger.Error("Done processing resource", zap.Bool("ready", resInfo.isReady()), zap.Error(resErr))
+			if !resErr.isExternalError {
+				logger.Error("Done processing resource with internal error",
+					zap.Bool("ready", resInfo.isReady()),
+					zap.Error(resErr.err),
+					zap.Bool("retriable", resErr.isRetriableError))
+			} else {
+				// Log at info level - external errors are expected (e.g. if the
+				// user puts something invalid in the spec)
+				logger.Info("Done processing resource with external error",
+					zap.Bool("ready", resInfo.isReady()),
+					zap.Error(resErr.err),
+					zap.Bool("retriable", resErr.isRetriableError))
+			}
 		} else {
-			logger.Info("Done processing resource", zap.Bool("ready", resInfo.isReady()))
+			logger.Debug("Done processing resource", zap.Bool("ready", resInfo.isReady()))
 		}
 		st.processedResources[resourceName] = &resInfo
 	}
@@ -552,8 +564,10 @@ func (st *bundleSyncTask) resourceConditions(res smith_v1.Resource) (
 			blockedCond.Message = fmt.Sprintf("Not ready: %q", resStatus.dependencies)
 		case resourceStatusInProgress:
 			inProgressCond.Status = cond_v1.ConditionTrue
+			inProgressCond.Message = resStatus.message
 		case resourceStatusReady:
 			readyCond.Status = cond_v1.ConditionTrue
+			readyCond.Message = resStatus.message
 		case resourceStatusError:
 			errorCond.Status = cond_v1.ConditionTrue
 			errorCond.Message = resStatus.err.Error()

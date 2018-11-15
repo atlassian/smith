@@ -63,8 +63,8 @@ func init() {
 	utilruntime.Must(autoscaling_v2b1.SchemeBuilder.AddToScheme(autoscalingV2B1Scheme))
 }
 
-func alwaysReady(_ runtime.Object) (statuschecker.ObjectStatusResult, error) {
-	return statuschecker.ObjectStatusReady{}, nil
+func alwaysReady(_ runtime.Object) statuschecker.ObjectStatusResult {
+	return statuschecker.ObjectStatusReady{}
 }
 
 func getDeploymentCondition(deployment *apps_v1.Deployment, condType apps_v1.DeploymentConditionType) *apps_v1.DeploymentCondition {
@@ -79,11 +79,12 @@ func getDeploymentCondition(deployment *apps_v1.Deployment, condType apps_v1.Dep
 }
 
 // Works according to https://kubernetes.io/docs/user-guide/deployments/#the-status-of-a-deployment
-func isDeploymentReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
-
+func isDeploymentReady(obj runtime.Object) statuschecker.ObjectStatusResult {
 	var deployment apps_v1.Deployment
 	if err := util.ConvertType(appsV1Scheme, obj, &deployment); err != nil {
-		return nil, err
+		return statuschecker.ObjectStatusError{
+			Error: err,
+		}
 	}
 
 	replicas := deployment.Spec.Replicas
@@ -97,41 +98,43 @@ func isDeploymentReady(obj runtime.Object) (statuschecker.ObjectStatusResult, er
 		progressingCond := getDeploymentCondition(&deployment, apps_v1.DeploymentProgressing)
 		if progressingCond != nil && progressingCond.Reason == timedOutReason {
 			return statuschecker.ObjectStatusError{
-				UserError:      true,
+				ExternalError:  true,
 				RetriableError: false,
 				Error:          errors.Errorf("deployment exceeded its progress deadline"),
-			}, nil
+			}
 		}
 		if replicas != nil && updatedReplicas < *replicas {
 			return statuschecker.ObjectStatusInProgress{
 				Message: fmt.Sprintf("Number of replicas converging. Requested=%d, Updated=%d", *replicas, updatedReplicas),
-			}, nil
+			}
 		}
 
 		if deployment.Status.Replicas > updatedReplicas {
 			return statuschecker.ObjectStatusInProgress{
 				Message: fmt.Sprintf("Number of replicas converging. Replicas=%d, Updated=%d", deployment.Status.Replicas, updatedReplicas),
-			}, nil
+			}
 		}
 
 		if availableReplicas < updatedReplicas {
 			return statuschecker.ObjectStatusInProgress{
 				Message: fmt.Sprintf("Number of replicas converging. Available=%d, Updated=%d", availableReplicas, updatedReplicas),
-			}, nil
+			}
 		}
 
-		return statuschecker.ObjectStatusReady{}, nil
+		return statuschecker.ObjectStatusReady{}
 	}
 
 	return statuschecker.ObjectStatusInProgress{
 		Message: "Deployment in progress",
-	}, nil
+	}
 }
 
-func isHorizontalPodAutoscalerReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
+func isHorizontalPodAutoscalerReady(obj runtime.Object) statuschecker.ObjectStatusResult {
 	var hpa autoscaling_v2b1.HorizontalPodAutoscaler
 	if err := util.ConvertType(autoscalingV2B1Scheme, obj, &hpa); err != nil {
-		return nil, err
+		return statuschecker.ObjectStatusError{
+			Error: err,
+		}
 	}
 
 	// For the HPA to be ready, AbleToScale and ScalingActive conditions should exist and be true
@@ -149,8 +152,9 @@ func isHorizontalPodAutoscalerReady(obj runtime.Object) (statuschecker.ObjectSta
 				// AbleToScale should not be false if the HPA is working, this is a (retriable) failure
 				return statuschecker.ObjectStatusError{
 					Error:          errors.Errorf("%s: %s", cond.Reason, cond.Message),
+					ExternalError:  true,
 					RetriableError: true,
-				}, nil
+				}
 			case core_v1.ConditionUnknown:
 				// Assume it's still coming up
 			}
@@ -165,8 +169,9 @@ func isHorizontalPodAutoscalerReady(obj runtime.Object) (statuschecker.ObjectSta
 				if cond.LastTransitionTime.Add(hpaScalingActiveTimeout).Before(now.Time) {
 					return statuschecker.ObjectStatusError{
 						Error:          errors.Errorf("%s: %s", cond.Reason, cond.Message),
+						ExternalError:  true,
 						RetriableError: true,
-					}, nil
+					}
 				}
 			case core_v1.ConditionUnknown:
 				// Assume it's still coming up
@@ -175,17 +180,19 @@ func isHorizontalPodAutoscalerReady(obj runtime.Object) (statuschecker.ObjectSta
 	}
 
 	if foundAbleToScale && foundScalingActive {
-		return statuschecker.ObjectStatusReady{}, nil
+		return statuschecker.ObjectStatusReady{}
 	}
 	return statuschecker.ObjectStatusInProgress{
 		Message: fmt.Sprintf("ableToScale: %v, scalingActive: %v", foundAbleToScale, foundScalingActive),
-	}, nil
+	}
 }
 
-func isScServiceBindingReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
+func isScServiceBindingReady(obj runtime.Object) statuschecker.ObjectStatusResult {
 	var sic sc_v1b1.ServiceBinding
 	if err := util.ConvertType(scV1B1Scheme, obj, &sic); err != nil {
-		return nil, err
+		return statuschecker.ObjectStatusError{
+			Error: err,
+		}
 	}
 	readyCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionReady)
 	if readyCond != nil {
@@ -193,7 +200,7 @@ func isScServiceBindingReady(obj runtime.Object) (statuschecker.ObjectStatusResu
 		case sc_v1b1.ConditionFalse:
 			return statuschecker.ObjectStatusInProgress{
 				Message: fmt.Sprintf("%v: %v", readyCond.Reason, readyCond.Message),
-			}, nil
+			}
 		case sc_v1b1.ConditionTrue:
 			var msg []string
 			if len(readyCond.Reason) != 0 {
@@ -204,29 +211,32 @@ func isScServiceBindingReady(obj runtime.Object) (statuschecker.ObjectStatusResu
 			}
 			return statuschecker.ObjectStatusReady{
 				Message: strings.Join(msg, ": "),
-			}, nil
+			}
 		default:
 			return statuschecker.ObjectStatusUnknown{
 				Details: fmt.Sprintf("status is %q", readyCond.Status),
-			}, nil
+			}
 		}
 	}
 	failedCond := getServiceBindingCondition(&sic, sc_v1b1.ServiceBindingConditionFailed)
 	if failedCond != nil && failedCond.Status == sc_v1b1.ConditionTrue {
 		return statuschecker.ObjectStatusError{
-			Error: errors.Errorf("%s: %s", failedCond.Reason, failedCond.Message),
-		}, nil
+			Error:         errors.Errorf("%s: %s", failedCond.Reason, failedCond.Message),
+			ExternalError: true,
+		}
 	}
 
 	return statuschecker.ObjectStatusInProgress{
 		Message: "Waiting for service catalog",
-	}, nil
+	}
 }
 
-func isScServiceInstanceReady(obj runtime.Object) (statuschecker.ObjectStatusResult, error) {
+func isScServiceInstanceReady(obj runtime.Object) statuschecker.ObjectStatusResult {
 	var instance sc_v1b1.ServiceInstance
 	if err := util.ConvertType(scV1B1Scheme, obj, &instance); err != nil {
-		return nil, err
+		return statuschecker.ObjectStatusError{
+			Error: err,
+		}
 	}
 	readyCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionReady)
 	if readyCond != nil {
@@ -237,11 +247,12 @@ func isScServiceInstanceReady(obj runtime.Object) (statuschecker.ObjectStatusRes
 				return statuschecker.ObjectStatusError{
 					Error:          errors.Errorf("%s: %s", readyCond.Reason, readyCond.Message),
 					RetriableError: true,
-				}, nil
+					ExternalError:  true,
+				}
 			}
 			return statuschecker.ObjectStatusInProgress{
 				Message: fmt.Sprintf("%v: %v", readyCond.Reason, readyCond.Message),
-			}, nil
+			}
 		case sc_v1b1.ConditionTrue:
 			var msg []string
 			if len(readyCond.Reason) != 0 {
@@ -252,23 +263,24 @@ func isScServiceInstanceReady(obj runtime.Object) (statuschecker.ObjectStatusRes
 			}
 			return statuschecker.ObjectStatusReady{
 				Message: strings.Join(msg, ": "),
-			}, nil
+			}
 		default:
 			return statuschecker.ObjectStatusUnknown{
 				Details: fmt.Sprintf("status is %q", readyCond.Status),
-			}, nil
+			}
 		}
 	}
 	failedCond := getServiceInstanceCondition(&instance, sc_v1b1.ServiceInstanceConditionFailed)
 	if failedCond != nil && failedCond.Status == sc_v1b1.ConditionTrue {
 		return statuschecker.ObjectStatusError{
-			Error: errors.Errorf("%s: %s", failedCond.Reason, failedCond.Message),
-		}, nil
+			Error:         errors.Errorf("%s: %s", failedCond.Reason, failedCond.Message),
+			ExternalError: true,
+		}
 	}
 
 	return statuschecker.ObjectStatusInProgress{
 		Message: "Waiting for service catalog",
-	}, nil
+	}
 }
 
 func getServiceInstanceCondition(instance *sc_v1b1.ServiceInstance, conditionType sc_v1b1.ServiceInstanceConditionType) *sc_v1b1.ServiceInstanceCondition {

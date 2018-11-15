@@ -35,7 +35,7 @@ type ObjectStatusInProgress struct {
 	Message string
 }
 type ObjectStatusError struct {
-	UserError      bool
+	ExternalError  bool
 	RetriableError bool
 	Error          error
 }
@@ -55,7 +55,7 @@ func (o ObjectStatusError) StatusType() ObjectStatusType {
 
 // ObjectStatusChecker checks object's status.
 // Function is responsible for handling different versions of objects by itself.
-type ObjectStatusChecker func(runtime.Object) (ObjectStatusResult, error)
+type ObjectStatusChecker func(runtime.Object) ObjectStatusResult
 
 // CRDStore gets a CRD definition for a Group and Kind of the resource (CRD instance).
 // Returns nil if CRD definition was not found.
@@ -64,7 +64,7 @@ type CRDStore interface {
 }
 
 type Interface interface {
-	CheckStatus(*unstructured.Unstructured) (r ObjectStatusResult, e error)
+	CheckStatus(*unstructured.Unstructured) ObjectStatusResult
 }
 
 type Checker struct {
@@ -88,12 +88,14 @@ func New(store CRDStore, kts ...map[schema.GroupKind]ObjectStatusChecker) (*Chec
 	}, nil
 }
 
-func (c *Checker) CheckStatus(obj *unstructured.Unstructured) (ObjectStatusResult, error) {
+func (c *Checker) CheckStatus(obj *unstructured.Unstructured) ObjectStatusResult {
 	gvk := obj.GroupVersionKind()
 	gk := gvk.GroupKind()
 
 	if gk.Kind == "" || gvk.Version == "" { // Group can be empty e.g. built-in objects like ConfigMap
-		return ObjectStatusUnknown{}, errors.Errorf("object has empty kind/version: %s", gvk)
+		return ObjectStatusError{
+			Error: errors.Errorf("object has empty kind/version: %s", gvk),
+		}
 	}
 
 	// 1. Check if it is a known built-in resource
@@ -104,7 +106,9 @@ func (c *Checker) CheckStatus(obj *unstructured.Unstructured) (ObjectStatusResul
 	// 2. Check if it is a CRD with path/value annotation
 	crd, err := c.crdWithPathValueAnnotation(gk)
 	if err != nil {
-		return nil, err
+		return ObjectStatusError{
+			Error: err,
+		}
 	}
 	if crd != nil {
 		return c.checkPathValue(crd, obj)
@@ -113,13 +117,15 @@ func (c *Checker) CheckStatus(obj *unstructured.Unstructured) (ObjectStatusResul
 	// 3. Check if it is a CRD with Kind/GroupVersion annotation
 	crd, err = c.crdWithKindGroupVersionAnnotation(gk)
 	if err != nil {
-		return nil, err
+		return ObjectStatusError{
+			Error: err,
+		}
 	}
 	if crd != nil {
 		return c.checkForInstance(crd, obj)
 	}
 
-	return ObjectStatusInProgress{}, nil
+	return ObjectStatusInProgress{}
 }
 
 func (c *Checker) crdWithKindGroupVersionAnnotation(gk schema.GroupKind) (*apiext_v1b1.CustomResourceDefinition, error) {
@@ -127,9 +133,9 @@ func (c *Checker) crdWithKindGroupVersionAnnotation(gk schema.GroupKind) (*apiex
 	return nil, nil
 }
 
-func (c *Checker) checkForInstance(crd *apiext_v1b1.CustomResourceDefinition, obj *unstructured.Unstructured) (ObjectStatusResult, error) {
+func (c *Checker) checkForInstance(crd *apiext_v1b1.CustomResourceDefinition, obj *unstructured.Unstructured) ObjectStatusResult {
 	// Not yet implemented
-	return ObjectStatusInProgress{}, nil
+	return ObjectStatusInProgress{}
 }
 
 func (c *Checker) crdWithPathValueAnnotation(gk schema.GroupKind) (*apiext_v1b1.CustomResourceDefinition, error) {
@@ -148,21 +154,21 @@ func (c *Checker) crdWithPathValueAnnotation(gk schema.GroupKind) (*apiext_v1b1.
 	return crd, nil
 }
 
-func (c *Checker) checkPathValue(crd *apiext_v1b1.CustomResourceDefinition, obj *unstructured.Unstructured) (ObjectStatusResult, error) {
+func (c *Checker) checkPathValue(crd *apiext_v1b1.CustomResourceDefinition, obj *unstructured.Unstructured) ObjectStatusResult {
 	path := crd.Annotations[smith.CrFieldPathAnnotation]
 	value := crd.Annotations[smith.CrFieldValueAnnotation]
 	actualValue, err := resources.GetJSONPathString(obj.Object, path)
 	if err != nil {
 		// invalid jsonpath annotations on CRD
 		return ObjectStatusError{
-			UserError: true,
-			Error:     err,
-		}, nil
+			ExternalError: true,
+			Error:         err,
+		}
 	}
 	if actualValue != value {
 		return ObjectStatusInProgress{
 			Message: fmt.Sprintf("Path %q for object still missing value %q", path, value),
-		}, nil
+		}
 	}
-	return ObjectStatusReady{}, nil
+	return ObjectStatusReady{}
 }
