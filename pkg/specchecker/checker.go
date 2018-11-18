@@ -1,4 +1,4 @@
-package speccheck
+package specchecker
 
 import (
 	"github.com/atlassian/smith/pkg/util"
@@ -13,12 +13,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-type SpecCheck struct {
+type Checker struct {
 	Store      Store
 	KnownTypes map[schema.GroupKind]ObjectProcessor
 }
 
-func New(store Store, kts ...map[schema.GroupKind]ObjectProcessor) *SpecCheck {
+func New(store Store, kts ...map[schema.GroupKind]ObjectProcessor) *Checker {
 	kt := make(map[schema.GroupKind]ObjectProcessor)
 	for _, knownTypes := range kts {
 		for knownGK, f := range knownTypes {
@@ -28,21 +28,21 @@ func New(store Store, kts ...map[schema.GroupKind]ObjectProcessor) *SpecCheck {
 			kt[knownGK] = f
 		}
 	}
-	return &SpecCheck{
+	return &Checker{
 		Store:      store,
 		KnownTypes: kt,
 	}
 }
 
 // BeforeCreate pre-processes object specification and returns an updated version.
-func (sc *SpecCheck) BeforeCreate(logger *zap.Logger, spec *unstructured.Unstructured) (*unstructured.Unstructured /*updatedSpec*/, error) {
-	processor, ok := sc.KnownTypes[spec.GroupVersionKind().GroupKind()]
+func (c *Checker) BeforeCreate(logger *zap.Logger, spec *unstructured.Unstructured) (*unstructured.Unstructured /*updatedSpec*/, error) {
+	processor, ok := c.KnownTypes[spec.GroupVersionKind().GroupKind()]
 	if !ok {
 		return spec, nil
 	}
 	ctx := &Context{
 		Logger: logger,
-		Store:  sc.Store,
+		Store:  c.Store,
 	}
 	updatedSpec, err := processor.BeforeCreate(ctx, spec)
 	if err != nil {
@@ -51,7 +51,7 @@ func (sc *SpecCheck) BeforeCreate(logger *zap.Logger, spec *unstructured.Unstruc
 	return util.RuntimeToUnstructured(updatedSpec)
 }
 
-func (sc *SpecCheck) CompareActualVsSpec(logger *zap.Logger, spec, actual runtime.Object) (*unstructured.Unstructured, bool /*match*/, string /* diff */, error) {
+func (c *Checker) CompareActualVsSpec(logger *zap.Logger, spec, actual runtime.Object) (*unstructured.Unstructured, bool /*match*/, string /* diff */, error) {
 	specUnstr, err := util.RuntimeToUnstructured(spec)
 	if err != nil {
 		return nil, false, "", err
@@ -61,13 +61,13 @@ func (sc *SpecCheck) CompareActualVsSpec(logger *zap.Logger, spec, actual runtim
 		return nil, false, "", err
 	}
 	// Compare spec and existing resource
-	return sc.compareActualVsSpec(logger, specUnstr, actualUnstr)
+	return c.compareActualVsSpec(logger, specUnstr, actualUnstr)
 }
 
 // compareActualVsSpec checks if actual resource satisfies the desired spec.
 // If actual matches spec then actual is returned untouched otherwise an updated object is returned.
 // Mutates spec (reuses parts of it).
-func (sc *SpecCheck) compareActualVsSpec(logger *zap.Logger, spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, bool /*match*/, string /* diff */, error) {
+func (c *Checker) compareActualVsSpec(logger *zap.Logger, spec, actual *unstructured.Unstructured) (*unstructured.Unstructured, bool /*match*/, string /* diff */, error) {
 	updated := actual.DeepCopy()
 	unstructured.RemoveNestedField(updated.Object, "status")
 
@@ -83,10 +83,10 @@ func (sc *SpecCheck) compareActualVsSpec(logger *zap.Logger, spec, actual *unstr
 	// Ignore fields managed by server, pre-process spec, etc
 	gk := spec.GroupVersionKind().GroupKind()
 
-	if processor, ok := sc.KnownTypes[gk]; ok {
+	if processor, ok := c.KnownTypes[gk]; ok {
 		ctx := &Context{
 			Logger: logger,
-			Store:  sc.Store,
+			Store:  c.Store,
 		}
 		appliedSpec, err := processor.ApplySpec(ctx, spec, actualClone)
 		if err != nil {

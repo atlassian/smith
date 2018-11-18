@@ -3,8 +3,8 @@ package builtin
 import (
 	"testing"
 
-	"github.com/atlassian/smith/pkg/speccheck"
-	specchecktesting "github.com/atlassian/smith/pkg/speccheck/testing"
+	"github.com/atlassian/smith/pkg/specchecker"
+	speccheckertesting "github.com/atlassian/smith/pkg/specchecker/testing"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,7 +49,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &instanceSpec)
 
-	store := specchecktesting.FakeStore{
+	store := speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
@@ -91,7 +91,7 @@ func TestSameChecksumIfNoChanges(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	ctx := &speccheck.Context{Logger: logger, Store: store}
+	ctx := &specchecker.Context{Logger: logger, Store: store}
 	updatedSpec, err := serviceInstance{}.BeforeCreate(ctx, spec)
 	require.NoError(t, err)
 
@@ -128,7 +128,7 @@ func TestAnnotationAddedForEmptyParametersFrom(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	ctx := &speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{Namespace: testNs}}
+	ctx := &specchecker.Context{Logger: logger, Store: speccheckertesting.FakeStore{Namespace: testNs}}
 	updatedSpec, err := serviceInstance{}.BeforeCreate(ctx, spec)
 	require.NoError(t, err)
 
@@ -167,7 +167,7 @@ func TestExplicitlyDisabled(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	ctx := &speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{Namespace: testNs}}
+	ctx := &specchecker.Context{Logger: logger, Store: speccheckertesting.FakeStore{Namespace: testNs}}
 	updatedSpec, err := serviceInstance{}.BeforeCreate(ctx, spec)
 	require.NoError(t, err)
 
@@ -247,7 +247,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 	}
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	ctx := &speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{
+	ctx := &specchecker.Context{Logger: logger, Store: speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: allResponses,
 	}}
@@ -262,7 +262,7 @@ func TestUpdateInstanceSecrets(t *testing.T) {
 
 	allResponses["secret1"] = allResponses["secret2"]
 
-	ctx = &speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{
+	ctx = &specchecker.Context{Logger: logger, Store: speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: allResponses,
 	}}
@@ -296,7 +296,7 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	updatedSpec, err := serviceInstance{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: specchecktesting.FakeStore{Namespace: testNs}}, spec)
+	updatedSpec, err := serviceInstance{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: speccheckertesting.FakeStore{Namespace: testNs}}, spec)
 	require.NoError(t, err)
 
 	instanceCheck := updatedSpec.(*sc_v1b1.ServiceInstance)
@@ -306,9 +306,9 @@ func TestUserEnteredAnnotationNoRefs(t *testing.T) {
 	firstAnnotationValue := instanceCheck.Annotations[SecretParametersChecksumAnnotation]
 	assert.NotEqual(t, firstAnnotationValue, userAnnotationValue)
 
-	compareToPreviousUpdate, err := serviceInstance{}.ApplySpec(&speccheck.Context{
+	compareToPreviousUpdate, err := serviceInstance{}.ApplySpec(&specchecker.Context{
 		Logger: logger,
-		Store:  specchecktesting.FakeStore{Namespace: testNs},
+		Store:  speccheckertesting.FakeStore{Namespace: testNs},
 	}, spec, runtimeToUnstructured(t, instanceCheck))
 	require.NoError(t, err)
 
@@ -349,7 +349,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &instanceSpec)
 
-	store := specchecktesting.FakeStore{
+	store := speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
@@ -375,7 +375,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	updatedSpec, err := serviceInstance{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := serviceInstance{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	instanceCheck := updatedSpec.(*sc_v1b1.ServiceInstance)
@@ -385,7 +385,7 @@ func TestUserEnteredAnnotationWithRefs(t *testing.T) {
 	firstAnnotationValue := instanceCheck.Annotations[SecretParametersChecksumAnnotation]
 	assert.NotEqual(t, firstAnnotationValue, userAnnotationValue)
 
-	compareToPreviousUpdate, err := serviceInstance{}.ApplySpec(&speccheck.Context{Logger: logger, Store: store}, spec, runtimeToUnstructured(t, instanceCheck))
+	compareToPreviousUpdate, err := serviceInstance{}.ApplySpec(&specchecker.Context{Logger: logger, Store: store}, spec, runtimeToUnstructured(t, instanceCheck))
 	require.NoError(t, err)
 
 	ignoreUserValue := compareToPreviousUpdate.(*sc_v1b1.ServiceInstance)

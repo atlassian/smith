@@ -1,7 +1,7 @@
 package builtin
 
 import (
-	"github.com/atlassian/smith/pkg/speccheck"
+	"github.com/atlassian/smith/pkg/specchecker"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -11,11 +11,11 @@ import (
 type serviceBinding struct {
 }
 
-func (serviceBinding) BeforeCreate(ctx *speccheck.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
+func (serviceBinding) BeforeCreate(ctx *specchecker.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
 	return spec, nil
 }
 
-func (serviceBinding) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+func (serviceBinding) ApplySpec(ctx *specchecker.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var sbSpec sc_v1b1.ServiceBinding
 	if err := util.ConvertType(scV1B1Scheme, spec, &sbSpec); err != nil {
 		return nil, err

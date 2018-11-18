@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/speccheck"
+	"github.com/atlassian/smith/pkg/specchecker"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -28,7 +28,7 @@ const (
 type deployment struct {
 }
 
-func (d deployment) BeforeCreate(ctx *speccheck.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
+func (d deployment) BeforeCreate(ctx *specchecker.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
 	var deploymentSpec apps_v1.Deployment
 	if err := util.ConvertType(appsV1Scheme, spec, &deploymentSpec); err != nil {
 		return nil, err
@@ -45,7 +45,7 @@ func (d deployment) BeforeCreate(ctx *speccheck.Context, spec *unstructured.Unst
 	return &deploymentSpec, nil
 }
 
-func (d deployment) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+func (d deployment) ApplySpec(ctx *specchecker.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var deploymentSpec apps_v1.Deployment
 	if err := util.ConvertType(appsV1Scheme, spec, &deploymentSpec); err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (d deployment) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured
 // setLastAppliedReplicasAnnotation updates replicas based on LastAppliedReplicas annotation and running config
 // to avoid conflicts with other controllers like HPA.
 // actual may be nil.
-func (deployment) setLastAppliedReplicasAnnotation(ctx *speccheck.Context, spec, actual *apps_v1.Deployment) {
+func (deployment) setLastAppliedReplicasAnnotation(ctx *specchecker.Context, spec, actual *apps_v1.Deployment) {
 	if spec.Spec.Replicas == nil {
 		var one int32 = 1
 		spec.Spec.Replicas = &one
@@ -116,7 +116,7 @@ func (deployment) setLastAppliedReplicasAnnotation(ctx *speccheck.Context, spec,
 }
 
 // works around https://github.com/kubernetes/kubernetes/issues/22368
-func (d deployment) setConfigurationHashAnnotation(ctx *speccheck.Context, spec *apps_v1.Deployment) error {
+func (d deployment) setConfigurationHashAnnotation(ctx *specchecker.Context, spec *apps_v1.Deployment) error {
 	if spec.Spec.Template.Annotations[EnvRefHashAnnotation] == Disabled {
 		return nil
 	}
@@ -133,7 +133,7 @@ func (d deployment) setConfigurationHashAnnotation(ctx *speccheck.Context, spec 
 	return nil
 }
 
-func (d deployment) generateHash(ctx *speccheck.Context, spec *apps_v1.Deployment) ([]byte, error) {
+func (d deployment) generateHash(ctx *specchecker.Context, spec *apps_v1.Deployment) ([]byte, error) {
 	hasher := sha256.New()
 
 	err := d.generateHashForContainers(ctx.Store, spec.Namespace, spec.Spec.Template.Spec.Containers, hasher)
@@ -147,12 +147,12 @@ func (d deployment) generateHash(ctx *speccheck.Context, spec *apps_v1.Deploymen
 	return hasher.Sum(nil), nil
 }
 
-func (deployment) generateHashForContainers(store speccheck.Store, namespace string, containers []core_v1.Container, hasher hash.Hash) error {
+func (deployment) generateHashForContainers(store specchecker.Store, namespace string, containers []core_v1.Container, hasher hash.Hash) error {
 	for _, container := range containers {
 		for _, envFrom := range container.EnvFrom {
 			secretRef := envFrom.SecretRef
 			if secretRef != nil {
-				err := speccheck.HashSecretRef(store, namespace, secretRef.Name, sets.NewString(), secretRef.Optional, hasher)
+				err := specchecker.HashSecretRef(store, namespace, secretRef.Name, sets.NewString(), secretRef.Optional, hasher)
 				if err != nil {
 					return err
 				}
@@ -160,7 +160,7 @@ func (deployment) generateHashForContainers(store speccheck.Store, namespace str
 
 			configMapRef := envFrom.ConfigMapRef
 			if configMapRef != nil {
-				err := speccheck.HashConfigMapRef(store, namespace, configMapRef.Name, sets.NewString(), configMapRef.Optional, hasher)
+				err := specchecker.HashConfigMapRef(store, namespace, configMapRef.Name, sets.NewString(), configMapRef.Optional, hasher)
 				if err != nil {
 					return err
 				}
@@ -173,7 +173,7 @@ func (deployment) generateHashForContainers(store speccheck.Store, namespace str
 
 			secretKeyRef := env.ValueFrom.SecretKeyRef
 			if secretKeyRef != nil {
-				err := speccheck.HashSecretRef(store, namespace, secretKeyRef.Name, sets.NewString(secretKeyRef.Key), secretKeyRef.Optional, hasher)
+				err := specchecker.HashSecretRef(store, namespace, secretKeyRef.Name, sets.NewString(secretKeyRef.Key), secretKeyRef.Optional, hasher)
 				if err != nil {
 					return err
 				}
@@ -181,7 +181,7 @@ func (deployment) generateHashForContainers(store speccheck.Store, namespace str
 
 			configMapKeyRef := env.ValueFrom.ConfigMapKeyRef
 			if configMapKeyRef != nil {
-				err := speccheck.HashConfigMapRef(store, namespace, configMapKeyRef.Name, sets.NewString(configMapKeyRef.Key), configMapKeyRef.Optional, hasher)
+				err := specchecker.HashConfigMapRef(store, namespace, configMapKeyRef.Name, sets.NewString(configMapKeyRef.Key), configMapKeyRef.Optional, hasher)
 				if err != nil {
 					return err
 				}

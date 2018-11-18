@@ -3,8 +3,8 @@ package builtin
 import (
 	"testing"
 
-	"github.com/atlassian/smith/pkg/speccheck"
-	specchecktesting "github.com/atlassian/smith/pkg/speccheck/testing"
+	"github.com/atlassian/smith/pkg/specchecker"
+	speccheckertesting "github.com/atlassian/smith/pkg/specchecker/testing"
 	"github.com/atlassian/smith/pkg/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,7 +82,7 @@ func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	store := specchecktesting.FakeStore{
+	store := speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
@@ -138,7 +138,7 @@ func TestAddsHashToDeploymentSpecForEnvFrom(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
@@ -207,7 +207,7 @@ func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	store := specchecktesting.FakeStore{
+	store := speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
@@ -264,7 +264,7 @@ func TestAddsHashToDeploymentSpecForInitContainersEnvFrom(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
@@ -312,7 +312,7 @@ func TestAddsHashToDeploymentSpecForEnv(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	store := specchecktesting.FakeStore{
+	store := speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
@@ -339,7 +339,7 @@ func TestAddsHashToDeploymentSpecForEnv(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
@@ -387,7 +387,7 @@ func TestHashNotIgnoredForNonExistingKey(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	store := specchecktesting.FakeStore{
+	store := speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
@@ -414,7 +414,7 @@ func TestHashNotIgnoredForNonExistingKey(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	_, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	_, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.Error(t, err)
 }
 
@@ -459,7 +459,7 @@ func TestHashIgnoredForOptionalNonExistingKey(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	store := specchecktesting.FakeStore{
+	store := speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
@@ -485,7 +485,7 @@ func TestHashIgnoredForOptionalNonExistingKey(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
@@ -535,11 +535,11 @@ func TestHashIgnoredForOptionalNonExistingSecret(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	store := specchecktesting.FakeStore{Namespace: testNs}
+	store := speccheckertesting.FakeStore{Namespace: testNs}
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
@@ -586,12 +586,12 @@ func TestHashNotIgnoredForNonExistingSecret(t *testing.T) {
 	}
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
-	store := specchecktesting.FakeStore{Namespace: testNs}
+	store := speccheckertesting.FakeStore{Namespace: testNs}
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	_, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	_, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.Error(t, err)
 }
 
@@ -634,12 +634,12 @@ func TestNoAnnotationForEmptyDeployment(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 	expectedSpec := runtimeToUnstructured(t, &expectedDeploymentSpec)
-	store := specchecktesting.FakeStore{Namespace: testNs}
+	store := speccheckertesting.FakeStore{Namespace: testNs}
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	updatedSpecUnstr := runtimeToUnstructured(t, updatedSpec)
@@ -696,9 +696,9 @@ func TestEmptyAnnotationForDeploymentThatDoesntUseAnything(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	store := specchecktesting.FakeStore{Namespace: testNs}
+	store := speccheckertesting.FakeStore{Namespace: testNs}
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
@@ -748,9 +748,9 @@ func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	store := specchecktesting.FakeStore{Namespace: testNs}
+	store := speccheckertesting.FakeStore{Namespace: testNs}
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
@@ -787,9 +787,9 @@ func TestUserEnteredAnnotationOverridden(t *testing.T) {
 
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
-	store := specchecktesting.FakeStore{Namespace: testNs}
+	store := speccheckertesting.FakeStore{Namespace: testNs}
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
@@ -838,7 +838,7 @@ func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
 
 	spec := runtimeToUnstructured(t, &deploymentSpec)
 
-	store := specchecktesting.FakeStore{
+	store := speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: map[string]runtime.Object{
 			"secret1": &core_v1.Secret{
@@ -865,7 +865,7 @@ func TestUserEnteredAnnotationInDeploymentWithRefs(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
@@ -945,7 +945,7 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 			},
 		},
 	}
-	store := specchecktesting.FakeStore{
+	store := speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: allResponses,
 	}
@@ -953,7 +953,7 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync() // nolint: errcheck
 
-	updatedSpec, err := deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
@@ -962,12 +962,12 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 	firstHash := deploymentCheck.Spec.Template.Annotations
 
 	allResponses["secret1"] = allResponses["secret2"]
-	store = specchecktesting.FakeStore{
+	store = speccheckertesting.FakeStore{
 		Namespace: testNs,
 		Responses: allResponses,
 	}
 
-	updatedSpec, err = deployment{}.BeforeCreate(&speccheck.Context{Logger: logger, Store: store}, spec)
+	updatedSpec, err = deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
 	require.NoError(t, err)
 
 	secondDeploymentCheck := updatedSpec.(*apps_v1.Deployment)

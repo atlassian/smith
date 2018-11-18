@@ -1,4 +1,4 @@
-package speccheck
+package specchecker
 
 import (
 	"go.uber.org/zap"

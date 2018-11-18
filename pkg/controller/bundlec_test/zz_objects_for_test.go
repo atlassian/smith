@@ -5,7 +5,7 @@ import (
 
 	"github.com/atlassian/smith/examples/sleeper"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	"github.com/atlassian/smith/pkg/speccheck/builtin"
+	"github.com/atlassian/smith/pkg/specchecker/builtin"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	core_v1 "k8s.io/api/core/v1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"

@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-type SpecCheck interface {
+type SpecChecker interface {
 	// BeforeCreate pre-processes object specification and returns an updated version.
 	BeforeCreate(logger *zap.Logger, spec *unstructured.Unstructured) (*unstructured.Unstructured /*updatedSpec*/, error)
 	CompareActualVsSpec(logger *zap.Logger, spec, actual runtime.Object) (updatedSpec *unstructured.Unstructured, match bool, diff string, err error)

@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 
 	"github.com/atlassian/smith"
-	"github.com/atlassian/smith/pkg/speccheck"
+	"github.com/atlassian/smith/pkg/specchecker"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
@@ -22,7 +22,7 @@ const (
 type serviceInstance struct {
 }
 
-func (s serviceInstance) BeforeCreate(ctx *speccheck.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
+func (s serviceInstance) BeforeCreate(ctx *specchecker.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
 	var instanceSpec sc_v1b1.ServiceInstance
 	if err := util.ConvertType(scV1B1Scheme, spec, &instanceSpec); err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func (s serviceInstance) BeforeCreate(ctx *speccheck.Context, spec *unstructured
 	return &instanceSpec, nil
 }
 
-func (s serviceInstance) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+func (s serviceInstance) ApplySpec(ctx *specchecker.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var instanceSpec sc_v1b1.ServiceInstance
 	if err := util.ConvertType(scV1B1Scheme, spec, &instanceSpec); err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (s serviceInstance) ApplySpec(ctx *speccheck.Context, spec, actual *unstruc
 // secrets referenced.
 //
 // This can be disabled by adding the annotation with the value 'disabled'
-func (s serviceInstance) setSecretParametersChecksumAnnotation(ctx *speccheck.Context, spec, actual *sc_v1b1.ServiceInstance) error {
+func (s serviceInstance) setSecretParametersChecksumAnnotation(ctx *specchecker.Context, spec, actual *sc_v1b1.ServiceInstance) error {
 	if spec.Annotations[SecretParametersChecksumAnnotation] == Disabled {
 		return nil
 	}
@@ -105,7 +105,7 @@ func (s serviceInstance) setSecretParametersChecksumAnnotation(ctx *speccheck.Co
 	return nil
 }
 
-func (s serviceInstance) calculateNewServiceInstanceCheckSum(ctx *speccheck.Context, instanceSpec *sc_v1b1.ServiceInstance) (string, error) {
+func (s serviceInstance) calculateNewServiceInstanceCheckSum(ctx *specchecker.Context, instanceSpec *sc_v1b1.ServiceInstance) (string, error) {
 	checksumPayload, err := s.generateSecretParametersChecksumPayload(ctx, instanceSpec)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate checksum")
@@ -114,12 +114,12 @@ func (s serviceInstance) calculateNewServiceInstanceCheckSum(ctx *speccheck.Cont
 	return hex.EncodeToString(checksumPayload), nil
 }
 
-func (serviceInstance) generateSecretParametersChecksumPayload(ctx *speccheck.Context, instanceSpec *sc_v1b1.ServiceInstance) ([]byte, error) {
+func (serviceInstance) generateSecretParametersChecksumPayload(ctx *specchecker.Context, instanceSpec *sc_v1b1.ServiceInstance) ([]byte, error) {
 	hash := sha256.New()
 
 	for _, parametersFrom := range instanceSpec.Spec.ParametersFrom {
 		secretKeyRef := parametersFrom.SecretKeyRef
-		err := speccheck.HashSecretRef(ctx.Store, instanceSpec.Namespace, secretKeyRef.Name, sets.NewString(secretKeyRef.Key), nil, hash)
+		err := specchecker.HashSecretRef(ctx.Store, instanceSpec.Namespace, secretKeyRef.Name, sets.NewString(secretKeyRef.Key), nil, hash)
 		if err != nil {
 			return nil, err
 		}

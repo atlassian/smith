@@ -22,7 +22,7 @@ func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) 
 		smartClient:                     c.SmartClient,
 		checker:                         c.Rc,
 		store:                           c.Store,
-		specCheck:                       c.SpecCheck,
+		specChecker:                     c.SpecChecker,
 		bundle:                          bundle,
 		pluginContainers:                c.PluginContainers,
 		scheme:                          c.Scheme,
