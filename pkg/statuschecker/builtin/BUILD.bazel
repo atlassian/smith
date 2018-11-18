@@ -2,8 +2,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["built_in.go"],
-    importpath = "github.com/atlassian/smith/pkg/statuschecker/types",
+    srcs = ["known_types.go"],
+    importpath = "github.com/atlassian/smith/pkg/statuschecker/builtin",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/statuschecker:go_default_library",

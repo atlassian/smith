@@ -2,7 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["ready_checker.go"],
+    srcs = ["checker.go"],
     importpath = "github.com/atlassian/smith/pkg/statuschecker",
     visibility = ["//visibility:public"],
     deps = [

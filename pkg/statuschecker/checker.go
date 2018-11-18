@@ -28,12 +28,15 @@ type ObjectStatusResult interface {
 type ObjectStatusReady struct {
 	Message string
 }
+
 type ObjectStatusUnknown struct {
 	Details string
 }
+
 type ObjectStatusInProgress struct {
 	Message string
 }
+
 type ObjectStatusError struct {
 	ExternalError  bool
 	RetriableError bool
