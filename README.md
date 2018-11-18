@@ -48,17 +48,19 @@ metadata:
   name: postgresql-resources.smith.atlassian.com
 spec:
   group: smith.atlassian.com
-  version: v1
   names:
     kind: PostgresqlResource
     plural: postgresqlresources
     singular: postgresqlresource
+  versions:
+  - name: v1
+    served: true
+    storage: true
 ```
 Bundle:
 ```yaml
 apiVersion: smith.atlassian.com/v1
 kind: Bundle
-description: "Sample resource bundle"
 metadata:
   name: bundle1
 spec:
@@ -121,7 +123,7 @@ and following the same behaviour, semantics and code "style" as native Kubernete
 
 ## Features
 
-- Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `Ingress`;
+- Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `Ingress`, `ServiceAccount`, `HorizontalPodAutoscaler`;
 - [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `ServiceInstance` and `ServiceBinding`.
 See [an example](examples/service_catalog) and
 [recording of the presentation](https://youtu.be/7fgPgtQh5Es) to [Service Catalog SIG](https://github.com/kubernetes/community/tree/master/sig-service-catalog);
