@@ -1,7 +1,7 @@
 package builtin
 
 import (
-	"github.com/atlassian/smith/pkg/speccheck"
+	"github.com/atlassian/smith/pkg/specchecker"
 	"github.com/atlassian/smith/pkg/util"
 	core_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -11,11 +11,11 @@ import (
 type service struct {
 }
 
-func (service) BeforeCreate(ctx *speccheck.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
+func (service) BeforeCreate(ctx *specchecker.Context, spec *unstructured.Unstructured) (runtime.Object /*updatedSpec*/, error) {
 	return spec, nil
 }
 
-func (service) ApplySpec(ctx *speccheck.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
+func (service) ApplySpec(ctx *specchecker.Context, spec, actual *unstructured.Unstructured) (runtime.Object, error) {
 	var serviceSpec core_v1.Service
 	if err := util.ConvertType(coreV1Scheme, spec, &serviceSpec); err != nil {
 		return nil, err

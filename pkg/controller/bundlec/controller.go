@@ -40,7 +40,7 @@ type Controller struct {
 	SmartClient  SmartClient
 	Rc           statuschecker.Interface
 	Store        Store
-	SpecCheck    SpecCheck
+	SpecChecker  SpecChecker
 	WorkQueue    ctrl.WorkQueueProducer
 
 	// CRD

@@ -97,7 +97,7 @@ type resourceSyncTask struct {
 	smartClient        SmartClient
 	checker            statuschecker.Interface
 	store              Store
-	specCheck          SpecCheck
+	specChecker        SpecChecker
 	bundle             *smith_v1.Bundle
 	processedResources map[smith_v1.ResourceName]*resourceInfo
 	pluginContainers   map[smith_v1.PluginName]plugin.Container
@@ -161,7 +161,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Check if the resource actually matches the spec to detect infinite update cycles
-	updatedSpec, match, _, err := st.specCheck.CompareActualVsSpec(st.logger, spec, resUpdated)
+	updatedSpec, match, _, err := st.specChecker.CompareActualVsSpec(st.logger, spec, resUpdated)
 	if err != nil {
 		return resourceInfo{
 			status: resourceStatusError{
@@ -680,7 +680,7 @@ func (st *resourceSyncTask) createOrUpdate(spec *unstructured.Unstructured, actu
 }
 
 func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, spec *unstructured.Unstructured) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
-	spec, err := st.specCheck.BeforeCreate(st.logger, spec)
+	spec, err := st.specChecker.BeforeCreate(st.logger, spec)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "object specification pre-processing failed")
 	}
@@ -704,7 +704,7 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, spec *unstructured.Unstructured, actual runtime.Object) (actualRet *unstructured.Unstructured, retriableError bool, e error) {
 	st.logger.Debug("Object found, checking spec", ctrlLogz.ObjectGk(spec.GroupVersionKind().GroupKind()), ctrlLogz.Object(spec))
 	// Compare spec and existing resource
-	updated, match, difference, err := st.specCheck.CompareActualVsSpec(st.logger, spec, actual)
+	updated, match, difference, err := st.specChecker.CompareActualVsSpec(st.logger, spec, actual)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "specification check failed")
 	}

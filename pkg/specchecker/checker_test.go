@@ -1,4 +1,4 @@
-package speccheck_test
+package specchecker_test
 
 import (
 	"encoding/json"
@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/atlassian/smith/pkg/speccheck"
-	"github.com/atlassian/smith/pkg/speccheck/builtin"
-	specchecktesting "github.com/atlassian/smith/pkg/speccheck/testing"
+	"github.com/atlassian/smith/pkg/specchecker"
+	"github.com/atlassian/smith/pkg/specchecker/builtin"
+	speccheckertesting "github.com/atlassian/smith/pkg/specchecker/testing"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -276,7 +276,7 @@ func TestEqualityCheck(t *testing.T) {
 		input := input
 		t.Run(input.name, func(t *testing.T) {
 			t.Parallel()
-			sc := speccheck.New(specchecktesting.FakeStore{}, builtin.ServiceCatalogKnownTypes, builtin.MainKnownTypes)
+			sc := specchecker.New(speccheckertesting.FakeStore{}, builtin.ServiceCatalogKnownTypes, builtin.MainKnownTypes)
 			_, match, difference, err := sc.CompareActualVsSpec(logger, input.spec, input.actual)
 			require.NoError(t, err)
 			assert.True(t, match)
@@ -475,7 +475,7 @@ func TestEqualityUnequal(t *testing.T) {
 		input := input
 		t.Run(input.name, func(t *testing.T) {
 			t.Parallel()
-			sc := speccheck.New(specchecktesting.FakeStore{}, builtin.ServiceCatalogKnownTypes, builtin.MainKnownTypes)
+			sc := specchecker.New(speccheckertesting.FakeStore{}, builtin.ServiceCatalogKnownTypes, builtin.MainKnownTypes)
 			_, match, difference, err := sc.CompareActualVsSpec(logger, input.spec, input.actual)
 			require.NoError(t, err)
 			assert.False(t, match)
@@ -498,7 +498,7 @@ func TestDoNotPanicWhenLoggingDiff(t *testing.T) {
 	err = json.Unmarshal([]byte(`{ "kind": "Bundle", "apiVersion": "v1", "environment": "test" }`), &actual)
 	require.NoError(t, err)
 
-	sc := speccheck.New(specchecktesting.FakeStore{}, builtin.ServiceCatalogKnownTypes, builtin.MainKnownTypes)
+	sc := specchecker.New(speccheckertesting.FakeStore{}, builtin.ServiceCatalogKnownTypes, builtin.MainKnownTypes)
 	_, _, _, err = sc.CompareActualVsSpec(logger, &expected, &actual)
 	require.NoError(t, err)
 }
@@ -520,7 +520,7 @@ func TestUpdateResourceEmptyMissingNilNoChanges(t *testing.T) {
 			spec := input2()
 			t.Run(fmt.Sprintf("%s actual, %s spec", kind1, kind2), func(t *testing.T) {
 				t.Parallel()
-				sc := speccheck.New(specchecktesting.FakeStore{})
+				sc := specchecker.New(speccheckertesting.FakeStore{})
 				updated, match, difference, err := sc.CompareActualVsSpec(logger, spec, actual)
 				require.NoError(t, err)
 				assert.True(t, match)

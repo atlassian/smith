@@ -33,7 +33,7 @@ type bundleSyncTask struct {
 	smartClient                     SmartClient
 	checker                         statuschecker.Interface
 	store                           Store
-	specCheck                       SpecCheck
+	specChecker                     SpecChecker
 	bundle                          *smith_v1.Bundle
 	pluginContainers                map[smith_v1.PluginName]plugin.Container
 	scheme                          *runtime.Scheme
@@ -91,7 +91,7 @@ func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
 			smartClient:        st.smartClient,
 			checker:            st.checker,
 			store:              st.store,
-			specCheck:          st.specCheck,
+			specChecker:        st.specChecker,
 			bundle:             st.bundle,
 			processedResources: st.processedResources,
 			pluginContainers:   st.pluginContainers,

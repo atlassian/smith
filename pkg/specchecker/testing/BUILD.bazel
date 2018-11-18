@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["stuff_for_tests.go"],
-    importpath = "github.com/atlassian/smith/pkg/speccheck/testing",
+    importpath = "github.com/atlassian/smith/pkg/specchecker/testing",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/pkg/errors:go_default_library",

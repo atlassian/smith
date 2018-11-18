@@ -10,8 +10,8 @@ import (
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
-	"github.com/atlassian/smith/pkg/speccheck"
-	"github.com/atlassian/smith/pkg/speccheck/builtin"
+	"github.com/atlassian/smith/pkg/specchecker"
+	"github.com/atlassian/smith/pkg/specchecker/builtin"
 	"github.com/atlassian/smith/pkg/statuschecker"
 	ready_types "github.com/atlassian/smith/pkg/statuschecker/types"
 	"github.com/atlassian/smith/pkg/store"
@@ -188,12 +188,12 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 		return nil, err
 	}
 
-	// Spec check
-	checkTypes := []map[schema.GroupKind]speccheck.ObjectProcessor{builtin.MainKnownTypes}
+	// Spec checker
+	checkTypes := []map[schema.GroupKind]specchecker.ObjectProcessor{builtin.MainKnownTypes}
 	if c.ServiceCatalogSupport {
 		checkTypes = append(checkTypes, builtin.ServiceCatalogKnownTypes)
 	}
-	specCheck := speccheck.New(multiStore, checkTypes...)
+	specChecker := specchecker.New(multiStore, checkTypes...)
 
 	// Controller
 	cntrlr := &bundlec.Controller{
@@ -204,7 +204,7 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 		SmartClient:                     smartClient,
 		Rc:                              rc,
 		Store:                           multiStore,
-		SpecCheck:                       specCheck,
+		SpecChecker:                     specChecker,
 		WorkQueue:                       cctx.WorkQueue,
 		CrdResyncPeriod:                 config.ResyncPeriod,
 		Namespace:                       config.Namespace,
