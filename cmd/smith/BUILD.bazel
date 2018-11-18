@@ -25,14 +25,14 @@ go_binary(
     name = "smith_race",
     embed = [":go_default_library"],
     race = "on",
-    tags = ["exclude_from_tests"],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 
 go_image(
     name = "container",
     binary = ":smith",
-    tags = ["exclude_from_tests"],
+    tags = ["manual"],
 )
 
 container_push(
@@ -43,4 +43,5 @@ container_push(
     repository = "atlassianlabs/smith",
     stamp = True,
     tag = "{STABLE_BUILD_GIT_TAG}-{STABLE_BUILD_GIT_COMMIT}",
+    tags = ["manual"],
 )
