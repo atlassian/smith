@@ -11,9 +11,9 @@ import (
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/specchecker"
-	"github.com/atlassian/smith/pkg/specchecker/builtin"
+	specchecker_builtin "github.com/atlassian/smith/pkg/specchecker/builtin"
 	"github.com/atlassian/smith/pkg/statuschecker"
-	ready_types "github.com/atlassian/smith/pkg/statuschecker/types"
+	statuschecker_builtin "github.com/atlassian/smith/pkg/statuschecker/builtin"
 	"github.com/atlassian/smith/pkg/store"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -179,9 +179,9 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 	}
 
 	// Status Checker
-	readyTypes := []map[schema.GroupKind]statuschecker.ObjectStatusChecker{ready_types.MainKnownTypes}
+	readyTypes := []map[schema.GroupKind]statuschecker.ObjectStatusChecker{statuschecker_builtin.MainKnownTypes}
 	if c.ServiceCatalogSupport {
-		readyTypes = append(readyTypes, ready_types.ServiceCatalogKnownTypes)
+		readyTypes = append(readyTypes, statuschecker_builtin.ServiceCatalogKnownTypes)
 	}
 	rc, err := statuschecker.New(crdStore, readyTypes...)
 	if err != nil {
@@ -189,9 +189,9 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 	}
 
 	// Spec checker
-	checkTypes := []map[schema.GroupKind]specchecker.ObjectProcessor{builtin.MainKnownTypes}
+	checkTypes := []map[schema.GroupKind]specchecker.ObjectProcessor{specchecker_builtin.MainKnownTypes}
 	if c.ServiceCatalogSupport {
-		checkTypes = append(checkTypes, builtin.ServiceCatalogKnownTypes)
+		checkTypes = append(checkTypes, specchecker_builtin.ServiceCatalogKnownTypes)
 	}
 	specChecker := specchecker.New(multiStore, checkTypes...)
 
