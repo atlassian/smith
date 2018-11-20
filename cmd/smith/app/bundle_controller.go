@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/atlassian/ctrl"
+	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/client"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 )
 
 type BundleControllerConstructor struct {
@@ -195,10 +197,15 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 	}
 	specChecker := specchecker.New(multiStore, checkTypes...)
 
+	// Event Recorder
+	broadcaster := record.NewBroadcaster()
+	recorder := broadcaster.NewRecorder(scheme, core_v1.EventSource{Component: smith.Smith})
+
 	// Controller
 	cntrlr := &bundlec.Controller{
 		Logger:                          config.Logger,
 		ReadyForWork:                    cctx.ReadyForWork,
+		MainClient:                      config.MainClient,
 		BundleClient:                    smithClient.SmithV1(),
 		BundleStore:                     bs,
 		SmartClient:                     smartClient,
@@ -213,6 +220,9 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 		Catalog:                         catalog,
 		BundleTransitionCounter:         bundleTransitionCounter,
 		BundleResourceTransitionCounter: bundleResourceTransitionCounter,
+
+		Broadcaster: broadcaster,
+		Recorder:    recorder,
 	}
 	cntrlr.Prepare(crdInf, resourceInfs)
 

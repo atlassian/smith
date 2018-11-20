@@ -29,6 +29,7 @@ func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) 
 		catalog:                         c.Catalog,
 		bundleTransitionCounter:         c.BundleTransitionCounter,
 		bundleResourceTransitionCounter: c.BundleResourceTransitionCounter,
+		recorder:                        c.Recorder,
 	}
 
 	var retriable bool

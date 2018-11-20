@@ -7,6 +7,7 @@ import (
 
 	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	ctrlLogz "github.com/atlassian/ctrl/logz"
+	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
@@ -18,10 +19,21 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	core_v1 "k8s.io/api/core/v1"
 	api_errors "k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/record"
+)
+
+const (
+	// These Reasons represent the situation where a condition for a resource matching that
+	// status is updated for any reason AND the condition is true (level based)
+	EventReasonResourcePrefix = "Resource"
+	EventReasonBundlePrefix   = "Bundle"
+
+	EventAnnotationResourceName = smith.Domain + "/ResourceName"
 )
 
 type bundleSyncTask struct {
@@ -40,6 +52,7 @@ type bundleSyncTask struct {
 	catalog                         *store.Catalog
 	bundleTransitionCounter         *prometheus.CounterVec
 	bundleResourceTransitionCounter *prometheus.CounterVec
+	recorder                        record.EventRecorder
 
 	// Outputs
 
@@ -609,6 +622,14 @@ func (st *bundleSyncTask) checkBundleConditionNeedsUpdate(condition *cond_v1.Con
 		st.bundleTransitionCounter.
 			WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(condition.Type), condition.Reason).
 			Inc()
+
+		eventType := core_v1.EventTypeNormal
+		reason := EventReasonBundlePrefix + string(condition.Type)
+		if condition.Type == smith_v1.BundleError {
+			eventType = core_v1.EventTypeWarning
+			reason = EventReasonBundlePrefix + condition.Reason
+		}
+		st.recorder.Eventf(st.bundle, eventType, reason, "%s", condition)
 	}
 
 	// Return true if one of the fields have changed.
@@ -637,6 +658,15 @@ func (st *bundleSyncTask) checkResourceConditionNeedsUpdate(resName smith_v1.Res
 		st.bundleResourceTransitionCounter.
 			WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(resName), string(condition.Type), condition.Reason).
 			Inc()
+
+		eventAnnotations := map[string]string{
+			EventAnnotationResourceName: string(resName),
+		}
+		eventType := core_v1.EventTypeNormal
+		if condition.Type == smith_v1.ResourceError {
+			eventType = core_v1.EventTypeWarning
+		}
+		st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, EventReasonResourcePrefix+string(condition.Type), "%s", condition)
 	}
 
 	// Return true if one of the fields have changed.

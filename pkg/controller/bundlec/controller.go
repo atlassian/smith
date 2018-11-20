@@ -17,7 +17,10 @@ import (
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
+	core_v1_client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 )
 
 type Controller struct {
@@ -35,6 +38,7 @@ type Controller struct {
 	Logger *zap.Logger
 
 	ReadyForWork func()
+	MainClient   kubernetes.Interface
 	BundleClient smithClient_v1.BundlesGetter
 	BundleStore  BundleStore
 	SmartClient  SmartClient
@@ -55,6 +59,9 @@ type Controller struct {
 	// Metrics
 	BundleTransitionCounter         *prometheus.CounterVec
 	BundleResourceTransitionCounter *prometheus.CounterVec
+
+	Broadcaster record.EventBroadcaster
+	Recorder    record.EventRecorder
 }
 
 // Prepare prepares the controller to be run.
@@ -90,6 +97,12 @@ func (c *Controller) Run(ctx context.Context) {
 
 	c.Logger.Info("Starting Bundle controller")
 	defer c.Logger.Info("Shutting down Bundle controller")
+
+	sink := core_v1_client.EventSinkImpl{
+		Interface: c.MainClient.CoreV1().Events(""),
+	}
+	recordingWatch := c.Broadcaster.StartRecordingToSink(&sink)
+	defer recordingWatch.Stop()
 
 	c.ReadyForWork()
 
