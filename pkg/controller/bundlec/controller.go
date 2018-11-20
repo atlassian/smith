@@ -15,6 +15,7 @@ import (
 	"github.com/atlassian/smith/pkg/store"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
@@ -99,7 +100,7 @@ func (c *Controller) Run(ctx context.Context) {
 	defer c.Logger.Info("Shutting down Bundle controller")
 
 	sink := core_v1_client.EventSinkImpl{
-		Interface: c.MainClient.CoreV1().Events(""),
+		Interface: c.MainClient.CoreV1().Events(meta_v1.NamespaceNone),
 	}
 	recordingWatch := c.Broadcaster.StartRecordingToSink(&sink)
 	defer recordingWatch.Stop()
