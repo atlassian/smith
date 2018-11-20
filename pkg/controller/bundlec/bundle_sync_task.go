@@ -628,12 +628,10 @@ func (st *bundleSyncTask) checkBundleConditionNeedsUpdate(condition *cond_v1.Con
 			EventAnnotationReason: condition.Reason,
 		}
 		eventType := core_v1.EventTypeNormal
-		reason := EventReasonBundlePrefix + string(condition.Type)
 		if condition.Type == smith_v1.BundleError {
 			eventType = core_v1.EventTypeWarning
-			reason = EventReasonBundlePrefix + condition.Reason
 		}
-		st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, reason, condition.Message)
+		st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, EventReasonResourcePrefix+string(condition.Type), condition.Message)
 	}
 
 	// Return true if one of the fields have changed.
