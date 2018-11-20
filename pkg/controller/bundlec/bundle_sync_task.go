@@ -34,6 +34,7 @@ const (
 	EventReasonBundlePrefix   = "Bundle"
 
 	EventAnnotationResourceName = smith.Domain + "/ResourceName"
+	EventAnnotationReason       = smith.Domain + "/Reason"
 )
 
 type bundleSyncTask struct {
@@ -623,13 +624,16 @@ func (st *bundleSyncTask) checkBundleConditionNeedsUpdate(condition *cond_v1.Con
 			WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(condition.Type), condition.Reason).
 			Inc()
 
+		eventAnnotations := map[string]string{
+			EventAnnotationReason: condition.Reason,
+		}
 		eventType := core_v1.EventTypeNormal
 		reason := EventReasonBundlePrefix + string(condition.Type)
 		if condition.Type == smith_v1.BundleError {
 			eventType = core_v1.EventTypeWarning
 			reason = EventReasonBundlePrefix + condition.Reason
 		}
-		st.recorder.Eventf(st.bundle, eventType, reason, "%s", condition)
+		st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, reason, condition.Message)
 	}
 
 	// Return true if one of the fields have changed.
@@ -661,12 +665,13 @@ func (st *bundleSyncTask) checkResourceConditionNeedsUpdate(resName smith_v1.Res
 
 		eventAnnotations := map[string]string{
 			EventAnnotationResourceName: string(resName),
+			EventAnnotationReason:       condition.Reason,
 		}
 		eventType := core_v1.EventTypeNormal
 		if condition.Type == smith_v1.ResourceError {
 			eventType = core_v1.EventTypeWarning
 		}
-		st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, EventReasonResourcePrefix+string(condition.Type), "%s", condition)
+		st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, EventReasonResourcePrefix+string(condition.Type), condition.Message)
 	}
 
 	// Return true if one of the fields have changed.
