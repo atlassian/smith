@@ -663,15 +663,18 @@ func (st *bundleSyncTask) checkResourceConditionNeedsUpdate(resName smith_v1.Res
 			WithLabelValues(st.bundle.GetNamespace(), st.bundle.GetName(), string(resName), string(condition.Type), condition.Reason).
 			Inc()
 
-		eventAnnotations := map[string]string{
-			EventAnnotationResourceName: string(resName),
-			EventAnnotationReason:       condition.Reason,
+		// blocked events are ignored because it's too spammy
+		if condition.Type != smith_v1.ResourceBlocked {
+			eventAnnotations := map[string]string{
+				EventAnnotationResourceName: string(resName),
+				EventAnnotationReason:       condition.Reason,
+			}
+			eventType := core_v1.EventTypeNormal
+			if condition.Type == smith_v1.ResourceError {
+				eventType = core_v1.EventTypeWarning
+			}
+			st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, EventReasonResourcePrefix+string(condition.Type), condition.Message)
 		}
-		eventType := core_v1.EventTypeNormal
-		if condition.Type == smith_v1.ResourceError {
-			eventType = core_v1.EventTypeWarning
-		}
-		st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, EventReasonResourcePrefix+string(condition.Type), condition.Message)
 	}
 
 	// Return true if one of the fields have changed.
