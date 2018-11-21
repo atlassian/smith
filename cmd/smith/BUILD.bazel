@@ -1,6 +1,7 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@io_bazel_rules_docker//container:container.bzl", "container_push")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load("@com_github_atlassian_bazel_tools//:multirun/def.bzl", "multirun")
 
 go_library(
     name = "go_default_library",
@@ -35,6 +36,12 @@ go_image(
     tags = ["manual"],
 )
 
+go_image(
+    name = "container_race",
+    binary = ":smith_race",
+    tags = ["manual"],
+)
+
 container_push(
     name = "push_docker",
     format = "Docker",
@@ -44,4 +51,23 @@ container_push(
     stamp = True,
     tag = "{STABLE_BUILD_GIT_TAG}-{STABLE_BUILD_GIT_COMMIT}",
     tags = ["manual"],
+)
+
+container_push(
+    name = "push_docker_race",
+    format = "Docker",
+    image = ":container_race",
+    registry = "index.docker.io",
+    repository = "atlassianlabs/smith",
+    stamp = True,
+    tag = "{STABLE_BUILD_GIT_TAG}-{STABLE_BUILD_GIT_COMMIT}-race",
+    tags = ["manual"],
+)
+
+multirun(
+    name = "push_docker_all",
+    commands = [
+        ":push_docker",
+        ":push_docker_race",
+    ],
 )
