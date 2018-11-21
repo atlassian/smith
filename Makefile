@@ -163,4 +163,4 @@ docker-export:
 release: update-bazel
 	bazel run \
 		--platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 \
-		//cmd/smith:push_docker
+		//cmd/smith:push_docker_all
