@@ -629,6 +629,10 @@ func (st *bundleSyncTask) checkBundleConditionNeedsUpdate(condition *cond_v1.Con
 		case smith_v1.BundleReady:
 			eventType = core_v1.EventTypeNormal
 			reason = smith.EventReasonBundleReady
+		default:
+			st.logger.Sugar().Errorf("Unexpected bundle condition type %q", condition.Type)
+			eventType = core_v1.EventTypeWarning
+			reason = smith.EventReasonUnknown
 		}
 		st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, reason, condition.Message)
 	}
@@ -678,6 +682,10 @@ func (st *bundleSyncTask) checkResourceConditionNeedsUpdate(resName smith_v1.Res
 			case smith_v1.ResourceReady:
 				eventType = core_v1.EventTypeNormal
 				reason = smith.EventReasonResourceReady
+			default:
+				st.logger.Sugar().Errorf("Unexpected resource condition type %q", condition.Type)
+				eventType = core_v1.EventTypeWarning
+				reason = smith.EventReasonUnknown
 			}
 			st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, reason, condition.Message)
 		}

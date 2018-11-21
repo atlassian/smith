@@ -18,4 +18,5 @@ const (
 	EventReasonBundleInProgress   = "BundleInProgress"
 	EventReasonBundleReady        = "BundleReady"
 	EventReasonBundleError        = "BundleError"
+	EventReasonUnknown            = "Unknown"
 )
