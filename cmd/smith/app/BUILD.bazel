@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/atlassian/smith/cmd/smith/app",
     visibility = ["//visibility:public"],
     deps = [
+        "//:go_default_library",
         "//pkg/apis/smith/v1:go_default_library",
         "//pkg/client:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
@@ -40,5 +41,6 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/restmapper:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ],
 )
