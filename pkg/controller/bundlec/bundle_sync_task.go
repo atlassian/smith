@@ -27,16 +27,6 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
-const (
-	// These Reasons represent the situation where a condition for a resource matching that
-	// status is updated for any reason AND the condition is true (level based)
-	EventReasonResourcePrefix = "Resource"
-	EventReasonBundlePrefix   = "Bundle"
-
-	EventAnnotationResourceName = smith.Domain + "/ResourceName"
-	EventAnnotationReason       = smith.Domain + "/Reason"
-)
-
 type bundleSyncTask struct {
 
 	// Inputs
@@ -625,13 +615,22 @@ func (st *bundleSyncTask) checkBundleConditionNeedsUpdate(condition *cond_v1.Con
 			Inc()
 
 		eventAnnotations := map[string]string{
-			EventAnnotationReason: condition.Reason,
+			smith.EventAnnotationReason: condition.Reason,
 		}
-		eventType := core_v1.EventTypeNormal
-		if condition.Type == smith_v1.BundleError {
+		var eventType string
+		var reason string
+		switch condition.Type {
+		case smith_v1.BundleError:
 			eventType = core_v1.EventTypeWarning
+			reason = smith.EventReasonBundleError
+		case smith_v1.BundleInProgress:
+			eventType = core_v1.EventTypeNormal
+			reason = smith.EventReasonBundleInProgress
+		case smith_v1.BundleReady:
+			eventType = core_v1.EventTypeNormal
+			reason = smith.EventReasonBundleReady
 		}
-		st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, EventReasonBundlePrefix+string(condition.Type), condition.Message)
+		st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, reason, condition.Message)
 	}
 
 	// Return true if one of the fields have changed.
@@ -664,14 +663,23 @@ func (st *bundleSyncTask) checkResourceConditionNeedsUpdate(resName smith_v1.Res
 		// blocked events are ignored because it's too spammy
 		if condition.Type != smith_v1.ResourceBlocked {
 			eventAnnotations := map[string]string{
-				EventAnnotationResourceName: string(resName),
-				EventAnnotationReason:       condition.Reason,
+				smith.EventAnnotationResourceName: string(resName),
+				smith.EventAnnotationReason:       condition.Reason,
 			}
-			eventType := core_v1.EventTypeNormal
-			if condition.Type == smith_v1.ResourceError {
+			var reason string
+			var eventType string
+			switch condition.Type {
+			case smith_v1.ResourceError:
 				eventType = core_v1.EventTypeWarning
+				reason = smith.EventReasonResourceError
+			case smith_v1.ResourceInProgress:
+				eventType = core_v1.EventTypeNormal
+				reason = smith.EventReasonResourceInProgress
+			case smith_v1.ResourceReady:
+				eventType = core_v1.EventTypeNormal
+				reason = smith.EventReasonResourceReady
 			}
-			st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, EventReasonResourcePrefix+string(condition.Type), condition.Message)
+			st.recorder.AnnotatedEventf(st.bundle, eventAnnotations, eventType, reason, condition.Message)
 		}
 	}
 

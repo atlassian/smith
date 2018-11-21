@@ -8,4 +8,14 @@ const (
 	CrFieldPathAnnotation  = Domain + "/CrReadyWhenFieldPath"
 	CrFieldValueAnnotation = Domain + "/CrReadyWhenFieldValue"
 	CrdSupportEnabled      = Domain + "/SupportEnabled"
+
+	EventAnnotationResourceName = Domain + "/ResourceName"
+	EventAnnotationReason       = Domain + "/Reason"
+
+	EventReasonResourceInProgress = "ResourceInProgress"
+	EventReasonResourceReady      = "ResourceReady"
+	EventReasonResourceError      = "ResourceError"
+	EventReasonBundleInProgress   = "BundleInProgress"
+	EventReasonBundleReady        = "BundleReady"
+	EventReasonBundleError        = "BundleError"
 )
