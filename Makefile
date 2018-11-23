@@ -1,6 +1,8 @@
-OS = $$(uname -s | tr A-Z a-z)
-BINARY_PREFIX_DIRECTORY=$(OS)_amd64_stripped
-KUBE_CONTEXT ?= minikube
+OS := $(shell uname -s | tr A-Z a-z)
+BINARY_PREFIX_DIRECTORY := $(OS)_amd64_stripped
+KUBECONTEXT ?= kubernetes-admin@kind-1
+KUBECONFIG ?= $(shell kind get kubeconfig-path)
+#KUBECONFIG ?= $$HOME/.kube/config
 
 .PHONY: setup-dev
 setup-dev: setup-ci
@@ -62,8 +64,8 @@ integration-test-ci:
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
 		--test_env=KUBERNETES_CONFIG_FROM=file \
-		--test_env=KUBERNETES_CONFIG_FILENAME=$$HOME/.kube/config \
-		--test_env=KUBERNETES_CONFIG_CONTEXT=$(KUBE_CONTEXT) \
+		--test_env=KUBERNETES_CONFIG_FILENAME='$(KUBECONFIG)' \
+		--test_env=KUBERNETES_CONFIG_CONTEXT='$(KUBECONTEXT)' \
 		//it:go_default_test
 
 .PHONY: integration-test-sc
@@ -75,8 +77,8 @@ integration-test-sc-ci:
 		--test_env=KUBE_PATCH_CONVERSION_DETECTOR=true \
 		--test_env=KUBE_CACHE_MUTATION_DETECTOR=true \
 		--test_env=KUBERNETES_CONFIG_FROM=file \
-		--test_env=KUBERNETES_CONFIG_FILENAME="$$HOME/.kube/config" \
-		--test_env=KUBERNETES_CONFIG_CONTEXT=$(KUBE_CONTEXT) \
+		--test_env=KUBERNETES_CONFIG_FILENAME='$(KUBECONFIG)' \
+		--test_env=KUBERNETES_CONFIG_CONTEXT='$(KUBECONTEXT)' \
 		//it/sc:go_default_test
 
 .PHONY: run
@@ -89,8 +91,8 @@ run: fmt update-bazel
 		-bundle-service-catalog=false \
 		-leader-elect \
 		-client-config-from=file \
-		-client-config-file-name="$$HOME/.kube/config" \
-		-client-config-context=$(KUBE_CONTEXT)
+		-client-config-file-name='$(KUBECONFIG)' \
+		-client-config-context='$(KUBECONTEXT)'
 
 .PHONY: run-sc
 run-sc: fmt update-bazel
@@ -101,8 +103,8 @@ run-sc: fmt update-bazel
 		-log-encoding=console \
 		-leader-elect \
 		-client-config-from=file \
-		-client-config-file-name="$$HOME/.kube/config" \
-		-client-config-context=$(KUBE_CONTEXT)
+		-client-config-file-name='$(KUBECONFIG)' \
+		-client-config-context='$(KUBECONTEXT)'
 
 .PHONY: sleeper-run
 sleeper-run: fmt update-bazel
@@ -112,8 +114,8 @@ sleeper-run: fmt update-bazel
 	bazel run //examples/sleeper/main:main_race \
 		-- \
 		-client-config-from=file \
-		-client-config-file-name="$$HOME/.kube/config" \
-		-client-config-context=$(KUBE_CONTEXT)
+		-client-config-file-name='$(KUBECONFIG)' \
+		-client-config-context='$(KUBECONTEXT)'
 
 .PHONY: test
 test: fmt update-bazel test-ci
