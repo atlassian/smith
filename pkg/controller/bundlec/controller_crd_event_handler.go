@@ -105,7 +105,7 @@ func (h *crdEventHandler) ensureWatch(logger *zap.Logger, crd *apiext_v1b1.Custo
 	}
 	gvk := schema.GroupVersionKind{
 		Group:   crd.Spec.Group,
-		Version: crd.Spec.Version,
+		Version: crd.Spec.Versions[0].Name,
 		Kind:    crd.Spec.Names.Kind,
 	}
 	logger.Info("Configuring watch for CRD")
@@ -159,7 +159,7 @@ func (h *crdEventHandler) ensureNoWatch(logger *zap.Logger, crd *apiext_v1b1.Cus
 	delete(h.watchers, crd.Name)
 	gvk := schema.GroupVersionKind{
 		Group:   crd.Spec.Group,
-		Version: crd.Spec.Version,
+		Version: crd.Spec.Versions[0].Name,
 		Kind:    crd.Spec.Names.Kind,
 	}
 	h.controller.Store.RemoveInformer(gvk)

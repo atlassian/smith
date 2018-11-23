@@ -159,7 +159,14 @@ func (tc *testCase) run(t *testing.T) {
 	for _, reactor := range tc.smithReactors {
 		smithClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
-	apiExtClient := apiExtFake.NewSimpleClientset(append(tc.apiExtClientObjects, resources.BundleCrd())...)
+	scheme, err := app.FullScheme(tc.enableServiceCatalog)
+	require.NoError(t, err)
+	apiExtObjects := append(tc.apiExtClientObjects, resources.BundleCrd())
+	for _, object := range apiExtObjects {
+		// Pretend that the object has been defaulted by the server. We need this to set the version field
+		scheme.Default(object)
+	}
+	apiExtClient := apiExtFake.NewSimpleClientset(apiExtObjects...)
 	tc.apiExtFake = &apiExtClient.Fake
 	for _, reactor := range tc.apiExtReactors {
 		apiExtClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
@@ -222,14 +229,12 @@ func (tc *testCase) run(t *testing.T) {
 		plugins = append(plugins, func() (plugin.Plugin, error) { return pluginInstance, nil })
 		tc.pluginsConstructed = append(tc.pluginsConstructed, pluginInstance)
 	}
-	scheme, err := app.FullScheme(tc.enableServiceCatalog)
-	require.NoError(t, err)
 
 	for _, object := range tc.apiExtClientObjects {
 		crd := object.(*apiext_v1b1.CustomResourceDefinition)
 		scheme.AddKnownTypeWithName(schema.GroupVersionKind{
 			Group:   crd.Spec.Group,
-			Version: crd.Spec.Version,
+			Version: crd.Spec.Versions[0].Name,
 			Kind:    crd.Spec.Names.Kind,
 			// obj: unstructured.Unstructured
 			// is here _only_ to keep rest scheme happy, we do not currently use scheme to deserialize
