@@ -45,12 +45,18 @@ func Crd() *apiext_v1b1.CustomResourceDefinition {
 			},
 		},
 		Spec: apiext_v1b1.CustomResourceDefinitionSpec{
-			Group:   sleeper_v1.GroupName,
-			Version: sleeper_v1.SleeperResourceVersion,
+			Group: sleeper_v1.GroupName,
 			Names: apiext_v1b1.CustomResourceDefinitionNames{
 				Plural:   sleeper_v1.SleeperResourcePlural,
 				Singular: sleeper_v1.SleeperResourceSingular,
 				Kind:     sleeper_v1.SleeperResourceKind,
+			},
+			Versions: []apiext_v1b1.CustomResourceDefinitionVersion{
+				{
+					Name:    sleeper_v1.SleeperResourceVersion,
+					Served:  true,
+					Storage: true,
+				},
 			},
 		},
 	}
