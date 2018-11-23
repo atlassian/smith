@@ -2,6 +2,7 @@ package bundlec_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -145,6 +146,11 @@ func (tc *testCase) run(t *testing.T) {
 		mainClient.AddReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 	}
 	if tc.bundle != nil {
+		tc.bundle.TypeMeta = meta_v1.TypeMeta{
+			Kind:       smith_v1.BundleResourceKind,
+			APIVersion: smith_v1.BundleResourceGroupVersion,
+		}
+		tc.bundle.ObjectMeta.SelfLink = fmt.Sprintf("/apis/%s/namespaces/%s/%s/%s", tc.bundle.TypeMeta.APIVersion, tc.bundle.Namespace, smith_v1.BundleResourcePlural, tc.bundle.Name)
 		convertBundleResourcesToUnstrucutred(t, tc.bundle, tc.enableServiceCatalog)
 		tc.smithClientObjects = append(tc.smithClientObjects, tc.bundle)
 	}
