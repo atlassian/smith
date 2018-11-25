@@ -74,6 +74,10 @@ func (d deployment) ApplySpec(ctx *specchecker.Context, spec, actual *unstructur
 // to avoid conflicts with other controllers like HPA.
 // actual may be nil.
 func (deployment) setLastAppliedReplicasAnnotation(ctx *specchecker.Context, spec, actual *apps_v1.Deployment) {
+	if spec.Annotations[LastAppliedReplicasAnnotation] == Disabled {
+		return
+	}
+
 	if spec.Spec.Replicas == nil {
 		var one int32 = 1
 		spec.Spec.Replicas = &one
