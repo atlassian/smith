@@ -756,8 +756,7 @@ func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
 
 	assert.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
-	assert.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
-	assert.Equal(t, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation], "disabled")
+	assert.Equal(t, "disabled", deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation])
 }
 
 func TestUserEnteredAnnotationOverridden(t *testing.T) {
