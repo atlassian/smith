@@ -4,9 +4,8 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "2ef1d7970012550e5cf636b66359c21b37b3ffdf8346c6f1743a3686180ffe05",
-    strip_prefix = "rules_go-3553e886579e390f045893050e4d79e760e70ebb",
-    urls = ["https://github.com/bazelbuild/rules_go/archive/3553e886579e390f045893050e4d79e760e70ebb.tar.gz"],
+    sha256 = "f87fa87475ea107b3c69196f39c82b7bbf58fe27c62a338684c20ca17d1d8613",
+    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.2/rules_go-0.16.2.tar.gz"],
 )
 
 http_archive(
@@ -17,23 +16,23 @@ http_archive(
 
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "35ea63d865e9e484ef4150629a302614e92d0bb95757770ffc273faf4d9a1f17",
-    strip_prefix = "rules_docker-39186e056fd7dc0c29c676e387e1ad73fc381aa2",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/39186e056fd7dc0c29c676e387e1ad73fc381aa2.tar.gz"],
+    sha256 = "1996d03503a8c593874915361938f3472364208027ef2435a5e7cd79410ee798",
+    strip_prefix = "rules_docker-9527234ef0b5a57bce93be524cb56d7ab1a85ea3",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/9527234ef0b5a57bce93be524cb56d7ab1a85ea3.tar.gz"],
 )
 
 http_archive(
     name = "com_github_bazelbuild_buildtools",
-    sha256 = "2a593582bfaf77717afb33371891f87f5d631af6de10069926ff8e51eab1a232",
-    strip_prefix = "buildtools-53432872c9e41db2d613d653f3cd0707d53ebc56",
-    urls = ["https://github.com/bazelbuild/buildtools/archive/53432872c9e41db2d613d653f3cd0707d53ebc56.tar.gz"],
+    sha256 = "953ed402234e54874a2a4020b011fd8d5e6e575883fe2c11fb112819c19edb28",
+    strip_prefix = "buildtools-d39e4d5c25111527369142f16cdb49aa67707313",
+    urls = ["https://github.com/bazelbuild/buildtools/archive/d39e4d5c25111527369142f16cdb49aa67707313.tar.gz"],
 )
 
 http_archive(
     name = "com_github_atlassian_bazel_tools",
-    sha256 = "91208f44bbc6ac9773f34b624e25c90216bdf35e533ec9caa6fd60e7d33b0de2",
-    strip_prefix = "bazel-tools-333dc4fc3538c407a8af095ad35bfb83e26ab853",
-    urls = ["https://github.com/atlassian/bazel-tools/archive/333dc4fc3538c407a8af095ad35bfb83e26ab853.tar.gz"],
+    sha256 = "8f3f0fdafc350845f96e024b1c61cfdda9b1102a93ac5bdb8e08f545334c81a8",
+    strip_prefix = "bazel-tools-e9957c4df9ee31e63b4f396512cb8df74afe97b2",
+    urls = ["https://github.com/atlassian/bazel-tools/archive/e9957c4df9ee31e63b4f396512cb8df74afe97b2.tar.gz"],
 )
 
 http_archive(
