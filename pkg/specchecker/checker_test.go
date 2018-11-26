@@ -352,6 +352,11 @@ func TestEqualityUnequal(t *testing.T) {
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &newNumberOfReplicas,
 					Template: core_v1.PodTemplateSpec{
+						ObjectMeta: meta_v1.ObjectMeta{
+							Annotations: map[string]string{
+								builtin.EnvRefHashAnnotation: "disabled",
+							},
+						},
 						Spec: core_v1.PodSpec{
 							Containers: []core_v1.Container{
 								{
@@ -382,6 +387,11 @@ func TestEqualityUnequal(t *testing.T) {
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &numberOfReplicas,
 					Template: core_v1.PodTemplateSpec{
+						ObjectMeta: meta_v1.ObjectMeta{
+							Annotations: map[string]string{
+								builtin.EnvRefHashAnnotation: "disabled",
+							},
+						},
 						Spec: core_v1.PodSpec{
 							Containers: []core_v1.Container{
 								{
@@ -404,6 +414,68 @@ func TestEqualityUnequal(t *testing.T) {
 			},
 		},
 		{
+			name: "Deployment with lastAppliedReplicas newly disabled",
+			spec: &apps_v1.Deployment{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Deployment",
+					APIVersion: apps_v1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Annotations: map[string]string{
+						builtin.LastAppliedReplicasAnnotation: "disabled",
+					},
+				},
+				Spec: apps_v1.DeploymentSpec{
+					// number of replicas is the same, but annotation is different
+					Replicas: &numberOfReplicas,
+					Template: core_v1.PodTemplateSpec{
+						ObjectMeta: meta_v1.ObjectMeta{
+							Annotations: map[string]string{
+								builtin.EnvRefHashAnnotation: "disabled",
+							},
+						},
+						Spec: core_v1.PodSpec{
+							Containers: []core_v1.Container{
+								{
+									Name:  "c1",
+									Image: "ima.ge",
+								},
+							},
+						},
+					},
+				},
+			},
+			actual: &apps_v1.Deployment{
+				TypeMeta: meta_v1.TypeMeta{
+					Kind:       "Deployment",
+					APIVersion: apps_v1.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: meta_v1.ObjectMeta{
+					Annotations: map[string]string{
+						builtin.LastAppliedReplicasAnnotation: strconv.Itoa(int(numberOfReplicas)),
+					},
+				},
+				Spec: apps_v1.DeploymentSpec{
+					Replicas: &numberOfReplicas,
+					Template: core_v1.PodTemplateSpec{
+						ObjectMeta: meta_v1.ObjectMeta{
+							Annotations: map[string]string{
+								builtin.EnvRefHashAnnotation: "disabled",
+							},
+						},
+						Spec: core_v1.PodSpec{
+							Containers: []core_v1.Container{
+								{
+									Name:  "c1",
+									Image: "ima.ge",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "Deployment with wrong format running replicas annotation",
 			spec: &apps_v1.Deployment{
 				TypeMeta: meta_v1.TypeMeta{
@@ -416,6 +488,11 @@ func TestEqualityUnequal(t *testing.T) {
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &numberOfReplicas,
 					Template: core_v1.PodTemplateSpec{
+						ObjectMeta: meta_v1.ObjectMeta{
+							Annotations: map[string]string{
+								builtin.EnvRefHashAnnotation: "disabled",
+							},
+						},
 						Spec: core_v1.PodSpec{
 							Containers: []core_v1.Container{
 								{
@@ -446,6 +523,11 @@ func TestEqualityUnequal(t *testing.T) {
 				Spec: apps_v1.DeploymentSpec{
 					Replicas: &numberOfReplicas,
 					Template: core_v1.PodTemplateSpec{
+						ObjectMeta: meta_v1.ObjectMeta{
+							Annotations: map[string]string{
+								builtin.EnvRefHashAnnotation: "disabled",
+							},
+						},
 						Spec: core_v1.PodSpec{
 							Containers: []core_v1.Container{
 								{

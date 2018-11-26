@@ -756,8 +756,7 @@ func TestDeploymentAnnotationExplicitlyDisabled(t *testing.T) {
 	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
 
 	assert.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
-	assert.Contains(t, deploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
-	assert.Equal(t, deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation], "disabled")
+	assert.Equal(t, "disabled", deploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation])
 }
 
 func TestUserEnteredAnnotationOverridden(t *testing.T) {
@@ -973,6 +972,47 @@ func TestDeploymentUpdatedSecrets(t *testing.T) {
 	secondDeploymentCheck := updatedSpec.(*apps_v1.Deployment)
 	assert.Contains(t, secondDeploymentCheck.Spec.Template.Annotations, EnvRefHashAnnotation)
 	assert.NotEqual(t, secondDeploymentCheck.Spec.Template.Annotations[EnvRefHashAnnotation], firstHash)
+}
+
+func TestLastAppliedReplicasExplicitlyDisabled(t *testing.T) {
+	t.Parallel()
+
+	deploymentSpec := apps_v1.Deployment{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: apps_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Namespace: testNs,
+			Annotations: map[string]string{
+				LastAppliedReplicasAnnotation: "disabled",
+			},
+		},
+		Spec: apps_v1.DeploymentSpec{
+			Template: core_v1.PodTemplateSpec{
+				Spec: core_v1.PodSpec{
+					Containers: []core_v1.Container{
+						core_v1.Container{
+							Image: "some/image:tag",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec := runtimeToUnstructured(t, &deploymentSpec)
+
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync() // nolint: errcheck
+	store := speccheckertesting.FakeStore{Namespace: testNs}
+
+	updatedSpec, err := deployment{}.BeforeCreate(&specchecker.Context{Logger: logger, Store: store}, spec)
+	require.NoError(t, err)
+
+	deploymentCheck := updatedSpec.(*apps_v1.Deployment)
+	assert.Contains(t, deploymentCheck.Annotations, LastAppliedReplicasAnnotation)
+	assert.Equal(t, "disabled", deploymentCheck.Annotations[LastAppliedReplicasAnnotation])
 }
 
 func runtimeToUnstructured(t *testing.T, obj runtime.Object) *unstructured.Unstructured {
