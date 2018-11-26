@@ -7,12 +7,12 @@
 # gazelle:exclude vendor/golang.org/x/tools/go/internal/gcimporter/testdata
 # gazelle:proto disable_global
 
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("@bazel_gazelle//:def.bzl", "gazelle")
-load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
 load("@com_github_atlassian_bazel_tools//buildozer:def.bzl", "buildozer")
 load("@com_github_atlassian_bazel_tools//goimports:def.bzl", "goimports")
 load("@com_github_atlassian_bazel_tools//gometalinter:def.bzl", "gometalinter")
+load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 gazelle(
     name = "gazelle",
@@ -45,6 +45,11 @@ buildifier(
     name = "buildifier_check",
     exclude_patterns = ["./vendor/*"],
     mode = "check",
+)
+
+buildifier(
+    name = "buildifier_fix",
+    lint_mode = "fix",
 )
 
 buildozer(
