@@ -151,7 +151,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	// Create or update resource
 	resUpdated, retriable, err := st.createOrUpdate(spec, actual)
 	if err != nil {
-		if api_errors.IsBadRequest(err) {
+		if api_errors.IsInvalid(err) {
 			return resourceInfo{
 				actual: resUpdated,
 				status: resourceStatusError{
