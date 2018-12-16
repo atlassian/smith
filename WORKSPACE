@@ -4,8 +4,8 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "f87fa87475ea107b3c69196f39c82b7bbf58fe27c62a338684c20ca17d1d8613",
-    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.2/rules_go-0.16.2.tar.gz"],
+    sha256 = "7be7dc01f1e0afdba6c8eb2b43d2fa01c743be1b9273ab1eaf6c233df078d705",
+    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.5/rules_go-0.16.5.tar.gz"],
 )
 
 http_archive(
@@ -16,33 +16,33 @@ http_archive(
 
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "1996d03503a8c593874915361938f3472364208027ef2435a5e7cd79410ee798",
-    strip_prefix = "rules_docker-9527234ef0b5a57bce93be524cb56d7ab1a85ea3",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/9527234ef0b5a57bce93be524cb56d7ab1a85ea3.tar.gz"],
+    sha256 = "db6c798ff9de88bf449c5b977a54984458c73407a927d94322ccc8dc01b9a38c",
+    strip_prefix = "rules_docker-f6664b6b5c7f4fac031883a7ec9fa6b8bab0ab98",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/f6664b6b5c7f4fac031883a7ec9fa6b8bab0ab98.tar.gz"],
 )
 
 http_archive(
     name = "com_github_bazelbuild_buildtools",
-    sha256 = "953ed402234e54874a2a4020b011fd8d5e6e575883fe2c11fb112819c19edb28",
-    strip_prefix = "buildtools-d39e4d5c25111527369142f16cdb49aa67707313",
-    urls = ["https://github.com/bazelbuild/buildtools/archive/d39e4d5c25111527369142f16cdb49aa67707313.tar.gz"],
+    sha256 = "15084722711a0ee0d7de96d3f57f9a87d1381f2e45a6f3feef577d27fc4d639d",
+    strip_prefix = "buildtools-ab1d6a0ca532b7b7f3450a42d5cbcfdcd736fd41",
+    urls = ["https://github.com/bazelbuild/buildtools/archive/ab1d6a0ca532b7b7f3450a42d5cbcfdcd736fd41.tar.gz"],
 )
 
 http_archive(
     name = "com_github_atlassian_bazel_tools",
-    sha256 = "8f3f0fdafc350845f96e024b1c61cfdda9b1102a93ac5bdb8e08f545334c81a8",
-    strip_prefix = "bazel-tools-e9957c4df9ee31e63b4f396512cb8df74afe97b2",
-    urls = ["https://github.com/atlassian/bazel-tools/archive/e9957c4df9ee31e63b4f396512cb8df74afe97b2.tar.gz"],
+    sha256 = "080773e11e832d3f2bf82576af1bf34d31e9fbdc99eb896b90732071afa5e4fd",
+    strip_prefix = "bazel-tools-96c1e41762781a1f25de2f45e6f0557c9642ef94",
+    urls = ["https://github.com/atlassian/bazel-tools/archive/96c1e41762781a1f25de2f45e6f0557c9642ef94.tar.gz"],
 )
 
 http_archive(
     name = "bazel_skylib",
-    sha256 = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7ce78541f",
-    strip_prefix = "bazel-skylib-0.5.0",
-    urls = ["https://github.com/bazelbuild/bazel-skylib/archive/0.5.0.tar.gz"],
+    sha256 = "eb5c57e4c12e68c0c20bc774bfbc60a568e800d025557bc4ea022c6479acc867",
+    strip_prefix = "bazel-skylib-0.6.0",
+    urls = ["https://github.com/bazelbuild/bazel-skylib/archive/0.6.0.tar.gz"],
 )
 
-load("@bazel_skylib//:lib.bzl", "versions")
+load("@bazel_skylib//lib:versions.bzl", "versions")
 
 versions.check(minimum_bazel_version = "0.18.0")
 
