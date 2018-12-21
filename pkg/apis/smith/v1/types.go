@@ -156,13 +156,42 @@ type PluginName string
 // +k8s:deepcopy-gen=true
 // Resource describes an object that should be provisioned.
 type Resource struct {
-	// Name of the resource for references.
-	Name ResourceName `json:"name"`
+	// Name of the resource.
+	Name              ResourceName       `json:"name"`
+	References        []Reference        `json:"references,omitempty"`
+	ForwardReferences []ForwardReference `json:"forwardReferences,omitempty"`
+	Spec              ResourceSpec       `json:"spec"`
+}
 
-	// Explicit dependencies.
-	References []Reference `json:"references,omitempty"`
+// +k8s:deepcopy-gen=true
+type ForwardReference struct {
+	Name     ReferenceName           `json:"name"`
+	Path     string                  `json:"path,omitempty"`
+	Filter   *ForwardReferenceFilter `json:"filter,omitempty"`
+	Example  interface{}             `json:"example,omitempty"`
+	Modifier string                  `json:"modifier,omitempty"`
+}
 
-	Spec ResourceSpec `json:"spec"`
+// DeepCopyInto is an deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ForwardReference) DeepCopyInto(out *ForwardReference) {
+	*out = *in
+	out.Filter = in.Filter.DeepCopy()
+	out.Example = runtime.DeepCopyJSONValue(in.Example)
+}
+
+// +k8s:deepcopy-gen=true
+type ForwardReferenceFilter struct {
+	Group      string      `json:"group"`
+	Version    string      `json:"version"`
+	Kind       string      `json:"kind"`
+	Predicates []Predicate `json:"predicates,omitempty"`
+}
+
+type Predicate struct {
+	// Path is a JSON path to get the value from an object.
+	Path string `json:"path"`
+	// Value is the expected value.
+	Value string `json:"value"`
 }
 
 // +k8s:deepcopy-gen=true
