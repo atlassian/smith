@@ -10,8 +10,8 @@ http_archive(
 
 http_archive(
     name = "bazel_gazelle",
-    sha256 = "6e875ab4b6bf64a38c352887760f21203ab054676d9c1b274963907e0768740d",
-    urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.15.0/bazel-gazelle-0.15.0.tar.gz"],
+    sha256 = "7949fc6cc17b5b191103e97481cf8889217263acf52e00b560683413af204fcb",
+    urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.16.0/bazel-gazelle-0.16.0.tar.gz"],
 )
 
 http_archive(
@@ -23,9 +23,9 @@ http_archive(
 
 http_archive(
     name = "com_github_bazelbuild_buildtools",
-    sha256 = "15084722711a0ee0d7de96d3f57f9a87d1381f2e45a6f3feef577d27fc4d639d",
-    strip_prefix = "buildtools-ab1d6a0ca532b7b7f3450a42d5cbcfdcd736fd41",
-    urls = ["https://github.com/bazelbuild/buildtools/archive/ab1d6a0ca532b7b7f3450a42d5cbcfdcd736fd41.tar.gz"],
+    sha256 = "68f0b91c5f96da8d61bc91f0bfa8fcefa5562871005fecf3bbf3dee479300edd",
+    strip_prefix = "buildtools-78432f994f6611cbbfa3ebfb41e0c931c12c747d",
+    urls = ["https://github.com/bazelbuild/buildtools/archive/78432f994f6611cbbfa3ebfb41e0c931c12c747d.tar.gz"],
 )
 
 http_archive(
