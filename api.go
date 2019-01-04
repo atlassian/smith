@@ -12,7 +12,7 @@ const (
 	EventAnnotationResourceName = Domain + "/ResourceName"
 	EventAnnotationReason       = Domain + "/Reason"
 
-	DeletionDelayAnnotation     = Domain + "/deleteDelay"
+	DeletionDelayAnnotation     = Domain + "/deletionDelay"
 	DeletionTimestampAnnotation = Domain + "/deletionTimestamp"
 
 	EventReasonResourceInProgress = "ResourceInProgress"
