@@ -228,7 +228,12 @@ func (in *PluginSpec) DeepCopyInto(out *PluginSpec) {
 
 // +k8s:deepcopy-gen=true
 type ResourceStatus struct {
-	Name       ResourceName        `json:"name"`
+	Name               ResourceName `json:"name"`
+	ResourceStatusData `json:",inline"`
+}
+
+// +k8s:deepcopy-gen=true
+type ResourceStatusData struct {
 	Conditions []cond_v1.Condition `json:"conditions,omitempty"`
 }
 

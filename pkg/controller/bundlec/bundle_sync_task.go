@@ -367,8 +367,10 @@ func (st *bundleSyncTask) handleNormalStatusUpdate(retriable bool, processErr er
 		bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &errorCond) || bundleStatusUpdated
 
 		resourceStatuses = append(resourceStatuses, smith_v1.ResourceStatus{
-			Name:       res.Name,
-			Conditions: []cond_v1.Condition{blockedCond, inProgressCond, readyCond, errorCond},
+			Name: res.Name,
+			ResourceStatusData: smith_v1.ResourceStatusData{
+				Conditions: []cond_v1.Condition{blockedCond, inProgressCond, readyCond, errorCond},
+			},
 		})
 	}
 
