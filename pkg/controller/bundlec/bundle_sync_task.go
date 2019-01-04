@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
 	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	ctrlLogz "github.com/atlassian/ctrl/logz"
@@ -14,6 +15,7 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/statuschecker"
 	"github.com/atlassian/smith/pkg/store"
+	"github.com/atlassian/smith/pkg/util"
 	"github.com/atlassian/smith/pkg/util/graph"
 	"github.com/atlassian/smith/pkg/util/logz"
 	"github.com/pkg/errors"
@@ -25,8 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
-	"time"
-	"github.com/atlassian/smith/pkg/util"
 )
 
 type bundleSyncTask struct {
@@ -294,6 +294,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			}
 			deletionTimestampAnnotation, ok := m.GetAnnotations()[smith.DeletionTimestampAnnotation]
 			if !ok {
+				// Mark object with deletionTimestamp annotation to start the countdown
 				annotations := m.GetAnnotations()
 				deletionTimestampBytes, err := meta_v1.Now().MarshalJSON()
 				if err != nil {
@@ -318,6 +319,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 				// The object will eventually be reprocessed for the check for delay expiration
 				continue
 			}
+			// Check if deletion delay has expired
 			var deletionTimestamp meta_v1.Time
 			err = deletionTimestamp.UnmarshalJSON([]byte(deletionTimestampAnnotation))
 			if err != nil {
