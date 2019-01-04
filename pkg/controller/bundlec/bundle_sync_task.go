@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
+	"time"
+	"github.com/atlassian/smith/pkg/util"
 )
 
 type bundleSyncTask struct {
@@ -271,6 +273,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			continue
 		}
 		logger.Info("Deleting object")
+
 		resClient, err := st.smartClient.ForGVK(ref.GroupVersionKind, st.bundle.Namespace)
 		if err != nil {
 			if firstErr == nil {
@@ -280,6 +283,53 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 				logger.Error("Failed to get client for object", zap.Error(err))
 			}
 			continue
+		}
+
+		deletionDelayAnnotation, ok := m.GetAnnotations()[smith.DeletionDelayAnnotation]
+		if ok {
+			// Trigger the "deletion delay" logic
+			deletionDelay, err := time.ParseDuration(deletionDelayAnnotation)
+			if err != nil {
+				return false, errors.Wrap(err, "failed to parse deletion delay duration")
+			}
+			deletionTimestampAnnotation, ok := m.GetAnnotations()[smith.DeletionTimestampAnnotation]
+			if !ok {
+				annotations := m.GetAnnotations()
+				deletionTimestampBytes, err := meta_v1.Now().MarshalJSON()
+				if err != nil {
+					return false, errors.Wrap(err, "failed to marshal deletion timestamp")
+				}
+				annotations[smith.DeletionTimestampAnnotation] = string(deletionTimestampBytes)
+				m.SetAnnotations(annotations)
+
+				unstr, err := util.RuntimeToUnstructured(obj)
+				if err != nil {
+					return false, errors.Wrap(err, "failed to convert runtime object to unstructured")
+				}
+				_, err = resClient.Update(unstr, meta_v1.UpdateOptions{})
+				if err != nil {
+					if firstErr == nil {
+						firstErr = err
+					} else {
+						logger.Warn("Failed to update object", zap.Error(err))
+					}
+					continue
+				}
+				// The object will eventually be reprocessed for the check for delay expiration
+				continue
+			}
+			var deletionTimestamp meta_v1.Time
+			err = deletionTimestamp.UnmarshalJSON([]byte(deletionTimestampAnnotation))
+			if err != nil {
+				return false, errors.Wrap(err, "failed to unmarshal deletion timestamp")
+			}
+			if !meta_v1.Now().After(deletionTimestamp.Add(deletionDelay)) {
+				// Skip deletion of resource until the delay expires
+				continue
+			}
+			// All checks passed -> deletion delay has expired, and we can proceed with
+			// deletion
+			logger.Sugar().Debugf("Deletion delay has expired, proceeding: name=%q, delay=%v, timestamp=%v", ref.Name, deletionDelay, deletionTimestamp)
 		}
 
 		uid := m.GetUID()
