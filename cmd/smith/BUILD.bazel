@@ -18,6 +18,7 @@ go_binary(
     name = "smith",
     embed = [":go_default_library"],
     pure = "on",
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 
@@ -25,7 +26,6 @@ go_binary(
     name = "smith_race",
     embed = [":go_default_library"],
     race = "on",
-    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 
