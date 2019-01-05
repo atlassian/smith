@@ -171,11 +171,12 @@ func (deployment) generateHashForContainers(store specchecker.Store, namespace s
 			}
 		}
 		for _, env := range container.Env {
-			if env.ValueFrom == nil {
+			valueFrom := env.ValueFrom
+			if valueFrom == nil {
 				continue
 			}
 
-			secretKeyRef := env.ValueFrom.SecretKeyRef
+			secretKeyRef := valueFrom.SecretKeyRef
 			if secretKeyRef != nil {
 				err := specchecker.HashSecretRef(store, namespace, secretKeyRef.Name, sets.NewString(secretKeyRef.Key), secretKeyRef.Optional, hasher)
 				if err != nil {
@@ -183,7 +184,7 @@ func (deployment) generateHashForContainers(store specchecker.Store, namespace s
 				}
 			}
 
-			configMapKeyRef := env.ValueFrom.ConfigMapKeyRef
+			configMapKeyRef := valueFrom.ConfigMapKeyRef
 			if configMapKeyRef != nil {
 				err := specchecker.HashConfigMapRef(store, namespace, configMapKeyRef.Name, sets.NewString(configMapKeyRef.Key), configMapKeyRef.Optional, hasher)
 				if err != nil {

@@ -116,8 +116,9 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 	if err != nil {
 		return nil, err
 	}
+	crdGVK := apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")
 	crdInf, err := apiExtensionsInformer(config, cctx, apiExtClient,
-		apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition"),
+		crdGVK,
 		apiext_v1b1inf.NewCustomResourceDefinitionInformer)
 	if err != nil {
 		return nil, err
@@ -148,7 +149,7 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 	if err != nil {
 		return nil, err
 	}
-	resourceInfs[apiext_v1b1.SchemeGroupVersion.WithKind("CustomResourceDefinition")] = crdInf
+	resourceInfs[crdGVK] = crdInf
 	resourceInfs[smith_v1.BundleGVK] = bundleInf
 	for gvk, inf := range resourceInfs {
 		if err = multiStore.AddInformer(gvk, inf); err != nil {
@@ -226,7 +227,10 @@ func (c *BundleControllerConstructor) New(config *ctrl.Config, cctx *ctrl.Contex
 		Broadcaster: broadcaster,
 		Recorder:    recorder,
 	}
-	cntrlr.Prepare(crdInf, resourceInfs)
+	err = cntrlr.Prepare(crdInf, resourceInfs)
+	if err != nil {
+		return nil, err
+	}
 
 	return &ctrl.Constructed{
 		Interface: cntrlr,
