@@ -210,7 +210,7 @@ func configMapNamespaceNameIndexKeysForContainers(namespace string, containers [
 			if configMapRef == nil {
 				continue
 			}
-			indexKeys = append(indexKeys, bySecretNamespaceNameIndexKey(namespace, configMapRef.Name))
+			indexKeys = append(indexKeys, byConfigMapNamespaceNameIndexKey(namespace, configMapRef.Name))
 		}
 		for _, env := range container.Env {
 			valueFrom := env.ValueFrom
@@ -222,7 +222,7 @@ func configMapNamespaceNameIndexKeysForContainers(namespace string, containers [
 			if configMapKeyRef == nil {
 				continue
 			}
-			indexKeys = append(indexKeys, bySecretNamespaceNameIndexKey(namespace, configMapKeyRef.Name))
+			indexKeys = append(indexKeys, byConfigMapNamespaceNameIndexKey(namespace, configMapKeyRef.Name))
 		}
 	}
 	return indexKeys
