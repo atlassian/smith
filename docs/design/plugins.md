@@ -141,11 +141,20 @@ func New() (smith_plugin.Plugin, error) {
 type filterPlugin struct {
 }
 
-func (p *filterPlugin) Process(spec map[string]interface{}, *smith_plugin.Context) (*smith_plugin.ProcessResult, error) {
+func (p *filterPlugin) Process(spec map[string]interface{}, *smith_plugin.Context) smith_plugin.ProcessResult {
+	// Possible error
+	if isError {
+		return &smith_plugin.ProcessResultFailure{
+			//Error: error here,
+			//IsExternalError: whether or not this is a user error,
+			//IsRetriable: whether or not this error should be retried,
+		}
+	}
+
 	// Do the processing
-	return &smith_plugin.ProcessResult{
+	return &smith_plugin.ProcessResultSuccess{
 		//Object: object literal here
-	}, nil
+	}
 }
 
 func (p *filterPlugin) Describe() *smith_plugin.Description {
