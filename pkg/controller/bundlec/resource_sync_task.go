@@ -34,40 +34,37 @@ const (
 )
 
 var (
-	// createOrUpdateInternalReasons describes the list of statuses which we consider
-	// internal errors from the createOrUpdate function.
-	// These will not be retried as they are internal errors.
-	createOrUpdateInternalReasons = [...]meta_v1.StatusReason{
+	isCreateOrUpdateInternal = [...]func(error) bool{
 		// AlreadyExists only happens during the create call, and we catch it
 		// and throw a Conflict. Should not happen.
-		meta_v1.StatusReasonAlreadyExists,
+		api_errors.IsAlreadyExists,
 
 		// Expired is typically only associated with Watches and this shouldn't
 		// happen at all
-		meta_v1.StatusReasonExpired,
+		api_errors.IsResourceExpired,
 
 		// Shouldn't happen at all because the method should always be right
-		meta_v1.StatusReasonMethodNotAllowed,
+		api_errors.IsMethodNotSupported,
 
 		// Shouldn't happen at all because the accept types should be right
-		meta_v1.StatusReasonNotAcceptable,
+		api_errors.IsNotAcceptable,
 
 		// Shouldn't happen at all because the client sets Content-Type.
-		meta_v1.StatusReasonUnsupportedMediaType,
+		api_errors.IsUnsupportedMediaType,
 
 		// BadRequest is different from Invalid - this indicates the created
 		// request itself is wrong and doesn't make sense.
-		meta_v1.StatusReasonBadRequest,
+		api_errors.IsBadRequest,
 	}
 
-	createOrUpdateNonRetriableReasons = [...]meta_v1.StatusReason{
+	isCreateOrUpdateNonRetriable = [...]func(error) bool{
 		// Conflict indicates that the object will be requeued, so we can avoid
 		// the retry
-		meta_v1.StatusReasonConflict,
+		api_errors.IsConflict,
 
 		// Invalid indicates the object itself is wrong, and we should probably
 		// just make this a terminal error
-		meta_v1.StatusReasonInvalid,
+		api_errors.IsInvalid,
 	}
 
 	prohibitedAnnotations = sets.NewString(smith.DeletionTimestampAnnotation)
@@ -208,30 +205,25 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	if err != nil {
 		cause := errors.Cause(err)
 
-		switch t := cause.(type) {
-		case api_errors.APIStatus:
-			for _, reason := range createOrUpdateInternalReasons {
-				if t.Status().Reason == reason {
-					return resourceInfo{
-						actual: resUpdated,
-						status: resourceStatusError{
-							err:              err,
-							isRetriableError: false,
-						},
-					}
-
+		for _, isInternalErr := range isCreateOrUpdateInternal {
+			if isInternalErr(cause) {
+				return resourceInfo{
+					actual: resUpdated,
+					status: resourceStatusError{
+						err: err,
+					},
 				}
+
 			}
-			for _, reason := range createOrUpdateNonRetriableReasons {
-				if t.Status().Reason == reason {
-					return resourceInfo{
-						actual: resUpdated,
-						status: resourceStatusError{
-							err:              err,
-							isRetriableError: false,
-							isExternalError:  true,
-						},
-					}
+		}
+		for _, isNonRetriable := range isCreateOrUpdateNonRetriable {
+			if isNonRetriable(cause) {
+				return resourceInfo{
+					actual: resUpdated,
+					status: resourceStatusError{
+						err:             err,
+						isExternalError: true,
+					},
 				}
 			}
 		}
