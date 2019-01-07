@@ -57,7 +57,7 @@ func (p *configMapWithDeps) Describe() *plugin.Description {
 	}
 }
 
-func (p *configMapWithDeps) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
+func (p *configMapWithDeps) Process(pluginSpec map[string]interface{}, context *plugin.Context) plugin.ProcessResult {
 	p.wasInvoked = true
 	failed := p.t.Failed()
 
@@ -119,17 +119,19 @@ func (p *configMapWithDeps) Process(pluginSpec map[string]interface{}, context *
 	}
 
 	if !failed && p.t.Failed() { // one of the assertions failed and it was the first failure in the test
-		return nil, errors.New("plugin failed BOOM!")
+		return &plugin.ProcessResultFailure{
+			Error: errors.New("plugin failed BOOM!"),
+		}
 	}
 
-	return &plugin.ProcessResult{
+	return &plugin.ProcessResultSuccess{
 		Object: &core_v1.ConfigMap{
 			TypeMeta: meta_v1.TypeMeta{
 				Kind:       "ConfigMap",
 				APIVersion: core_v1.SchemeGroupVersion.String(),
 			},
 		},
-	}, nil
+	}
 }
 
 func simpleConfigMapPlugin(t *testing.T) testingPlugin {
@@ -154,7 +156,7 @@ func (p *simpleConfigMap) Describe() *plugin.Description {
 	}
 }
 
-func (p *simpleConfigMap) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
+func (p *simpleConfigMap) Process(pluginSpec map[string]interface{}, context *plugin.Context) plugin.ProcessResult {
 	p.wasInvoked = true
 	failed := p.t.Failed()
 
@@ -169,17 +171,19 @@ func (p *simpleConfigMap) Process(pluginSpec map[string]interface{}, context *pl
 	}
 
 	if !failed && p.t.Failed() { // one of the assertions failed and it was the first failure in the test
-		return nil, errors.New("plugin failed BOOM!")
+		return &plugin.ProcessResultFailure{
+			Error: errors.New("plugin failed BOOM!"),
+		}
 	}
 
-	return &plugin.ProcessResult{
+	return &plugin.ProcessResultSuccess{
 		Object: &core_v1.ConfigMap{
 			TypeMeta: meta_v1.TypeMeta{
 				Kind:       "ConfigMap",
 				APIVersion: core_v1.SchemeGroupVersion.String(),
 			},
 		},
-	}, nil
+	}
 }
 
 func mockConfigMapPlugin(configMap *core_v1.ConfigMap) func(*testing.T) testingPlugin {
@@ -253,7 +257,9 @@ func (p *failingPluginStruct) Describe() *plugin.Description {
 	}
 }
 
-func (p *failingPluginStruct) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
+func (p *failingPluginStruct) Process(pluginSpec map[string]interface{}, context *plugin.Context) plugin.ProcessResult {
 	p.wasInvoked = true
-	return nil, errors.New("plugin failed as it should. BOOM!")
+	return &plugin.ProcessResultFailure{
+		Error: errors.New("plugin failed as it should. BOOM!"),
+	}
 }
