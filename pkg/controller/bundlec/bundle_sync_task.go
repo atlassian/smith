@@ -290,22 +290,30 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			// Trigger the "deletion delay" logic
 			deletionDelay, err := time.ParseDuration(deletionDelayAnnotation)
 			if err != nil {
-				return false, errors.Wrap(err, "failed to parse deletion delay duration")
+				if firstErr == nil {
+					retriable = false
+					firstErr = errors.Wrap(err, "failed to parse deletion delay duration")
+				} else {
+					logger.Warn("failed to parse deletion delay duration", zap.Error(err))
+				}
+				continue
 			}
 			deletionTimestampAnnotation, ok := m.GetAnnotations()[smith.DeletionTimestampAnnotation]
 			if !ok {
 				// Mark object with deletionTimestamp annotation to start the countdown
 				annotations := m.GetAnnotations()
-				deletionTimestampBytes, err := meta_v1.Now().MarshalJSON()
-				if err != nil {
-					return false, errors.Wrap(err, "failed to marshal deletion timestamp")
-				}
-				annotations[smith.DeletionTimestampAnnotation] = string(deletionTimestampBytes)
+				annotations[smith.DeletionTimestampAnnotation] = time.Now().UTC().Format(time.RFC3339)
 				m.SetAnnotations(annotations)
 
 				unstr, err := util.RuntimeToUnstructured(obj)
 				if err != nil {
-					return false, errors.Wrap(err, "failed to convert runtime object to unstructured")
+					if firstErr == nil {
+						retriable = false
+						firstErr = errors.Wrap(err, "failed to convert runtime object to unstructured")
+					} else {
+						logger.Warn("failed to convert runtime object to unstructured", zap.Error(err))
+					}
+					continue
 				}
 				_, err = resClient.Update(unstr, meta_v1.UpdateOptions{})
 				if err != nil {
@@ -314,18 +322,23 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 					} else {
 						logger.Warn("Failed to update object", zap.Error(err))
 					}
+					if api_errors.IsConflict(err) {
+						// Escape the processing loop, the conflict means that
+						// we are processing a stale object revision,
+						// and a newer revision will be re-processed soon
+						return retriable, firstErr
+					}
 					continue
 				}
 				// The object will eventually be reprocessed for the check for delay expiration
 				continue
 			}
 			// Check if deletion delay has expired
-			var deletionTimestamp meta_v1.Time
-			err = deletionTimestamp.UnmarshalJSON([]byte(deletionTimestampAnnotation))
+			deletionTimestamp, err := time.Parse(time.RFC3339, deletionTimestampAnnotation)
 			if err != nil {
 				return false, errors.Wrap(err, "failed to unmarshal deletion timestamp")
 			}
-			if !meta_v1.Now().After(deletionTimestamp.Add(deletionDelay)) {
+			if !time.Now().UTC().After(deletionTimestamp.Add(deletionDelay)) {
 				// Skip deletion of resource until the delay expires
 				continue
 			}
