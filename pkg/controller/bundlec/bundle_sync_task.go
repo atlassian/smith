@@ -339,7 +339,7 @@ func (st *bundleSyncTask) preDelete(logger *zap.Logger, name string, obj runtime
 	deletionTimestampAnnotation, ok := annotations[smith.DeletionTimestampAnnotation]
 	if !ok {
 		// Mark object with deletionTimestamp annotation to start the countdown
-		annotations[smith.DeletionTimestampAnnotation] = time.Now().UTC().Format(time.RFC3339)
+		annotations[smith.DeletionTimestampAnnotation] = timeToString(time.Now())
 		m.SetAnnotations(annotations)
 
 		unstr, err := util.RuntimeToUnstructured(obj)
@@ -360,7 +360,7 @@ func (st *bundleSyncTask) preDelete(logger *zap.Logger, name string, obj runtime
 		return false, false, nil
 	}
 	// Check if deletion delay has expired
-	deletionTimestamp, err := time.Parse(time.RFC3339, deletionTimestampAnnotation)
+	deletionTimestamp, err := timeFromString(deletionTimestampAnnotation)
 	if err != nil {
 		return false, false, errors.Wrap(err, "failed to unmarshal deletion timestamp")
 	}
@@ -787,4 +787,12 @@ func sortBundle(bundle *smith_v1.Bundle) (*graph.Graph, []graph.V, error) {
 	}
 
 	return g, sorted, nil
+}
+
+func timeToString(t time.Time) string {
+	return t.UTC().Format(time.RFC3339)
+}
+
+func timeFromString(s string) (time.Time, error) {
+	return time.Parse(time.RFC3339, s)
 }
