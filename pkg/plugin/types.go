@@ -14,7 +14,7 @@ type ProcessResultType string
 
 const (
 	ProcessResultSuccessType ProcessResultType = "Success"
-	ProcessResultFailureType ProcessResultType = "Error"
+	ProcessResultFailureType ProcessResultType = "Failure"
 )
 
 // NewFunc is a factory function that returns an initialized plugin.
