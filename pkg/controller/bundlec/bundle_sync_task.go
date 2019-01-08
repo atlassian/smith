@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/dynamic"
 )
 
 type bundleSyncTask struct {
@@ -285,66 +286,19 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			continue
 		}
 
-		deletionDelayAnnotation, ok := m.GetAnnotations()[smith.DeletionDelayAnnotation]
-		if ok {
-			// Trigger the "deletion delay" logic
-			deletionDelay, err := time.ParseDuration(deletionDelayAnnotation)
-			if err != nil {
-				if firstErr == nil {
-					retriable = false
-					firstErr = errors.Wrap(err, "failed to parse deletion delay duration")
-				} else {
-					logger.Warn("failed to parse deletion delay duration", zap.Error(err))
-				}
-				continue
+		readyToDelete, retriableErr, err := st.preDelete(logger, ref.Name, obj, m, resClient)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+				retriable = retriableErr
+			} else {
+				logger.Error("Failed to execute pre-delete for object", zap.Error(err))
 			}
-			deletionTimestampAnnotation, ok := m.GetAnnotations()[smith.DeletionTimestampAnnotation]
-			if !ok {
-				// Mark object with deletionTimestamp annotation to start the countdown
-				annotations := m.GetAnnotations()
-				annotations[smith.DeletionTimestampAnnotation] = time.Now().UTC().Format(time.RFC3339)
-				m.SetAnnotations(annotations)
-
-				unstr, err := util.RuntimeToUnstructured(obj)
-				if err != nil {
-					if firstErr == nil {
-						retriable = false
-						firstErr = errors.Wrap(err, "failed to convert runtime object to unstructured")
-					} else {
-						logger.Warn("failed to convert runtime object to unstructured", zap.Error(err))
-					}
-					continue
-				}
-				_, err = resClient.Update(unstr, meta_v1.UpdateOptions{})
-				if err != nil {
-					if firstErr == nil {
-						firstErr = err
-					} else {
-						logger.Warn("Failed to update object", zap.Error(err))
-					}
-					if api_errors.IsConflict(err) {
-						// Escape the processing loop, the conflict means that
-						// we are processing a stale object revision,
-						// and a newer revision will be re-processed soon
-						return retriable, firstErr
-					}
-					continue
-				}
-				// The object will eventually be reprocessed for the check for delay expiration
-				continue
-			}
-			// Check if deletion delay has expired
-			deletionTimestamp, err := time.Parse(time.RFC3339, deletionTimestampAnnotation)
-			if err != nil {
-				return false, errors.Wrap(err, "failed to unmarshal deletion timestamp")
-			}
-			if !time.Now().UTC().After(deletionTimestamp.Add(deletionDelay)) {
-				// Skip deletion of resource until the delay expires
-				continue
-			}
-			// All checks passed -> deletion delay has expired, and we can proceed with
-			// deletion
-			logger.Sugar().Debugf("Deletion delay has expired, proceeding: name=%q, delay=%v, timestamp=%v", ref.Name, deletionDelay, deletionTimestamp)
+			continue
+		}
+		if !readyToDelete {
+			// Skip deletion and retry later
+			continue
 		}
 
 		uid := m.GetUID()
@@ -366,6 +320,58 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 		}
 	}
 	return retriable, firstErr
+}
+
+func (st *bundleSyncTask) preDelete(logger *zap.Logger, name string, obj runtime.Object, m meta_v1.Object, resClient dynamic.ResourceInterface) (bool /* readyToDelete */, bool /* retriableError */, error) {
+	annotations := m.GetAnnotations()
+	deletionDelayAnnotation, ok := annotations[smith.DeletionDelayAnnotation]
+	if !ok {
+		// If there is no deletion delay annotation,
+		// we can proceed with deletion immediately
+		return true, false, nil
+	}
+
+	// Trigger the "deletion delay" logic
+	deletionDelay, err := time.ParseDuration(deletionDelayAnnotation)
+	if err != nil {
+		return false, false, errors.Wrap(err, "failed to parse deletion delay duration")
+	}
+	deletionTimestampAnnotation, ok := annotations[smith.DeletionTimestampAnnotation]
+	if !ok {
+		// Mark object with deletionTimestamp annotation to start the countdown
+		annotations[smith.DeletionTimestampAnnotation] = time.Now().UTC().Format(time.RFC3339)
+		m.SetAnnotations(annotations)
+
+		unstr, err := util.RuntimeToUnstructured(obj)
+		if err != nil {
+			return false, false, errors.Wrap(err, "failed to convert runtime object to unstructured")
+		}
+		_, err = resClient.Update(unstr, meta_v1.UpdateOptions{})
+		if err != nil {
+			if api_errors.IsConflict(err) {
+				// Escape the processing loop, the conflict means that
+				// we are processing a stale object revision,
+				// and a newer revision will be re-processed soon
+				return false, false, err
+			}
+			return false, true, err
+		}
+		// The object will eventually be reprocessed for the check for delay expiration
+		return false, false, nil
+	}
+	// Check if deletion delay has expired
+	deletionTimestamp, err := time.Parse(time.RFC3339, deletionTimestampAnnotation)
+	if err != nil {
+		return false, false, errors.Wrap(err, "failed to unmarshal deletion timestamp")
+	}
+	if time.Now().UTC().Before(deletionTimestamp.Add(deletionDelay)) {
+		// Skip deletion of resource until the delay expires
+		return false, false, nil
+	}
+	// All checks passed -> deletion delay has expired,
+	// and we can proceed with deletion
+	logger.Sugar().Debugf("Deletion delay has expired, proceeding: name=%q, delay=%v, timestamp=%v", name, deletionDelay, deletionTimestamp)
+	return true, false, nil
 }
 
 func (st *bundleSyncTask) updateBundle() error {
