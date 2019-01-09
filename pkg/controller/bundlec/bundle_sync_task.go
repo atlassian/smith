@@ -26,8 +26,8 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/record"
 )
 
 type bundleSyncTask struct {

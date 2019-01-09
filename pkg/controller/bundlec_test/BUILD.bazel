@@ -6,6 +6,7 @@ go_test(
     srcs = [
         "actual_object_passed_to_plugin_test.go",
         "cr_in_another_namespace_test.go",
+        "delay_delete_removed_object_test.go",
         "delete_removed_object_test.go",
         "deleted_bundle_foreground_deletion_noop_test.go",
         "deleted_bundle_manual_delete_resources_fail_test.go",
