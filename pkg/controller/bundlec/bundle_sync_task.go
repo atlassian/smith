@@ -172,7 +172,7 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 	st.objectsToDelete = make(map[objectRef]runtime.Object, len(objs))
 
 	var firstErr error
-	retriable := true
+	retriable := false
 	policy := meta_v1.DeletePropagationForeground
 	for _, obj := range objs {
 		m := obj.(meta_v1.Object)
@@ -195,7 +195,6 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 		resClient, err := st.smartClient.ForGVK(gvk, st.bundle.Namespace)
 		if err != nil {
 			if firstErr == nil {
-				retriable = false
 				firstErr = err
 			} else {
 				logger.Error("Failed to get client for object", zap.Error(err))
@@ -214,6 +213,7 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 			// conflict means it has been deleted and re-created (UID does not match)
 			if firstErr == nil {
 				firstErr = err
+				retriable = true // could be some temporary network issue
 			} else {
 				logger.Warn("Failed to delete object", zap.Error(err))
 			}
@@ -278,7 +278,6 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 		resClient, err := st.smartClient.ForGVK(ref.GroupVersionKind, st.bundle.Namespace)
 		if err != nil {
 			if firstErr == nil {
-				retriable = false
 				firstErr = err
 			} else {
 				logger.Error("Failed to get client for object", zap.Error(err))
@@ -288,9 +287,11 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 
 		readyToDelete, retriableErr, err := st.preDelete(logger, ref.Name, obj, resClient)
 		if err != nil {
+			if retriableErr {
+				retriable = true
+			}
 			if firstErr == nil {
 				firstErr = err
-				retriable = retriableErr
 			} else {
 				logger.Error("Failed to execute pre-delete for object", zap.Error(err))
 			}

@@ -155,7 +155,7 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	}
 
 	// Validate spec
-	status := st.validateSpec(spec)
+	status = st.validateSpec(spec)
 	if status != nil {
 		return resourceInfo{
 			status: status,
