@@ -286,7 +286,7 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			continue
 		}
 
-		readyToDelete, retriableErr, err := st.preDelete(logger, ref.Name, obj, m, resClient)
+		readyToDelete, retriableErr, err := st.preDelete(logger, ref.Name, obj, resClient)
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
@@ -322,7 +322,8 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 	return retriable, firstErr
 }
 
-func (st *bundleSyncTask) preDelete(logger *zap.Logger, name string, obj runtime.Object, m meta_v1.Object, resClient dynamic.ResourceInterface) (bool /* readyToDelete */, bool /* retriableError */, error) {
+func (st *bundleSyncTask) preDelete(logger *zap.Logger, name string, obj runtime.Object, resClient dynamic.ResourceInterface) (bool /* readyToDelete */, bool /* retriableError */, error) {
+	m := obj.(meta_v1.Object)
 	annotations := m.GetAnnotations()
 	deletionDelayAnnotation, ok := annotations[smith.DeletionDelayAnnotation]
 	if !ok {
@@ -354,6 +355,10 @@ func (st *bundleSyncTask) preDelete(logger *zap.Logger, name string, obj runtime
 				// and a newer revision will be re-processed soon
 				return false, false, err
 			}
+			if api_errors.IsNotFound(err) {
+				// The object has already been deleted, skip it
+				return false, false, nil
+			}
 			return false, true, err
 		}
 		// The object will eventually be reprocessed for the check for delay expiration
@@ -364,13 +369,13 @@ func (st *bundleSyncTask) preDelete(logger *zap.Logger, name string, obj runtime
 	if err != nil {
 		return false, false, errors.Wrap(err, "failed to unmarshal deletion timestamp")
 	}
-	if time.Now().UTC().Before(deletionTimestamp.Add(deletionDelay)) {
+	if time.Now().Before(deletionTimestamp.Add(deletionDelay)) {
 		// Skip deletion of resource until the delay expires
 		return false, false, nil
 	}
 	// All checks passed -> deletion delay has expired,
 	// and we can proceed with deletion
-	logger.Sugar().Debugf("Deletion delay has expired, proceeding: name=%q, delay=%v, timestamp=%v", name, deletionDelay, deletionTimestamp)
+	logger.Sugar().Debugf("Deletion delay has expired, proceeding: delay=%v, timestamp=%v", deletionDelay, deletionTimestamp)
 	return true, false, nil
 }
 
