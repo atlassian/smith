@@ -2,6 +2,7 @@ package bundlec
 
 import (
 	ctrlLogz "github.com/atlassian/ctrl/logz"
+	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/statuschecker"
@@ -717,6 +718,15 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	if err != nil {
 		return nil, false, errors.Wrap(err, "specification check failed")
 	}
+
+	// Delete the DeletionTimestamp annotation if it is present
+	annotations := updated.GetAnnotations()
+	if _, ok := annotations[smith.DeletionTimestampAnnotation]; ok {
+		delete(annotations, smith.DeletionTimestampAnnotation)
+		updated.SetAnnotations(annotations)
+		match = false
+	}
+
 	if match {
 		st.logger.Debug("Object has correct spec", ctrlLogz.Object(spec))
 		return updated, false, nil
