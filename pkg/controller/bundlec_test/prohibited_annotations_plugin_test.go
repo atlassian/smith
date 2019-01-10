@@ -2,10 +2,10 @@ package bundlec_test
 
 import (
 	"context"
-	"github.com/atlassian/smith"
 	"testing"
 
 	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
+	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
@@ -13,19 +13,30 @@ import (
 	"github.com/stretchr/testify/require"
 	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kube_testing "k8s.io/client-go/testing"
 )
 
-// Should detect prohibited annotations in resource spec and return error
-// Should work for both object and plugin spec
-func TestProhibitedAnnotationsRejected(t *testing.T) {
+// Should detect prohibited annotations in resource spec returned by a plugin and return error
+func TestProhibitedAnnotationsPluginRejected(t *testing.T) {
 	t.Parallel()
 
-	cm1 := configMapNeedsUpdate()
-	cm1.Annotations[smith.DeletionTimestampAnnotation] = "2006-01-02T15:04:05Z07:00"
-
-	cm2 := configMapNeedsUpdate()
-	cm2.Annotations[smith.DeletionTimestampAnnotation] = "2006-01-02T15:04:05Z07:00"
+	r1 := smith_v1.ResourceName("resource1")
+	cm1 := &core_v1.ConfigMap{
+		TypeMeta: meta_v1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: core_v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: mapNeedsAnUpdate,
+			Annotations: map[string]string{
+				smith.DeletionTimestampAnnotation: "2006-01-02T15:04:05Z07:00",
+			},
+		},
+		Data: map[string]string{
+			"delete": "this key",
+		},
+	}
 
 	tc := testCase{
 		bundle: &smith_v1.Bundle{
@@ -38,25 +49,11 @@ func TestProhibitedAnnotationsRejected(t *testing.T) {
 			Spec: smith_v1.BundleSpec{
 				Resources: []smith_v1.Resource{
 					{
-						Name: "r1",
-						Spec: smith_v1.ResourceSpec{
-							Object: &core_v1.ConfigMap{
-								TypeMeta: meta_v1.TypeMeta{
-									Kind:       "ConfigMap",
-									APIVersion: core_v1.SchemeGroupVersion.String(),
-								},
-								ObjectMeta: meta_v1.ObjectMeta{
-									Name: "r1",
-								},
-							},
-						},
-					},
-					{
-						Name: "r2",
+						Name: r1,
 						Spec: smith_v1.ResourceSpec{
 							Plugin: &smith_v1.PluginSpec{
 								Name:       pluginMockConfigMap,
-								ObjectName: "r2",
+								ObjectName: string(r1),
 							},
 						},
 					},
@@ -66,11 +63,12 @@ func TestProhibitedAnnotationsRejected(t *testing.T) {
 		appName:   testAppName,
 		namespace: testNamespace,
 		plugins: map[smith_v1.PluginName]func(*testing.T) testingPlugin{
-			pluginMockConfigMap: mockConfigMapPlugin(cm2),
+			pluginMockConfigMap: mockConfigMapPlugin(cm1),
 		},
+		pluginsShouldBeInvoked: sets.NewString(string(pluginMockConfigMap)),
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
 			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
-			assert.EqualError(t, err, `bundle contains two resources with the same name "`+resP1+`"`)
+			assert.EqualError(t, err, `error processing resource(s): ["`+string(r1)+`"]`)
 			assert.False(t, retriable)
 
 			actions := tc.smithFake.Actions()
@@ -82,10 +80,12 @@ func TestProhibitedAnnotationsRejected(t *testing.T) {
 			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleInProgress, cond_v1.ConditionFalse)
 			smith_testing.AssertCondition(t, updateBundle, smith_v1.BundleError, cond_v1.ConditionTrue)
 
-			smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceBlocked, cond_v1.ConditionUnknown)
-			smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceInProgress, cond_v1.ConditionUnknown)
-			smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceReady, cond_v1.ConditionUnknown)
-			smith_testing.AssertResourceCondition(t, updateBundle, resP1, smith_v1.ResourceError, cond_v1.ConditionUnknown)
+			smith_testing.AssertResourceCondition(t, updateBundle, r1, smith_v1.ResourceBlocked, cond_v1.ConditionFalse)
+			smith_testing.AssertResourceCondition(t, updateBundle, r1, smith_v1.ResourceInProgress, cond_v1.ConditionFalse)
+			smith_testing.AssertResourceCondition(t, updateBundle, r1, smith_v1.ResourceReady, cond_v1.ConditionFalse)
+			smith_testing.AssertResourceCondition(t, updateBundle, r1, smith_v1.ResourceError, cond_v1.ConditionTrue)
+
+			smith_testing.AssertResourceConditionMessage(t, updateBundle, r1, smith_v1.ResourceError, `annotation "smith.atlassian.com/deletionTimestamp" cannot be set by the user`)
 		},
 	}
 	tc.run(t)

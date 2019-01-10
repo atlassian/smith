@@ -429,13 +429,13 @@ func (st *bundleSyncTask) handleNormalStatusUpdate(retriable bool, processErr er
 	// Construct resource conditions and check if there were any resource errors
 	resourceStatuses := make([]smith_v1.ResourceStatus, 0, len(st.processedResources))
 	var failedResources []smith_v1.ResourceName
-	retriableResourceErr := true
+	retriableResourceErr := false
 	for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
 		blockedCond, inProgressCond, readyCond, errorCond := st.resourceConditions(res)
 
 		if errorCond.Status == cond_v1.ConditionTrue {
 			failedResources = append(failedResources, res.Name)
-			retriableResourceErr = retriableResourceErr && errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must not continue if at least one error is not retriable
+			retriableResourceErr = retriableResourceErr || errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must continue if at least one error is retriable
 		}
 
 		bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &blockedCond) || bundleStatusUpdated

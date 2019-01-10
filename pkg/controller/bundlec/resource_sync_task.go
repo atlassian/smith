@@ -578,7 +578,8 @@ func (st *resourceSyncTask) validateSpec(spec *unstructured.Unstructured) resour
 		for key := range prohibitedAnnotations {
 			if _, ok := annotations[key]; ok {
 				return resourceStatusError{
-					err: errors.Errorf("annotation %q cannot be set by the user", key),
+					err:              errors.Errorf("annotation %q cannot be set by the user", key),
+					isRetriableError: false,
 				}
 			}
 		}
