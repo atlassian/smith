@@ -2,6 +2,7 @@ package bundlec
 
 import (
 	ctrlLogz "github.com/atlassian/ctrl/logz"
+	"github.com/atlassian/smith"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/statuschecker"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	k8s_errors "k8s.io/apimachinery/pkg/util/errors"
 	k8s_json "k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -29,6 +31,10 @@ const (
 	ResourceStatusTypeInProgress           ResourceStatusType = "InProgress"
 	ResourceStatusTypeDependenciesNotReady ResourceStatusType = "DependenciesNotReady"
 	ResourceStatusTypeError                ResourceStatusType = "Error"
+)
+
+var (
+	prohibitedAnnotations = sets.NewString(smith.DeletionTimestampAnnotation)
 )
 
 // resourceStatus is one of "resourceStatus*" structs.
@@ -142,6 +148,19 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 
 	// Eval spec
 	spec, status := st.evalSpec(res, actual)
+	if status != nil {
+		return resourceInfo{
+			status: status,
+		}
+	}
+
+	// Validate spec
+	status = st.validateSpec(spec)
+	if status != nil {
+		return resourceInfo{
+			status: status,
+		}
+	}
 	if status != nil {
 		return resourceInfo{
 			status: status,
@@ -551,6 +570,23 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 	return obj, nil
 }
 
+// validateSpec enforces constraints on the desires object spec
+// e.g. prohibits Smith-managed annotations
+func (st *resourceSyncTask) validateSpec(spec *unstructured.Unstructured) resourceStatus {
+	annotations := spec.GetAnnotations()
+	if len(annotations) > 0 {
+		for key := range prohibitedAnnotations {
+			if _, ok := annotations[key]; ok {
+				return resourceStatusError{
+					err:              errors.Errorf("annotation %q cannot be set by the user", key),
+					isRetriableError: false,
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // evalPluginSpec evaluates the plugin resource specification and returns the result.
 func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtime.Object) (*unstructured.Unstructured, resourceStatus) {
 	pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
@@ -717,6 +753,15 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 	if err != nil {
 		return nil, false, errors.Wrap(err, "specification check failed")
 	}
+
+	// Delete the DeletionTimestamp annotation if it is present
+	annotations := updated.GetAnnotations()
+	if _, ok := annotations[smith.DeletionTimestampAnnotation]; ok {
+		delete(annotations, smith.DeletionTimestampAnnotation)
+		updated.SetAnnotations(annotations)
+		match = false
+	}
+
 	if match {
 		st.logger.Debug("Object has correct spec", ctrlLogz.Object(spec))
 		return updated, false, nil

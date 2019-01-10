@@ -120,6 +120,7 @@ const (
 	mapMarkedForDeletion              = "map-not-in-the-bundle-anymore-marked-for-deletetion"
 	mapMarkedForDeletionUid types.UID = "map-deleted-uid"
 
+	pluginMockConfigMap     smith_v1.PluginName = "mockConfigMap"
 	pluginSimpleConfigMap   smith_v1.PluginName = "simpleConfigMap"
 	pluginConfigMapWithDeps smith_v1.PluginName = "configMapWithDeps"
 	pluginFailing           smith_v1.PluginName = "pluginFailing"

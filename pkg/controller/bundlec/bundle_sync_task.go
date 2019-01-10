@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
 	cond_v1 "github.com/atlassian/ctrl/apis/condition/v1"
 	ctrlLogz "github.com/atlassian/ctrl/logz"
@@ -14,6 +15,7 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/statuschecker"
 	"github.com/atlassian/smith/pkg/store"
+	"github.com/atlassian/smith/pkg/util"
 	"github.com/atlassian/smith/pkg/util/graph"
 	"github.com/atlassian/smith/pkg/util/logz"
 	"github.com/pkg/errors"
@@ -24,6 +26,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/record"
 )
 
@@ -169,7 +172,7 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 	st.objectsToDelete = make(map[objectRef]runtime.Object, len(objs))
 
 	var firstErr error
-	retriable := true
+	retriable := false
 	policy := meta_v1.DeletePropagationForeground
 	for _, obj := range objs {
 		m := obj.(meta_v1.Object)
@@ -192,7 +195,6 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 		resClient, err := st.smartClient.ForGVK(gvk, st.bundle.Namespace)
 		if err != nil {
 			if firstErr == nil {
-				retriable = false
 				firstErr = err
 			} else {
 				logger.Error("Failed to get client for object", zap.Error(err))
@@ -211,6 +213,7 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 			// conflict means it has been deleted and re-created (UID does not match)
 			if firstErr == nil {
 				firstErr = err
+				retriable = true // could be some temporary network issue
 			} else {
 				logger.Warn("Failed to delete object", zap.Error(err))
 			}
@@ -271,14 +274,31 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 			continue
 		}
 		logger.Info("Deleting object")
+
 		resClient, err := st.smartClient.ForGVK(ref.GroupVersionKind, st.bundle.Namespace)
 		if err != nil {
 			if firstErr == nil {
-				retriable = false
 				firstErr = err
 			} else {
 				logger.Error("Failed to get client for object", zap.Error(err))
 			}
+			continue
+		}
+
+		readyToDelete, retriableErr, err := st.preDelete(logger, ref.Name, obj, resClient)
+		if err != nil {
+			if retriableErr {
+				retriable = true
+			}
+			if firstErr == nil {
+				firstErr = err
+			} else {
+				logger.Error("Failed to execute pre-delete for object", zap.Error(err))
+			}
+			continue
+		}
+		if !readyToDelete {
+			// Skip deletion and retry later
 			continue
 		}
 
@@ -301,6 +321,63 @@ func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error
 		}
 	}
 	return retriable, firstErr
+}
+
+func (st *bundleSyncTask) preDelete(logger *zap.Logger, name string, obj runtime.Object, resClient dynamic.ResourceInterface) (bool /* readyToDelete */, bool /* retriableError */, error) {
+	m := obj.(meta_v1.Object)
+	annotations := m.GetAnnotations()
+	deletionDelayAnnotation, ok := annotations[smith.DeletionDelayAnnotation]
+	if !ok {
+		// If there is no deletion delay annotation,
+		// we can proceed with deletion immediately
+		return true, false, nil
+	}
+
+	// Trigger the "deletion delay" logic
+	deletionDelay, err := time.ParseDuration(deletionDelayAnnotation)
+	if err != nil {
+		return false, false, errors.Wrap(err, "failed to parse deletion delay duration")
+	}
+	deletionTimestampAnnotation, ok := annotations[smith.DeletionTimestampAnnotation]
+	if !ok {
+		// Mark object with deletionTimestamp annotation to start the countdown
+		annotations[smith.DeletionTimestampAnnotation] = timeToString(time.Now())
+		m.SetAnnotations(annotations)
+
+		unstr, err := util.RuntimeToUnstructured(obj)
+		if err != nil {
+			return false, false, errors.Wrap(err, "failed to convert runtime object to unstructured")
+		}
+		_, err = resClient.Update(unstr, meta_v1.UpdateOptions{})
+		if err != nil {
+			if api_errors.IsConflict(err) {
+				// Escape the processing loop, the conflict means that
+				// we are processing a stale object revision,
+				// and a newer revision will be re-processed soon
+				return false, false, err
+			}
+			if api_errors.IsNotFound(err) {
+				// The object has already been deleted, skip it
+				return false, false, nil
+			}
+			return false, true, err
+		}
+		// The object will eventually be reprocessed for the check for delay expiration
+		return false, false, nil
+	}
+	// Check if deletion delay has expired
+	deletionTimestamp, err := timeFromString(deletionTimestampAnnotation)
+	if err != nil {
+		return false, false, errors.Wrap(err, "failed to unmarshal deletion timestamp")
+	}
+	if time.Now().Before(deletionTimestamp.Add(deletionDelay)) {
+		// Skip deletion of resource until the delay expires
+		return false, false, nil
+	}
+	// All checks passed -> deletion delay has expired,
+	// and we can proceed with deletion
+	logger.Sugar().Debugf("Deletion delay has expired, proceeding: delay=%v, timestamp=%v", deletionDelay, deletionTimestamp)
+	return true, false, nil
 }
 
 func (st *bundleSyncTask) updateBundle() error {
@@ -352,13 +429,13 @@ func (st *bundleSyncTask) handleNormalStatusUpdate(retriable bool, processErr er
 	// Construct resource conditions and check if there were any resource errors
 	resourceStatuses := make([]smith_v1.ResourceStatus, 0, len(st.processedResources))
 	var failedResources []smith_v1.ResourceName
-	retriableResourceErr := true
+	retriableResourceErr := false
 	for _, res := range st.bundle.Spec.Resources { // Deterministic iteration order
 		blockedCond, inProgressCond, readyCond, errorCond := st.resourceConditions(res)
 
 		if errorCond.Status == cond_v1.ConditionTrue {
 			failedResources = append(failedResources, res.Name)
-			retriableResourceErr = retriableResourceErr && errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must not continue if at least one error is not retriable
+			retriableResourceErr = retriableResourceErr || errorCond.Reason == smith_v1.ResourceReasonRetriableError // Must continue if at least one error is retriable
 		}
 
 		bundleStatusUpdated = st.checkResourceConditionNeedsUpdate(res.Name, &blockedCond) || bundleStatusUpdated
@@ -718,4 +795,12 @@ func sortBundle(bundle *smith_v1.Bundle) (*graph.Graph, []graph.V, error) {
 	}
 
 	return g, sorted, nil
+}
+
+func timeToString(t time.Time) string {
+	return t.UTC().Format(time.RFC3339)
+}
+
+func timeFromString(s string) (time.Time, error) {
+	return time.Parse(time.RFC3339, s)
 }

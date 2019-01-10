@@ -182,6 +182,55 @@ func (p *simpleConfigMap) Process(pluginSpec map[string]interface{}, context *pl
 	}, nil
 }
 
+func mockConfigMapPlugin(configMap *core_v1.ConfigMap) func(*testing.T) testingPlugin {
+	return func(t *testing.T) testingPlugin {
+		return &mockConfigMap{
+			t:         t,
+			configMap: configMap,
+		}
+	}
+}
+
+type mockConfigMap struct {
+	t          *testing.T
+	wasInvoked bool
+	configMap  *core_v1.ConfigMap
+}
+
+func (p *mockConfigMap) WasInvoked() bool {
+	return p.wasInvoked
+}
+
+func (p *mockConfigMap) Describe() *plugin.Description {
+	return &plugin.Description{
+		Name: pluginMockConfigMap,
+		GVK:  core_v1.SchemeGroupVersion.WithKind("ConfigMap"),
+	}
+}
+
+func (p *mockConfigMap) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
+	p.wasInvoked = true
+	failed := p.t.Failed()
+
+	assert.Equal(p.t, testNamespace, context.Namespace)
+
+	actualShouldExist, _ := pluginSpec["actualShouldExist"].(bool)
+
+	if actualShouldExist {
+		assert.IsType(p.t, &core_v1.ConfigMap{}, context.Actual)
+	} else {
+		assert.Nil(p.t, context.Actual)
+	}
+
+	if !failed && p.t.Failed() { // one of the assertions failed and it was the first failure in the test
+		return nil, errors.New("plugin failed BOOM!")
+	}
+
+	return &plugin.ProcessResult{
+		Object: p.configMap,
+	}, nil
+}
+
 func newFailingPlugin(t *testing.T) testingPlugin {
 	return &failingPluginStruct{
 		t: t,
