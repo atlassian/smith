@@ -25,6 +25,7 @@ import (
 	autoscaling_v2b1 "k8s.io/api/autoscaling/v2beta1"
 	core_v1 "k8s.io/api/core/v1"
 	ext_v1b1 "k8s.io/api/extensions/v1beta1"
+	policy_v1 "k8s.io/api/policy/v1beta1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
@@ -35,6 +36,7 @@ import (
 	autoscaling_v2b1inf "k8s.io/client-go/informers/autoscaling/v2beta1"
 	core_v1inf "k8s.io/client-go/informers/core/v1"
 	ext_v1b1inf "k8s.io/client-go/informers/extensions/v1beta1"
+	policy_v1b1inf "k8s.io/client-go/informers/policy/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
@@ -263,6 +265,7 @@ func (c *BundleControllerConstructor) resourceInformers(config *ctrl.Config, cct
 		core_v1.SchemeGroupVersion.WithKind("ServiceAccount"):                   core_v1inf.NewServiceAccountInformer,
 		apps_v1.SchemeGroupVersion.WithKind("Deployment"):                       apps_v1inf.NewDeploymentInformer,
 		autoscaling_v2b1.SchemeGroupVersion.WithKind("HorizontalPodAutoscaler"): autoscaling_v2b1inf.NewHorizontalPodAutoscalerInformer,
+		policy_v1.SchemeGroupVersion.WithKind("PodDisruptionBudget"):            policy_v1b1inf.NewPodDisruptionBudgetInformer,
 	}
 	infs := make(map[schema.GroupVersionKind]cache.SharedIndexInformer, len(coreInfs)+2)
 	for gvk, coreInf := range coreInfs {
@@ -301,6 +304,7 @@ func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
 	sb.Register(apps_v1.SchemeBuilder...)
 	sb.Register(apiext_v1b1.SchemeBuilder...)
 	sb.Register(autoscaling_v2b1.SchemeBuilder...)
+	sb.Register(policy_v1.SchemeBuilder...)
 	if serviceCatalog {
 		sb.Register(sc_v1b1.SchemeBuilder...)
 	}
