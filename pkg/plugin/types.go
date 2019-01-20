@@ -10,6 +10,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+type ProcessResultType string
+
+const (
+	ProcessResultSuccessType ProcessResultType = "Success"
+	ProcessResultFailureType ProcessResultType = "Failure"
+)
+
 // NewFunc is a factory function that returns an initialized plugin.
 // Called once on Smith startup.
 type NewFunc func() (Plugin, error)
@@ -19,7 +26,7 @@ type Plugin interface {
 	// Describe returns information about the plugin.
 	Describe() *Description
 	// Process processes a plugin specification and produces an object as the result.
-	Process(map[string]interface{}, *Context) (*ProcessResult, error)
+	Process(map[string]interface{}, *Context) ProcessResult
 }
 
 type Description struct {
@@ -53,7 +60,25 @@ type Dependency struct {
 }
 
 // ProcessResult contains result of the Process() call.
-type ProcessResult struct {
+type ProcessResult interface {
+	StatusType() ProcessResultType
+}
+
+type ProcessResultSuccess struct {
 	// Object is the object that should be created/updated.
 	Object runtime.Object
+}
+
+type ProcessResultFailure struct {
+	Error            error
+	IsExternalError  bool
+	IsRetriableError bool
+}
+
+func (r *ProcessResultSuccess) StatusType() ProcessResultType {
+	return ProcessResultSuccessType
+}
+
+func (r *ProcessResultFailure) StatusType() ProcessResultType {
+	return ProcessResultFailureType
 }

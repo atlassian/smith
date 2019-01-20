@@ -34,6 +34,39 @@ const (
 )
 
 var (
+	isCreateOrUpdateInternal = [...]func(error) bool{
+		// AlreadyExists only happens during the create call, and we catch it
+		// and throw a Conflict. Should not happen.
+		api_errors.IsAlreadyExists,
+
+		// Expired is typically only associated with Watches and this shouldn't
+		// happen at all
+		api_errors.IsResourceExpired,
+
+		// Shouldn't happen at all because the method should always be right
+		api_errors.IsMethodNotSupported,
+
+		// Shouldn't happen at all because the accept types should be right
+		api_errors.IsNotAcceptable,
+
+		// Shouldn't happen at all because the client sets Content-Type.
+		api_errors.IsUnsupportedMediaType,
+
+		// BadRequest is different from Invalid - this indicates the created
+		// request itself is wrong and doesn't make sense.
+		api_errors.IsBadRequest,
+	}
+
+	isCreateOrUpdateNonRetriable = [...]func(error) bool{
+		// Conflict indicates that the object will be requeued, so we can avoid
+		// the retry
+		api_errors.IsConflict,
+
+		// Invalid indicates the object itself is wrong, and we should probably
+		// just make this a terminal error
+		api_errors.IsInvalid,
+	}
+
 	prohibitedAnnotations = sets.NewString(smith.DeletionTimestampAnnotation)
 )
 
@@ -170,20 +203,37 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 	// Create or update resource
 	resUpdated, retriable, err := st.createOrUpdate(spec, actual)
 	if err != nil {
-		if api_errors.IsInvalid(errors.Cause(err)) {
-			return resourceInfo{
-				actual: resUpdated,
-				status: resourceStatusError{
-					err:             err,
-					isExternalError: true,
-				},
+		cause := errors.Cause(err)
+
+		for _, isInternalErr := range isCreateOrUpdateInternal {
+			if isInternalErr(cause) {
+				return resourceInfo{
+					actual: resUpdated,
+					status: resourceStatusError{
+						err: err,
+					},
+				}
+
 			}
 		}
+		for _, isNonRetriable := range isCreateOrUpdateNonRetriable {
+			if isNonRetriable(cause) {
+				return resourceInfo{
+					actual: resUpdated,
+					status: resourceStatusError{
+						err:             err,
+						isExternalError: true,
+					},
+				}
+			}
+		}
+
 		return resourceInfo{
 			actual: resUpdated,
 			status: resourceStatusError{
 				err:              err,
 				isRetriableError: retriable,
+				isExternalError:  true,
 			},
 		}
 	}
@@ -617,24 +667,29 @@ func (st *resourceSyncTask) evalPluginSpec(res *smith_v1.Resource, actual runtim
 		}
 	}
 
-	result, err := pluginContainer.Plugin.Process(res.Spec.Plugin.Spec, &plugin.Context{
+	result := pluginContainer.Plugin.Process(res.Spec.Plugin.Spec, &plugin.Context{
 		Namespace:    st.bundle.Namespace,
 		Actual:       actual,
 		Dependencies: dependencies,
 	})
-	if err != nil {
-		// This is difficult to tell if it's an internal or external error due
-		// to the current plugin interface. At this point, the spec validated
-		// against the schema but this error could either be plugin failure or
-		// another validation failure and we can't distinguish the two.
-		// Throw it out as an internal error for now.
+	var pluginObj runtime.Object
+	switch res := result.(type) {
+	case *plugin.ProcessResultSuccess:
+		pluginObj = res.Object
+	case *plugin.ProcessResultFailure:
 		return nil, resourceStatusError{
-			err: err,
+			err:              res.Error,
+			isRetriableError: res.IsRetriableError,
+			isExternalError:  res.IsExternalError,
+		}
+	default:
+		return nil, resourceStatusError{
+			err: errors.Errorf("unexpected plugin result type %q", res.StatusType()),
 		}
 	}
 
 	// Make sure plugin is returning us something that obeys the PluginSpec.
-	object, err := util.RuntimeToUnstructured(result.Object)
+	object, err := util.RuntimeToUnstructured(pluginObj)
 	if err != nil {
 		return nil, resourceStatusError{
 			err: errors.Wrap(err, "plugin output cannot be converted from runtime.Object"),
@@ -742,7 +797,12 @@ func (st *resourceSyncTask) createResource(resClient dynamic.ResourceInterface, 
 		return nil, false, errors.Wrap(err, "object found, but not in Store yet (will re-process)")
 	}
 	// Unexpected error, will retry
-	return nil, true, err
+	apiStatusErr, ok := err.(api_errors.APIStatus)
+	if ok {
+		apiStatus := apiStatusErr.Status()
+		return nil, true, errors.Wrapf(err, "unexpected APIStatus (code %v, reason %q) while creating resource", apiStatus.Code, apiStatus.Reason)
+	}
+	return nil, true, errors.WithStack(err)
 }
 
 // Mutates spec and actual.
@@ -776,7 +836,12 @@ func (st *resourceSyncTask) updateResource(resClient dynamic.ResourceInterface, 
 			return nil, false, errors.Wrap(err, "object update resulted in conflict (will re-process)")
 		}
 		// Unexpected error, will retry
-		return nil, true, err
+		apiStatusErr, ok := err.(api_errors.APIStatus)
+		if ok {
+			apiStatus := apiStatusErr.Status()
+			return nil, true, errors.Wrapf(err, "unexpected APIStatus (code %v, reason %q) while creating resource", apiStatus.Code, apiStatus.Reason)
+		}
+		return nil, true, errors.WithStack(err)
 	}
 	st.logger.Info("Object updated", ctrlLogz.Object(spec))
 	return updated, false, nil
