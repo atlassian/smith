@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/atlassian/smith/pkg/crd"
 	"github.com/atlassian/smith/pkg/resources"
 )
 
@@ -20,5 +21,5 @@ func innerMain() error {
 	printBundle := flag.String("print-bundle", "yaml", "Print Bundle CRD and exit (specify format: json or yaml)")
 	flag.Parse()
 
-	return resources.PrintCleanedObject(os.Stdout, *printBundle, resources.BundleCrd())
+	return resources.PrintCleanedObject(os.Stdout, *printBundle, crd.BundleCrd())
 }
