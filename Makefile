@@ -1,6 +1,6 @@
 OS := $(shell uname -s | tr A-Z a-z)
 BINARY_PREFIX_DIRECTORY := $(OS)_amd64_stripped
-KUBECONTEXT ?= kubernetes-admin@kind-1
+KUBECONTEXT ?= kubernetes-admin@1
 KUBECONFIG ?= $(shell kind get kubeconfig-path)
 #KUBECONFIG ?= $$HOME/.kube/config
 
