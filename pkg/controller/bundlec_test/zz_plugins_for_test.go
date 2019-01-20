@@ -212,7 +212,7 @@ func (p *mockConfigMap) Describe() *plugin.Description {
 	}
 }
 
-func (p *mockConfigMap) Process(pluginSpec map[string]interface{}, context *plugin.Context) (*plugin.ProcessResult, error) {
+func (p *mockConfigMap) Process(pluginSpec map[string]interface{}, context *plugin.Context) plugin.ProcessResult {
 	p.wasInvoked = true
 	failed := p.t.Failed()
 
@@ -227,12 +227,14 @@ func (p *mockConfigMap) Process(pluginSpec map[string]interface{}, context *plug
 	}
 
 	if !failed && p.t.Failed() { // one of the assertions failed and it was the first failure in the test
-		return nil, errors.New("plugin failed BOOM!")
+		return &plugin.ProcessResultFailure{
+			Error: errors.New("plugin failed BOOM!"),
+		}
 	}
 
-	return &plugin.ProcessResult{
+	return &plugin.ProcessResultSuccess{
 		Object: p.configMap,
-	}, nil
+	}
 }
 
 func newFailingPlugin(t *testing.T) testingPlugin {
