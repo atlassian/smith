@@ -5,7 +5,10 @@ go_library(
     srcs = ["main.go"],
     importpath = "github.com/atlassian/smith/cmd/crd",
     visibility = ["//visibility:private"],
-    deps = ["//pkg/resources:go_default_library"],
+    deps = [
+        "//pkg/crd:go_default_library",
+        "//pkg/resources:go_default_library",
+    ],
 )
 
 go_binary(

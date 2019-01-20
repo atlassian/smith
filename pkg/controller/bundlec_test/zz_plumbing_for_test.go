@@ -18,8 +18,8 @@ import (
 	smithFake "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/fake"
 	"github.com/atlassian/smith/pkg/client/smart"
 	"github.com/atlassian/smith/pkg/controller/bundlec"
+	"github.com/atlassian/smith/pkg/crd"
 	"github.com/atlassian/smith/pkg/plugin"
-	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
@@ -162,7 +162,7 @@ func (tc *testCase) run(t *testing.T) {
 	}
 	scheme, err := app.FullScheme(tc.enableServiceCatalog)
 	require.NoError(t, err)
-	apiExtObjects := append(tc.apiExtClientObjects, resources.BundleCrd())
+	apiExtObjects := append(tc.apiExtClientObjects, crd.BundleCrd())
 	for _, object := range apiExtObjects {
 		// Pretend that the object has been defaulted by the server. We need this to set the version field
 		scheme.Default(object)

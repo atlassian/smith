@@ -47,6 +47,7 @@ go_test(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/smart:go_default_library",
         "//pkg/controller/bundlec:go_default_library",
+        "//pkg/crd:go_default_library",
         "//pkg/plugin:go_default_library",
         "//pkg/resources:go_default_library",
         "//pkg/specchecker/builtin:go_default_library",

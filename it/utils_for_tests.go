@@ -18,6 +18,7 @@ import (
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClientset "github.com/atlassian/smith/pkg/client/clientset_generated/clientset"
 	"github.com/atlassian/smith/pkg/client/smart"
+	"github.com/atlassian/smith/pkg/crd"
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
@@ -253,7 +254,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 
 	crdLister := apiext_v1b1list.NewCustomResourceDefinitionLister(crdInf.GetIndexer())
 	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, apiExtClient, crdLister, sleeper.Crd()))
-	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, apiExtClient, crdLister, resources.BundleCrd()))
+	require.NoError(t, resources.EnsureCrdExistsAndIsEstablished(ctxTest, logger, apiExtClient, crdLister, crd.BundleCrd()))
 
 	stage.StartWithContext(func(ctx context.Context) {
 		apl := &ctrlApp.App{
