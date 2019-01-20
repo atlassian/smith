@@ -117,7 +117,7 @@ func (c *FakeBundles) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 // Patch applies the patch and returns the patched bundle.
 func (c *FakeBundles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *smithv1.Bundle, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(bundlesResource, c.ns, name, data, subresources...), &smithv1.Bundle{})
+		Invokes(testing.NewPatchSubresourceAction(bundlesResource, c.ns, name, pt, data, subresources...), &smithv1.Bundle{})
 
 	if obj == nil {
 		return nil, err
