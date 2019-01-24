@@ -248,7 +248,7 @@ func (st *bundleSyncTask) findObjectsToDelete() error {
 		} else if res.Spec.Plugin != nil {
 			plugin, ok := st.pluginContainers[res.Spec.Plugin.Name]
 			if !ok {
-				continue
+				return errors.Errorf("plugin %q is not a valid plugin", res.Spec.Plugin.Name)
 			}
 			gvk = plugin.Plugin.Describe().GVK
 			name = res.Spec.Plugin.ObjectName
