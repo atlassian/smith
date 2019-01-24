@@ -246,6 +246,9 @@ func (st *bundleSyncTask) findObjectsToDelete() error {
 			gvk = res.Spec.Object.GetObjectKind().GroupVersionKind()
 			name = res.Spec.Object.(meta_v1.Object).GetName()
 		} else if res.Spec.Plugin != nil {
+			// Any prevalidation during resource processing is applicable here as the cleanup step
+			// always happens regardless of if processing failed or not. Thus it makes more sense
+			// to abort the cleanup in case of an invalid spec.
 			plugin, ok := st.pluginContainers[res.Spec.Plugin.Name]
 			if !ok {
 				return errors.Errorf("plugin %q is not a valid plugin", res.Spec.Plugin.Name)

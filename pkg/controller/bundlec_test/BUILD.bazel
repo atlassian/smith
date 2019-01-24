@@ -5,6 +5,7 @@ go_test(
     size = "small",
     srcs = [
         "actual_object_passed_to_plugin_test.go",
+        "cleanup_test.go",
         "cr_in_another_namespace_test.go",
         "delay_postpone_delete_removed_object_test.go",
         "delay_proceed_delete_removed_object_test.go",

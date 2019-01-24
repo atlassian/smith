@@ -395,7 +395,11 @@ nextPlugin:
 			})
 			continue nextPlugin
 		}
-		t.Errorf("plugin status for %s that has not been constructed", pluginStatus.Name)
+
+		if pluginStatus.Status != smith_v1.PluginStatusNoSuchPlugin {
+			// We should have found it?
+			t.Errorf("plugin status for %s that has not been constructed", pluginStatus.Name)
+		}
 	}
 }
 
