@@ -250,7 +250,7 @@ func (st *bundleSyncTask) findObjectsToDelete() error {
 			if !ok {
 				continue
 			}
-			gvk = gvk.Plugin.Describe().GVK
+			gvk = plugin.Plugin.Describe().GVK
 			name = res.Spec.Plugin.ObjectName
 		} else {
 			// neither "object" nor "plugin" field is specified. This shouldn't really happen (schema), but we
