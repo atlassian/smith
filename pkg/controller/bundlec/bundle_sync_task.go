@@ -246,7 +246,11 @@ func (st *bundleSyncTask) findObjectsToDelete() error {
 			gvk = res.Spec.Object.GetObjectKind().GroupVersionKind()
 			name = res.Spec.Object.(meta_v1.Object).GetName()
 		} else if res.Spec.Plugin != nil {
-			gvk = st.pluginContainers[res.Spec.Plugin.Name].Plugin.Describe().GVK
+			plugin, ok := st.pluginContainers[res.Spec.Plugin.Name]
+			if !ok {
+				continue
+			}
+			gvk = gvk.Plugin.Describe().GVK
 			name = res.Spec.Plugin.ObjectName
 		} else {
 			// neither "object" nor "plugin" field is specified. This shouldn't really happen (schema), but we
