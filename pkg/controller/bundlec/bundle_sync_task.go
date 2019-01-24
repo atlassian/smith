@@ -242,10 +242,14 @@ func (st *bundleSyncTask) findObjectsToDelete() error {
 	for _, res := range st.bundle.Spec.Resources {
 		var gvk schema.GroupVersionKind
 		var name string
-		if res.Spec.Object != nil {
+
+		switch {
+		case res.Spec.Object != nil:
+
 			gvk = res.Spec.Object.GetObjectKind().GroupVersionKind()
 			name = res.Spec.Object.(meta_v1.Object).GetName()
-		} else if res.Spec.Plugin != nil {
+
+		case res.Spec.Plugin != nil:
 			// Any prevalidation during resource processing is applicable here as the cleanup step
 			// always happens regardless of if processing failed or not. Thus it makes more sense
 			// to abort the cleanup in case of an invalid spec.
@@ -255,12 +259,12 @@ func (st *bundleSyncTask) findObjectsToDelete() error {
 			}
 			gvk = plugin.Plugin.Describe().GVK
 			name = res.Spec.Plugin.ObjectName
-		} else {
-			// neither "object" nor "plugin" field is specified. This shouldn't really happen (schema), but we
-			// ignore the error and continue collecting objects. Even if not caught by the schema, this error
-			// must have been reported earlier while processing this resource.
-			continue
+		default:
+			// neither "object" nor "plugin" field is specified. This shouldn't really happen (schema), so we
+			// should abort the deletion as a defensive mechanism for safety.
+			return errors.New("resource is neither object nor plugin")
 		}
+
 		delete(st.objectsToDelete, objectRef{
 			GroupVersionKind: gvk,
 			Name:             name,
