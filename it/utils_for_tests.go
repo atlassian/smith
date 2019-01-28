@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+	apps_v1 "k8s.io/api/apps/v1"
 	core_v1 "k8s.io/api/core/v1"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiext_v1b1inf "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1"
@@ -36,6 +37,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -44,6 +46,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 	toolswatch "k8s.io/client-go/tools/watch"
 )
+
+var (
+	appsV1Scheme = runtime.NewScheme()
+)
+
+func init() {
+	utilruntime.Must(apps_v1.SchemeBuilder.AddToScheme(appsV1Scheme))
+}
 
 type TestFunc func(context.Context, *testing.T, *Config, ...interface{})
 
@@ -158,6 +168,31 @@ func IsBundleObservedGenerationCond(namespace, name string) toolswatch.Condition
 		}
 		b := event.Object.(*smith_v1.Bundle)
 		return b.Status.ObservedGeneration >= b.Generation, nil
+	}
+}
+
+func IsPodSpecAnnotationCond(t *testing.T, namespace, name, annotation, value string) toolswatch.ConditionFunc {
+	return func(event watch.Event) (bool, error) {
+		metaObj := event.Object.(meta_v1.Object)
+		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
+			return false, nil
+		}
+		deployment := &apps_v1.Deployment{}
+		err := util.ConvertType(appsV1Scheme, event.Object, deployment)
+		if err != nil {
+			return false, err
+		}
+		annotations := deployment.Spec.Template.Annotations
+		actual, ok := annotations[annotation]
+		if !ok {
+			t.Logf("Pod Spec annotation %s is not set", annotation)
+			return false, nil
+		}
+		if actual != value {
+			t.Logf("Ignoring Pod Spec annotation %s value %s. Expecting %s", annotation, actual, value)
+			return false, nil
+		}
+		return true, nil
 	}
 }
 
