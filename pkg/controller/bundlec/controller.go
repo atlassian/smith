@@ -8,6 +8,7 @@ import (
 	"github.com/ash2k/stager/wait"
 	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/handlers"
+	"github.com/atlassian/ctrl/logz"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	smithClient_v1 "github.com/atlassian/smith/pkg/client/clientset_generated/clientset/typed/smith/v1"
 	"github.com/atlassian/smith/pkg/plugin"
@@ -99,7 +100,7 @@ func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[
 		Logger:    c.Logger,
 		WorkQueue: c.WorkQueue,
 		Gvk:       configMapGVK,
-		Lookup:    c.lookupBundleByDeploymentByIndex(deploymentByIndex, byConfigMapNamespaceNameIndexName, byConfigMapNamespaceNameIndexKey),
+		Lookup:    c.lookupBundleByObjectByIndex(deploymentByIndex, byConfigMapNamespaceNameIndexName, byConfigMapNamespaceNameIndexKey),
 	})
 	// Secret -> Deployment -> Bundle event propagation
 	secretGVK := core_v1.SchemeGroupVersion.WithKind("Secret")
@@ -108,7 +109,7 @@ func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[
 		Logger:    c.Logger,
 		WorkQueue: c.WorkQueue,
 		Gvk:       secretGVK,
-		Lookup:    c.lookupBundleByDeploymentByIndex(deploymentByIndex, bySecretNamespaceNameIndexName, bySecretNamespaceNameIndexKey),
+		Lookup:    c.lookupBundleByObjectByIndex(deploymentByIndex, bySecretNamespaceNameIndexName, bySecretNamespaceNameIndexKey),
 	})
 	// Standard handler
 	for gvk, resourceInf := range resourceInfs {
@@ -148,31 +149,48 @@ func (c *Controller) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-// lookupBundleByDeploymentByIndex returns a function that can be used to perform lookups of Bundles that contain
-// Deployment objects that reference ConfigMap/Secret objects.
-func (c *Controller) lookupBundleByDeploymentByIndex(byIndex byIndexFunc, indexName string, indexKey indexKeyFunc) func(runtime.Object) ([]runtime.Object, error) {
-	deploymentGK := schema.GroupKind{
-		Group: apps_v1.GroupName,
-		Kind:  "Deployment",
-	}
+// lookupBundleByObjectByIndex returns a function that can be used to perform lookups of Bundles that contain
+// objects returned from an index.
+func (c *Controller) lookupBundleByObjectByIndex(byIndex byIndexFunc, indexName string, indexKey indexKeyFunc) func(runtime.Object) ([]runtime.Object, error) {
 	return func(obj runtime.Object) ([]runtime.Object /*bundles*/, error) {
-		// obj is ConfigMap or Secret
+		// obj is an object that is referred by some other object that might be in a Bundle
 		objMeta := obj.(meta_v1.Object)
-		// find all Deployments that reference this obj
-		deploymentsFromIndex, err := byIndex(indexName, indexKey(objMeta.GetNamespace(), objMeta.GetName()))
+		// find all object that reference this obj
+		objsFromIndex, err := byIndex(indexName, indexKey(objMeta.GetNamespace(), objMeta.GetName()))
 		if err != nil {
 			return nil, err
 		}
 		var bundles []runtime.Object
-		for _, deploymentInterface := range deploymentsFromIndex {
-			deployment := deploymentInterface.(*apps_v1.Deployment)
-			// find all Bundles that reference this Deployment
-			bundlesForDeployment, err := c.BundleStore.GetBundlesByObject(deploymentGK, deployment.Namespace, deployment.Name)
+		for _, objFromIndex := range objsFromIndex {
+			runtimeObjFromIndex := objFromIndex.(runtime.Object)
+			metaObjFromIndex := objFromIndex.(meta_v1.Object)
+			gvks, _, err := c.Scheme.ObjectKinds(runtimeObjFromIndex)
 			if err != nil {
-				return nil, err
+				// Log and continue to try to process other objects if there are any more in objsFromIndex
+				// This shouldn't happen normally
+				c.Logger.
+					With(zap.Error(err), logz.Namespace(metaObjFromIndex), logz.Object(metaObjFromIndex)).
+					Sugar().Errorf("Could not determine GVK of an object")
+				continue
 			}
-			for _, bundle := range bundlesForDeployment {
-				bundles = append(bundles, bundle)
+			gks := make(map[schema.GroupKind]struct{}, len(gvks)) // not clear if duplicates are allowed, so de-dupe
+			for _, gvk := range gvks {
+				gks[gvk.GroupKind()] = struct{}{}
+			}
+
+			// find all Bundles that contain this object
+			for gk := range gks {
+				bundlesForObject, err := c.BundleStore.GetBundlesByObject(gk, metaObjFromIndex.GetNamespace(), metaObjFromIndex.GetName())
+				if err != nil {
+					// Log and continue to try to process other GKs
+					c.Logger.
+						With(zap.Error(err), logz.Namespace(metaObjFromIndex), logz.Object(metaObjFromIndex)).
+						Sugar().Errorf("Failed to get Bundles by object")
+					continue
+				}
+				for _, bundle := range bundlesForObject {
+					bundles = append(bundles, bundle)
+				}
 			}
 		}
 		return bundles, nil
