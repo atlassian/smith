@@ -1,14 +1,7 @@
 # Smith
 
-[![Godoc](https://godoc.org/github.com/atlassian/smith?status.svg)](https://godoc.org/github.com/atlassian/smith)
 [![Build Status](https://travis-ci.org/atlassian/smith.svg?branch=master)](https://travis-ci.org/atlassian/smith)
-[![Coverage Status](https://coveralls.io/repos/github/atlassian/smith/badge.svg?branch=master)](https://coveralls.io/github/atlassian/smith?branch=master)
-[![GitHub tag](https://img.shields.io/github/tag/atlassian/smith.svg?maxAge=86400)](https://github.com/atlassian/smith)
-[![Docker Pulls](https://img.shields.io/docker/pulls/atlassianlabs/smith.svg)](https://hub.docker.com/r/atlassianlabs/smith/)
-[![Docker Stars](https://img.shields.io/docker/stars/atlassianlabs/smith.svg)](https://hub.docker.com/r/atlassianlabs/smith/)
-[![MicroBadger Layers Size](https://images.microbadger.com/badges/image/atlassianlabs/smith.svg)](https://microbadger.com/images/atlassianlabs/smith)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atlassian/smith)](https://goreportcard.com/report/github.com/atlassian/smith)
-[![license](https://img.shields.io/github/license/atlassian/smith.svg)](LICENSE)
 
 **Smith** is a Kubernetes workflow engine / resource manager.
 
