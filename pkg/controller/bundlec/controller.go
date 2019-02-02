@@ -14,6 +14,7 @@ import (
 	"github.com/atlassian/smith/pkg/plugin"
 	"github.com/atlassian/smith/pkg/statuschecker"
 	"github.com/atlassian/smith/pkg/store"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -86,8 +87,8 @@ func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[
 	})
 	deploymentInf := resourceInfs[apps_v1.SchemeGroupVersion.WithKind("Deployment")]
 	err := deploymentInf.AddIndexers(cache.Indexers{
-		byConfigMapNamespaceNameIndexName: byConfigMapNamespaceNameIndex,
-		bySecretNamespaceNameIndexName:    bySecretNamespaceNameIndex,
+		byConfigMapNamespaceNameIndexName: deploymentByConfigMapNamespaceNameIndex,
+		bySecretNamespaceNameIndexName:    deploymentBySecretNamespaceNameIndex,
 	})
 	if err != nil {
 		return errors.WithStack(err)
@@ -100,7 +101,7 @@ func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[
 		Logger:    c.Logger,
 		WorkQueue: c.WorkQueue,
 		Gvk:       configMapGVK,
-		Lookup:    c.lookupBundleByObjectByIndex(deploymentByIndex, byConfigMapNamespaceNameIndexName, byConfigMapNamespaceNameIndexKey),
+		Lookup:    c.lookupBundleByObjectByIndex(deploymentByIndex, byConfigMapNamespaceNameIndexName, byNamespaceNameIndexKey),
 	})
 	// Secret -> Deployment -> Bundle event propagation
 	secretGVK := core_v1.SchemeGroupVersion.WithKind("Secret")
@@ -109,8 +110,40 @@ func (c *Controller) Prepare(crdInf cache.SharedIndexInformer, resourceInfs map[
 		Logger:    c.Logger,
 		WorkQueue: c.WorkQueue,
 		Gvk:       secretGVK,
-		Lookup:    c.lookupBundleByObjectByIndex(deploymentByIndex, bySecretNamespaceNameIndexName, bySecretNamespaceNameIndexKey),
+		Lookup:    c.lookupBundleByObjectByIndex(deploymentByIndex, bySecretNamespaceNameIndexName, byNamespaceNameIndexKey),
 	})
+	serviceInstanceInf, ok := resourceInfs[sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance")]
+	if ok { // Service Catalog support is enabled
+		// Secret -> ServiceInstance -> Bundle event propagation
+		err := serviceInstanceInf.AddIndexers(cache.Indexers{
+			bySecretNamespaceNameIndexName: serviceInstanceBySecretNamespaceNameIndex,
+		})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		serviceInstanceByIndex := serviceInstanceInf.GetIndexer().ByIndex
+		secretInf.AddEventHandler(&handlers.LookupHandler{
+			Logger:    c.Logger,
+			WorkQueue: c.WorkQueue,
+			Gvk:       secretGVK,
+			Lookup:    c.lookupBundleByObjectByIndex(serviceInstanceByIndex, bySecretNamespaceNameIndexName, byNamespaceNameIndexKey),
+		})
+		// Secret -> ServiceBinding -> Bundle event propagation
+		serviceBindingInf := resourceInfs[sc_v1b1.SchemeGroupVersion.WithKind("ServiceBinding")]
+		err = serviceBindingInf.AddIndexers(cache.Indexers{
+			bySecretNamespaceNameIndexName: serviceBindingBySecretNamespaceNameIndex,
+		})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		serviceBindingByIndex := serviceBindingInf.GetIndexer().ByIndex
+		secretInf.AddEventHandler(&handlers.LookupHandler{
+			Logger:    c.Logger,
+			WorkQueue: c.WorkQueue,
+			Gvk:       secretGVK,
+			Lookup:    c.lookupBundleByObjectByIndex(serviceBindingByIndex, bySecretNamespaceNameIndexName, byNamespaceNameIndexKey),
+		})
+	}
 	// Standard handler
 	for gvk, resourceInf := range resourceInfs {
 		resourceInf.AddEventHandler(&handlers.ControlledResourceHandler{
@@ -213,11 +246,33 @@ func (c *controllerIndexAdapter) ControllerByObject(gk schema.GroupKind, namespa
 	return objs, nil
 }
 
-func byConfigMapNamespaceNameIndex(obj interface{}) ([]string, error) {
+func serviceInstanceBySecretNamespaceNameIndex(obj interface{}) ([]string, error) {
+	instance := obj.(*sc_v1b1.ServiceInstance)
+	return indexKeysFromParametersFrom(instance.Namespace, instance.Spec.ParametersFrom), nil
+}
+
+func serviceBindingBySecretNamespaceNameIndex(obj interface{}) ([]string, error) {
+	binding := obj.(*sc_v1b1.ServiceBinding)
+	return indexKeysFromParametersFrom(binding.Namespace, binding.Spec.ParametersFrom), nil
+}
+
+func indexKeysFromParametersFrom(namespace string, parametersFrom []sc_v1b1.ParametersFromSource) []string {
+	var indexKeys []string
+	for _, from := range parametersFrom {
+		fromValue := from.SecretKeyRef
+		if fromValue == nil {
+			continue
+		}
+		indexKeys = append(indexKeys, byNamespaceNameIndexKey(namespace, fromValue.Name))
+	}
+	return indexKeys
+}
+
+func deploymentByConfigMapNamespaceNameIndex(obj interface{}) ([]string, error) {
 	d := obj.(*apps_v1.Deployment)
-	index := configMapNamespaceNameIndexKeysForContainers(d.Namespace, d.Spec.Template.Spec.Containers)
-	index = append(index, configMapNamespaceNameIndexKeysForContainers(d.Namespace, d.Spec.Template.Spec.InitContainers)...)
-	return index, nil
+	indexKeys := configMapNamespaceNameIndexKeysForContainers(d.Namespace, d.Spec.Template.Spec.Containers)
+	indexKeys = append(indexKeys, configMapNamespaceNameIndexKeysForContainers(d.Namespace, d.Spec.Template.Spec.InitContainers)...)
+	return indexKeys, nil
 }
 
 func configMapNamespaceNameIndexKeysForContainers(namespace string, containers []core_v1.Container) []string {
@@ -228,7 +283,7 @@ func configMapNamespaceNameIndexKeysForContainers(namespace string, containers [
 			if configMapRef == nil {
 				continue
 			}
-			indexKeys = append(indexKeys, byConfigMapNamespaceNameIndexKey(namespace, configMapRef.Name))
+			indexKeys = append(indexKeys, byNamespaceNameIndexKey(namespace, configMapRef.Name))
 		}
 		for _, env := range container.Env {
 			valueFrom := env.ValueFrom
@@ -240,21 +295,17 @@ func configMapNamespaceNameIndexKeysForContainers(namespace string, containers [
 			if configMapKeyRef == nil {
 				continue
 			}
-			indexKeys = append(indexKeys, byConfigMapNamespaceNameIndexKey(namespace, configMapKeyRef.Name))
+			indexKeys = append(indexKeys, byNamespaceNameIndexKey(namespace, configMapKeyRef.Name))
 		}
 	}
 	return indexKeys
 }
 
-func byConfigMapNamespaceNameIndexKey(configMapNamespace, configMapName string) string {
-	return configMapNamespace + "/" + configMapName
-}
-
-func bySecretNamespaceNameIndex(obj interface{}) ([]string, error) {
+func deploymentBySecretNamespaceNameIndex(obj interface{}) ([]string, error) {
 	d := obj.(*apps_v1.Deployment)
-	index := secretNamespaceNameIndexKeysForContainers(d.Namespace, d.Spec.Template.Spec.Containers)
-	index = append(index, secretNamespaceNameIndexKeysForContainers(d.Namespace, d.Spec.Template.Spec.InitContainers)...)
-	return index, nil
+	indexKeys := secretNamespaceNameIndexKeysForContainers(d.Namespace, d.Spec.Template.Spec.Containers)
+	indexKeys = append(indexKeys, secretNamespaceNameIndexKeysForContainers(d.Namespace, d.Spec.Template.Spec.InitContainers)...)
+	return indexKeys, nil
 }
 
 func secretNamespaceNameIndexKeysForContainers(namespace string, containers []core_v1.Container) []string {
@@ -265,7 +316,7 @@ func secretNamespaceNameIndexKeysForContainers(namespace string, containers []co
 			if secretRef == nil {
 				continue
 			}
-			indexKeys = append(indexKeys, bySecretNamespaceNameIndexKey(namespace, secretRef.Name))
+			indexKeys = append(indexKeys, byNamespaceNameIndexKey(namespace, secretRef.Name))
 		}
 		for _, env := range container.Env {
 			valueFrom := env.ValueFrom
@@ -277,12 +328,12 @@ func secretNamespaceNameIndexKeysForContainers(namespace string, containers []co
 			if secretKeyRef == nil {
 				continue
 			}
-			indexKeys = append(indexKeys, bySecretNamespaceNameIndexKey(namespace, secretKeyRef.Name))
+			indexKeys = append(indexKeys, byNamespaceNameIndexKey(namespace, secretKeyRef.Name))
 		}
 	}
 	return indexKeys
 }
 
-func bySecretNamespaceNameIndexKey(secretNamespace, secretName string) string {
-	return secretNamespace + "/" + secretName
+func byNamespaceNameIndexKey(namespace, name string) string {
+	return namespace + "/" + name
 }

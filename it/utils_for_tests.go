@@ -22,6 +22,7 @@ import (
 	"github.com/atlassian/smith/pkg/resources"
 	"github.com/atlassian/smith/pkg/util"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
+	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -49,10 +50,12 @@ import (
 
 var (
 	appsV1Scheme = runtime.NewScheme()
+	scV1B1Scheme = runtime.NewScheme()
 )
 
 func init() {
 	utilruntime.Must(apps_v1.SchemeBuilder.AddToScheme(appsV1Scheme))
+	utilruntime.Must(sc_v1b1.SchemeBuilder.AddToScheme(scV1B1Scheme))
 }
 
 type TestFunc func(context.Context, *testing.T, *Config, ...interface{})
@@ -193,6 +196,23 @@ func IsPodSpecAnnotationCond(t *testing.T, namespace, name, annotation, value st
 			return false, nil
 		}
 		return true, nil
+	}
+}
+
+// IsServiceInstanceUpdateRequestsCond allows to wait until spec.updateRequests of a ServiceInstance is greater than
+// the provided value.
+func IsServiceInstanceUpdateRequestsCond(t *testing.T, namespace, name string, value int64) toolswatch.ConditionFunc {
+	return func(event watch.Event) (bool, error) {
+		metaObj := event.Object.(meta_v1.Object)
+		if metaObj.GetNamespace() != namespace || metaObj.GetName() != name {
+			return false, nil
+		}
+		si := &sc_v1b1.ServiceInstance{}
+		err := util.ConvertType(scV1B1Scheme, event.Object, si)
+		if err != nil {
+			return false, err
+		}
+		return si.Spec.UpdateRequests > value, nil
 	}
 }
 
