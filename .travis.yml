@@ -7,41 +7,46 @@ cache:
     - $GOPATH/pkg/dep
 
 go:
-  - 1.11.4
+  - 1.11.5
 
 os:
   - linux
 env:
   global:
-    - CHANGE_MINIKUBE_NONE_USER=true
     - DEP_VERSION=v0.5.0
-    - BAZEL_VERSION=0.21.0
+    - BAZEL_VERSION=0.22.0
     - KUBECTL_VERSION=v1.13.2
     - KUBE_VERSION=v1.13.2
+    - HELM_VERSION=v2.12.3
     # DOCKER_USERNAME and DOCKER_PASSWORD
     - secure: "CThhdBCfpxP8l3hxrsyZTRQ4KF1fFIonK0L7JYSYoUxM0jWhXBi/r+BgMrGPvNZcVY0FKk2my4dzg4wKTVB8Ghosq7FfcQsuUunBMB7R+oWJ3crtRx8GU2auuhQWrKMoWcotrMfUJ0rzfrNE5H4TM5dcIOrW1A/SOSuOihGK8TCIUfdID2oPJlNu/tfA78TRFvAeWDvLZa7adRscJV+eqil18lFhTD37hf4H/Dag1UEiF69+H1QebQ865RUxL8TRf8KpTxAgVVR2ftlDRPZwIkz4bw6EbAOnVe8YHbpAagfnSBA39nWspDk+yPfVpW3bCuspMsGkbGS7KrCDr2y3noVkgssNWQwl5+4OJO2anp5meBHdktB1PZMPTlxZyOFL+ApfvtSzj9eqXAifFcnKIMRNH6YNLMH2/TMmTNiWo9TVben7oP/Ue3yHFjzRTraDelo/ALDJpyNr7cCVcL6IICq1d4JhoqQnMbXJuYyHd+I5beOBxXXOTOCzBIQkwcq4dnkjSiPoJht3KrKSxm7lANyQWo7+8393d0AUBZ4eOTXv2F8VYUwu65UyBkC/oF8jAo7ab3+gl1j8x/wUYhFuw1/M2XISTtkGhdkiakuOcuG724X2S95eM8jhXCUOkJEHSJ8ufIFut+Y3Y14owXRgQ3FvO1A4JjEmBFteF0zsPK0="
     - secure: "Hv6Sj29d9gI63bORCGHVeX5KqEryAAXf9INQL1ABs33a46wVzGCHM/9H/mE3FItHN7RZaeOEeUoDSePOt/8NBtZSAZ1PvbqhMgztvSWtweS9ezzClUHxN3BRZPSyNmZdrK0S9fo+NXgcgqcmOM9gQzrAduHIkWOOwdSGWgT6zNlAZovddwJ8RUtKavZ7U4szJyMtzlQ8S2K8PdTX9glH1U+8ZLHr54uDrhl3WqsCoBEV0GV59eOIaIseDorCEscVj1EDYCPdkYdU6/AWiuUlqXeOvC67CLcu/5W8m05YWXrEhKG+17jEWRPM+G+Kiyj6HccvjTTaXqTsx9ZLuWmSt86mgo15DmJlVtzpvkptgHhheDyp5MkifValXN3gvWzk3VqjHIUh81dP2o8iAWrGfJcYg+8hdv/obfNGvfcSKwgdefIp4B6f/VRvIySvHUqKavj2fEAGDMYHqahHyKGF/VegHuQbCT+F+mI+GdAwun7XzuDVAlftnbrl2kPq7Kjs+ahU4ZIU4pk6eY15rh/WPlR2v0M7O4nfv1IoyHh9F/G6foqwqDoT+RBF1VMr9WDEezz5B35si6ILI/+SG/7BnbHkFRGorOw86ZqMoIs7dkdpz8uHiz+ba83COuASbrHUMfTG3HQ65XY7puqccSPBQzg7yoVmqPUJJNkaroVMWmU="
 
-# Some of the instructions to install and run minikube are from https://blog.travis-ci.com/2017-10-26-running-kubernetes-on-travis-ci-with-minikube
 before_install:
+  # download things concurrently
   - |
-    curl -Lo dep "https://github.com/golang/dep/releases/download/${DEP_VERSION}/dep-linux-amd64"
+    $(
+      curl -Lo dep "https://github.com/golang/dep/releases/download/${DEP_VERSION}/dep-linux-amd64" &
+      curl -Lo install_bazel.sh "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh" &
+      curl -Lo helm.tar.gz "https://storage.googleapis.com/kubernetes-helm/helm-${HELM_VERSION}-linux-amd64.tar.gz" &
+      curl -Lo kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" &
+      wait
+    )
+  - |
     chmod +x dep
     sudo mv dep /usr/local/bin/
   - |
-    curl -Lo install.sh "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh"
-    chmod +x install.sh
-    ./install.sh --user
-    rm -f install.sh
+    chmod +x install_bazel.sh
+    ./install_bazel.sh --user
+    rm -f install_bazel.sh
     mv .bazelrc.travis .bazelrc
   - |
-    curl -Lo kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    tar -zxvf helm.tar.gz
+    sudo mv linux-amd64/helm /usr/local/bin/
+    rm -rf linux-amd64
+  - |
     chmod +x kubectl
     sudo mv kubectl /usr/local/bin/
-  - |
-    go get sigs.k8s.io/kind
-    docker pull kindest/node:${KUBE_VERSION}
-    kind create cluster --image="kindest/node:${KUBE_VERSION}"
 install:
   - make setup-ci
 
@@ -49,12 +54,29 @@ script:
   - make update-bazel
   - make verify
   - make test-ci
+  - go get sigs.k8s.io/kind
   - |
+    kind create cluster --image="kindest/node:${KUBE_VERSION}"
     export KUBECONFIG="$(kind get kubeconfig-path)"
     export KUBECONTEXT="kubernetes-admin@1"
-    make integration-test-ci
+  - |
+    kubectl create clusterrolebinding tiller-cluster-admin \
+      --clusterrole=cluster-admin \
+      --serviceaccount=kube-system:default
+    helm init
+  # run integration tests while tiller is starting
+  - make integration-test-ci
+  - |
+    helm repo add svc-cat https://svc-catalog-charts.storage.googleapis.com
+    helm install svc-cat/catalog --name catalog --namespace catalog
+    helm install svc-cat/ups-broker --name ups-broker --namespace ups-broker
+  # build container and run checks while service catalog and UPS are starting
   - make docker
   - make check
+  - |
+    kubectl create -f it/sc/ups-clusterservicebroker.yaml
+    sleep 5
+    make integration-test-sc-ci
 
 after_success:
   - if [ "$TRAVIS_OS_NAME" == "linux" -a ! -z "$TRAVIS_TAG" ]; then
