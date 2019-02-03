@@ -77,10 +77,10 @@ func HashConfigMap(configMap *core_v1.ConfigMap, h hash.Hash, filter sets.String
 
 		// The key is either in Data or BinaryData
 		data, inData := configMap.Data[k]
-		binaryData := configMap.BinaryData[k]
 		if inData {
 			io.WriteString(h, data) // nolint: gosec, errcheck
 		} else {
+			binaryData := configMap.BinaryData[k]
 			h.Write(binaryData) // nolint: gosec, errcheck
 		}
 

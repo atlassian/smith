@@ -1,14 +1,7 @@
 # Smith
 
-[![Godoc](https://godoc.org/github.com/atlassian/smith?status.svg)](https://godoc.org/github.com/atlassian/smith)
 [![Build Status](https://travis-ci.org/atlassian/smith.svg?branch=master)](https://travis-ci.org/atlassian/smith)
-[![Coverage Status](https://coveralls.io/repos/github/atlassian/smith/badge.svg?branch=master)](https://coveralls.io/github/atlassian/smith?branch=master)
-[![GitHub tag](https://img.shields.io/github/tag/atlassian/smith.svg?maxAge=86400)](https://github.com/atlassian/smith)
-[![Docker Pulls](https://img.shields.io/docker/pulls/atlassianlabs/smith.svg)](https://hub.docker.com/r/atlassianlabs/smith/)
-[![Docker Stars](https://img.shields.io/docker/stars/atlassianlabs/smith.svg)](https://hub.docker.com/r/atlassianlabs/smith/)
-[![MicroBadger Layers Size](https://images.microbadger.com/badges/image/atlassianlabs/smith.svg)](https://microbadger.com/images/atlassianlabs/smith)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atlassian/smith)](https://goreportcard.com/report/github.com/atlassian/smith)
-[![license](https://img.shields.io/github/license/atlassian/smith.svg)](LICENSE)
 
 **Smith** is a Kubernetes workflow engine / resource manager.
 
@@ -233,11 +226,6 @@ those contributing as an individual.
 * [CLA for corporate contributors](https://na2.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=e1c17c66-ca4d-4aab-a953-2c231af4a20b)
 * [CLA for individuals](https://na2.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=3f94fbdc-2fbe-46ac-b14c-5d152700ae5d)
 
-## Stargazers over time
-
-[![Stargazers over time](https://starcharts.herokuapp.com/atlassian/smith.svg)](https://starcharts.herokuapp.com/atlassian/smith)
-
 ## License
 
-Copyright (c) 2016-2018 Atlassian and others. Apache 2.0 licensed, see LICENSE file.
-
+Copyright (c) 2016-2019 Atlassian and others. Apache 2.0 licensed, see LICENSE file.
