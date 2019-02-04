@@ -23,6 +23,15 @@ fmt-bazel:
 update-bazel:
 	bazel run //:gazelle
 
+.PHONY: update-ctrl
+update-ctrl:
+	dep ensure -v -update github.com/atlassian/ctrl
+
+.PHONY: bump-dependencies
+bump-dependencies: \
+	update-ctrl \
+	update-bazel
+
 .PHONY: fmt
 fmt:
 	bazel run //:goimports
