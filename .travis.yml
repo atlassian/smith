@@ -15,9 +15,10 @@ env:
   global:
     - DEP_VERSION=v0.5.0
     - BAZEL_VERSION=0.22.0
-    - KUBECTL_VERSION=v1.13.2
-    - KUBE_VERSION=v1.13.2
+    - KUBECTL_VERSION=v1.13.3
+    - KUBE_VERSION=v1.13.3
     - HELM_VERSION=v2.12.3
+    - KIND_CLUSTER_NAME=ci
     # DOCKER_USERNAME and DOCKER_PASSWORD
     - secure: "CThhdBCfpxP8l3hxrsyZTRQ4KF1fFIonK0L7JYSYoUxM0jWhXBi/r+BgMrGPvNZcVY0FKk2my4dzg4wKTVB8Ghosq7FfcQsuUunBMB7R+oWJ3crtRx8GU2auuhQWrKMoWcotrMfUJ0rzfrNE5H4TM5dcIOrW1A/SOSuOihGK8TCIUfdID2oPJlNu/tfA78TRFvAeWDvLZa7adRscJV+eqil18lFhTD37hf4H/Dag1UEiF69+H1QebQ865RUxL8TRf8KpTxAgVVR2ftlDRPZwIkz4bw6EbAOnVe8YHbpAagfnSBA39nWspDk+yPfVpW3bCuspMsGkbGS7KrCDr2y3noVkgssNWQwl5+4OJO2anp5meBHdktB1PZMPTlxZyOFL+ApfvtSzj9eqXAifFcnKIMRNH6YNLMH2/TMmTNiWo9TVben7oP/Ue3yHFjzRTraDelo/ALDJpyNr7cCVcL6IICq1d4JhoqQnMbXJuYyHd+I5beOBxXXOTOCzBIQkwcq4dnkjSiPoJht3KrKSxm7lANyQWo7+8393d0AUBZ4eOTXv2F8VYUwu65UyBkC/oF8jAo7ab3+gl1j8x/wUYhFuw1/M2XISTtkGhdkiakuOcuG724X2S95eM8jhXCUOkJEHSJ8ufIFut+Y3Y14owXRgQ3FvO1A4JjEmBFteF0zsPK0="
     - secure: "Hv6Sj29d9gI63bORCGHVeX5KqEryAAXf9INQL1ABs33a46wVzGCHM/9H/mE3FItHN7RZaeOEeUoDSePOt/8NBtZSAZ1PvbqhMgztvSWtweS9ezzClUHxN3BRZPSyNmZdrK0S9fo+NXgcgqcmOM9gQzrAduHIkWOOwdSGWgT6zNlAZovddwJ8RUtKavZ7U4szJyMtzlQ8S2K8PdTX9glH1U+8ZLHr54uDrhl3WqsCoBEV0GV59eOIaIseDorCEscVj1EDYCPdkYdU6/AWiuUlqXeOvC67CLcu/5W8m05YWXrEhKG+17jEWRPM+G+Kiyj6HccvjTTaXqTsx9ZLuWmSt86mgo15DmJlVtzpvkptgHhheDyp5MkifValXN3gvWzk3VqjHIUh81dP2o8iAWrGfJcYg+8hdv/obfNGvfcSKwgdefIp4B6f/VRvIySvHUqKavj2fEAGDMYHqahHyKGF/VegHuQbCT+F+mI+GdAwun7XzuDVAlftnbrl2kPq7Kjs+ahU4ZIU4pk6eY15rh/WPlR2v0M7O4nfv1IoyHh9F/G6foqwqDoT+RBF1VMr9WDEezz5B35si6ILI/+SG/7BnbHkFRGorOw86ZqMoIs7dkdpz8uHiz+ba83COuASbrHUMfTG3HQ65XY7puqccSPBQzg7yoVmqPUJJNkaroVMWmU="
@@ -56,9 +57,9 @@ script:
   - make test-ci
   - go get sigs.k8s.io/kind
   - |
-    kind create cluster --image="kindest/node:${KUBE_VERSION}"
-    export KUBECONFIG="$(kind get kubeconfig-path)"
-    export KUBECONTEXT="kubernetes-admin@1"
+    kind create cluster --image="kindest/node:${KUBE_VERSION}" --name="$KIND_CLUSTER_NAME"
+    export KUBECONFIG="$(kind get kubeconfig-path --name="$KIND_CLUSTER_NAME")"
+    export KUBECONTEXT="kubernetes-admin@$KIND_CLUSTER_NAME"
   - |
     kubectl create clusterrolebinding tiller-cluster-admin \
       --clusterrole=cluster-admin \
