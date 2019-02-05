@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	toolswatch "k8s.io/client-go/tools/watch"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -255,6 +256,12 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 		cli := smithClient.SmithV1().Bundles(cfg.Namespace)
 		b, err := cli.Get(bundle.Name, meta_v1.GetOptions{})
 		if err == nil {
+			if t.Failed() {
+				bundleYaml, err := yaml.Marshal(b)
+				if assert.NoError(t, err) {
+					t.Logf("%s", bundleYaml)
+				}
+			}
 			if len(b.Finalizers) > 0 {
 				t.Logf("Removing finalizers from Bundle %q", bundle.Name)
 				b.Finalizers = nil
