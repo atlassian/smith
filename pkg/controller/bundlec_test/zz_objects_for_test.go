@@ -130,7 +130,7 @@ func serviceBinding(ready, inProgress, error bool) *sc_v1b1.ServiceBinding {
 			},
 		},
 		Spec: sc_v1b1.ServiceBindingSpec{
-			ServiceInstanceRef: sc_v1b1.LocalObjectReference{
+			InstanceRef: sc_v1b1.LocalObjectReference{
 				Name: si1,
 			},
 			SecretName: s1,

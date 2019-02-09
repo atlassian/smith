@@ -51,15 +51,15 @@
   revision = "36442dbdb585210f8d5a1b45e67aa323c197d5c4"
 
 [[projects]]
-  digest = "1:27b09ccbce3d346cf66df932366127594f0f78dce13557c2d75b86cb84a6a020"
+  digest = "1:2044e66f3681209b8958a8fcb5df4aa56a847479f942b1d18a0b811455180756"
   name = "github.com/go-chi/chi"
   packages = [
     ".",
     "middleware",
   ]
   pruneopts = "NT"
-  revision = "e95203758b2a6ec24a8e97124d5719ffe5ec1374"
-  version = "v4.0.0"
+  revision = "1a6bb108ccf279c8dac6f9bad857d773b4f9b421"
+  version = "v4.0.1"
 
 [[projects]]
   digest = "1:b30982388481180ce6d5fdd719e97896c4a1282f00df20a2fdcc5ce4634aa6eb"
@@ -152,7 +152,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:c643da1fbe46f9bf715bbc04643e1101f1aa3964478b385c9c90f914c5cefcad"
+  digest = "1:8df49afed4e61e0cd373405a88ad0de39621e77594b78fb56fe8a0d67cb4b01a"
   name = "github.com/kubernetes-incubator/service-catalog"
   packages = [
     "pkg/apis/servicecatalog",
@@ -172,7 +172,7 @@
     "pkg/filter",
   ]
   pruneopts = "NT"
-  revision = "9ef0eed8e55b96b7dd681cd270040e2eec0bd96e"
+  revision = "67c179df642ea76c70c7fb9ffe6c9f6e2f98b013"
 
 [[projects]]
   digest = "1:ea1db000388d88b31db7531c83016bef0d6db0d908a07794bfc36aca16fbf935"
@@ -508,7 +508,7 @@
 
 [[projects]]
   branch = "release-1.13"
-  digest = "1:344360823b1ea10db8cdd35fb5b7bf4a61bd9123c950d28596ead2621d703c17"
+  digest = "1:ab2d890f5dc2152c90c26d34362bf37f5f44a7c47b4d7fc4d2032d786a6462de"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/equality",
@@ -543,6 +543,7 @@
     "pkg/util/mergepatch",
     "pkg/util/naming",
     "pkg/util/net",
+    "pkg/util/rand",
     "pkg/util/runtime",
     "pkg/util/sets",
     "pkg/util/strategicpatch",
@@ -556,7 +557,7 @@
     "third_party/forked/golang/reflect",
   ]
   pruneopts = "NT"
-  revision = "572dfc7bdfcb4531361a17d27b92851f59acf0dc"
+  revision = "e355a776c090890b639e31f4c5c409705d5948dd"
 
 [[projects]]
   branch = "release-10.0"
