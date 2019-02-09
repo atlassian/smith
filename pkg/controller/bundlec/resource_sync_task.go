@@ -762,12 +762,12 @@ func (st *resourceSyncTask) prepareServiceBindingDependency(dependency *plugin.D
 	}
 	dependency.Outputs = append(dependency.Outputs, secret)
 
-	serviceInstance, exists, err := st.store.Get(sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), obj.Namespace, obj.Spec.ServiceInstanceRef.Name)
+	serviceInstance, exists, err := st.store.Get(sc_v1b1.SchemeGroupVersion.WithKind("ServiceInstance"), obj.Namespace, obj.Spec.InstanceRef.Name)
 	if err != nil {
-		return errors.Wrapf(err, "error finding ServiceInstance %q", obj.Spec.ServiceInstanceRef.Name)
+		return errors.Wrapf(err, "error finding ServiceInstance %q", obj.Spec.InstanceRef.Name)
 	}
 	if !exists {
-		return errors.Errorf("cannot find ServiceInstance %q", obj.Spec.ServiceInstanceRef.Name)
+		return errors.Errorf("cannot find ServiceInstance %q", obj.Spec.InstanceRef.Name)
 	}
 	dependency.Auxiliary = append(dependency.Auxiliary, serviceInstance)
 	return nil

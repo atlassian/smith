@@ -67,7 +67,7 @@ func TestNoActionsForBlockedResources(t *testing.T) {
 									Name: sb1,
 								},
 								Spec: sc_v1b1.ServiceBindingSpec{
-									ServiceInstanceRef: sc_v1b1.LocalObjectReference{
+									InstanceRef: sc_v1b1.LocalObjectReference{
 										Name: si1,
 									},
 									SecretName: s1,

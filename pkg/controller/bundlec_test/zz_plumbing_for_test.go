@@ -208,7 +208,7 @@ func (tc *testCase) run(t *testing.T) {
 						CommonServicePlanSpec: sc_v1b1.CommonServicePlanSpec{
 							ExternalName: servicePlanExternalName,
 							ExternalID:   servicePlanNameAndID,
-							ServiceInstanceCreateParameterSchema: &runtime.RawExtension{Raw: []byte(`
+							InstanceCreateParameterSchema: &runtime.RawExtension{Raw: []byte(`
 {"type": "object", "properties": {"testSchema": {"type": "boolean"}}}
 `)},
 						},

@@ -77,7 +77,7 @@ func serviceBinding1() *sc_v1b1.ServiceBinding {
 			Name: serviceBinding1name,
 		},
 		Spec: sc_v1b1.ServiceBindingSpec{
-			ServiceInstanceRef: sc_v1b1.LocalObjectReference{
+			InstanceRef: sc_v1b1.LocalObjectReference{
 				Name: serviceInstance1name,
 			},
 			SecretName: serviceBinding1secret,
@@ -95,7 +95,7 @@ func serviceBinding1withParametersFrom() *sc_v1b1.ServiceBinding {
 			Name: serviceBinding1name,
 		},
 		Spec: sc_v1b1.ServiceBindingSpec{
-			ServiceInstanceRef: sc_v1b1.LocalObjectReference{
+			InstanceRef: sc_v1b1.LocalObjectReference{
 				Name: serviceInstance1name,
 			},
 			ParametersFrom: []sc_v1b1.ParametersFromSource{

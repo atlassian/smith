@@ -228,9 +228,9 @@ func (c *Catalog) getParsedSchema(plan *sc_v1b1.ClusterServicePlan, action planS
 	var rawSchema *runtime.RawExtension
 	switch action {
 	case instanceCreateAction:
-		rawSchema = plan.Spec.ServiceInstanceCreateParameterSchema
+		rawSchema = plan.Spec.InstanceCreateParameterSchema
 	case instanceUpdateAction:
-		rawSchema = plan.Spec.ServiceInstanceUpdateParameterSchema
+		rawSchema = plan.Spec.InstanceUpdateParameterSchema
 	case bindingCreateAction:
 		rawSchema = plan.Spec.ServiceBindingCreateParameterSchema
 	default:
