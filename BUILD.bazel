@@ -12,7 +12,7 @@ load("@com_github_atlassian_bazel_tools//buildozer:def.bzl", "buildozer")
 load("@com_github_atlassian_bazel_tools//goimports:def.bzl", "goimports")
 load("@com_github_atlassian_bazel_tools//gometalinter:def.bzl", "gometalinter")
 load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "nogo")
 
 gazelle(
     name = "gazelle",
@@ -54,7 +54,7 @@ buildifier(
 
 buildozer(
     name = "buildozer",
-    commands = "//build:buildozer_commands.txt",
+    commands = "build/buildozer_commands.txt",
 )
 
 goimports(
@@ -73,7 +73,7 @@ goimports(
 
 gometalinter(
     name = "gometalinter",
-    config = "//:.gometalinter.json",
+    config = "build/gometalinter.json",
     paths = [
         ".",
         "cmd/...",
@@ -82,4 +82,11 @@ gometalinter(
         "pkg/...",
     ],
     prefix = "github.com/atlassian/smith",
+)
+
+nogo(
+    name = "nogo",
+    config = "build/nogo-config.json",
+    vet = True,
+    visibility = ["//visibility:public"],
 )
