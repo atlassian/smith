@@ -9,6 +9,7 @@ It's functional and under active development.
 
 ## News
 
+- 13.02.2019: A lot of changes went in and we are using it in production. Time for v2.
 - 01.01.2018: [Milestone v1.0](https://github.com/atlassian/smith/milestones/v1.0) is complete and v1.0.0 released!
 
 ## The idea
