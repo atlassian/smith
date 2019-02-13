@@ -14,7 +14,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e4ab0ee33017b8b824973767dec64736ddc16d29b314cd97d453a75ba003c038"
+  digest = "1:3b68cf4e03d5b40a7d4aa40f3ce9c48d34ef4bcef9e255fc7fe37df0be1c9bb4"
   name = "github.com/atlassian/ctrl"
   packages = [
     ".",
@@ -27,7 +27,7 @@
     "process",
   ]
   pruneopts = "NT"
-  revision = "7919fa10836ba0e66970e34226c2b0eedb5d9485"
+  revision = "30152a801242bb7aa023702c184d4aa919dab4bc"
 
 [[projects]]
   digest = "1:07918ac16957399fa68bf94b3ab26dccccc6992f1ccbcf589896734569a0a7e7"
