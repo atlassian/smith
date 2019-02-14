@@ -153,7 +153,7 @@ quick-test:
 
 .PHONY: check
 check:
-	bazel run //:gometalinter
+	bazel run //:golangcilint
 
 .PHONY: docker
 docker:
