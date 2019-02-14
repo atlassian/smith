@@ -81,16 +81,20 @@ func (s *BundleStore) byCrdGroupKindIndex(obj interface{}) ([]string, error) {
 	var result []string
 	for _, resource := range bundle.Spec.Resources {
 		var gvk schema.GroupVersionKind
-		if resource.Spec.Object != nil {
+
+		switch {
+		case resource.Spec.Object != nil:
 			gvk = resource.Spec.Object.GetObjectKind().GroupVersionKind()
-		} else if resource.Spec.Plugin != nil {
+
+		case resource.Spec.Plugin != nil:
 			p, ok := s.pluginContainers[resource.Spec.Plugin.Name]
 			if !ok {
 				// Unknown plugin. Do not return error to avoid informer panicking
 				continue
 			}
 			gvk = p.Plugin.Describe().GVK
-		} else {
+
+		default:
 			// Invalid object, ignore
 			continue
 		}
@@ -114,10 +118,11 @@ func (s *BundleStore) byObjectIndex(obj interface{}) ([]string, error) {
 	for _, resource := range bundle.Spec.Resources {
 		var gvk schema.GroupVersionKind
 		var name string
-		if resource.Spec.Object != nil {
+		switch {
+		case resource.Spec.Object != nil:
 			gvk = resource.Spec.Object.GetObjectKind().GroupVersionKind()
 			name = resource.Spec.Object.(meta_v1.Object).GetName()
-		} else if resource.Spec.Plugin != nil {
+		case resource.Spec.Plugin != nil:
 			p, ok := s.pluginContainers[resource.Spec.Plugin.Name]
 			if !ok {
 				// Unknown plugin. Do not return error to avoid informer panicking
@@ -125,7 +130,7 @@ func (s *BundleStore) byObjectIndex(obj interface{}) ([]string, error) {
 			}
 			gvk = p.Plugin.Describe().GVK
 			name = resource.Spec.Plugin.ObjectName
-		} else {
+		default:
 			// Invalid object, ignore
 			continue
 		}

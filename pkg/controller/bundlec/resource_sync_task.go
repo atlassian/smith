@@ -240,21 +240,26 @@ func (st *resourceSyncTask) processResource(res *smith_v1.Resource) resourceInfo
 
 	// Check if the resource actually matches the spec to detect infinite update cycles
 	updatedSpec, match, _, err := st.specChecker.CompareActualVsSpec(st.logger, spec, resUpdated)
-	if err != nil {
+
+	switch {
+	case err != nil:
 		return resourceInfo{
 			status: resourceStatusError{
 				err: err,
 			},
 		}
-	}
-	if !match {
-		if util.IsSecret(updatedSpec) {
-			st.logger.Error("Objects are different after specification re-check: Secret object does not match")
-		} else {
-			// We use reflect diff here instead of the returned json diff to see the types
-			difference := diff.ObjectReflectDiff(updatedSpec.Object, resUpdated.Object)
-			st.logger.Sugar().Errorf("Objects are different after specification re-check (`a` is what we've sent and `b` is what Kubernetes persisted and returned):\n%s", difference)
+	case !match && util.IsSecret(updatedSpec):
+		// Don't log the secret
+		st.logger.Error("Objects are different after specification re-check: Secret object does not match")
+		return resourceInfo{
+			status: resourceStatusError{
+				err: errors.New("specification of the created/updated object does not match the desired spec"),
+			},
 		}
+	case !match:
+		// We use reflect diff here instead of the returned json diff to see the types
+		difference := diff.ObjectReflectDiff(updatedSpec.Object, resUpdated.Object)
+		st.logger.Sugar().Errorf("Objects are different after specification re-check (`a` is what we've sent and `b` is what Kubernetes persisted and returned):\n%s", difference)
 		return resourceInfo{
 			status: resourceStatusError{
 				err: errors.New("specification of the created/updated object does not match the desired spec"),
@@ -354,10 +359,12 @@ func (st *resourceSyncTask) checkAllDependenciesAreReady(res *smith_v1.Resource)
 func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Object, resourceStatus) {
 	var gvk schema.GroupVersionKind
 	var name string
-	if res.Spec.Object != nil {
+
+	switch {
+	case res.Spec.Object != nil:
 		gvk = res.Spec.Object.GetObjectKind().GroupVersionKind()
 		name = res.Spec.Object.(meta_v1.Object).GetName()
-	} else if res.Spec.Plugin != nil {
+	case res.Spec.Plugin != nil:
 		pluginContainer, ok := st.pluginContainers[res.Spec.Plugin.Name]
 		if !ok {
 			return nil, resourceStatusError{
@@ -367,7 +374,7 @@ func (st *resourceSyncTask) getActualObject(res *smith_v1.Resource) (runtime.Obj
 		}
 		gvk = pluginContainer.Plugin.Describe().GVK
 		name = res.Spec.Plugin.ObjectName
-	} else {
+	default:
 		// unreachable
 		return nil, resourceStatusError{
 			err:             errors.New(`neither "object" nor "plugin" field is specified`),
@@ -515,7 +522,9 @@ func (st *resourceSyncTask) prevalidate(res *smith_v1.Resource) resourceStatus {
 func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Object) (*unstructured.Unstructured, resourceStatus) {
 	// Process the spec
 	var objectOrPluginSpec map[string]interface{}
-	if res.Spec.Object != nil {
+
+	switch {
+	case res.Spec.Object != nil:
 		specUnstr, err := util.RuntimeToUnstructured(res.Spec.Object)
 		if err != nil {
 			return nil, resourceStatusError{
@@ -523,10 +532,10 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 			}
 		}
 		objectOrPluginSpec = specUnstr.Object
-	} else if res.Spec.Plugin != nil {
+	case res.Spec.Plugin != nil:
 		res = res.DeepCopy() // Spec processor mutates in place
 		objectOrPluginSpec = res.Spec.Plugin.Spec
-	} else {
+	default:
 		return nil, resourceStatusError{
 			err:             errors.New(`neither "object" nor "plugin" field is specified`),
 			isExternalError: true,
@@ -549,17 +558,18 @@ func (st *resourceSyncTask) evalSpec(res *smith_v1.Resource, actual runtime.Obje
 	}
 
 	var obj *unstructured.Unstructured
-	if res.Spec.Object != nil {
+	switch {
+	case res.Spec.Object != nil:
 		obj = &unstructured.Unstructured{
 			Object: objectOrPluginSpec,
 		}
-	} else if res.Spec.Plugin != nil {
+	case res.Spec.Plugin != nil:
 		var status resourceStatus
 		obj, status = st.evalPluginSpec(res, actual)
 		if status != nil {
 			return nil, status
 		}
-	} else {
+	default:
 		return nil, resourceStatusError{
 			err:             errors.New(`neither "object" nor "plugin" field is specified`),
 			isExternalError: true,
@@ -731,8 +741,8 @@ func (st *resourceSyncTask) prepareDependencies(references []smith_v1.Reference)
 		dependency := plugin.Dependency{
 			Actual: actual,
 		}
-		switch obj := actual.(type) {
-		case *sc_v1b1.ServiceBinding:
+
+		if obj, ok := actual.(*sc_v1b1.ServiceBinding); ok {
 			if err := st.prepareServiceBindingDependency(&dependency, obj); err != nil {
 				return nil, errors.Wrapf(err, "error processing ServiceBinding %q", obj.Name)
 			}
