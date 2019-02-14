@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -118,9 +117,7 @@ func (h *crdEventHandler) ensureWatch(logger *zap.Logger, crd *apiext_v1b1.Custo
 		ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
 			return res.List(options)
 		},
-		WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-			return res.Watch(options)
-		},
+		WatchFunc: res.Watch,
 	}, &unstructured.Unstructured{}, h.controller.CrdResyncPeriod, cache.Indexers{})
 	h.controller.wgLock.Lock()
 	defer h.controller.wgLock.Unlock()

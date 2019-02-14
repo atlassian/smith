@@ -1,0 +1,42 @@
+---
+# missing configuration
+#  --aggregate
+#  --sort=path,line
+#  --vendor=true
+#  --warnunmatcheddirective=false
+
+# missing linters
+# - go tool vet --shadow
+# - deadcode
+# - gotype
+# - unconvert
+
+run:
+  concurrency: 4
+  deadline: 10m
+  skip-dirs:
+    - "apis"
+    - "client"
+  skip-files:
+    - "_test\\.go"
+    - "\\.deepcopy\\.go"
+  tests: false
+linters:
+  enable:
+    #- dupl
+    #- gochecknoglobals
+    - goconst
+    - gocritic
+    - gofmt
+    #- golint
+    - gosec
+    - maligned
+    - misspell
+    - nakedret
+    #- prealloc
+    #- unparam
+  disable:
+    - gocyclo
+    - interfacer
+    - govet
+    - staticcheck
