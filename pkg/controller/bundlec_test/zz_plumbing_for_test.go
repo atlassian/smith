@@ -313,8 +313,10 @@ func (tc *testCase) run(t *testing.T) {
 
 func (tc *testCase) defaultTest(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller) {
 	require.NotNil(t, tc.bundle)
-	_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
+	external, retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 	require.NoError(t, err)
+	assert.False(t, external)
+	assert.False(t, retriable)
 }
 
 func (tc *testCase) verifyActions(t *testing.T) {

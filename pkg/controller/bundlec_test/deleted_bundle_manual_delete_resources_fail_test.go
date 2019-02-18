@@ -81,7 +81,8 @@ func TestKeepFinalizerWhenResourceDeletionFails(t *testing.T) {
 		namespace:            testNamespace,
 		enableServiceCatalog: false,
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
-			_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
+			external, _, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
+			assert.False(t, external, "error should be an internal error")
 			assert.EqualError(t, err, `an error on the server ("unknown") has prevented the request from succeeding`)
 
 			actions := tc.smithFake.Actions()

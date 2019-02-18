@@ -59,22 +59,27 @@ type bundleSyncTask struct {
 // For each resource ensure its dependencies (if any) are in READY state before creating it.
 // If at least one dependency is not READY - skip the resource. Rebuild will/should be called once the dependency
 // updates it's state (noticed via watching).
-
+//
 // READY state might mean something different for each resource type. For a Custom Resource it may mean
 // that a field "State" in the Status of the resource is set to "Ready". It is customizable via
 // annotations with some defaults.
-func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
+//
+// This method will not return an error if there are any errors due to resource processing.
+// Instead, the results there will be written to st.processedResources. The caller
+// will need to inspect both the error return value and the results of st.processedResources
+// to see if the bundle was successfully processed.
+func (st *bundleSyncTask) processNormal() (externalError bool, retriableError bool, e error) {
 	// If the "deleteResources" finalizer is missing, add it and finish the processing iteration
 	if !hasDeleteResourcesFinalizer(st.bundle) {
 		st.newFinalizers = addDeleteResourcesFinalizer(st.bundle.GetFinalizers())
-		return false, nil
+		return false, false, nil
 	}
 
 	// Build resource map by name
 	resourceMap := make(map[smith_v1.ResourceName]smith_v1.Resource, len(st.bundle.Spec.Resources))
 	for _, res := range st.bundle.Spec.Resources {
 		if _, exist := resourceMap[res.Name]; exist {
-			return false, errors.Errorf("bundle contains two resources with the same name %q", res.Name)
+			return true, false, errors.Errorf("bundle contains two resources with the same name %q", res.Name)
 		}
 		resourceMap[res.Name] = res
 	}
@@ -82,7 +87,8 @@ func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
 	// Build the graph and topologically sort it
 	_, sorted, sortErr := sortBundle(st.bundle)
 	if sortErr != nil {
-		return false, errors.Wrap(sortErr, "topological sort of resources failed")
+		// Dependency cycle usually
+		return true, false, errors.Wrap(sortErr, "topological sort of resources failed")
 	}
 
 	st.processedResources = make(map[smith_v1.ResourceName]*resourceInfo, len(st.bundle.Spec.Resources))
@@ -110,7 +116,7 @@ func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
 		if resErr != nil {
 			if api_errors.IsConflict(errors.Cause(resErr.err)) {
 				// Short circuit on conflict
-				return resErr.isRetriableError, resErr.err
+				return false, resErr.isRetriableError, resErr.err
 			}
 			if !resErr.isExternalError {
 				logger.Error("Done processing resource with internal error",
@@ -130,30 +136,30 @@ func (st *bundleSyncTask) processNormal() (retriableError bool, e error) {
 		}
 		st.processedResources[resourceName] = &resInfo
 	}
-	err := st.findObjectsToDelete()
+	external, retriable, err := st.findObjectsToDelete()
 	if err != nil {
-		return false, err
+		return external, retriable, err
 	}
 	if st.isBundleReady() {
 		// Delete objects which were removed from the bundle
 		retriable, err := st.deleteRemovedResources()
 		if err != nil {
-			return retriable, err
+			return false, retriable, err
 		}
 	}
 
-	return false, nil
+	return false, false, nil
 }
 
 // Process the bundle marked with DeletionTimestamp
 // TODO: remove this method after https://github.com/kubernetes/kubernetes/issues/59850 is fixed
-func (st *bundleSyncTask) processDeleted() (retriableError bool, e error) {
+func (st *bundleSyncTask) processDeleted() (externalError bool, retriableError bool, e error) {
 	if hasDeleteResourcesFinalizer(st.bundle) {
 		if !resources.HasFinalizer(st.bundle, meta_v1.FinalizerDeleteDependents) {
 			// If "foregroundDeletion" finalizer was not set, perform manual cascade deletion
 			retrieable, err := st.deleteAllResources()
 			if err != nil {
-				return retrieable, err
+				return false, retrieable, err
 			}
 		}
 
@@ -161,7 +167,7 @@ func (st *bundleSyncTask) processDeleted() (retriableError bool, e error) {
 		// of resources has succeeded, remove the "deleteResources" finalizer
 		st.newFinalizers = removeDeleteResourcesFinalizer(st.bundle.GetFinalizers())
 	}
-	return false, nil
+	return false, false, nil
 }
 
 func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
@@ -225,10 +231,10 @@ func (st *bundleSyncTask) deleteAllResources() (retriableError bool, e error) {
 
 // findObjectsToDelete initializes objectsToDelete field with objects that have controller owner references to
 // the Bundle being processed but are not defined in it.
-func (st *bundleSyncTask) findObjectsToDelete() error {
+func (st *bundleSyncTask) findObjectsToDelete() (bool /*external*/, bool /*retriable*/, error) {
 	objs, err := st.store.ObjectsControlledBy(st.bundle.Namespace, st.bundle.UID)
 	if err != nil {
-		return err
+		return false, false, err
 	}
 	st.objectsToDelete = make(map[objectRef]runtime.Object, len(objs))
 	for _, obj := range objs {
@@ -255,14 +261,14 @@ func (st *bundleSyncTask) findObjectsToDelete() error {
 			// to abort the cleanup in case of an invalid spec.
 			plugin, ok := st.pluginContainers[res.Spec.Plugin.Name]
 			if !ok {
-				return errors.Errorf("plugin %q is not a valid plugin", res.Spec.Plugin.Name)
+				return true, false, errors.Errorf("plugin %q is not a valid plugin", res.Spec.Plugin.Name)
 			}
 			gvk = plugin.Plugin.Describe().GVK
 			name = res.Spec.Plugin.ObjectName
 		default:
 			// neither "object" nor "plugin" field is specified. This shouldn't really happen (schema), so we
 			// should abort the deletion as a defensive mechanism for safety.
-			return errors.New("resource is neither object nor plugin")
+			return true, false, errors.New("resource is neither object nor plugin")
 		}
 
 		delete(st.objectsToDelete, objectRef{
@@ -270,7 +276,7 @@ func (st *bundleSyncTask) findObjectsToDelete() error {
 			Name:             name,
 		})
 	}
-	return nil
+	return false, false, nil
 }
 
 func (st *bundleSyncTask) deleteRemovedResources() (retriableError bool, e error) {
@@ -412,27 +418,22 @@ func (st *bundleSyncTask) updateBundleStatus() error {
 func (st *bundleSyncTask) handleProcessResult(retriable bool, processErr error) (bool /*retriable*/, error) {
 	switch {
 	case st.newFinalizers != nil:
-		return st.handleNewFinalizers(retriable, processErr)
+		return st.handleNewFinalizers()
 	case st.bundle.DeletionTimestamp == nil:
 		return st.handleNormalStatusUpdate(retriable, processErr)
 	}
 
-	return retriable, processErr
+	return false, nil
 }
 
-func (st *bundleSyncTask) handleNewFinalizers(retriable bool, processErr error) (bool /*retriable*/, error) {
+func (st *bundleSyncTask) handleNewFinalizers() (bool /*retriable*/, error) {
 	// Update finalizers
 	st.bundle.Finalizers = st.newFinalizers
 	err := st.updateBundle()
 	if err != nil {
-		if processErr == nil {
-			processErr = err
-			retriable = true
-		} else {
-			st.logger.Error("Error updating Bundle", zap.Error(err))
-		}
+		return true, err
 	}
-	return retriable, processErr
+	return false, nil
 }
 
 func (st *bundleSyncTask) handleNormalStatusUpdate(retriable bool, processErr error) (bool /*retriable*/, error) {
@@ -504,39 +505,34 @@ func (st *bundleSyncTask) handleNormalStatusUpdate(retriable bool, processErr er
 		st.bundle.Status.Conditions = []cond_v1.Condition{inProgressCond, readyCond, errorCond}
 	}
 
-	obj2deleteUpdated, err := st.updateObjectsToDeleteStatus()
-	if err != nil {
-		// Just log the error and continue
-		st.logger.Error("Error updating ObjectsToDelete status field", zap.Error(err))
-	} else {
-		bundleStatusUpdated = obj2deleteUpdated || bundleStatusUpdated
+	// Populate objectsToDelete if not already populated previously so we can update
+	// the statuses of objects to delete.
+	if st.objectsToDelete == nil {
+		external, retriable, err := st.findObjectsToDelete()
+		if err != nil {
+			if !external {
+				return retriable, err
+			}
+			st.logger.Info("Error updating ObjectsToDelete status field", zap.Error(err))
+		}
 	}
+
+	bundleStatusUpdated = st.updateObjectsToDeleteStatus() || bundleStatusUpdated
 	if st.bundle.Generation != st.bundle.Status.ObservedGeneration {
 		st.logger.Sugar().Debugf("Updating ObservedGeneration %d -> %d", st.bundle.Status.ObservedGeneration, st.bundle.Generation)
 		st.bundle.Status.ObservedGeneration = st.bundle.Generation
 		bundleStatusUpdated = true
 	}
 	if bundleStatusUpdated {
-		err = st.updateBundleStatus()
+		err := st.updateBundleStatus()
 		if err != nil {
-			if processErr == nil {
-				processErr = err
-				retriable = true
-			} else {
-				st.logger.Error("Error updating Bundle status", zap.Error(err))
-			}
+			return true, err
 		}
 	}
-	return retriable, processErr
+	return false, nil
 }
 
-func (st *bundleSyncTask) updateObjectsToDeleteStatus() (bool /* bundleUpdated */, error) {
-	if st.objectsToDelete == nil {
-		err := st.findObjectsToDelete()
-		if err != nil {
-			return false, err
-		}
-	}
+func (st *bundleSyncTask) updateObjectsToDeleteStatus() bool /* bundleUpdated */ {
 	newToDelete := make([]smith_v1.ObjectToDelete, 0, len(st.objectsToDelete))
 	for ref := range st.objectsToDelete {
 		newToDelete = append(newToDelete, smith_v1.ObjectToDelete{
@@ -579,9 +575,9 @@ func (st *bundleSyncTask) updateObjectsToDeleteStatus() (bool /* bundleUpdated *
 	})
 	if !reflect.DeepEqual(st.bundle.Status.ObjectsToDelete, newToDelete) {
 		st.bundle.Status.ObjectsToDelete = newToDelete
-		return true, nil
+		return true
 	}
-	return false, nil
+	return false
 }
 
 func (st *bundleSyncTask) isBundleReady() bool {
