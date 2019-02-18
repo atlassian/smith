@@ -63,7 +63,7 @@ func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) 
 	// over the handleProcessErr if any.
 	if err != nil {
 		if handleProcessErr != nil {
-			st.logger.Error("Error updating Bundle", zap.Error(handleProcessErr))
+			st.logger.Error("Error processing Bundle", zap.Error(handleProcessErr))
 		}
 
 		return external, retriable || handleProcessRetriable, err
@@ -72,7 +72,7 @@ func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) 
 	// Inspect resources, returning an error if necessary
 	allExternalErrors := true
 	hasRetriableResourceErr := false
-	failedResources := make([]string, 0, len(st.processedResources))
+	var failedResources []string
 	for resName, resInfo := range st.processedResources {
 		resErr := resInfo.fetchError()
 
@@ -84,10 +84,10 @@ func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) 
 	}
 	if len(failedResources) > 0 {
 		if handleProcessErr != nil {
-			st.logger.Error("Error updating Bundle", zap.Error(handleProcessErr))
+			st.logger.Error("Error processing Bundle", zap.Error(handleProcessErr))
 		}
 		// stable output
-		sort.Sort(failedResources)
+		sort.Strings(failedResources)
 		err := errors.Errorf("error processing resource(s): %q", failedResources)
 		return allExternalErrors, hasRetriableResourceErr || handleProcessRetriable, err
 	}
