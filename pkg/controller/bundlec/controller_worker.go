@@ -1,6 +1,8 @@
 package bundlec
 
 import (
+	"sort"
+
 	"github.com/atlassian/ctrl"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
 	"github.com/pkg/errors"
@@ -84,6 +86,8 @@ func (c *Controller) ProcessBundle(logger *zap.Logger, bundle *smith_v1.Bundle) 
 		if handleProcessErr != nil {
 			st.logger.Error("Error updating Bundle", zap.Error(handleProcessErr))
 		}
+		// stable output
+		sort.Sort(failedResources)
 		err := errors.Errorf("error processing resource(s): %q", failedResources)
 		return allExternalErrors, hasRetriableResourceErr || handleProcessRetriable, err
 	}
