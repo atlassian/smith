@@ -75,8 +75,9 @@ func TestCleanupOfInvalidPlugin(t *testing.T) {
 		pluginsShouldBeInvoked: sets.NewString(),
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
 			require.NotNil(t, tc.bundle)
-			_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
+			external, _, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			require.Error(t, err)
+			assert.True(t, external, "error should be an external error")
 			assert.EqualError(t, err, "plugin \"configMapWithDeps\" is not a valid plugin")
 		},
 	}
@@ -115,8 +116,9 @@ func TestCleanupOfNeitherPluginOrObject(t *testing.T) {
 		pluginsShouldBeInvoked: sets.NewString(),
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
 			require.NotNil(t, tc.bundle)
-			_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
+			external, _, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			require.Error(t, err)
+			assert.True(t, external, "error should be an external error")
 			assert.EqualError(t, err, "resource is neither object nor plugin")
 		},
 	}

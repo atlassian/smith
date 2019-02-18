@@ -48,9 +48,10 @@ func TestInvalidReferences(t *testing.T) {
 			pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
 		},
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
-			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
+			external, retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.EqualError(t, err, `topological sort of resources failed: vertex "bla" not found`)
-			assert.False(t, retriable)
+			assert.True(t, external, "error should be an external error")
+			assert.False(t, retriable, "error should not be retriable")
 
 			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 3)

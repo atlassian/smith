@@ -82,9 +82,10 @@ func TestServiceInstanceSchemaInvalid(t *testing.T) {
 			pluginConfigMapWithDeps: configMapWithDependenciesPlugin(false, false),
 		},
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
-			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
-			assert.False(t, retriable)
+			external, retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.EqualError(t, err, `error processing resource(s): ["`+resSi1+`" "`+resSi2+`"]`)
+			assert.True(t, external, "error should be an external error") // bunch of spec validation errors
+			assert.False(t, retriable, "error should not be a retriable error")
 
 			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 3)

@@ -9,6 +9,7 @@ import (
 	"github.com/atlassian/smith/pkg/controller/bundlec"
 	smith_testing "github.com/atlassian/smith/pkg/util/testing"
 	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,8 +61,10 @@ func TestStatusPropagated(t *testing.T) {
 		},
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
 			require.NotNil(t, tc.bundle)
-			_, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
+			external, retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			require.EqualError(t, err, "error processing resource(s): [\"resSi1\"]")
+			assert.True(t, external, "error should be an external error")  // service instance failures
+			assert.True(t, retriable, "error should be a retriable error") // ProvisionCallFailed is retriable
 			bundle := tc.findBundleUpdate(t, true)
 			smith_testing.AssertResourceCondition(t, bundle, "resSi1", smith_v1.BundleError, cond_v1.ConditionTrue)
 			smith_testing.AssertResourceConditionMessage(t, bundle, "resSi1", smith_v1.BundleError, "ProvisionCallFailed: Error provisioning ServiceInstance of ClusterServiceClass failed")

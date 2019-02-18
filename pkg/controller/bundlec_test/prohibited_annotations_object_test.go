@@ -59,9 +59,10 @@ func TestProhibitedAnnotationsObjectRejected(t *testing.T) {
 		appName:   testAppName,
 		namespace: testNamespace,
 		test: func(t *testing.T, ctx context.Context, cntrlr *bundlec.Controller, tc *testCase) {
-			retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
+			external, retriable, err := cntrlr.ProcessBundle(tc.logger, tc.bundle)
 			assert.EqualError(t, err, `error processing resource(s): ["`+string(r1)+`"]`)
-			assert.False(t, retriable)
+			assert.True(t, external, "error should be an external error") // user tried to set annotation
+			assert.False(t, retriable, "error should not be a retriable error")
 
 			actions := tc.smithFake.Actions()
 			require.Len(t, actions, 3)
