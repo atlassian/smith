@@ -298,7 +298,7 @@ func SetupApp(t *testing.T, bundle *smith_v1.Bundle, serviceCatalog, createBundl
 	stgr := stager.New()
 	defer stgr.Shutdown()
 
-	ctxTest, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	ctxTest, cancel := context.WithTimeout(context.Background(), 200*time.Second)
 	defer cancel()
 
 	apiExtClient, err := apiExtClientset.NewForConfig(config)

@@ -135,7 +135,7 @@ func constructBundle(t *testing.T, progressDeadlineSeconds int32, containerParam
 func TestDeploymentReady(t *testing.T) {
 	t.Parallel()
 
-	bundle := constructBundle(t, 10, "-l", "0", "-r", "0")
+	bundle := constructBundle(t, 60, "-l", "0", "-r", "0")
 	SetupApp(t, bundle, false, true, assertSuccess)
 }
 
