@@ -93,7 +93,7 @@ spec:
 Some resource types can have Outputs:
 - Values placed into Status field of the object
 - New objects likes [Secrets](https://kubernetes.io/docs/user-guide/secrets/) and/or [ConfigMaps](https://kubernetes.io/docs/user-guide/configmap/)
-- [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) [objects](https://github.com/kubernetes-incubator/service-catalog/blob/master/docs/v1/api.md)
+- [Service Catalog](https://github.com/kubernetes-sigs/service-catalog) [objects](https://github.com/kubernetes-sigs/service-catalog/blob/master/docs/v1/api.md)
 
 Resources can reference outputs of other resources within the same bundle. [See what is supported](./docs/design/field-references.md).
 
@@ -118,7 +118,7 @@ and following the same behaviour, semantics and code "style" as native Kubernete
 ## Features
 
 - Supported object kinds: `Deployment`, `Service`, `ConfigMap`, `Secret`, `Ingress`, `ServiceAccount`, `HorizontalPodAutoscaler`, `PodDisruptionBudget`;
-- [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support: objects with kind `ServiceInstance` and `ServiceBinding`.
+- [Service Catalog](https://github.com/kubernetes-sigs/service-catalog) support: objects with kind `ServiceInstance` and `ServiceBinding`.
 See [an example](examples/service_catalog) and
 [recording of the presentation](https://youtu.be/7fgPgtQh5Es) to [Service Catalog SIG](https://github.com/kubernetes/community/tree/master/sig-service-catalog);
 - Dynamic Custom Resources support via [special annotations](docs/design/managing-resources.md#defined-annotations);
@@ -178,12 +178,12 @@ E.g. to run against Kubernetes-for-Docker use `KUBE_CONTEXT=docker-for-desktop`.
 ```bash
 make integration-test
 ```
-* To run integration tests for [Service Catalog](https://github.com/kubernetes-incubator/service-catalog) support run
+* To run integration tests for [Service Catalog](https://github.com/kubernetes-sigs/service-catalog) support run
 ```bash
 make integration-test-sc
 ```
 This command assumes Service Catalog and UPS Broker are installed in the cluster. To install them follow the
-[Service Catalog walkthrough](https://github.com/kubernetes-incubator/service-catalog/blob/master/docs/walkthrough.md).
+[Service Catalog walkthrough](https://github.com/kubernetes-sigs/service-catalog/blob/master/docs/walkthrough.md).
 * To run Smith locally against the configured context run
 ```bash
 make run

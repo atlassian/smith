@@ -3,6 +3,8 @@ BINARY_PREFIX_DIRECTORY := $(OS)_amd64_stripped
 KUBECONTEXT ?= kubernetes-admin@kind
 KUBECONFIG ?= $(shell kind get kubeconfig-path)
 #KUBECONFIG ?= $$HOME/.kube/config
+KUBE="kubernetes-1.15.2"
+CLIENT="v12.0.0"
 
 .PHONY: setup-dev
 setup-dev: setup-ci
@@ -12,7 +14,30 @@ setup-ci: setup-base
 
 .PHONY: setup-base
 setup-base:
-	dep ensure
+	go mod vendor
+
+# to update kubernetes version:
+# 1. copy https://github.com/kubernetes/kubernetes/blob/v1.15.1/go.mod "require" section into go.mod
+# 2. remove all v0.0.0 k8s.io/* statements
+# 3. run this command
+.PHONY: update-kube
+update-kube:
+	# b7d2813feb2da17aef5db65e9c3d5c356d634a4d version of service-catalog
+	# is used because latest released one 0.2.1 has references to old repo location
+	# use 0.2.2+ once released.
+	go get \
+		k8s.io/api/core/v1@$(KUBE) \
+		k8s.io/apimachinery@$(KUBE) \
+		k8s.io/apiserver@$(KUBE) \
+		k8s.io/apiextensions-apiserver@$(KUBE) \
+		k8s.io/client-go@$(CLIENT) \
+		k8s.io/code-generator/cmd/deepcopy-gen@$(KUBE) \
+		k8s.io/code-generator/cmd/client-gen@$(KUBE) \
+		github.com/stretchr/testify@v1.3.0 \
+		github.com/kubernetes-sigs/service-catalog@b7d2813feb2da17aef5db65e9c3d5c356d634a4d \
+		github.com/atlassian/ctrl@master
+	go mod tidy
+	go mod vendor
 
 .PHONY: fmt-bazel
 fmt-bazel:
@@ -23,13 +48,9 @@ fmt-bazel:
 update-bazel:
 	bazel run //:gazelle
 
-.PHONY: update-ctrl
-update-ctrl:
-	dep ensure -v -update github.com/atlassian/ctrl
-
 .PHONY: bump-dependencies
 bump-dependencies: \
-	update-ctrl \
+	update-kube \
 	update-bazel
 
 .PHONY: fmt
@@ -44,20 +65,24 @@ print-bundle-crd: fmt update-bazel
 generate: generate-client generate-deepcopy
 
 .PHONY: generate-client
-generate-client:
+generate-client: update-bazel
 	bazel build //vendor/k8s.io/code-generator/cmd/client-gen
 	# Generate the versioned clientset (pkg/client/clientset_generated/clientset)
+	# couldn't make it work outside of GOPATH
+	GOFLAGS=-mod=vendor GO111MODULE="on" \
 	bazel-bin/vendor/k8s.io/code-generator/cmd/client-gen/$(BINARY_PREFIX_DIRECTORY)/client-gen $(VERIFY_CODE) \
-	--input-base "github.com/atlassian/smith/pkg/apis/" \
+	--input-base "github.com/atlassian/smith/pkg/apis" \
 	--input "smith/v1" \
-	--clientset-path "github.com/atlassian/smith/pkg/client/clientset_generated/" \
+	--output-package "github.com/atlassian/smith/pkg/client/clientset_generated" \
 	--clientset-name "clientset" \
 	--go-header-file "build/code-generator/boilerplate.go.txt"
 
 .PHONY: generate-deepcopy
-generate-deepcopy:
+generate-deepcopy: update-bazel
 	bazel build //vendor/k8s.io/code-generator/cmd/deepcopy-gen
 	# Generate deep copies
+	# couldn't make it work outside of GOPATH
+	GOFLAGS=-mod=vendor GO111MODULE="on" \
 	bazel-bin/vendor/k8s.io/code-generator/cmd/deepcopy-gen/$(BINARY_PREFIX_DIRECTORY)/deepcopy-gen $(VERIFY_CODE) \
 	--go-header-file "build/code-generator/boilerplate.go.txt" \
 	--input-dirs "github.com/atlassian/smith/pkg/apis/smith/v1,github.com/atlassian/smith/examples/sleeper/pkg/apis/sleeper/v1" \

@@ -7,7 +7,7 @@ import (
 	"github.com/atlassian/smith"
 	"github.com/atlassian/smith/pkg/specchecker"
 	"github.com/atlassian/smith/pkg/util"
-	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
+	sc_v1b1 "github.com/kubernetes-sigs/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"

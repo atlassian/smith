@@ -6,8 +6,8 @@ import (
 
 	"github.com/atlassian/smith/it"
 	smith_v1 "github.com/atlassian/smith/pkg/apis/smith/v1"
-	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
-	scClientset "github.com/kubernetes-incubator/service-catalog/pkg/client/clientset_generated/clientset"
+	sc_v1b1 "github.com/kubernetes-sigs/service-catalog/pkg/apis/servicecatalog/v1beta1"
+	scClientset "github.com/kubernetes-sigs/service-catalog/pkg/client/clientset_generated/clientset"
 	"github.com/stretchr/testify/require"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"

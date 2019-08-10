@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	sc_v1b1 "github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
+	sc_v1b1 "github.com/kubernetes-sigs/service-catalog/pkg/apis/servicecatalog/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/xeipuuv/gojsonschema"
 	"k8s.io/apimachinery/pkg/runtime"

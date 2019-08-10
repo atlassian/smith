@@ -1,5 +1,4 @@
 build --workspace_status_command build/print-workspace-status.sh
-build --remote_http_cache=http://localhost:7777
 
 test --test_output=errors
 test --test_verbose_timeout_warnings
