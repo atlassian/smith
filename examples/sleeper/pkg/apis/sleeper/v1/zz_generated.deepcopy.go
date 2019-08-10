@@ -42,7 +42,7 @@ func (in *Sleeper) DeepCopyObject() runtime.Object {
 func (in *SleeperList) DeepCopyInto(out *SleeperList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Sleeper, len(*in))
