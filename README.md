@@ -152,18 +152,18 @@ use case is a PaaS that delegates (some) object manipulations to Smith.
 * Kubernetes 1.11+ is required - we use
 [`/status` subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#status-subresource)
 and OpenAPI schema features that became available in this version; 
-* List of project dependencies and their versions can be found in `Gopkg.toml` and `Gopkg.lock` files.
+* List of project dependencies and their versions can be found in `go.mod` and `go.sum` files.
 
 ## Building, testing and running
 
-* [`dep`](https://github.com/golang/dep) is used for package management. Please [install it](https://github.com/golang/dep#setup).
+* Go modules are used for package management. You need Go v1.12 or newer.
 * [`Bazel`](https://www.bazel.build/) is used as the build tool. Please [install it](https://docs.bazel.build/versions/master/install.html).
 * To install dependencies run
 ```bash
 make setup
 ```
 
-Integration tests can be run against any Kuberentes context that is configured locally. To see which contexts are
+Integration tests can be run against any Kubernetes context that is configured locally. To see which contexts are
 available run:
 ```bash
 kubectl config get-contexts
