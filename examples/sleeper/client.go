@@ -29,7 +29,7 @@ func Client(cfg *rest.Config) (*rest.RESTClient, error) {
 	config.GroupVersion = &sleeper_v1.SchemeGroupVersion
 	config.APIPath = "/apis"
 	config.ContentType = runtime.ContentTypeJSON
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)}
+	config.NegotiatedSerializer = serializer.NewCodecFactory(scheme).WithoutConversion()
 
 	return rest.RESTClientFor(&config)
 }
