@@ -105,7 +105,7 @@ func (c *Catalog) GetClassOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (
 			return nil, errors.WithStack(err)
 		}
 		if !exists {
-			return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServiceClass Name=%q", serviceInstanceSpec.ClusterServiceClassName)
+			return nil, errors.Errorf("ServiceInstance refers to nonexistent ClusterServiceClass Name=%q", serviceInstanceSpec.ClusterServiceClassName)
 		}
 		return item.(*sc_v1b1.ClusterServiceClass), nil
 	case serviceInstanceSpec.ClusterServiceClassExternalID != "":
@@ -115,7 +115,7 @@ func (c *Catalog) GetClassOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (
 		}
 		switch len(items) {
 		case 0:
-			return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServiceClass ExternalID=%q", serviceInstanceSpec.ClusterServiceClassExternalID)
+			return nil, errors.Errorf("ServiceInstance refers to nonexistent ClusterServiceClass ExternalID=%q", serviceInstanceSpec.ClusterServiceClassExternalID)
 		case 1:
 			return items[0].(*sc_v1b1.ClusterServiceClass), nil
 		default:
@@ -128,7 +128,7 @@ func (c *Catalog) GetClassOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (
 		}
 		switch len(items) {
 		case 0:
-			return nil, errors.Errorf("ServiceInstance refers to non-existent ClusterServiceClass ExternalName=%q", serviceInstanceSpec.ClusterServiceClassExternalName)
+			return nil, errors.Errorf("ServiceInstance refers to nonexistent ClusterServiceClass ExternalName=%q", serviceInstanceSpec.ClusterServiceClassExternalName)
 		case 1:
 			return items[0].(*sc_v1b1.ClusterServiceClass), nil
 		default:
@@ -155,7 +155,7 @@ func (c *Catalog) GetPlanOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (*
 			return nil, errors.WithStack(err)
 		}
 		if !exists {
-			return nil, errors.Errorf("ServiceInstance refers to non-existent ClusterServicePlan Name=%q", serviceInstanceSpec.ClusterServicePlanName)
+			return nil, errors.Errorf("ServiceInstance refers to nonexistent ClusterServicePlan Name=%q", serviceInstanceSpec.ClusterServicePlanName)
 		}
 		return item.(*sc_v1b1.ClusterServicePlan), nil
 	case serviceInstanceSpec.ClusterServicePlanExternalID != "":
@@ -165,7 +165,7 @@ func (c *Catalog) GetPlanOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (*
 		}
 		switch len(items) {
 		case 0:
-			return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServicePlan ExternalID=%q", serviceInstanceSpec.ClusterServicePlanExternalID)
+			return nil, errors.Errorf("ServiceInstance refers to nonexistent ClusterServicePlan ExternalID=%q", serviceInstanceSpec.ClusterServicePlanExternalID)
 		case 1:
 			return items[0].(*sc_v1b1.ClusterServicePlan), nil
 		default:
@@ -185,7 +185,7 @@ func (c *Catalog) GetPlanOf(serviceInstanceSpec *sc_v1b1.ServiceInstanceSpec) (*
 		}
 		switch len(items) {
 		case 0:
-			return nil, errors.Errorf("ServiceInstance refers to non-existant ClusterServicePlan %q", planKey)
+			return nil, errors.Errorf("ServiceInstance refers to nonexistent ClusterServicePlan %q", planKey)
 		case 1:
 			return items[0].(*sc_v1b1.ClusterServicePlan), nil
 		default:
