@@ -3,8 +3,7 @@ BINARY_PREFIX_DIRECTORY := $(OS)_amd64_stripped
 KUBECONTEXT ?= kubernetes-admin@kind
 KUBECONFIG ?= $(shell kind get kubeconfig-path)
 #KUBECONFIG ?= $$HOME/.kube/config
-KUBE="kubernetes-1.15.2"
-CLIENT="v12.0.0"
+KUBE="kubernetes-1.16.1"
 
 .PHONY: setup-dev
 setup-dev: setup-ci
@@ -17,7 +16,7 @@ setup-base:
 	go mod vendor
 
 # to update kubernetes version:
-# 1. copy https://github.com/kubernetes/kubernetes/blob/v1.15.1/go.mod "require" section into go.mod
+# 1. copy https://github.com/kubernetes/kubernetes/blob/v1.16.1/go.mod "require" section into go.mod
 # 2. remove all v0.0.0 k8s.io/* statements
 # 3. run this command
 .PHONY: update-kube
@@ -30,11 +29,11 @@ update-kube:
 		k8s.io/apimachinery@$(KUBE) \
 		k8s.io/apiserver@$(KUBE) \
 		k8s.io/apiextensions-apiserver@$(KUBE) \
-		k8s.io/client-go@$(CLIENT) \
+		k8s.io/client-go@$(KUBE) \
 		k8s.io/code-generator/cmd/deepcopy-gen@$(KUBE) \
 		k8s.io/code-generator/cmd/client-gen@$(KUBE) \
 		github.com/stretchr/testify@v1.3.0 \
-		github.com/kubernetes-sigs/service-catalog@b7d2813feb2da17aef5db65e9c3d5c356d634a4d \
+		github.com/kubernetes-sigs/service-catalog@master \
 		github.com/atlassian/ctrl@master
 	go mod tidy
 	go mod vendor
