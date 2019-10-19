@@ -24,7 +24,7 @@ import (
 	apps_v1 "k8s.io/api/apps/v1"
 	autoscaling_v2b1 "k8s.io/api/autoscaling/v2beta1"
 	core_v1 "k8s.io/api/core/v1"
-	ext_v1b1 "k8s.io/api/extensions/v1beta1"
+	net_v1b1 "k8s.io/api/networking/v1beta1"
 	policy_v1 "k8s.io/api/policy/v1beta1"
 	apiext_v1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiExtClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -35,7 +35,7 @@ import (
 	apps_v1inf "k8s.io/client-go/informers/apps/v1"
 	autoscaling_v2b1inf "k8s.io/client-go/informers/autoscaling/v2beta1"
 	core_v1inf "k8s.io/client-go/informers/core/v1"
-	ext_v1b1inf "k8s.io/client-go/informers/extensions/v1beta1"
+	net_v1b1inf "k8s.io/client-go/informers/networking/v1beta1"
 	policy_v1b1inf "k8s.io/client-go/informers/policy/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
@@ -262,7 +262,7 @@ func (c *BundleControllerConstructor) loadPlugins() (map[smith_v1.PluginName]plu
 func (c *BundleControllerConstructor) resourceInformers(config *ctrl.Config, cctx *ctrl.Context, scClient scClientset.Interface) (map[schema.GroupVersionKind]cache.SharedIndexInformer, error) {
 	coreInfs := map[schema.GroupVersionKind]func(kubernetes.Interface, string, time.Duration, cache.Indexers) cache.SharedIndexInformer{
 		// Core API types
-		ext_v1b1.SchemeGroupVersion.WithKind("Ingress"):                         ext_v1b1inf.NewIngressInformer,
+		net_v1b1.SchemeGroupVersion.WithKind("Ingress"):                         net_v1b1inf.NewIngressInformer,
 		core_v1.SchemeGroupVersion.WithKind("Service"):                          core_v1inf.NewServiceInformer,
 		core_v1.SchemeGroupVersion.WithKind("ConfigMap"):                        core_v1inf.NewConfigMapInformer,
 		core_v1.SchemeGroupVersion.WithKind("Secret"):                           core_v1inf.NewSecretInformer,
@@ -303,7 +303,7 @@ func FullScheme(serviceCatalog bool) (*runtime.Scheme, error) {
 	scheme := runtime.NewScheme()
 	var sb runtime.SchemeBuilder
 	sb.Register(smith_v1.SchemeBuilder...)
-	sb.Register(ext_v1b1.SchemeBuilder...)
+	sb.Register(net_v1b1.SchemeBuilder...)
 	sb.Register(core_v1.SchemeBuilder...)
 	sb.Register(apps_v1.SchemeBuilder...)
 	sb.Register(apiext_v1b1.SchemeBuilder...)
