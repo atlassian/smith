@@ -12,7 +12,7 @@ import (
 	apps_v1 "k8s.io/api/apps/v1"
 	autoscaling_v2b1 "k8s.io/api/autoscaling/v2beta1"
 	core_v1 "k8s.io/api/core/v1"
-	ext_v1b1 "k8s.io/api/extensions/v1beta1"
+	net_v1b1 "k8s.io/api/networking/v1beta1"
 	policy_v1 "k8s.io/api/policy/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,7 +35,7 @@ var (
 		{Group: core_v1.GroupName, Kind: "Service"}:               alwaysReady,
 		{Group: core_v1.GroupName, Kind: "ServiceAccount"}:        alwaysReady,
 		{Group: apps_v1.GroupName, Kind: "Deployment"}:            isDeploymentReady,
-		{Group: ext_v1b1.GroupName, Kind: "Ingress"}:              alwaysReady,
+		{Group: net_v1b1.GroupName, Kind: "Ingress"}:              alwaysReady,
 		{Group: policy_v1.GroupName, Kind: "PodDisruptionBudget"}: alwaysReady,
 
 		{Group: autoscaling_v2b1.GroupName, Kind: "HorizontalPodAutoscaler"}: isHorizontalPodAutoscalerReady,
